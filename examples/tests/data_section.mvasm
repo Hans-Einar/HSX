@@ -1,0 +1,20 @@
+.data
+msg:
+    .asciz "OK"
+msg_tail:
+    .byte 0x7F
+msg_ptr:
+    .word msg
+msg_off:
+    .half off16(msg_tail)
+
+.text
+.entry start
+start:
+    LDI32 R1, msg
+    LDB R0, [R1+0]
+    LDI R2, off16(msg_tail)
+    LDI R3, 0
+    LDI32 R4, msg_ptr
+    LD R5, [R4+0]
+    RET

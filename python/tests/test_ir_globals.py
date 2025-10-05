@@ -1,0 +1,40 @@
+import importlib.util
+from pathlib import Path
+
+
+def _load_hsx_llc():
+    root = Path(__file__).resolve().parents[1] / "hsx-llc.py"
+    spec = importlib.util.spec_from_file_location("hsx_llc", root)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+HSX_LLC = _load_hsx_llc()
+
+
+def test_global_string_lowering_emits_data_section():
+    ll = """@msg = internal constant [3 x i8] c\"OK\\00\", align 1\n\n"""
+    ll += """define dso_local i32 @main(i32 %idx) {\nentry:\n  %idx64 = sext i32 %idx to i64\n  %ptr = getelementptr inbounds [3 x i8], ptr @msg, i64 0, i64 %idx64\n  %byte = load i8, ptr %ptr, align 1\n  %res = sext i8 %byte to i32\n  ret i32 %res\n}\n"""
+    asm = HSX_LLC.compile_ll_to_mvasm(ll, trace=False)
+    lines = [line for line in asm.splitlines() if line]
+    assert '.data' in lines
+    assert 'msg:' in lines
+    byte_lines = [line for line in lines if line.strip().startswith('.byte')]
+    assert any('0x4F' in line for line in byte_lines)
+    assert '.text' in lines
+    assert any(line.startswith('LDI32') and 'msg' in line for line in lines)
+    assert any(line.startswith('LDB ') for line in lines)
+
+
+def test_global_int_lowering_loads_with_ld():
+    ll = """@idx = dso_local global i32 0, align 4\n\n"""
+    ll += """define dso_local i32 @main() {\nentry:\n  %val = load volatile i32, ptr @idx, align 4\n  ret i32 %val\n}\n"""
+    asm = HSX_LLC.compile_ll_to_mvasm(ll, trace=False)
+    lines = [line for line in asm.splitlines() if line]
+    assert '.data' in lines and 'idx:' in lines
+    assert any(line.strip().startswith('.word') for line in lines)
+    assert '.text' in lines
+    assert any(line.startswith('LDI32') and 'idx' in line for line in lines)
+    assert any(line.startswith('LD ') for line in lines)

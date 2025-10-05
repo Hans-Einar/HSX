@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "entry": 0,
+  "entry_symbol": null,
+  "code": [
+    16777258,
+    620756992
+  ],
+  "rodata": "",
+  "externs": [
+    "foo"
+  ],
+  "imports": [],
+  "relocs": [],
+  "symbols": {
+    "foo": {
+      "section": "text",
+      "offset": 0
+    }
+  }
+}

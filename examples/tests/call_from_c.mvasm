@@ -1,4 +1,6 @@
 .entry
+.extern callee
+.extern caller
 ; -- function caller --
 caller:
 caller__entry:

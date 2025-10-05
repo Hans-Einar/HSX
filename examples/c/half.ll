@@ -35,10 +35,21 @@ define dso_local i32 @half_ops(half noundef %0, half noundef %1) #0 {
   store half %25, ptr %7, align 2
   %26 = load half, ptr %7, align 2
   %27 = fptosi half %26 to i32
-  ret i32 %27
+  %28 = call i32 @use_val(i32 noundef %27) #1
+  ret i32 %28
+}
+
+; Function Attrs: noinline nounwind optnone uwtable
+define internal i32 @use_val(i32 noundef %0) #0 {
+  %2 = alloca i32, align 4
+  store i32 %0, ptr %2, align 4
+  %3 = load i32, ptr %2, align 4
+  %4 = add nsw i32 %3, 1
+  ret i32 %4
 }
 
 attributes #0 = { noinline nounwind optnone uwtable "min-legal-vector-width"="0" "no-builtins" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cmov,+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
+attributes #1 = { nobuiltin "no-builtins" }
 
 !llvm.module.flags = !{!0, !1, !2, !3}
 !llvm.ident = !{!4}

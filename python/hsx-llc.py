@@ -22,19 +22,84 @@ ARG_REGS = ["R1","R2","R3"]  # more via stack later
 class ISelError(Exception):
     pass
 
+def parse_llvm_string_literal(body: str) -> bytes:
+    out = bytearray()
+    i = 0
+    while i < len(body):
+        ch = body[i]
+        if ch != '\\':
+            out.append(ord(ch))
+            i += 1
+            continue
+        if i + 2 >= len(body):
+            raise ISelError(f"Bad string escape in c\"{body}\"")
+        hx = body[i + 1:i + 3]
+        out.append(int(hx, 16))
+        i += 3
+    return bytes(out)
+
+
+def parse_global_definition(line: str):
+    line = line.strip()
+    string_match = re.match(r'@([A-Za-z0-9_]+)\s*=\s*(?:private\s+)?(?:unnamed_addr\s+)?(?:internal\s+)?constant\s+\[(\d+)\s+x\s+i8\]\s+c"(.*)"(?:,\s*align\s*(\d+))?', line)
+    if string_match:
+        name, _, body, align = string_match.groups()
+        data = parse_llvm_string_literal(body)
+        return {"name": name, "kind": "bytes", "data": data, "align": int(align) if align else None}
+    int_match = re.match(r'@([A-Za-z0-9_]+)\s*=\s*(?:dso_local\s+)?global\s+i(8|16|32)\s+([^,]+)(?:,\s*align\s*(\d+))?', line)
+    if int_match:
+        name, bits, value_str, align = int_match.groups()
+        value_str = value_str.strip()
+        value = 0 if value_str == 'zeroinitializer' else int(value_str)
+        return {"name": name, "kind": "int", "bits": int(bits), "value": value, "align": int(align) if align else None}
+    return None
+
+
+def render_globals(globals_list):
+    if not globals_list:
+        return []
+    lines = ['.data']
+    for entry in globals_list:
+        align = entry.get('align') or 0
+        if align > 1:
+            lines.append(f"    .align {align}")
+        lines.append(f"{entry['name']}:")
+        if entry['kind'] == 'bytes':
+            data = entry['data']
+            if data:
+                for idx in range(0, len(data), 8):
+                    chunk = data[idx:idx + 8]
+                    lines.append('    .byte ' + ', '.join(f"0x{b:02X}" for b in chunk))
+            else:
+                lines.append('    .byte 0')
+        elif entry['kind'] == 'int':
+            bits = entry['bits']
+            value = entry['value']
+            if bits == 8:
+                lines.append(f"    .byte {value}")
+            elif bits == 16:
+                lines.append(f"    .half {value}")
+            else:
+                lines.append(f"    .word {value}")
+    return lines
+
 def parse_ir(lines: List[str]) -> Dict:
-    # Ultra-minimal parser for functions and instructions
-    ir = {"functions": []}
+    ir = {"functions": [], "globals": []}
     cur = None
     bb = None
     for raw in lines:
         line = raw.strip()
-        if not line or line.startswith(";"): 
+        if not line or line.startswith(";"):
+            continue
+        if cur is None and line.startswith('@'):
+            glob = parse_global_definition(line)
+            if glob:
+                ir["globals"].append(glob)
             continue
         if line.startswith("define "):
             m = re.match(r'define\s+(?:[\w.]+\s+)*i(\d+)\s+@([A-Za-z0-9_]+)\s*\(([^)]*)\)\s*(?:[^{{]*)\{', line)
-            if not m: 
-                raise ISelError("Unsupported function signature: "+line)
+            if not m:
+                raise ISelError("Unsupported function signature: " + line)
             retbits, name, args = m.groups()
             cur = {"name": name, "retbits": int(retbits), "args": args.split(",") if args.strip() else [], "blocks": []}
             ir["functions"].append(cur)
@@ -56,10 +121,10 @@ def parse_ir(lines: List[str]) -> Dict:
             cur["blocks"].append(bb)
             continue
         if line == "}":
-            cur = None; bb = None
+            cur = None
+            bb = None
             continue
         if bb is None:
-            # auto-create entry if not explicitly started
             bb = {"label": "entry", "ins": []}
             cur["blocks"].append(bb)
         bb["ins"].append(line)
@@ -231,9 +296,14 @@ def optimize_movs(lines: List[str]) -> List[str]:
     stage2 = eliminate_mov_chains(stage1)
     return stage2
 
-def lower_function(fn: Dict, trace=False) -> List[str]:
+def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_symbols=None) -> List[str]:
     asm: List[str] = []
     vmap: Dict[str,str] = {}
+    if imports is None:
+        imports = set()
+    if defined is None:
+        defined = set()
+
 
     asm.append(f"; -- function {fn['name']} --")
     # Map arguments (if any) to R1..R3 (MVP ignores types)
@@ -273,6 +343,21 @@ def lower_function(fn: Dict, trace=False) -> List[str]:
             vmap[name] = f"R{next_idx}"
         return vmap[name]
 
+    global_symbols_set = set(global_symbols or [])
+    global_cache: Dict[str, str] = {}
+
+    def materialize_global(symbol: str) -> str:
+        if symbol not in global_symbols_set:
+            raise ISelError(f"Unknown global @{symbol}")
+        key = f"@{symbol}"
+        reg = global_cache.get(key)
+        if reg is not None:
+            return reg
+        reg = alloc_vreg(key)
+        asm.append(f"LDI32 {reg}, {symbol}")
+        global_cache[key] = reg
+        return reg
+
     def materialize(value: str, tmp: str) -> str:
         value = value.strip()
         if value.startswith('%'):
@@ -296,6 +381,8 @@ def lower_function(fn: Dict, trace=False) -> List[str]:
         value = value.strip()
         if value in vmap:
             return vmap[value]
+        if value.startswith('@'):
+            return materialize_global(value[1:])
         m = re.match(r'inttoptr\s*\(i\d+\s+([-]?\d+)\s+to\s+ptr\)', value)
         if m:
             imm = int(m.group(1))
@@ -305,10 +392,19 @@ def lower_function(fn: Dict, trace=False) -> List[str]:
 
     def resolve_operand(value: str, tmp: str = "R12") -> str:
         value = value.strip()
+        if value in float_alias:
+            return float_alias[value]
+        hmatch = re.match(r'0xH([0-9A-Fa-f]+)', value)
+        if hmatch:
+            bits = int(hmatch.group(1), 16)
+            load_const(tmp, bits)
+            return tmp
         if value.startswith('%'):
             if value not in vmap:
                 raise ISelError(f"Unknown value {value}")
             return vmap[value]
+        if value.startswith('@'):
+            return materialize_global(value[1:])
         if value.startswith('inttoptr'):
             return materialize_ptr(value, tmp)
         if value in ('true', 'false'):
@@ -319,6 +415,10 @@ def lower_function(fn: Dict, trace=False) -> List[str]:
 
     phi_comments = defaultdict(list)
     phi_moves = defaultdict(list)
+    float_alias: Dict[str, str] = {}
+
+    def clear_alias(name: str) -> None:
+        float_alias.pop(name, None)
 
     for block in fn["blocks"]:
         remaining_ins = []
@@ -342,6 +442,7 @@ def lower_function(fn: Dict, trace=False) -> List[str]:
         if not moves:
             return
         for dest, value in moves:
+            clear_alias(dest)
             dest_reg = alloc_vreg(dest)
             src_reg = resolve_operand(value, dest_reg)
             if dest_reg != src_reg:
@@ -389,6 +490,7 @@ def lower_function(fn: Dict, trace=False) -> List[str]:
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*(add|sub|mul)(?:\s+[A-Za-z]+)*\s+i32\s+([^,]+),\s*([^,]+)', line)
             if m:
                 dst, op, lhs, rhs = m.groups()
+                clear_alias(dst)
                 ra = materialize(lhs, "R12")
                 rb = materialize(rhs, "R13")
                 rd = alloc_vreg(dst)
@@ -399,6 +501,7 @@ def lower_function(fn: Dict, trace=False) -> List[str]:
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*f(add|sub|mul|div)\s+half\s+([^,]+),\s*([^,]+)', line)
             if m:
                 dst, op, lhs, rhs = m.groups()
+                clear_alias(dst)
                 ra = resolve_operand(lhs, "R12")
                 rb = resolve_operand(rhs, "R13")
                 rd = alloc_vreg(dst)
@@ -406,19 +509,59 @@ def lower_function(fn: Dict, trace=False) -> List[str]:
                 asm.append(f"{opmap[op]} {rd}, {ra}, {rb}")
                 continue
 
+            m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*f(add|sub|mul|div)\s+float\s+([^,]+),\s*([^,]+)', line)
+            if m:
+                dst, op, lhs, rhs = m.groups()
+                if lhs not in float_alias or rhs not in float_alias:
+                    raise ISelError(f"Float operation requires half alias operands: {orig_line}")
+                clear_alias(dst)
+                ra = resolve_operand(lhs, "R12")
+                rb = resolve_operand(rhs, "R13")
+                rd = alloc_vreg(dst)
+                opmap = {"add": "FADD", "sub": "FSUB", "mul": "FMUL", "div": "FDIV"}
+                asm.append(f"{opmap[op]} {rd}, {ra}, {rb}")
+                float_alias[dst] = rd
+                vmap[dst] = rd
+                continue
+
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*fpext\s+half\s+(%[A-Za-z0-9_]+)\s+to\s+float', line)
             if m:
                 dst, src = m.groups()
-                rd = alloc_vreg(dst)
-                rs = resolve_operand(src, "R12")
-                asm.append(f"I2F {rd}, {rs}")
+                clear_alias(dst)
+                src_reg = resolve_operand(src, "R12")
+                vmap[dst] = src_reg
+                float_alias[dst] = src_reg
                 continue
 
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*fptrunc\s+float\s+(%[A-Za-z0-9_]+)\s+to\s+half', line)
             if m:
                 dst, src = m.groups()
-                rd = alloc_vreg(dst)
+                clear_alias(dst)
+                if src not in float_alias:
+                    raise ISelError(f"fptrunc expects known float source: {orig_line}")
                 rs = resolve_operand(src, "R12")
+                rd = alloc_vreg(dst)
+                if rd != rs:
+                    asm.append(f"MOV {rd}, {rs}")
+                continue
+
+            m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*fptosi\s+half\s+(%[A-Za-z0-9_]+)\s+to\s+i32', line)
+            if m:
+                dst, src = m.groups()
+                clear_alias(dst)
+                rs = resolve_operand(src, "R12")
+                rd = alloc_vreg(dst)
+                asm.append(f"F2I {rd}, {rs}")
+                continue
+
+            m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*fptosi\s+float\s+(%[A-Za-z0-9_]+)\s+to\s+i32', line)
+            if m:
+                dst, src = m.groups()
+                if src not in float_alias:
+                    raise ISelError(f"fptosi float source not supported: {orig_line}")
+                clear_alias(dst)
+                rs = resolve_operand(src, "R12")
+                rd = alloc_vreg(dst)
                 asm.append(f"F2I {rd}, {rs}")
                 continue
 
@@ -434,8 +577,11 @@ def lower_function(fn: Dict, trace=False) -> List[str]:
                     src_reg = resolve_operand(value_token, target_reg)
                     if src_reg != target_reg:
                         asm.append(f"MOV {target_reg}, {src_reg}")
+                if defined is not None and func_name not in defined:
+                    imports.add(func_name)
                 asm.append(f"CALL {func_name}")
                 if dst:
+                    clear_alias(dst)
                     rd = alloc_vreg(dst)
                     if rd != R_RET:
                         asm.append(f"MOV {rd}, {R_RET}")
@@ -444,6 +590,7 @@ def lower_function(fn: Dict, trace=False) -> List[str]:
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*icmp\s+(eq|ne|sgt|slt)\s+i32\s+([^,]+),\s*([^,]+)', line)
             if m:
                 dst, pred, lhs, rhs = m.groups()
+                clear_alias(dst)
                 ra = resolve_operand(lhs, "R12")
                 rb = resolve_operand(rhs, "R13")
                 tmp_reg = alloc_vreg(new_label("icmp_tmp"))
@@ -479,6 +626,7 @@ def lower_function(fn: Dict, trace=False) -> List[str]:
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*select\s+i1\s+(%[A-Za-z0-9_]+),\s+i32\s+([^,]+),\s+i32\s+([^,]+)', line)
             if m:
                 dst, cond, vtrue, vfalse = m.groups()
+                clear_alias(dst)
                 rd = alloc_vreg(dst)
                 cond_reg = resolve_operand(cond, "R12")
                 true_label = new_label("select_true")
@@ -496,9 +644,38 @@ def lower_function(fn: Dict, trace=False) -> List[str]:
                 asm.append(f"{end_label}:")
                 continue
 
+            m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*sext\s+i(8|16|32)\s+(%[A-Za-z0-9_]+)\s+to\s+i(32|64)', line)
+            if m:
+                dst, src_bits, src, dst_bits = m.groups()
+                src_bits = int(src_bits)
+                dst_bits = int(dst_bits)
+                clear_alias(dst)
+                rs = resolve_operand(src, "R12")
+                if src_bits == 8 and dst_bits >= 32:
+                    rd = alloc_vreg(dst)
+                    mask_reg = alloc_vreg(new_label("sext8_mask"))
+                    load_const(mask_reg, 0x80)
+                    bias_reg = alloc_vreg(new_label("sext8_bias"))
+                    load_const(bias_reg, 0x100)
+                    asm.append(f"MOV {rd}, {rs}")
+                    asm.append(f"AND {mask_reg}, {rs}, {mask_reg}")
+                    asm.append(f"CMP {mask_reg}, R0")
+                    pos_label = new_label("sext8_pos")
+                    asm.append(f"JZ {pos_label}")
+                    asm.append(f"SUB {rd}, {rd}, {bias_reg}")
+                    asm.append(f"{pos_label}:")
+                    continue
+                if src_bits == 32 and dst_bits == 64:
+                    rd = alloc_vreg(dst)
+                    if rd != rs:
+                        asm.append(f"MOV {rd}, {rs}")
+                    continue
+                raise ISelError(f"Unsupported sext: {orig_line}")
+
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*zext\s+i1\s+(%[A-Za-z0-9_]+)\s+to\s+i32', line)
             if m:
                 dst, src = m.groups()
+                clear_alias(dst)
                 rd = alloc_vreg(dst)
                 rs = vmap.get(src)
                 if rs is None:
@@ -530,9 +707,36 @@ def lower_function(fn: Dict, trace=False) -> List[str]:
                 asm.append(f"JMP {label_map.get(flabel, flabel)}")
                 continue
 
-            m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*load(?:\s+volatile)?\s+(i32|ptr|half),\s*(?:i32\*|ptr)\s+([^,]+)(?:,\s*align\s+\d+)?', line)
+            m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*getelementptr\s+inbounds\s+\[([0-9]+)\s+x\s+i8\],\s*ptr\s+@([A-Za-z0-9_]+),\s*i64\s+0,\s*i64\s+([^,]+)', line)
+            if m:
+                dst, _, global_name, index = m.groups()
+                clear_alias(dst)
+                rd = alloc_vreg(dst)
+                base_reg = materialize_global(global_name)
+                asm.append(f"MOV {rd}, {base_reg}")
+                index = index.strip()
+                if index not in ('0', '0LL', '0l'):
+                    idx_reg = resolve_operand(index, "R12")
+                    asm.append(f"ADD {rd}, {rd}, {idx_reg}")
+                continue
+
+            m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*getelementptr\s+inbounds\s+i8,\s*ptr\s+@([A-Za-z0-9_]+),\s*i64\s+([^,]+)', line)
+            if m:
+                dst, global_name, index = m.groups()
+                clear_alias(dst)
+                rd = alloc_vreg(dst)
+                base_reg = materialize_global(global_name)
+                asm.append(f"MOV {rd}, {base_reg}")
+                index = index.strip()
+                if index not in ('0', '0LL', '0l'):
+                    idx_reg = resolve_operand(index, "R12")
+                    asm.append(f"ADD {rd}, {rd}, {idx_reg}")
+                continue
+
+            m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*load(?:\s+volatile)?\s+(i8|i16|i32|ptr|half),\s*(?:i\d+\*|ptr)\s+([^,]+)(?:,\s*align\s+\d+)?', line)
             if m:
                 dst, dtype, ptr = m.groups()
+                clear_alias(dst)
                 rd = alloc_vreg(dst)
                 if ptr in stack_slots:
                     src_reg = alloc_vreg(ptr)
@@ -540,10 +744,12 @@ def lower_function(fn: Dict, trace=False) -> List[str]:
                         asm.append(f"MOV {rd}, {src_reg}")
                 else:
                     rp = materialize_ptr(ptr, "R14")
-                    asm.append(f"LD {rd}, [{rp}+0]")
+                    op_map = {"i8": "LDB", "i16": "LDH", "half": "LDH"}
+                    instr = op_map.get(dtype, "LD")
+                    asm.append(f"{instr} {rd}, [{rp}+0]")
                 continue
 
-            m = re.match(r'store(?:\s+volatile)?\s+(i32|ptr|half)\s+([^,]+),\s*(?:i32\*|ptr)\s+([^,]+)(?:,\s*align\s+\d+)?', line)
+            m = re.match(r'store(?:\s+volatile)?\s+(i8|i16|i32|ptr|half)\s+([^,]+),\s*(?:i\d+\*|ptr)\s+([^,]+)(?:,\s*align\s+\d+)?', line)
             if m:
                 dtype, src, ptr = m.groups()
                 if ptr in stack_slots:
@@ -560,7 +766,9 @@ def lower_function(fn: Dict, trace=False) -> List[str]:
                         rs = materialize_ptr(src, "R12")
                     else:
                         rs = materialize(src, "R12")
-                    asm.append(f"ST [{rp}+0], {rs}")
+                    op_map = {"i8": "STB", "i16": "STH", "half": "STH"}
+                    instr = op_map.get(dtype, "ST")
+                    asm.append(f"{instr} [{rp}+0], {rs}")
                 continue
 
             raise ISelError("Unsupported IR line: "+orig_line)
@@ -569,14 +777,28 @@ def lower_function(fn: Dict, trace=False) -> List[str]:
 def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
     ir = parse_ir(ir_text.splitlines())
     entry_label = next((fn['name'] for fn in ir['functions'] if fn['name'] == 'main'), None)
+    defined_names = {fn['name'] for fn in ir['functions']}
+    globals_list = ir.get('globals', [])
+    global_names = {g['name'] for g in globals_list}
+    imports = set()
     out = []
-    for fn in ir["functions"]:
-        out += lower_function(fn, trace=trace)
-    if out:
+    for fn in ir['functions']:
+        out += lower_function(fn, trace=trace, imports=imports, defined=defined_names, global_symbols=global_names)
+    if out or globals_list:
+        header = []
         if entry_label:
-            out.insert(0, f".entry {entry_label}")
+            header.append(f".entry {entry_label}")
         else:
-            out.insert(0, ".entry")
+            header.append('.entry')
+        exports = sorted(defined_names)
+        for name in exports:
+            header.append(f".extern {name}")
+        if imports:
+            for name in sorted(imports):
+                header.append(f".import {name}")
+        header += render_globals(globals_list)
+        header.append('.text')
+        out = header + out
         if enable_opt and not trace:
             out = optimize_movs(out)
     return "\n".join(out) + "\n"

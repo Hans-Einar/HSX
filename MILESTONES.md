@@ -30,6 +30,9 @@ Enhance the Python toolchain with broader IR coverage, call/branch lowering, and
 
 ### Progress Log
 - 2025-10-05: Added MOV-optimisation pass, icmp lowering, phi handling, call lowering, and half precision support. Created regression C samples (`loadstore`, `icmp`, `call`) and matching batch pipelines. Added pytest coverage for MOV, icmp, phi/call cases. VM now supports logical ops used by the new lowering.
+- 2025-10-06: Extended host VM with --entry-symbol/--max-steps/--trace-file flags, dev-libm handlers, and SVC EXIT; added CLI batch runs for `call`/`phi`; new pytest coverage for VM exit and dev-libm trace paths.
+- 2025-10-07: Completed `_Float16` lowering end-to-end (fptosi, float alias folding) so `half_test.bat` succeeds; added .import auto-emission and acceptance in assembler; new pytest suite covering half conversions.
+- 2025-10-08: Added `.hxo` object output and JSON linker (`hld.py`), automated a multi-object C pipeline via `link_test.bat`, and expanded host VM coverage with CLI tests for `--max-steps`, `--trace-file`, and `--entry-symbol`.
 
 ---
 
@@ -72,6 +75,16 @@ Port HSX Executive to AVR128DA28 and manage hybrid flash/FRAM memory.
 - Validate CAN + UART shell on real hardware.
 
 ---
+
+---
+
+## Milestone 7 - Debugger & Tooling
+Develop interactive debugging support and richer developer ergonomics across the HSX toolchain.
+
+### Objectives
+- Design breakpoint and single-step support for the Python VM and future hardware targets.
+- Extend assembler/VM metadata to surface source locations and symbol tables.
+- Integrate trace/inspection commands into shell tooling and document the workflow.
 
 ## Repository Snapshot (Milestone 1)
 ```

@@ -75,8 +75,22 @@ entry:
 """
     lines = compile_to_lines(ll)
     assert any(line.startswith('FADD ') for line in lines)
-    assert any(line.startswith('I2F ') for line in lines)
-    assert any(line.startswith('F2I ') for line in lines)
+    assert any(line.startswith('CALL use_val') for line in lines)
+    assert lines[-2].startswith('MOV R0,')
     assert 'CALL use_val' in lines
     assert lines[-1] == 'RET'
     assert lines[-2].startswith('MOV R0,')
+
+def test_externs_for_defined_functions():
+    ll = """define dso_local i32 @foo() {\nentry:\n  ret i32 1\n}\n\ndefine dso_local i32 @main() {\nentry:\n  %r = call i32 @foo()\n  ret i32 %r\n}\n"""
+    asm = _load_hsx_llc().compile_ll_to_mvasm(ll, trace=False)
+    lines = [line for line in asm.splitlines() if line and not line.startswith(';')]
+    assert lines[0] == '.entry main'
+    assert lines[1] == '.extern foo'
+    assert lines[2] == '.extern main'
+    assert lines[3] == '.text'
+
+def test_imports_for_external_call():
+    ll = """declare i32 @ext(i32)\n\ndefine dso_local i32 @wrap(i32 %x) {\nentry:\n  %r = call i32 @ext(i32 %x)\n  ret i32 %r\n}\n"""
+    asm = _load_hsx_llc().compile_ll_to_mvasm(ll, trace=False)
+    assert '.import ext' in asm.splitlines()

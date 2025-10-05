@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "entry": 0,
+  "entry_symbol": "main",
+  "code": [
+    20971520,
+    603979776,
+    72351744,
+    67436544,
+    620756992
+  ],
+  "rodata": "",
+  "externs": [
+    "main"
+  ],
+  "imports": [
+    "foo"
+  ],
+  "relocs": [
+    {
+      "type": "jump",
+      "index": 1,
+      "symbol": "foo",
+      "kind": "symbol",
+      "section": "code"
+    }
+  ],
+  "symbols": {
+    "main": {
+      "section": "text",
+      "offset": 0
+    }
+  }
+}

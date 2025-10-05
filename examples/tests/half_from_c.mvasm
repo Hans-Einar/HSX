@@ -1,0 +1,33 @@
+.entry
+; -- function half_ops --
+half_ops:
+half_ops__entry:
+MOV R6, R2
+MOV R7, R1
+MOV R11, R7
+MOV R13, R6
+FADD R5, R11, R13
+MOV R6, R5
+MOV R8, R6
+MOV R9, R6
+FMUL R11, R7, R9
+MOV R9, R11
+MOV R13, R8
+MOV R5, R9
+FADD R7, R13, R5
+MOV R10, R7
+MOV R9, R10
+F2I R10, R9
+MOV R1, R10
+CALL use_val
+MOV R11, R0
+MOV R0, R11
+RET
+; -- function use_val --
+use_val:
+use_val__entry:
+MOV R6, R1
+LDI R13, 1
+ADD R7, R6, R13
+MOV R0, R7
+RET

@@ -1,0 +1,8 @@
+.entry
+.extern foo
+.text
+; -- function foo --
+foo:
+foo__entry:
+LDI R0, 42
+RET

@@ -1,0 +1,16 @@
+.entry main
+.extern foo
+.extern main
+; -- function foo --
+foo:
+foo__entry:
+LDI R0, 1
+RET
+; -- function main --
+main:
+main__entry:
+LDI R4, 0
+CALL foo
+MOV R5, R0
+MOV R0, R5
+RET

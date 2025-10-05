@@ -1,0 +1,12 @@
+.entry main
+.extern main
+.import foo
+.text
+; -- function main --
+main:
+main__entry:
+LDI R4, 0
+CALL foo
+MOV R5, R0
+MOV R0, R5
+RET

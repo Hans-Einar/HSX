@@ -1,0 +1,33 @@
+.entry main
+.extern half_ops
+.extern main
+.extern use_val
+.text
+; -- function main --
+main:
+main__entry:
+LDI32 R1, 15872
+LDI32 R2, 16512
+CALL half_ops
+MOV R4, R0
+MOV R0, R4
+RET
+; -- function half_ops --
+half_ops:
+half_ops__entry:
+FADD R6, R1, R2
+FMUL R7, R1, R2
+FADD R8, R6, R7
+F2I R9, R8
+MOV R1, R9
+CALL use_val
+MOV R10, R0
+MOV R0, R10
+RET
+; -- function use_val --
+use_val:
+use_val__entry:
+LDI R13, 1
+ADD R5, R1, R13
+MOV R0, R5
+RET

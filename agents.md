@@ -62,13 +62,13 @@
 - [x] hsx-llc.py: add load/store lowering
 - [x] hsx-llc.py: add icmp lowering with CMP+JNZ boolean temps
 - [x] hsx-llc.py: add br/call/phi handling and half precision fadd/fmul/fpext/fptrunc
-- [ ] hsx-llc.py: emit .extern/.import for external calls
-- [ ] asm.py: support .extern/.import/.text/.data and stable 16-bit offsets
-- [ ] host_vm.py: implement --entry-symbol/--max-steps, dev-libm, and SVC EXIT
-- [ ] host_vm.py: add --trace-file sink for instruction logging
-- [ ] asm.py/hld.py: add .hxo output and linker that writes HSXE with _start entry
+- [x] hsx-llc.py: emit .extern/.import for external calls
+- [x] asm.py: support .extern/.import/.text/.data and stable 16-bit offsets
+- [x] host_vm.py: implement --entry-symbol/--max-steps, dev-libm, and SVC EXIT
+- [x] host_vm.py: add --trace-file sink for instruction logging
+- [x] asm.py/hld.py: add .hxo output and linker that writes HSXE with _start entry
 - [ ] Pytest: add test_crc, test_ir2asm, test_vm_exit
-- [ ] Pipeline: run hello.c through full toolchain to host VM [EXIT 42]
+- [x] Pipeline: run hello.c through full toolchain to host VM [EXIT 42]
 
 ## Implementation constraints (Codex agents)
 - Behold alle eksisterende CLI-flagg og imports; legg heller til nye flagg enn aa endre navn.

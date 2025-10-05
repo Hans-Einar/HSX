@@ -120,7 +120,7 @@ class FSStub:
     def mkdir(self, path): return 0
 
 class MiniVM:
-    def __init__(self, code: bytes, *, entry: int = 0, rodata: bytes = b"", trace: bool = False, svc_trace: bool = False):
+    def __init__(self, code: bytes, *, entry: int = 0, rodata: bytes = b"", trace: bool = False, svc_trace: bool = False, dev_libm: bool = False, trace_file=None):
         self.code = code
         self.regs = [0] * 16
         self.pc = entry
@@ -132,8 +132,16 @@ class MiniVM:
         self.fs = FSStub()
         self.trace = trace
         self.svc_trace = svc_trace
+        self.dev_libm = dev_libm
+        self.trace_out = trace_file
         if rodata:
             self._load_rodata(rodata)
+
+    def _log(self, msg):
+        if self.trace_out:
+            self.trace_out.write(msg + "\n")
+            self.trace_out.flush()
+        print(msg)
 
     def _load_rodata(self, rodata: bytes, base: int = 0x4000):
         end = min(base + len(rodata), len(self.mem))
@@ -188,10 +196,8 @@ class MiniVM:
             self.mem[a] = (v >> 8) & 0xFF
             self.mem[(a + 1) & 0xFFFF] = v & 0xFF
 
-        if self.trace:
-            print(
-                f"[TRACE] pc=0x{self.pc:04X} op=0x{op:02X} rd=R{rd} rs1=R{rs1} rs2=R{rs2} imm={imm}"
-            )
+        if self.trace or self.trace_out:
+            self._log(f"[TRACE] pc=0x{self.pc:04X} op=0x{op:02X} rd=R{rd} rs1=R{rs1} rs2=R{rs2} imm={imm}")
 
         adv = 4
         if op == 0x01:  # LDI
@@ -261,7 +267,7 @@ class MiniVM:
             mod = (imm >> 8) & 0x0F
             fn = imm & 0xFF
             if self.svc_trace:
-                print(f"[SVC] mod=0x{mod:X} fn=0x{fn:X} R0..R3={self.regs[:4]}")
+                self._log(f"[SVC] mod=0x{mod:X} fn=0x{fn:X} R0..R3={self.regs[:4]}")
             self.handle_svc(mod, fn)
         elif op == 0x50:  # FADD
             a = f16_to_f32(self.regs[rs1] & 0xFFFF)
@@ -310,23 +316,37 @@ class MiniVM:
         if mod == 0x0 and fn == 0:
             self.regs[0] = self.cycles
         elif mod == 0x1 and fn == 0:
+            exit_code = self.regs[0] & 0xFFFFFFFF
+            self._log(f"[EXIT {exit_code}]")
+            self.running = False
+        elif mod == 0x1 and fn == 1:
             ptr = self.regs[1] & 0xFFFF
             ln = self.regs[2] & 0xFFFF
             data = bytes(self.mem[ptr : ptr + ln])
             text = data.decode("utf-8", errors="ignore")
-            print(f"[UART.tx] {text}", end="")
+            self._log(f"[UART.tx] {text}")
             self.regs[0] = ln
         elif mod == 0x2 and fn == 0:
             can_id = self.regs[1] & 0x7FF
             ptr = self.regs[2] & 0xFFFF
             ln = self.regs[3] & 0xFF
             data = bytes(self.mem[ptr : ptr + ln])
-            print(f"[CAN.tx] id=0x{can_id:03X} data={data.hex()}")
+            self._log(f"[CAN.tx] id=0x{can_id:03X} data={data.hex()}")
             self.regs[0] = 0
+        elif self.dev_libm and mod == 0xE:
+            import math
+            funcs = {0: math.sin, 1: math.cos, 2: math.exp}
+            if fn in funcs:
+                arg = f16_to_f32(self.regs[1] & 0xFFFF)
+                res = funcs[fn](arg)
+                self.regs[0] = (self.regs[0] & 0xFFFF0000) | (f32_to_f16(res) & 0xFFFF)
+            else:
+                self._log(f"[SVC] dev-libm fn={fn} unsupported")
+                self.regs[0] = 0
         elif mod == 0x4:
             self._svc_fs(fn)
         else:
-            print(f"[SVC] mod=0x{mod:X} fn=0x{fn:X} (stub)")
+            self._log(f"[SVC] mod=0x{mod:X} fn=0x{fn:X} (stub)")
             self.regs[0] = 0
 
     def _read_c_string(self, addr):
@@ -407,24 +427,54 @@ def main():
     ap = argparse.ArgumentParser(description="HSX Python VM")
     ap.add_argument("program", help=".hxe image produced by asm.py")
     ap.add_argument("--trace", action="store_true", help="print executed instructions")
+    ap.add_argument("--trace-file", help="append trace output to a file")
     ap.add_argument("--svc-trace", action="store_true", help="log SVC invocations")
-    ap.add_argument("--max-cycles", type=int, default=100000, help="safety cap on executed cycles")
+    ap.add_argument("--max-steps", type=int, default=None, help="safety cap on executed steps")
+    ap.add_argument("--max-cycles", type=int, default=None, help="deprecated alias for --max-steps")
+    ap.add_argument("--entry-symbol", help="override entry address (numeric for now)")
     ap.add_argument("--no-preload", action="store_true", help="skip demo memory preload")
+    ap.add_argument("--dev-libm", action="store_true", help="enable sin_hsx/cos_hsx/exp_hsx soft handlers")
     ap.add_argument("-v", "--verbose", action="store_true", help="print header metadata")
     args = ap.parse_args()
 
+    max_steps = args.max_steps or args.max_cycles or 100000
+
+    trace_fp = None
+    if args.trace_file:
+        trace_fp = open(args.trace_file, "w", encoding="utf-8")
+
     header, code, rodata = load_hxe(args.program, verbose=args.verbose)
-    vm = MiniVM(code, entry=header["entry"], rodata=rodata, trace=args.trace, svc_trace=args.svc_trace)
 
-    if not args.no_preload:
-        vm.mem[0x0200:0x020C] = b"/hello.txt\x00"
-        vm.mem[0x0100:0x0114] = b"hello from MiniVM!\n"
+    vm = MiniVM(
+        code,
+        entry=header["entry"],
+        rodata=rodata,
+        trace=args.trace,
+        svc_trace=args.svc_trace,
+        dev_libm=args.dev_libm,
+        trace_file=trace_fp,
+    )
 
-    while vm.running and vm.cycles < args.max_cycles:
-        vm.step()
+    if args.entry_symbol:
+        try:
+            entry_override = int(args.entry_symbol, 0)
+        except ValueError as exc:
+            raise SystemExit("--entry-symbol must be numeric (e.g. 0x100)") from exc
+        vm.set_entry(entry_override)
 
-    if vm.running:
-        print(f"[VM] Max cycles {args.max_cycles} reached; halting")
+    try:
+        if not args.no_preload:
+            vm.mem[0x0200:0x020C] = b"/hello.txt" + bytes([0])
+            vm.mem[0x0100:0x0114] = b"hello from MiniVM!\n"
+
+        while vm.running and (max_steps is None or vm.cycles < max_steps):
+            vm.step()
+    finally:
+        if trace_fp:
+            trace_fp.close()
+
+    if vm.running and max_steps is not None and vm.cycles >= max_steps:
+        print(f"[VM] Max steps {max_steps} reached; halting")
     print(f"[VM] Halted after {vm.cycles} cycles @ PC=0x{vm.pc:04X}")
     print(f"[VM] R0..R7: {vm.regs[:8]}")
 
