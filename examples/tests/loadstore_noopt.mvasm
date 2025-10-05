@@ -1,0 +1,19 @@
+.entry main
+; -- function main --
+main:
+main__entry:
+LDI R12, 0
+MOV R4, R12
+LDI R12, 100
+MOV R5, R12
+LDI R12, 99
+MOV R6, R12
+MOV R8, R6
+MOV R9, R5
+ST [R9+0], R8
+MOV R10, R5
+LD R11, [R10+0]
+MOV R7, R11
+MOV R12, R7
+MOV R0, R12
+RET

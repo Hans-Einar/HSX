@@ -1,0 +1,15 @@
+.entry main
+; -- function add2 --
+add2:
+add2__entry:
+; IR: %3 = add nsw i32 %1, %0
+ADD R6, R2, R1
+; IR: ret i32 %3
+MOV R0, R6
+RET
+; -- function main --
+main:
+main__entry:
+; IR: ret i32 42
+LDI R0, 42
+RET

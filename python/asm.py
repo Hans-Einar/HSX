@@ -2,11 +2,11 @@
 import sys, re, struct, zlib, argparse
 from pathlib import Path
 
-MAGIC = 0x4D564243  # 'MVBC'
-VERSION = 0x0003
+MAGIC = 0x48535845  # 'HSXE'
+VERSION = 0x0001
 
 OPC = {
-    "LDI":   0x01, "LD": 0x02, "ST": 0x03, "MOV": 0x04,
+    "LDI":   0x01, "LD": 0x02, "ST": 0x03, "MOV": 0x04, "LDB": 0x06, "LDH": 0x07, "STB": 0x08, "STH": 0x09,
     "ADD": 0x10, "SUB": 0x11, "MUL": 0x12, "DIV": 0x13,
     "AND": 0x14, "OR": 0x15, "XOR": 0x16, "NOT": 0x17,
     "CMP": 0x20, "JMP": 0x21, "JZ": 0x22, "JNZ": 0x23, "CALL": 0x24, "RET": 0x25,
@@ -103,13 +103,13 @@ def assemble(lines):
         elif mnem == 'LDI32':
             rd = regnum(args[0]); imm = parse_int(args[1])
             add_word(emit_word(op, rd, 0, 0, 0)); add_word(imm & 0xFFFFFFFF)
-        elif mnem == 'LD':
+        elif mnem in ('LD','LDB','LDH'):
             rd = regnum(args[0])
             m = re.match(r'\[(R[0-9]|R1[0-5])\s*\+\s*([^\]]+)\]', args[1], re.IGNORECASE)
             if not m: raise ValueError("LD expects [Rs+imm]")
             rs1 = regnum(m.group(1)); imm = parse_int(m.group(2))
             add_word(emit_word(op, rd, rs1, 0, sign12(imm)))
-        elif mnem == 'ST':
+        elif mnem in ('ST','STB','STH'):
             m = re.match(r'\[(R[0-9]|R1[0-5])\s*\+\s*([^\]]+)\]', args[0], re.IGNORECASE)
             if not m: raise ValueError("ST expects [Rs+imm]")
             rs1 = regnum(m.group(1)); imm = parse_int(m.group(2)); rs2 = regnum(args[1])
@@ -148,29 +148,43 @@ def assemble(lines):
             if label not in labels: raise ValueError(f"Unknown label {label}")
             code[idx] = emit_word(OPC[mnem], 0, 0, 0, sign12(labels[label]))
         elif fx[0]=='entry':
-            pass
+            _, label = fx
+            if label not in labels:
+                raise ValueError(f"Unknown label {label}")
+            entry = labels[label]
 
     return code, entry
 
-def write_exe(code_words, entry, out_path, rodata=b"", bss_size=0, req_caps=0, flags=0):
+def write_hxe(code_words, entry, out_path, rodata=b"", bss_size=0, req_caps=0, flags=0):
     code_bytes = b"".join((w & 0xFFFFFFFF).to_bytes(4, "big") for w in code_words)
+    crc_input = struct.pack(">IHHIIIII",
+        MAGIC, VERSION, flags, entry, len(code_bytes),
+        len(rodata), bss_size, req_caps)
+    full_without_crc = crc_input + code_bytes + rodata
+    crc = zlib.crc32(full_without_crc) & 0xFFFFFFFF
     header = struct.pack(">IHHIIIIII",
         MAGIC, VERSION, flags, entry, len(code_bytes),
-        len(rodata), bss_size, req_caps, 0)  # crc placeholder
-    full = header + code_bytes + rodata
-    crc = zlib.crc32(full[:-4]) & 0xFFFFFFFF
-    full = full[:-4] + struct.pack(">I", crc)
+        len(rodata), bss_size, req_caps, crc)
     with open(out_path, "wb") as f:
-        f.write(full)
+        f.write(header)
+        f.write(code_bytes)
+        f.write(rodata)
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("input")
     ap.add_argument("-o","--output", required=True)
+    ap.add_argument("-v","--verbose", action="store_true", help="print assembly statistics")
+    ap.add_argument("--dump-bytes", action="store_true", help="emit code words as hex for debugging")
     args = ap.parse_args()
     with open(args.input,"r",encoding="utf-8") as f:
         lines = f.readlines()
     code, entry = assemble(lines)
-    write_exe(code, entry or 0, args.output)
+    write_hxe(code, entry or 0, args.output)
+    if args.verbose:
+        print(f"entry=0x{(entry or 0):08X} words={len(code)} bytes={len(code)*4}")
+    if args.dump_bytes:
+        for idx, word in enumerate(code):
+            print(f"{idx:04}: {word:08X}")
     print(f"Wrote {args.output} ({len(code)} words)")
 
 if __name__ == "__main__":

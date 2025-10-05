@@ -1,0 +1,23 @@
+.entry
+; -- function phi_example --
+phi_example:
+phi_example__entry:
+; IR: br i1 %cond, label %then, label %else
+CMP R1, R0
+JZ phi_example__br_else_1
+JMP phi_example__then
+phi_example__br_else_1:
+JMP phi_example__else
+phi_example__then:
+; IR: br label %merge
+MOV R7, R2
+JMP phi_example__merge
+phi_example__else:
+; IR: br label %merge
+MOV R7, R3
+JMP phi_example__merge
+phi_example__merge:
+; PHI: %phi = phi i32 [ %a, %then ], [ %b, %else ]
+; IR: ret i32 %phi
+MOV R0, R7
+RET

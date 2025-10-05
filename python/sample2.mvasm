@@ -1,0 +1,39 @@
+; sample2.mvasm — test f16 + FS + byte/half memory ops
+.entry
+
+; Prepare strings in RAM
+; place "/hello.txt\0" at 0x0200 and "payload\n\0" at 0x0210
+LDI32 R0, 0x2F68656C  ; "/hel"
+ST    [R0+0], R0      ; just to force ST path; in real assembler we'd need data sect
+; We'll just assume host preloads these for demo and focus on SVCs
+
+; FS.open("/hello.txt", 0)
+LDI   R1, 0x200
+LDI   R2, 0
+SVC   0x500           ; mod=5 FS, fn=0 open -> R0=fd
+MOV   R4, R0
+
+; FS.read(fd, buf=0x300, len=32)
+MOV   R1, R4
+LDI   R2, 0x300
+LDI   R3, 32
+SVC   0x501           ; read
+; UART.tx(buf, bytes)
+MOV   R1, R2
+MOV   R2, R0
+SVC   0x100           ; UART.tx
+
+; f16: R5 = I2F(42), R6 = I2F(100), R7 = R5 + R6
+LDI   R1, 42
+I2F   R5, R1
+LDI   R1, 100
+I2F   R6, R1
+FADD  R7, R5, R6
+F2I   R8, R7          ; expect 142
+; Print int via UART: write 4 bytes from 0x0400 (little demo)
+LDI   R1, 0x400
+ST    [R1+0], R8
+LDI   R2, 4
+SVC   0x100
+
+RET

@@ -1,0 +1,18 @@
+.entry
+; -- function caller --
+caller:
+caller__entry:
+LDI R2, 5
+CALL callee
+MOV R7, R0
+MOV R0, R7
+RET
+; -- function callee --
+callee:
+callee__entry:
+MOV R6, R2
+MOV R8, R1
+MOV R9, R6
+ADD R10, R8, R9
+MOV R0, R10
+RET

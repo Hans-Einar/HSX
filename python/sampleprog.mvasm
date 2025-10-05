@@ -6,10 +6,10 @@ LDI    R1, 0x100
 LDI    R2, 20
 SVC    MOD=0x1, FN=0
 
-; Prepare CAN frame
+; Prepare CAN frame (mod=0x2 fn=0)
 LDI    R1, 0x123
 LDI    R2, 0x100
 LDI    R3, 8
-SVC    0x400
+SVC    MOD=0x2, FN=0
 
 RET

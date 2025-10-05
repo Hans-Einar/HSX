@@ -1,0 +1,11 @@
+.entry
+; -- function caller --
+caller:
+caller__entry:
+; IR: %r = call i32 @callee(i32 %x, i32 5)
+LDI R2, 5
+CALL callee
+MOV R5, R0
+; IR: ret i32 %r
+MOV R0, R5
+RET

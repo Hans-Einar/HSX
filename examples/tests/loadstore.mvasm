@@ -1,0 +1,8 @@
+.entry
+loadstore:
+LDI R1, 99
+LDI R2, 100
+ST [R2+0], R1
+LD R6, [R2+0]
+MOV R0, R6
+RET

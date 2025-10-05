@@ -1,0 +1,18 @@
+.entry
+; -- function cmp_slt --
+cmp_slt:
+cmp_slt__entry:
+; IR: %lt = icmp slt i32 %a, %b
+SUB R6, R1, R2
+CMP R6, R0
+LDI R7, 0
+JZ cmp_slt__icmp_end_2
+LDI32 R8, 2147483648
+AND R8, R6, R8
+CMP R8, R0
+JZ cmp_slt__icmp_end_2
+LDI R7, 1
+cmp_slt__icmp_end_2:
+; IR: ret i32 %lt
+MOV R0, R7
+RET

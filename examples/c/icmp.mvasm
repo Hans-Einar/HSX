@@ -1,0 +1,29 @@
+.entry
+; -- function cmp --
+cmp:
+cmp__entry:
+; IR: %cmp = icmp eq i32 %a, %b
+SUB R6, R1, R2
+CMP R6, R0
+LDI R7, 0
+JZ cmp__icmp_eq_true_2
+JMP cmp__icmp_end_3
+cmp__icmp_eq_true_2:
+LDI R7, 1
+cmp__icmp_end_3:
+; IR: %gt = icmp sgt i32 %a, %b
+SUB R8, R1, R2
+CMP R8, R0
+LDI R9, 0
+JZ cmp__icmp_end_5
+LDI32 R10, 2147483648
+AND R10, R8, R10
+CMP R10, R0
+JNZ cmp__icmp_end_5
+LDI R9, 1
+cmp__icmp_end_5:
+; IR: %sum = add i32 %cmp, %gt
+ADD R11, R7, R9
+; IR: ret i32 %sum
+MOV R0, R11
+RET

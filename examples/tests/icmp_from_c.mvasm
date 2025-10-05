@@ -1,0 +1,52 @@
+.entry main
+; -- function main --
+main:
+main__entry:
+LDI R4, 0
+LDI R5, 5
+LDI R6, 3
+MOV R10, R5
+MOV R11, R6
+SUB R12, R10, R11
+CMP R12, R0
+LDI R13, 0
+JZ main__icmp_eq_true_2
+JMP main__icmp_end_3
+main__icmp_eq_true_2:
+LDI R7, 1
+main__icmp_end_3:
+SUB R7, R5, R6
+CMP R7, R0
+LDI R8, 0
+JZ main__icmp_end_5
+LDI32 R9, 2147483648
+AND R9, R7, R9
+CMP R9, R0
+JNZ main__icmp_end_5
+LDI R8, 1
+main__icmp_end_5:
+MOV R11, R5
+MOV R12, R6
+SUB R13, R11, R12
+CMP R13, R0
+LDI R4, 0
+JZ main__icmp_end_8
+LDI32 R5, 2147483648
+AND R5, R13, R5
+CMP R5, R0
+JZ main__icmp_end_8
+LDI R9, 1
+main__icmp_end_8:
+MOV R9, R8
+ADD R10, R8, R9
+ADD R11, R7, R10
+MOV R12, R9
+MOV R13, R9
+ADD R4, R12, R13
+MOV R5, R9
+ADD R6, R4, R5
+MOV R7, R9
+ADD R8, R6, R7
+ADD R9, R11, R8
+MOV R0, R9
+RET

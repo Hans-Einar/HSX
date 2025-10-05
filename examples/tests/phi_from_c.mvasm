@@ -1,0 +1,31 @@
+.entry
+; -- function phi_test --
+phi_test:
+phi_test__entry:
+MOV R8, R3
+MOV R9, R2
+MOV R11, R1
+LDI R13, 0
+SUB R12, R11, R13
+CMP R12, R0
+LDI R13, 0
+JNZ phi_test__icmp_ne_true_2
+JMP phi_test__icmp_end_3
+phi_test__icmp_ne_true_2:
+LDI R13, 1
+phi_test__icmp_end_3:
+CMP R13, R0
+JZ phi_test__br_else_4
+JMP phi_test__10
+phi_test__br_else_4:
+JMP phi_test__12
+phi_test__10:
+MOV R7, R9
+JMP phi_test__14
+phi_test__12:
+MOV R7, R8
+JMP phi_test__14
+phi_test__14:
+MOV R6, R7
+MOV R0, R6
+RET
