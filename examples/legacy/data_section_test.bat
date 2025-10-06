@@ -12,7 +12,7 @@ if not exist "%OUTDIR%" mkdir "%OUTDIR%"
 call %HSX_PY% "%ROOT%\python\asm.py" "%SRC%" -o "%HXE%" -v
 if errorlevel 1 goto :error
 
-call %HSX_PY% "%ROOT%\python\host_vm.py" "%HXE%" --trace
+call %HSX_PY% "%ROOT%\platforms\\python\\host_vm.py" "%HXE%" --trace
 if errorlevel 1 goto :error
 
 echo Done.

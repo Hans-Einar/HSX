@@ -1,7 +1,7 @@
 import math
 
 from python import asm as hsx_asm
-from python.host_vm import MiniVM, f16_to_f32
+from platforms.python.host_vm import MiniVM, f16_to_f32
 
 
 def assemble(lines):

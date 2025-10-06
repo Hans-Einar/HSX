@@ -32,7 +32,7 @@ if errorlevel 1 goto :error
 call %HSX_PY% "%ROOT%\python\asm.py" "%ASM_OUT%" -o "%HXE_OUT%" -v
 if errorlevel 1 goto :error
 
-call %HSX_PY% "%ROOT%\python\host_vm.py" "%HXE_OUT%" --trace
+call %HSX_PY% "%ROOT%\platforms\\python\\host_vm.py" "%HXE_OUT%" --trace
 if errorlevel 1 goto :error
 
 echo Done.

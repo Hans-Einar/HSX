@@ -581,6 +581,8 @@ def main():
             relocs=relocs,
             exports=exports,
         )
+    else:
+        write_hxe(code, entry or 0, args.output, rodata=rodata)
     if args.verbose:
         print(f"entry=0x{(entry or 0):08X} words={len(code)} bytes={len(code)*4} rodata={len(rodata)}")
         if imports_decl:

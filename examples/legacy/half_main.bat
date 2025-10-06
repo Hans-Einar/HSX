@@ -37,7 +37,7 @@ call %HSX_PY% "%ROOT%\python\asm.py" "%OUTDIR%\half_main.mvasm" -o "%OUTDIR%\hal
 if errorlevel 1 goto :error
 
 echo [half_main.bat] Running in HSX VM...
-call %HSX_PY% "%ROOT%\python\host_vm.py" "%OUTDIR%\half_main.hxe" --trace --max-steps 1000
+call %HSX_PY% "%ROOT%\platforms\\python\\host_vm.py" "%OUTDIR%\half_main.hxe" --trace --max-steps 1000
 if errorlevel 1 goto :error
 
 echo Done.

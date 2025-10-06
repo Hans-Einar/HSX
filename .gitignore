@@ -1,0 +1,12 @@
+﻿__pycache__/
+*.pyc
+*.pyo
+.env/
+.venv/
+/build/
+examples/tests/build/
+examples/demos/build/
+docs/html/
+docs/latex/
+dist/
+

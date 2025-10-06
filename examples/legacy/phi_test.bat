@@ -31,7 +31,7 @@ if errorlevel 1 goto :error
 call %HSX_PY% "%ROOT%\python\asm.py" "%OUTDIR%\phi_from_c.mvasm" -o "%OUTDIR%\phi_from_c.hxe" -v
 if errorlevel 1 goto :error
 
-call %HSX_PY% "%ROOT%\python\host_vm.py" "%OUTDIR%\phi_from_c.hxe" --trace
+call %HSX_PY% "%ROOT%\platforms\\python\\host_vm.py" "%OUTDIR%\phi_from_c.hxe" --trace
 if errorlevel 1 goto :error
 
 echo Done.

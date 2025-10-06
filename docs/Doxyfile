@@ -1,0 +1,26 @@
+﻿# Doxygen configuration for HSX project
+
+PROJECT_NAME           = "HSX Toolchain"
+PROJECT_NUMBER         = "0.1"
+OUTPUT_DIRECTORY       = .
+CREATE_SUBDIRS         = NO
+OPTIMIZE_OUTPUT_FOR_C  = YES
+OPTIMIZE_OUTPUT_JAVA   = NO
+OPTIMIZE_FOR_FORTRAN   = NO
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = YES
+EXTRACT_STATIC         = YES
+WARN_IF_UNDOCUMENTED   = NO
+
+INPUT                  = . ../python ../platforms/python ../examples
+FILE_PATTERNS          = *.c *.h *.py *.md
+RECURSIVE              = YES
+
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+
+GENERATE_LATEX         = NO
+
+USE_MDFILE_AS_MAINPAGE = ARCHITECTURE.md
+MARKDOWN_SUPPORT       = YES
+EXTENSION_MAPPING      = md=Markdown

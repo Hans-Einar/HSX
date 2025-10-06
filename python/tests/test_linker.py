@@ -3,7 +3,7 @@ from pathlib import Path
 
 from python import asm as hsx_asm
 from python import hld as hsx_linker
-from python.host_vm import MiniVM, load_hxe
+from platforms.python.host_vm import MiniVM, load_hxe
 
 
 def _load_hsx_llc():

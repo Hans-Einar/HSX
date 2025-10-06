@@ -19,7 +19,7 @@ Kjøre runden **C → LLVM IR → HSX ASM → HXE → host VM** i Python.
 clang -S -emit-llvm -O2 examples/c/hello.c -o examples/c/hello.ll
 python3 python/hsx-llc.py examples/c/hello.ll -o examples/c/hello.mvasm --trace
 python3 python/asm.py    examples/c/hello.mvasm -o examples/c/hello.hxe -v
-python3 python/host_vm.py examples/c/hello.hxe --trace
+python3 platforms/python/host_vm.py examples/c/hello.hxe --trace
 
 ## ABI (MVP)
 R0=ret, R1..R3 args, stack R15, f16 in low16(R*).

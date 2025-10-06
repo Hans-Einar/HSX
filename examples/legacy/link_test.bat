@@ -58,7 +58,7 @@ if errorlevel 1 goto :error
 call %HSX_PY% "%ROOT%\python\hld.py" "%HXO_LIB%" "%HXO_MAIN%" -o "%HXE_OUT%"
 if errorlevel 1 goto :error
 
-call %HSX_PY% "%ROOT%\python\host_vm.py" "%HXE_OUT%"
+call %HSX_PY% "%ROOT%\platforms\\python\\host_vm.py" "%HXE_OUT%"
 if errorlevel 1 goto :error
 
 echo Done.

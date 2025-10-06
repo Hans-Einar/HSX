@@ -97,11 +97,19 @@ def parse_ir(lines: List[str]) -> Dict:
                 ir["globals"].append(glob)
             continue
         if line.startswith("define "):
-            m = re.match(r'define\s+(?:[\w.]+\s+)*i(\d+)\s+@([A-Za-z0-9_]+)\s*\(([^)]*)\)\s*(?:[^{{]*)\{', line)
+            m = re.match(r'define\s+(?:[\w.]+\s+)*(void|half|i\d+)\s+@([A-Za-z0-9_]+)\s*\(([^)]*)\)\s*(?:[^{}]*)\{', line)
             if not m:
                 raise ISelError("Unsupported function signature: " + line)
-            retbits, name, args = m.groups()
-            cur = {"name": name, "retbits": int(retbits), "args": args.split(",") if args.strip() else [], "blocks": []}
+            rettype, name, args = m.groups()
+            if rettype.startswith('i'):
+                retbits = int(rettype[1:])
+            elif rettype == 'half':
+                retbits = 16
+            elif rettype == 'void':
+                retbits = 0
+            else:
+                raise ISelError("Unsupported return type: " + rettype)
+            cur = {"name": name, "rettype": rettype, "retbits": retbits, "args": args.split(",") if args.strip() else [], "blocks": []}
             ir["functions"].append(cur)
             bb = None
             continue
@@ -481,6 +489,12 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     imm = int(line.split()[-1])
                     asm.append(f"LDI {R_RET}, {imm}")
                     asm.append("RET")
+                elif line.startswith("ret half "):
+                    value = line.split(" ", 2)[2]
+                    src_reg = resolve_operand(value, R_RET)
+                    if src_reg != R_RET:
+                        asm.append(f"MOV {R_RET}, {src_reg}")
+                    asm.append("RET")
                 elif re.match(r'ret\s+void', line):
                     asm.append("RET")
                 else:
@@ -684,6 +698,22 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     asm.append(f"MOV {rd}, {rs}")
                 continue
 
+            m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*zext\s+i(8|16|32)\s+([^,]+)\s+to\s+i(32|64)', line)
+            if m:
+                dst, src_bits, src, dst_bits = m.groups()
+                src_bits = int(src_bits)
+                dst_bits = int(dst_bits)
+                clear_alias(dst)
+                rd = alloc_vreg(dst)
+                rs = resolve_operand(src, "R12")
+                if rd != rs:
+                    asm.append(f"MOV {rd}, {rs}")
+                mask = (1 << src_bits) - 1
+                mask_reg = alloc_vreg(new_label("zext_mask"))
+                load_const(mask_reg, mask)
+                asm.append(f"AND {rd}, {rd}, {mask_reg}")
+                continue
+
             m = re.match(r'br\s+label\s+%([A-Za-z0-9_]+)', line)
             if m:
                 target_label = m.group(1)
@@ -757,7 +787,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     if dtype == 'ptr':
                         rs = materialize_ptr(src, "R12")
                     else:
-                        rs = materialize(src, "R12")
+                        rs = resolve_operand(src, "R12")
                     if dst_reg != rs:
                         asm.append(f"MOV {dst_reg}, {rs}")
                 else:
@@ -765,7 +795,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     if dtype == 'ptr':
                         rs = materialize_ptr(src, "R12")
                     else:
-                        rs = materialize(src, "R12")
+                        rs = resolve_operand(src, "R12")
                     op_map = {"i8": "STB", "i16": "STH", "half": "STH"}
                     instr = op_map.get(dtype, "ST")
                     asm.append(f"{instr} [{rp}+0], {rs}")
