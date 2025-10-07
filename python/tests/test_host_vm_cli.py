@@ -15,7 +15,8 @@ def _build_hxe(tmp_path: Path, asm_source: str) -> Path:
 
 
 def _run_vm(tmp_path: Path, extra_args):
-    host_vm = Path(__file__).resolve().parents[1] / "host_vm.py"
+    repo_root = Path(__file__).resolve().parents[2]
+    host_vm = repo_root / "platforms" / "python" / "host_vm.py"
     cmd = [sys.executable, str(host_vm)] + extra_args
     return subprocess.run(cmd, capture_output=True, text=True, cwd=tmp_path)
 

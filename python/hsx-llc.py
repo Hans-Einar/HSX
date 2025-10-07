@@ -9,7 +9,7 @@ Usage:
 """
 import argparse, re, sys
 from collections import defaultdict
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 R_RET = "R0"
 ATTR_TOKENS = {"nsw", "nuw", "noundef", "dso_local", "local_unnamed_addr", "volatile"}
@@ -170,14 +170,41 @@ def next_instruction_index(lines: List[str], start_idx: int) -> int:
     return -1
 
 
-def register_used(lines: List[str], start_idx: int, reg: str) -> bool:
+def build_label_positions(lines: List[str]) -> Dict[str, int]:
+    positions: Dict[str, int] = {}
+    for idx, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped or stripped.startswith(';'):
+            continue
+        if stripped.endswith(':') and not stripped.startswith('.'):
+            positions[stripped[:-1]] = idx
+    return positions
+
+
+def register_used(
+    lines: List[str],
+    start_idx: int,
+    reg: str,
+    *,
+    origin_idx: Optional[int] = None,
+    labels: Optional[Dict[str, int]] = None,
+) -> bool:
     pattern = re.compile(rf'\b{reg}\b', re.IGNORECASE)
+    label_positions = labels if labels is not None else build_label_positions(lines)
     for idx in range(start_idx, len(lines)):
         stripped = lines[idx].strip()
         if not stripped or stripped.startswith(';'):
             continue
         if stripped.endswith(':') or stripped.startswith('.'):
             continue
+        if origin_idx is not None:
+            branch_match = re.match(r'(JMP|JZ|JNZ|JC|JNC|JA|JAE|JB|JBE)\s+([A-Za-z0-9_.$]+)', stripped, re.IGNORECASE)
+            if branch_match:
+                target = branch_match.group(2)
+                target_idx = label_positions.get(target)
+                if target_idx is None or target_idx <= origin_idx:
+                    return True
+                return True
         dest_match = re.match(r'[A-Z]+\s+(R\d{1,2})', stripped)
         if dest_match and dest_match.group(1).upper() == reg.upper():
             return False  # redefined before any use
@@ -213,6 +240,7 @@ def combine_ldi_movs(lines: List[str]) -> List[str]:
         result: List[str] = []
         changed = False
         i = 0
+        label_positions = build_label_positions(work)
         while i < len(work):
             line = work[i]
             stripped = line.strip()
@@ -231,7 +259,13 @@ def combine_ldi_movs(lines: List[str]) -> List[str]:
                         dst_reg = mov_match.group(1).upper()
                         mov_src = mov_match.group(2).upper()
                         if mov_src == src_reg and not is_return_mov(work, next_idx):
-                            if not register_used(work, next_idx + 1, src_reg):
+                            if not register_used(
+                                work,
+                                next_idx + 1,
+                                src_reg,
+                                origin_idx=i,
+                                labels=label_positions,
+                            ):
                                 result.append(f"LDI {dst_reg}, {imm}")
                                 for filler in work[i + 1:next_idx]:
                                     result.append(filler)
@@ -264,6 +298,7 @@ def pop_last_instruction(lines: List[str]) -> None:
 
 
 def eliminate_mov_chains(lines: List[str]) -> List[str]:
+    label_positions = build_label_positions(lines)
     result: List[str] = []
     last_instr = None
     for idx, line in enumerate(lines):
@@ -279,21 +314,30 @@ def eliminate_mov_chains(lines: List[str]) -> List[str]:
                 continue
             if dst == R_RET and is_return_mov(lines, idx):
                 result.append(f"MOV {dst}, {src}")
-                last_instr = ('MOV', dst, src)
+                last_instr = ('MOV', dst, src, idx)
                 continue
             if last_instr and last_instr[0] == 'MOV' and last_instr[1] == src:
                 prev_src = last_instr[2]
-                if not register_used(lines, idx + 1, src):
+                origin_idx = last_instr[3] if len(last_instr) > 3 and last_instr[3] is not None else idx
+                if not register_used(
+                    lines,
+                    idx + 1,
+                    src,
+                    origin_idx=origin_idx,
+                    labels=label_positions,
+                ):
                     pop_last_instruction(result)
                     last_instr = find_last_instruction(result)
+                    if last_instr and len(last_instr) == 3:
+                        last_instr = last_instr + (None,)
                     src = prev_src
                     if dst == src:
                         continue
             result.append(f"MOV {dst}, {src}")
-            last_instr = ('MOV', dst, src)
+            last_instr = ('MOV', dst, src, idx)
             continue
         result.append(line)
-        last_instr = ('OTHER', None, None)
+        last_instr = ('OTHER', None, None, idx)
     return result
 
 

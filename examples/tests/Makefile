@@ -15,8 +15,13 @@ TESTS := $(patsubst %/,%,$(TEST_DIRS))
 
 LL_ARTIFACTS := $(addsuffix /main.ll,$(addprefix $(BUILD_DIR)/,$(TESTS)))
 MVA_ARTIFACTS := $(LL_ARTIFACTS:.ll=.mvasm)
+LINKER_TEST := test_linker
+LINKER_COMPONENTS := main lib
+LINKER_LL := $(addsuffix .ll,$(addprefix $(BUILD_DIR)/$(LINKER_TEST)/,$(LINKER_COMPONENTS)))
+LINKER_MVA := $(LINKER_LL:.ll=.mvasm)
+LINKER_HXO := $(LINKER_LL:.ll=.hxo)
 HXE_ARTIFACTS := $(LL_ARTIFACTS:.ll=.hxe)
-.SECONDARY: $(LL_ARTIFACTS) $(MVA_ARTIFACTS) $(HXE_ARTIFACTS)
+.SECONDARY: $(LL_ARTIFACTS) $(MVA_ARTIFACTS) $(HXE_ARTIFACTS) $(LINKER_LL) $(LINKER_MVA) $(LINKER_HXO)
 
 .PHONY: all tests run-% clean list
 
@@ -33,6 +38,22 @@ list:
 
 run-%: $(BUILD_DIR)/%/main.hxe
 	$(PYTHON) "$(VM)" $< $(RUN_ARGS)
+
+$(BUILD_DIR)/$(LINKER_TEST)/main.hxe: $(LINKER_HXO)
+	$(MKDIR_CMD)
+	$(PYTHON) "$(REPO_ROOT)/python/hld.py" -o $@ $^
+
+$(BUILD_DIR)/$(LINKER_TEST)/%.hxo: $(BUILD_DIR)/$(LINKER_TEST)/%.mvasm
+	$(MKDIR_CMD)
+	$(PYTHON) "$(REPO_ROOT)/python/asm.py" $< -o $@ --emit-hxo
+
+$(BUILD_DIR)/$(LINKER_TEST)/%.mvasm: $(BUILD_DIR)/$(LINKER_TEST)/%.ll
+	$(MKDIR_CMD)
+	$(PYTHON) "$(REPO_ROOT)/python/hsx-llc.py" $< -o $@
+
+$(BUILD_DIR)/$(LINKER_TEST)/%.ll: $(LINKER_TEST)/%.c
+	$(MKDIR_CMD)
+	$(CLANG) $(CLANGFLAGS) $< -o $@
 
 $(BUILD_DIR)/%/main.hxe: $(BUILD_DIR)/%/main.mvasm
 	$(MKDIR_CMD)

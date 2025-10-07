@@ -1,0 +1,16 @@
+.entry main
+.extern main
+.text
+; -- function main --
+main:
+main__entry:
+LDI R4, 0
+LDI R5, 3
+LDI R6, 2
+MOV R7, R5
+MOV R8, R6
+MUL R9, R7, R8
+LDI R13, 1
+ADD R10, R9, R13
+MOV R0, R10
+RET

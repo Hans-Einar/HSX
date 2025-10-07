@@ -1,0 +1,111 @@
+.entry shell_main
+.extern shell_main
+.text
+shell_main:
+shell_main__entry:
+    LDI32 R1, header_str
+    LDI R2, 21
+    SVC 0x101
+
+    LDI R1, 0x300
+    LDI R2, 256
+    SVC 0x301
+    MOV R4, R0
+
+    LDI32 R1, list_hdr
+    LDI R2, 10
+    SVC 0x101
+
+    LDI R1, 0x300
+    MOV R2, R4
+    SVC 0x101
+
+    LDI R10, 0
+    CMP R4, R10
+    JZ no_payloads
+
+    LDI R5, 0x300
+    LDI R6, 0x400
+    MOV R7, R6
+    LDI R8, 0
+    LDI R9, 10
+    LDI R11, 1
+copy_loop:
+    LDB R12, [R5+0]
+    CMP R12, R8
+    JZ copy_done
+    CMP R12, R9
+    JZ copy_done
+    STB [R6+0], R12
+    ADD R5, R5, R11
+    ADD R6, R6, R11
+    JMP copy_loop
+copy_done:
+    STB [R6+0], R8
+
+    LDB R12, [R7+0]
+    LDI R3, 40
+    CMP R12, R3
+    JZ no_payloads
+
+
+    MOV R2, R6
+    SUB R2, R2, R7
+    MOV R15, R2
+
+    LDI32 R1, launch_str
+    LDI R2, 11
+    SVC 0x101
+
+    MOV R1, R7
+    MOV R2, R15
+    SVC 0x101
+
+    LDI32 R1, newline_str
+    LDI R2, 1
+    SVC 0x101
+
+    MOV R1, R7
+    SVC 0x300
+    MOV R12, R0
+
+    LDI32 R1, done_str
+    LDI R2, 20
+    SVC 0x101
+
+    LDI R13, 48
+    MOV R1, R12
+    ADD R1, R1, R13
+    LDI R14, 0x410
+    STB [R14+0], R1
+    STB [R14+1], R8
+
+    MOV R1, R14
+    LDI R2, 1
+    SVC 0x101
+
+    LDI32 R1, newline_str
+    LDI R2, 1
+    SVC 0x101
+
+    RET
+
+no_payloads:
+    LDI32 R1, no_payload_str
+    LDI R2, 19
+    SVC 0x101
+    RET
+
+.data
+header_str:
+    .byte 61,61,32,72,83,88,32,83,104,101,108,108,32,68,101,109,111,32,61,61,10
+list_hdr:
+    .byte 80,97,121,108,111,97,100,115,58,10
+launch_str:
+    .byte 76,97,117,110,99,104,105,110,103,58,32
+done_str:
+    .byte 69,120,101,99,32,99,111,109,112,108,101,116,101,46,32,69,120,105,116,61
+no_payload_str:
+    .byte 78,111,32,112,97,121,108,111,97,100,115,32,102,111,117,110,100,46,10
+newline_str:
+    .byte 10
