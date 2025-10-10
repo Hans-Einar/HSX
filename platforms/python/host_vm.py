@@ -261,6 +261,8 @@ class MiniVM:
         self._mailbox_handler: Optional[Callable[[int], None]] = mailbox_handler
         self.pid: Optional[int] = None
         self.call_stack: List[int] = []
+        self._last_pc: Optional[int] = None
+        self._repeat_pc_count: int = 0
         if rodata:
             self._load_rodata(rodata)
 
@@ -444,6 +446,8 @@ class MiniVM:
             self.sleep_pending_ms = None
             self.emit_event({"type": "sleep_complete"})
 
+        prev_pc = self.pc
+
         if self.pc + 4 > len(self.code):
             print(f"[VM] PC 0x{self.pc:04X} is outside code length {len(self.code)}")
             self.running = False
@@ -553,16 +557,38 @@ class MiniVM:
                 self.pc = imm & 0xFFFFFFFF
                 adv = 0
         elif op == 0x24:  # CALL
-            return_addr = (self.pc + adv) & 0xFFFFFFFF
+            return_addr = (self.pc + 4) & 0xFFFFFFFF
+            target = imm & 0xFFFFFFFF
+            new_sp = (self.sp - 4) & 0xFFFFFFFF
+            st32(new_sp, return_addr)
+            self.sp = new_sp
+            if len(self.regs) >= 16:
+                self.regs[15] = self.sp & 0xFFFFFFFF
             self.call_stack.append(return_addr)
-            self.pc = imm & 0xFFFFFFFF
+            if self.trace:
+                self._log(
+                    f"[CALL] pc=0x{(self.pc & 0xFFFF):04X} -> 0x{target & 0xFFFFFFFF:04X} "
+                    f"ret=0x{return_addr:04X} sp=0x{self.sp:04X}"
+                )
+            self.pc = target
             adv = 0
         elif op == 0x25:  # RET
-            if self.call_stack:
-                self.pc = self.call_stack.pop()
-                adv = 0
-            else:
+            if self.trace:
+                self._log(f"[RET] pc=0x{(self.pc & 0xFFFF):04X} sp=0x{self.sp:04X}")
+            if not self.call_stack:
                 self.running = False
+            else:
+                if self.sp >= len(self.mem):
+                    self._log("[RET] stack underflow")
+                    self.running = False
+                else:
+                    return_addr = ld32(self.sp)
+                    self.sp = (self.sp + 4) & 0xFFFFFFFF
+                    if len(self.regs) >= 16:
+                        self.regs[15] = self.sp & 0xFFFFFFFF
+                    self.call_stack.pop()
+                    self.pc = return_addr & 0xFFFFFFFF
+                    adv = 0
         elif op == 0x30:  # SVC
             mod = (imm >> 8) & 0x0F
             fn = imm & 0xFF
@@ -620,6 +646,16 @@ class MiniVM:
             ctx.psw = self.flags
             if not self.running:
                 ctx.state = "stopped"
+
+        if self.pc == prev_pc:
+            self._repeat_pc_count += 1
+            if op == 0x24 and self._repeat_pc_count >= 32:
+                self._log(
+                    f"[VM] Possible stuck CALL at PC=0x{prev_pc & 0xFFFF:04X}; check stack state"
+                )
+        else:
+            self._repeat_pc_count = 0
+        self._last_pc = self.pc
 
     def handle_svc(self, mod, fn):
         if mod == 0x0 and fn == 0:

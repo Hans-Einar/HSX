@@ -17,7 +17,7 @@ OPC = {
 }
 
 REGISTER_RE = re.compile(r"R([0-9]|1[0-5])\b", re.IGNORECASE)
-SYMBOL_TOKEN_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_.$]*")
+SYMBOL_TOKEN_RE = re.compile(r"[A-Za-z_.][A-Za-z0-9_.$]*")
 EXPR_TOKEN_RE = re.compile(r"(lo16|hi16|off16)\(([^)]+)\)")
 SECTION_TEXT = "text"
 SECTION_DATA = "data"
@@ -187,6 +187,8 @@ def assemble(lines, *, include_base: Path | None = None):
     entry_symbol = None
     externs = set()
     imports_decl = set()
+    exports: Dict[str, Dict[str, int]] = {}
+    explicit_exports = set()
     entry = 0
     section = SECTION_TEXT
     pc = 0
@@ -209,6 +211,8 @@ def assemble(lines, *, include_base: Path | None = None):
         if name in labels:
             raise ValueError(f"Duplicate label: {name}")
         labels[name] = (section, current_offset())
+        if name in explicit_exports:
+            exports.setdefault(name, {'section': section, 'offset': current_offset()})
 
     def resolve_symbol(name):
         if name in labels:
@@ -268,7 +272,7 @@ def assemble(lines, *, include_base: Path | None = None):
             parts = line.split()
             if len(parts) != 2:
                 raise ValueError(".export expects symbol")
-            externs.add(parts[1])
+            explicit_exports.add(parts[1])
             continue
         if lower.startswith('.import'):
             parts = line.split()
@@ -508,10 +512,20 @@ def assemble(lines, *, include_base: Path | None = None):
         elif ftype == 'imm32':
             kind, name = fx['ref']
             value = eval_symbol_ref(fx['ref'])
+            needs_reloc = value is None
+            if not needs_reloc and fx['ref'][0] == 'symbol':
+                sym_name = fx['ref'][1]
+                if sym_name in labels and labels[sym_name][0] == SECTION_DATA:
+                    needs_reloc = True
             if value is None:
                 relocs.append({'type': 'imm32', 'index': fx['index'], 'symbol': name, 'kind': kind, 'section': 'code'})
                 continue
             code[fx['index']] = value & 0xFFFFFFFF
+            if needs_reloc:
+                if name in labels:
+                    sec, offset = labels[name]
+                    exports.setdefault(name, {'section': sec, 'offset': offset})
+                relocs.append({'type': 'imm32', 'index': fx['index'], 'symbol': name, 'kind': kind, 'section': 'code'})
         elif ftype == 'jump':
             kind, name = fx['ref']
             value = eval_symbol_ref(fx['ref'])
@@ -556,7 +570,6 @@ def assemble(lines, *, include_base: Path | None = None):
         else:
             raise ValueError(f"Unknown fixup type {ftype}")
 
-    exports = {}
     for sym in externs:
         if sym in labels:
             sec, offset = labels[sym]

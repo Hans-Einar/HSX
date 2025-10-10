@@ -42,18 +42,18 @@ def parse_llvm_string_literal(body: str) -> bytes:
 
 def parse_global_definition(line: str):
     line = line.strip()
-    string_match = re.match(r'@([A-Za-z0-9_]+)\s*=\s*(?:private\s+)?(?:unnamed_addr\s+)?(?:internal\s+)?constant\s+\[(\d+)\s+x\s+i8\]\s+c"(.*)"(?:,\s*align\s*(\d+))?', line)
+    string_match = re.match(r'@([A-Za-z0-9_.]+)\s*=\s*(?:[\w.]+\s+)*constant\s+\[(\d+)\s+x\s+i8\]\s+c"(.*)"(?:,\s*align\s*(\d+))?', line)
     if string_match:
         name, _, body, align = string_match.groups()
         data = parse_llvm_string_literal(body)
         return {"name": name, "kind": "bytes", "data": data, "align": int(align) if align else None}
-    zero_array_match = re.match(r'@([A-Za-z0-9_]+)\s*=\s*(?:[\w.]+\s+)*global\s+\[(\d+)\s+x\s+i8\]\s+zeroinitializer(?:,\s*align\s*(\d+))?', line)
+    zero_array_match = re.match(r'@([A-Za-z0-9_.]+)\s*=\s*(?:[\w.]+\s+)*global\s+\[(\d+)\s+x\s+i8\]\s+zeroinitializer(?:,\s*align\s*(\d+))?', line)
     if zero_array_match:
         name, count, align = zero_array_match.groups()
         count = int(count)
         data = bytes([0] * count)
         return {"name": name, "kind": "bytes", "data": data, "align": int(align) if align else None}
-    int_match = re.match(r'@([A-Za-z0-9_]+)\s*=\s*(?:[\w.]+\s+)*global\s+i(8|16|32)\s+([^,]+)(?:,\s*align\s*(\d+))?', line)
+    int_match = re.match(r'@([A-Za-z0-9_.]+)\s*=\s*(?:[\w.]+\s+)*global\s+i(8|16|32)\s+([^,]+)(?:,\s*align\s*(\d+))?', line)
     if int_match:
         name, bits, value_str, align = int_match.groups()
         value_str = value_str.strip()
@@ -386,7 +386,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     continue
                 use_counts[tok] += 1
 
-    AVAILABLE_REGS = [f"R{i}" for i in range(4, 12)] + ["R15"]
+    AVAILABLE_REGS = ["R4", "R5", "R6", "R8", "R9", "R10", "R11", "R15"]
     free_regs: List[str] = AVAILABLE_REGS.copy()
     value_types: Dict[str, str] = {}
     spilled_values: Dict[str, Tuple[str, str]] = {}
@@ -394,6 +394,8 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
     spill_data_lines: List[str] = []
     spill_slot_counter = 0
     pinned_values = set()
+    pinned_registers: Dict[str, str] = {}
+    first_stack_slot: Optional[str] = None
     reg_lru: List[str] = []
     spilled_float_alias = set()
 
@@ -574,6 +576,12 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
     def alloc_vreg(name: str, val_type: Optional[str] = None) -> str:
         val_type = canonical_type(val_type or value_types.get(name))
         value_types[name] = val_type
+        if name in pinned_registers:
+            reg = pinned_registers[name]
+            if name not in vmap:
+                vmap[name] = reg
+            mark_used(name)
+            return reg
         if name in vmap:
             mark_used(name)
             return vmap[name]
@@ -790,7 +798,15 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 stack_slots.add(slot)
                 pinned_values.add(slot)
                 value_types[slot] = 'ptr'
-                alloc_vreg(slot, 'ptr')
+                if first_stack_slot is None:
+                    first_stack_slot = slot
+                    pinned_registers[slot] = 'R7'
+                    if 'R7' in free_regs:
+                        free_regs.remove('R7')
+                    vmap[slot] = 'R7'
+                    mark_used(slot)
+                else:
+                    alloc_vreg(slot, 'ptr')
                 continue
 
             if line.startswith("ret "):
@@ -990,7 +1006,10 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 tmp_reg = alloc_vreg(tmp_name, 'i32')
                 rd = alloc_vreg(dst, 'i32')
                 asm.append(f"SUB {tmp_reg}, {ra}, {rb}")
-                asm.append(f"CMP {tmp_reg}, R0")
+                zero_name = new_label("icmp_zero_const")
+                zero_reg = alloc_vreg(zero_name, 'i32')
+                load_const(zero_reg, 0)
+                asm.append(f"CMP {tmp_reg}, {zero_reg}")
                 asm.append(f"LDI {rd}, 0")
                 if pred in ("eq", "ne"):
                     true_label = new_label(f"icmp_{pred}_true")
@@ -1009,7 +1028,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     mask_reg = alloc_vreg(mask_name, 'i32')
                     load_const(mask_reg, 0x80000000)
                     asm.append(f"AND {mask_reg}, {tmp_reg}, {mask_reg}")
-                    asm.append(f"CMP {mask_reg}, R0")
+                    asm.append(f"CMP {mask_reg}, {zero_reg}")
                     if pred in ("sgt", "sge"):
                         asm.append(f"JNZ {end_label}")
                         asm.append(f"LDI {rd}, 1")
@@ -1023,6 +1042,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                         asm.append(f"LDI {rd}, 1")
                     asm.append(f"{end_label}:")
                     release_reg(mask_name)
+                release_reg(zero_name)
                 release_reg(tmp_name)
                 maybe_release(dst)
                 continue
@@ -1035,8 +1055,12 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 cond_reg = resolve_operand(cond, "R12")
                 true_label = new_label("select_true")
                 end_label = new_label("select_end")
-                asm.append(f"CMP {cond_reg}, R0")
+                zero_name = new_label("select_zero")
+                zero_reg = alloc_vreg(zero_name, 'i32')
+                load_const(zero_reg, 0)
+                asm.append(f"CMP {cond_reg}, {zero_reg}")
                 asm.append(f"JNZ {true_label}")
+                release_reg(zero_name)
                 false_reg = resolve_operand(vfalse, rd)
                 if false_reg != rd:
                     asm.append(f"MOV {rd}, {false_reg}")
@@ -1066,7 +1090,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     load_const(bias_reg, 0x100)
                     asm.append(f"MOV {rd}, {rs}")
                     asm.append(f"AND {mask_reg}, {rs}, {mask_reg}")
-                    asm.append(f"CMP {mask_reg}, R0")
+                    asm.append(f"CMP {mask_reg}, {zero_reg}")
                     pos_label = new_label("sext8_pos")
                     asm.append(f"JZ {pos_label}")
                     asm.append(f"SUB {rd}, {rd}, {bias_reg}")
@@ -1129,8 +1153,12 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 cond_reg = ensure_value_in_reg(cond)
                 consume_use(cond)
                 else_label = new_label("br_else")
-                asm.append(f"CMP {cond_reg}, R0")
+                zero_name = new_label("br_zero")
+                zero_reg = alloc_vreg(zero_name, 'i32')
+                load_const(zero_reg, 0)
+                asm.append(f"CMP {cond_reg}, {zero_reg}")
                 asm.append(f"JZ {else_label}")
+                release_reg(zero_name)
                 apply_phi_moves(b["label"], tlabel)
                 asm.append(f"JMP {label_map.get(tlabel, tlabel)}")
                 asm.append(f"{else_label}:")
