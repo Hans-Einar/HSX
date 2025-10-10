@@ -7,7 +7,7 @@ import python.asm as hsx_asm
 
 def _build_hxe(tmp_path: Path, asm_source: str) -> Path:
     lines = [line + "\n" for line in asm_source.strip().splitlines()]
-    code, entry, externs, imports_decl, rodata, relocs, exports, entry_symbol = hsx_asm.assemble(lines)
+    code, entry, externs, imports_decl, rodata, relocs, exports, entry_symbol, _local_symbols = hsx_asm.assemble(lines)
     assert not relocs, f"unexpected relocations: {relocs}"
     out = tmp_path / "prog.hxe"
     hsx_asm.write_hxe(code, entry or 0, out, rodata=rodata)

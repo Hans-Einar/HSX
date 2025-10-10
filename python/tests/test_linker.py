@@ -21,7 +21,10 @@ HSX_LLC = _load_hsx_llc()
 def compile_to_hxo(ir: str, path: Path):
     asm_text = HSX_LLC.compile_ll_to_mvasm(ir, trace=False)
     lines = [line + "\n" for line in asm_text.splitlines()]
-    code, entry, externs, imports_decl, rodata, relocs, exports, entry_symbol = hsx_asm.assemble(lines)
+    code, entry, externs, imports_decl, rodata, relocs, exports, entry_symbol, local_symbols = hsx_asm.assemble(
+        lines,
+        for_object=True,
+    )
     hsx_asm.write_hxo_object(
         path,
         code_words=code,
@@ -32,6 +35,7 @@ def compile_to_hxo(ir: str, path: Path):
         imports_decl=imports_decl,
         relocs=relocs,
         exports=exports,
+        local_symbols=local_symbols,
     )
     return path
 

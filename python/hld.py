@@ -31,6 +31,7 @@ def load_hxo(path: Path) -> Dict:
         "imports": data.get("imports", []),
         "symbols": data.get("symbols", {}),
         "relocs": data.get("relocs", []),
+        "local_symbols": data.get("local_symbols", {}),
     }
     return module
 
@@ -91,9 +92,25 @@ def link_objects(object_paths: List[Path], output: Path, *, verbose: bool = Fals
     for mod in modules:
         for reloc in mod["relocs"]:
             symbol = reloc["symbol"]
-            if symbol not in symbol_table:
-                raise ValueError(f"Relocation references unknown symbol '{symbol}' in {mod['path']}")
-            sym_entry = symbol_table[symbol]
+            sym_entry = symbol_table.get(symbol)
+            if sym_entry is None:
+                local_info = mod.get("local_symbols", {}).get(symbol)
+                if local_info is None:
+                    raise ValueError(f"Relocation references unknown symbol '{symbol}' in {mod['path']}")
+                section = local_info.get("section")
+                offset = int(local_info.get("offset", 0))
+                if section == "text":
+                    address = mod["code_base"] + offset
+                elif section == "data":
+                    address = RODATA_BASE + mod["ro_base"] + offset
+                else:
+                    raise ValueError(f"Unsupported local symbol section '{section}' for {symbol}")
+                sym_entry = {
+                    "address": address,
+                    "offset": offset,
+                    "section": section,
+                    "module": mod,
+                }
             value = compute_reloc_value(reloc.get("kind"), sym_entry)
             if reloc.get("section") == "code":
                 idx = reloc["index"]

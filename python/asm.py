@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys, re, struct, zlib, argparse, json
 from pathlib import Path
+from typing import Any, Dict
 
 MAGIC = 0x48535845  # 'HSXE'
 VERSION = 0x0001
@@ -176,7 +177,72 @@ def parse_symbol_token(token):
     return None
 
 
-def assemble(lines, *, include_base: Path | None = None):
+def _build_symbol_table(labels: Dict[str, tuple[str, int]], externs: set[str], imports_decl: set[str]) -> Dict[str, Dict[str, Any]]:
+    symtab: Dict[str, Dict[str, Any]] = {}
+    for name, (section, offset) in labels.items():
+        if section == SECTION_TEXT:
+            abs_addr = offset
+        elif section == SECTION_DATA:
+            abs_addr = RODATA_BASE + offset
+        else:
+            continue
+        symtab[name] = {
+            "section": section,
+            "offset": offset,
+            "abs_addr": abs_addr,
+            "unit_local": name not in externs and name not in imports_decl,
+        }
+    return symtab
+
+
+def _compute_local_reloc_value(reloc: Dict[str, Any], sym_info: Dict[str, Any]) -> int:
+    kind = reloc.get("kind")
+    if kind in (None, "symbol"):
+        return int(sym_info["abs_addr"])
+    if kind == "lo16":
+        return int(sym_info["abs_addr"]) & 0xFFFF
+    if kind == "hi16":
+        return (int(sym_info["abs_addr"]) >> 16) & 0xFFFF
+    if kind == "off16":
+        return int(sym_info["offset"]) & 0xFFFF
+    raise ValueError(f"Unsupported relocation kind {kind}")
+
+
+def _resolve_unit_local_relocs(code_words: list[int], rodata_buf: bytearray, relocs: list[Dict[str, Any]], symtab: Dict[str, Dict[str, Any]]) -> list[Dict[str, Any]]:
+    remaining: list[Dict[str, Any]] = []
+    for reloc in relocs:
+        symbol = reloc.get("symbol")
+        sym_info = symtab.get(symbol)
+        if not sym_info or not sym_info.get("unit_local"):
+            remaining.append(reloc)
+            continue
+        value = _compute_local_reloc_value(reloc, sym_info)
+        section = reloc.get("section")
+        rtype = reloc.get("type")
+        if section == "code":
+            idx = reloc["index"]
+            if rtype in {"imm12", "jump", "mem"}:
+                code_words[idx] = set_imm12(code_words[idx], value)
+            elif rtype == "imm32":
+                code_words[idx] = value & 0xFFFFFFFF
+            else:
+                raise ValueError(f"Unsupported code relocation type {rtype}")
+        elif section == "rodata":
+            offset = reloc["offset"]
+            if rtype == "data_word":
+                rodata_buf[offset:offset + 4] = (value & 0xFFFFFFFF).to_bytes(4, "little")
+            elif rtype == "data_half":
+                rodata_buf[offset:offset + 2] = (value & 0xFFFF).to_bytes(2, "little")
+            elif rtype == "data_byte":
+                rodata_buf[offset] = value & 0xFF
+            else:
+                raise ValueError(f"Unsupported rodata relocation type {rtype}")
+        else:
+            raise ValueError(f"Unknown relocation section {section}")
+    return remaining
+
+
+def assemble(lines, *, include_base: Path | None = None, for_object: bool = False):
     include_base = include_base or Path.cwd()
     lines = _expand_includes(list(lines), include_base, set())
     code = []
@@ -505,19 +571,21 @@ def assemble(lines, *, include_base: Path | None = None):
         if ftype == 'imm12':
             kind, name = fx['ref']
             value = eval_symbol_ref(fx['ref'])
-            if value is None:
+            is_local = name in labels
+            if value is None or (for_object and is_local):
                 relocs.append({'type': 'imm12', 'index': fx['index'], 'symbol': name, 'kind': kind, 'section': 'code'})
                 continue
             code[fx['index']] = set_imm12(code[fx['index']], value)
         elif ftype == 'imm32':
             kind, name = fx['ref']
             value = eval_symbol_ref(fx['ref'])
-            needs_reloc = value is None
+            is_local = name in labels
+            needs_reloc = value is None or (for_object and is_local)
             if not needs_reloc and fx['ref'][0] == 'symbol':
                 sym_name = fx['ref'][1]
                 if sym_name in labels and labels[sym_name][0] == SECTION_DATA:
                     needs_reloc = True
-            if value is None:
+            if value is None or (for_object and is_local):
                 relocs.append({'type': 'imm32', 'index': fx['index'], 'symbol': name, 'kind': kind, 'section': 'code'})
                 continue
             code[fx['index']] = value & 0xFFFFFFFF
@@ -529,7 +597,8 @@ def assemble(lines, *, include_base: Path | None = None):
         elif ftype == 'jump':
             kind, name = fx['ref']
             value = eval_symbol_ref(fx['ref'])
-            if value is None:
+            is_local = name in labels
+            if value is None or (for_object and is_local):
                 relocs.append({'type': 'jump', 'index': fx['index'], 'symbol': name, 'kind': kind, 'section': 'code'})
                 continue
             code[fx['index']] = set_imm12(code[fx['index']], value)
@@ -542,33 +611,48 @@ def assemble(lines, *, include_base: Path | None = None):
         elif ftype == 'mem':
             kind, name = fx['ref']
             value = eval_symbol_ref(fx['ref'])
-            if value is None:
+            is_local = name in labels
+            if value is None or (for_object and is_local):
                 relocs.append({'type': 'mem', 'index': fx['index'], 'symbol': name, 'kind': kind, 'section': 'code'})
                 continue
             code[fx['index']] = set_imm12(code[fx['index']], value)
         elif ftype == 'data_word':
             kind, name = fx['ref']
             value = eval_symbol_ref(fx['ref'])
-            if value is None:
+            is_local = name in labels
+            if value is None or (for_object and is_local):
                 relocs.append({'type': 'data_word', 'offset': fx['offset'], 'symbol': name, 'kind': kind, 'section': 'rodata'})
                 continue
             rodata[fx['offset']:fx['offset'] + 4] = (value & 0xFFFFFFFF).to_bytes(4, 'little')
         elif ftype == 'data_half':
             kind, name = fx['ref']
             value = eval_symbol_ref(fx['ref'])
-            if value is None:
+            is_local = name in labels
+            if value is None or (for_object and is_local):
                 relocs.append({'type': 'data_half', 'offset': fx['offset'], 'symbol': name, 'kind': kind, 'section': 'rodata'})
                 continue
             rodata[fx['offset']:fx['offset'] + 2] = (value & 0xFFFF).to_bytes(2, 'little')
         elif ftype == 'data_byte':
             kind, name = fx['ref']
             value = eval_symbol_ref(fx['ref'])
-            if value is None:
+            is_local = name in labels
+            if value is None or (for_object and is_local):
                 relocs.append({'type': 'data_byte', 'offset': fx['offset'], 'symbol': name, 'kind': kind, 'section': 'rodata'})
                 continue
             rodata[fx['offset']] = value & 0xFF
         else:
             raise ValueError(f"Unknown fixup type {ftype}")
+
+    symtab = _build_symbol_table(labels, externs, imports_decl)
+    if not for_object:
+        relocs = _resolve_unit_local_relocs(code, rodata, relocs, symtab)
+    local_symbols = {
+        name: {
+            'section': info['section'],
+            'offset': info['offset'],
+        }
+        for name, info in symtab.items()
+    }
 
     for sym in externs:
         if sym in labels:
@@ -577,7 +661,7 @@ def assemble(lines, *, include_base: Path | None = None):
     if entry_symbol and entry_symbol in labels:
         sec, offset = labels[entry_symbol]
         exports.setdefault(entry_symbol, {'section': sec, 'offset': offset})
-    return code, entry, sorted(externs), sorted(imports_decl), bytes(rodata), relocs, exports, entry_symbol
+    return code, entry, sorted(externs), sorted(imports_decl), bytes(rodata), relocs, exports, entry_symbol, local_symbols
 
 
 def write_hxe(code_words, entry, out_path, rodata=b"", bss_size=0, req_caps=0, flags=0):
@@ -596,7 +680,7 @@ def write_hxe(code_words, entry, out_path, rodata=b"", bss_size=0, req_caps=0, f
         f.write(rodata)
 
 
-def write_hxo_object(out_path, *, code_words, rodata, entry, entry_symbol, externs, imports_decl, relocs, exports):
+def write_hxo_object(out_path, *, code_words, rodata, entry, entry_symbol, externs, imports_decl, relocs, exports, local_symbols):
     obj = {
         "version": 1,
         "entry": entry,
@@ -607,6 +691,7 @@ def write_hxo_object(out_path, *, code_words, rodata, entry, entry_symbol, exter
         "imports": list(imports_decl),
         "relocs": relocs,
         "symbols": exports,
+        "local_symbols": local_symbols,
     }
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(obj, f, indent=2)
@@ -624,7 +709,11 @@ def main():
     input_path = Path(args.input).resolve()
     with input_path.open("r", encoding="utf-8") as f:
         lines = f.readlines()
-    code, entry, externs, imports_decl, rodata, relocs, exports, entry_symbol = assemble(lines, include_base=input_path.parent)
+    code, entry, externs, imports_decl, rodata, relocs, exports, entry_symbol, local_symbols = assemble(
+        lines,
+        include_base=input_path.parent,
+        for_object=args.emit_hxo,
+    )
     if args.emit_hxo:
         write_hxo_object(
             args.output,
@@ -636,6 +725,7 @@ def main():
             imports_decl=imports_decl,
             relocs=relocs,
             exports=exports,
+            local_symbols=local_symbols,
         )
     else:
         write_hxe(code, entry or 0, args.output, rodata=rodata)

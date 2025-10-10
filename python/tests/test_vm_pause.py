@@ -10,7 +10,7 @@ from python.execd import ExecutiveState
 
 
 def _assemble(lines):
-    code_words, entry, externs, imports_decl, rodata, relocs, exports, entry_symbol = hsx_asm.assemble(lines)
+    code_words, entry, externs, imports_decl, rodata, relocs, exports, entry_symbol, _local_symbols = hsx_asm.assemble(lines)
     assert not relocs
     code_bytes = b"".join((word & 0xFFFFFFFF).to_bytes(4, "big") for word in code_words)
     return code_bytes, entry, rodata

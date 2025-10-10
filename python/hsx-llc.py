@@ -1088,6 +1088,9 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     bias_name = new_label("sext8_bias")
                     bias_reg = alloc_vreg(bias_name, 'i32')
                     load_const(bias_reg, 0x100)
+                    zero_name = new_label("sext8_zero")
+                    zero_reg = alloc_vreg(zero_name, 'i32')
+                    load_const(zero_reg, 0)
                     asm.append(f"MOV {rd}, {rs}")
                     asm.append(f"AND {mask_reg}, {rs}, {mask_reg}")
                     asm.append(f"CMP {mask_reg}, {zero_reg}")
@@ -1097,6 +1100,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     asm.append(f"{pos_label}:")
                     release_reg(mask_name)
                     release_reg(bias_name)
+                    release_reg(zero_name)
                     maybe_release(dst)
                     continue
                 if src_bits == 32 and dst_bits == 64:

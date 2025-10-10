@@ -23,7 +23,7 @@ def assemble_source(src: str):
 
 
 def test_data_section_emits_rodata_and_pointers():
-    code, entry, externs, imports_decl, rodata, relocs, exports, entry_symbol = assemble_source(
+    code, entry, externs, imports_decl, rodata, relocs, exports, entry_symbol, _local_symbols = assemble_source(
         """
         .data
         msg:
@@ -70,7 +70,7 @@ def test_off16_fixup_for_data_offset():
 
 
 def test_data_word_self_reference_requires_rodata_base():
-    code, entry, externs, imports_decl, rodata, relocs, exports, entry_symbol = assemble_source(
+    code, entry, externs, imports_decl, rodata, relocs, exports, entry_symbol, _local_symbols = assemble_source(
         """
         .data
         prefix:

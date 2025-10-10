@@ -15,7 +15,7 @@ def _load_hsx_llc():
 
 
 def _assemble(lines):
-    code_words, entry, externs, imports_decl, rodata, relocs, exports, entry_symbol = hsx_asm.assemble(lines)
+    code_words, entry, externs, imports_decl, rodata, relocs, exports, entry_symbol, _local_symbols = hsx_asm.assemble(lines)
     assert not relocs, f"Unresolved relocations: {relocs}"
     code_bytes = b"".join((w & 0xFFFFFFFF).to_bytes(4, "big") for w in code_words)
     return code_bytes, entry, rodata
