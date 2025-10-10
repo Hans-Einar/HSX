@@ -1,12 +1,16 @@
-﻿#include <stdint.h>
+#include <stdint.h>
 
-static _Float16 accumulate(_Float16 a, _Float16 b) {
-    return a + b;
-}
+typedef __fp16 hsx_half_t;
+
+typedef union {
+    hsx_half_t value;
+    uint16_t bits;
+} hsx_half_bits_t;
 
 int main(void) {
-    _Float16 x = (_Float16)1.5;
-    _Float16 y = (_Float16)2.0;
-    _Float16 z = accumulate(x, y);
-    return (int)z;
+    hsx_half_t x = (hsx_half_t)1.5f;
+    hsx_half_t y = (hsx_half_t)2.0f;
+    hsx_half_bits_t out;
+    out.value = (hsx_half_t)(((float)x) + ((float)y));
+    return (int)out.bits;
 }

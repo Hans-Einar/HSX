@@ -128,6 +128,40 @@ def parse_string_literal(token):
     return bytes(out)
 
 
+def _expand_includes(lines, base_dir: Path, seen: set[Path]) -> list[str]:
+    output: list[str] = []
+    base_dir = base_dir.resolve()
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            output.append(line)
+            continue
+        token = stripped.split(None, 1)[0].lower()
+        if token != '.include':
+            output.append(line)
+            continue
+        parts = stripped.split(None, 1)
+        if len(parts) != 2:
+            raise ValueError(".include expects a filename")
+        arg = parts[1].split(';', 1)[0].strip()
+        if not arg:
+            raise ValueError(".include missing filename")
+        if arg[0] in ('"', "'"):
+            include_bytes = parse_string_literal(arg)
+            include_name = include_bytes.decode('utf-8')
+        else:
+            include_name = arg.split()[0]
+        include_path = (base_dir / include_name).resolve()
+        if include_path in seen:
+            raise ValueError(f"Recursive .include detected for {include_path}")
+        if not include_path.exists():
+            raise FileNotFoundError(f"Included file not found: {include_path}")
+        with include_path.open('r', encoding='utf-8') as inc_file:
+            sub_lines = inc_file.read().splitlines(True)
+        output.extend(_expand_includes(sub_lines, include_path.parent, seen | {include_path}))
+    return output
+
+
 def parse_symbol_token(token):
     token = token.strip()
     m = EXPR_TOKEN_RE.fullmatch(token)
@@ -142,7 +176,9 @@ def parse_symbol_token(token):
     return None
 
 
-def assemble(lines):
+def assemble(lines, *, include_base: Path | None = None):
+    include_base = include_base or Path.cwd()
+    lines = _expand_includes(list(lines), include_base, set())
     code = []
     rodata = bytearray()
     labels = {}
@@ -226,6 +262,12 @@ def assemble(lines):
             parts = line.split()
             if len(parts) != 2:
                 raise ValueError(".extern expects symbol")
+            externs.add(parts[1])
+            continue
+        if lower.startswith('.export'):
+            parts = line.split()
+            if len(parts) != 2:
+                raise ValueError(".export expects symbol")
             externs.add(parts[1])
             continue
         if lower.startswith('.import'):
@@ -566,9 +608,10 @@ def main():
     ap.add_argument("--dump-bytes", action="store_true", help="emit code words as hex for debugging")
     ap.add_argument("--emit-hxo", action="store_true", help="emit HSX object (.hxo) instead of final .hxe")
     args = ap.parse_args()
-    with open(args.input, "r", encoding="utf-8") as f:
+    input_path = Path(args.input).resolve()
+    with input_path.open("r", encoding="utf-8") as f:
         lines = f.readlines()
-    code, entry, externs, imports_decl, rodata, relocs, exports, entry_symbol = assemble(lines)
+    code, entry, externs, imports_decl, rodata, relocs, exports, entry_symbol = assemble(lines, include_base=input_path.parent)
     if args.emit_hxo:
         write_hxo_object(
             args.output,

@@ -88,6 +88,28 @@ def _pretty_ps(payload: dict) -> None:
         print(f"  {marker} {pid:4}  {state:<8}  {prio:>4}  {quantum:>7}  {cycles:>8}  {str(sleep):<5}  {program}")
 
 
+
+def _pretty_listen(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    messages = payload.get("messages", [])
+    print("listen:")
+    if not messages:
+        print("  (no messages)")
+        return
+    for msg in messages:
+        target = msg.get("target")
+        text = msg.get("text", "")
+        data_hex = msg.get("data_hex", "")
+        length = msg.get("length")
+        src_pid = msg.get("src_pid")
+        print(f"  target={target} len={length} src={src_pid}")
+        if text:
+            print(f"    text: {text}")
+        if data_hex and (not text or text.encode('utf-8').hex() != data_hex):
+            print(f"    data_hex: {data_hex}")
+
 PRETTY_HANDLERS = {
     'dumpregs': _pretty_dumpregs,
     'info': _pretty_info,
@@ -134,6 +156,126 @@ def send_request(host: str, port: int, payload: dict) -> dict:
 
 
 
+def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -> dict:
+    payload_cmd = cmd
+    payload: dict[str, object] = {"cmd": payload_cmd}
+
+    if cmd in {"attach", "detach", "ps", "start_auto", "stop_auto", "shutdown", "pause", "resume", "kill", "load", "exec", "step", "listen", "send", "sched", "info", "peek", "poke", "dumpregs", "stdiofanout", "mailboxes", "mailbox_snapshot", "mailbox_open", "mailbox_close", "mailbox_bind", "mailbox_send", "mailbox_recv", "mailbox_peek", "mailbox_tap"}:
+        pass
+
+    if cmd == "info":
+        if args:
+            payload["pid"] = args[0]
+        return payload
+
+    if cmd == "load":
+        if not args:
+            raise ValueError("load requires <path>")
+        base = Path(args[0])
+        if current_dir is not None and not base.is_absolute():
+            base = (current_dir / base)
+        base = base.resolve(strict=False)
+        payload["path"] = str(base)
+        return payload
+
+    if cmd == "exec":
+        if not args:
+            raise ValueError("exec requires <path>")
+        base = Path(args[0])
+        if current_dir is not None and not base.is_absolute():
+            base = (current_dir / base)
+        base = base.resolve(strict=False)
+        payload["path"] = str(base)
+        return payload
+
+    if cmd == "step":
+        if args:
+            try:
+                payload["cycles"] = int(args[0])
+            except ValueError as exc:
+                raise ValueError("step cycles must be integer") from exc
+        return payload
+
+    if cmd == "listen":
+        remaining = list(args)
+        for key in ("pid", "limit", "max_len"):
+            if not remaining:
+                break
+            value = remaining[0]
+            try:
+                payload[key] = int(value)
+            except ValueError as exc:
+                raise ValueError("listen arguments must be integers") from exc
+            remaining.pop(0)
+        return payload
+
+    if cmd == "send":
+        if len(args) < 2:
+            raise ValueError("send requires <pid> [channel] <data>")
+        payload["pid"] = args[0]
+        if len(args) == 2:
+            payload["data"] = args[1]
+        else:
+            payload["channel"] = args[1]
+            payload["data"] = " ".join(args[2:])
+        return payload
+
+    if cmd == "stdiofanout":
+        if not args:
+            raise ValueError("stdiofanout requires <mode> [stream] [pid]")
+        payload["cmd"] = "stdio_fanout"
+        payload["mode"] = args[0]
+        if len(args) > 1:
+            payload["stream"] = args[1]
+        if len(args) > 2:
+            payload["pid"] = args[2]
+        return payload
+
+    if cmd == "sched":
+        if not args:
+            raise ValueError("sched requires <pid> [priority <n>] [quantum <n>]")
+        payload["pid"] = args[0]
+        tokens = args[1:]
+        i = 0
+        while i < len(tokens):
+            token = tokens[i].lower()
+            if token in {"priority", "quantum"} and i + 1 < len(tokens):
+                payload[token] = tokens[i + 1]
+                i += 2
+            else:
+                raise ValueError("sched usage: sched <pid> [priority <n>] [quantum <n>]")
+        return payload
+
+    if cmd == "peek":
+        if len(args) < 2:
+            raise ValueError("peek requires <pid> <addr> [len]")
+        payload["pid"] = args[0]
+        payload["addr"] = args[1]
+        if len(args) > 2:
+            payload["length"] = args[2]
+        return payload
+
+    if cmd == "poke":
+        if len(args) < 3:
+            raise ValueError("poke requires <pid> <addr> <hexdata>")
+        payload["pid"] = args[0]
+        payload["addr"] = args[1]
+        payload["data"] = args[2]
+        return payload
+
+    if cmd == "dumpregs":
+        if not args:
+            raise ValueError("dumpregs requires <pid>")
+        payload["pid"] = args[0]
+        return payload
+
+    if cmd in {"pause", "resume", "kill"}:
+        if not args:
+            raise ValueError(f"{cmd} requires <pid>")
+        payload["pid"] = args[0]
+        return payload
+
+    return payload
 def cmd_loop(host: str, port: int, cwd: Path | None = None) -> None:
     current_dir = (cwd or Path.cwd()).resolve()
     print(f"Connected to executive at {host}:{port}. Type 'help' for commands.")
@@ -148,10 +290,10 @@ def cmd_loop(host: str, port: int, cwd: Path | None = None) -> None:
         if line.lower() in {'quit', 'exit'}:
             break
         if line.lower() == 'help':
-            print("Commands: info [pid], attach, detach, ps, load <path>, exec <path>, start_auto, stop_auto, step <cycles>, pause <pid>, resume <pid>, kill <pid>, sched <pid> [priority <n>] [quantum <n>], restart [targets], peek <pid> <addr> [len], poke <pid> <addr> <hex>, dumpregs <pid>, ls [path], cd <path>, pwd, shutdown, quit")
+            print("Commands: info [pid], attach, detach, ps, load <path>, exec <path>, start_auto, stop_auto, step [cycles], pause <pid>, resume <pid>, kill <pid>, sched <pid> [priority <n>] [quantum <n>], restart [targets], listen [pid] [limit] [max_len], send <pid> [channel] <data>, stdiofanout <mode> [stream] [pid], peek <pid> <addr> [len], poke <pid> <addr> <hex>, dumpregs <pid>, ls [path], cd <path>, pwd, shutdown, quit")
             continue
         parts = line.split()
-        cmd = parts[0]
+        cmd = parts[0].lower()
         args = parts[1:]
 
         if cmd == 'pwd':
@@ -181,96 +323,27 @@ def cmd_loop(host: str, port: int, cwd: Path | None = None) -> None:
             current_dir = target
             continue
 
-        payload = {'cmd': cmd}
         if cmd == 'restart':
             targets = [t.lower() for t in args] if args else ['vm', 'exec', 'shell']
             remote_targets = [t for t in targets if t in {'vm', 'exec'}]
-            response = None
             if remote_targets:
-                payload['targets'] = remote_targets
                 try:
-                    response = send_request(host, port, payload)
+                    resp = send_request(host, port, {"cmd": "restart", "targets": remote_targets})
                 except Exception as exc:
                     print(f"error: {exc}")
-                    response = None
-            if response:
-                print(json.dumps(response, indent=2, sort_keys=True))
+                else:
+                    print(json.dumps(resp, indent=2, sort_keys=True))
             if 'shell' in targets:
                 print('[shell] restarting')
                 os.execv(sys.executable, [sys.executable] + sys.argv)
             continue
-        if cmd in {'load', 'exec'}:
-            if not args:
-                print(f'{cmd} requires a path')
-                continue
-            payload['path'] = str((current_dir / args[0]).resolve())
-            if cmd == 'exec':
-                payload['cmd'] = 'exec'
-        elif cmd == 'step':
-            if args:
-                try:
-                    payload['cycles'] = int(args[0])
-                except ValueError:
-                    print('cycles must be integer')
-                    continue
-        if cmd == 'peek':
-            if len(args) < 2:
-                print('usage: peek <pid> <addr> [len]')
-                continue
-            payload['pid'] = args[0]
-            payload['addr'] = args[1]
-            if len(args) > 2:
-                payload['length'] = args[2]
-        elif cmd == 'info':
-            if args:
-                try:
-                    payload['pid'] = int(args[0])
-                except ValueError:
-                    print('info pid must be integer')
-                    continue
-        elif cmd == 'poke':
-            if len(args) < 3:
-                print('usage: poke <pid> <addr> <hexdata>')
-                continue
-            payload['pid'] = args[0]
-            payload['addr'] = args[1]
-            payload['data'] = args[2]
-        elif cmd == 'dumpregs':
-            if len(args) < 1:
-                print('usage: dumpregs <pid>')
-                continue
-            payload['pid'] = args[0]
-        elif cmd in {'pause', 'resume', 'kill'}:
-            if len(args) < 1:
-                print(f'usage: {cmd} <pid>')
-                continue
-            payload['pid'] = args[0]
-        elif cmd == 'sched':
-            if not args:
-                print('usage: sched <pid> [priority <n>] [quantum <n>]')
-                continue
-            payload['pid'] = args[0]
-            remainder = args[1:]
-            i = 0
-            while i < len(remainder):
-                token = remainder[i].lower()
-                if token == 'priority' and i + 1 < len(remainder):
-                    payload['priority'] = remainder[i + 1]
-                    i += 2
-                elif token == 'quantum' and i + 1 < len(remainder):
-                    payload['quantum'] = remainder[i + 1]
-                    i += 2
-                else:
-                    print('usage: sched <pid> [priority <n>] [quantum <n>]')
-                    break
-            else:
-                try:
-                    resp = send_request(host, port, payload)
-                except Exception as exc:
-                    print(f"error: {exc}")
-                    continue
-                print(json.dumps(resp, indent=2, sort_keys=True))
-                continue
+
+        try:
+            payload = _build_payload(cmd, args, current_dir)
+        except ValueError as exc:
+            print(exc)
+            continue
+
         try:
             resp = send_request(host, port, payload)
         except Exception as exc:
@@ -289,28 +362,21 @@ def main() -> None:
     parser.add_argument("--host", default="127.0.0.1", help="executive host")
     parser.add_argument("--port", type=int, default=9998, help="executive port")
     parser.add_argument("--cycles", type=int, help="cycles for step command")
-    parser.add_argument("--path", help="path for load command")
+    parser.add_argument("--path", help="path for load/exec commands")
     parser.add_argument("--verbose", action="store_true", help="verbose load")
     args_ns = parser.parse_args()
     if not args_ns.cmd:
         cmd_loop(args_ns.host, args_ns.port)
         return
+
     cmd = args_ns.cmd.lower()
-    payload = {'cmd': cmd}
-    if cmd in {'load', 'exec'}:
-        if not args_ns.path:
-            parser.error(f'{cmd} requires --path')
-        payload['path'] = str(Path(args_ns.path).resolve())
-        if args_ns.verbose:
-            payload['verbose'] = True
-    if cmd == 'step' and args_ns.cycles is not None:
-        payload['cycles'] = args_ns.cycles
+    args = list(args_ns.args)
+
     if cmd == 'restart':
-        targets = [arg.lower() for arg in args_ns.args] if args_ns.args else ['vm', 'exec', 'shell']
+        targets = [arg.lower() for arg in args] if args else ['vm', 'exec', 'shell']
         remote_targets = [t for t in targets if t in {'vm', 'exec'}]
-        resp = None
         if remote_targets:
-            payload['targets'] = remote_targets
+            payload = {"cmd": "restart", "targets": remote_targets}
             resp = send_request(args_ns.host, args_ns.port, payload)
             print(json.dumps(resp, indent=2, sort_keys=True))
         if 'shell' in targets:
@@ -318,46 +384,24 @@ def main() -> None:
             os.execv(sys.executable, [sys.executable] + sys.argv)
         return
 
-    if cmd in {'peek', 'poke', 'dumpregs', 'pause', 'resume', 'kill', 'sched', 'info'}:
-        if not args_ns.args:
-            parser.error(f"{cmd} requires arguments")
-        if cmd == 'peek':
-            if len(args_ns.args) < 2:
-                parser.error('peek requires pid and addr')
-            payload['pid'] = args_ns.args[0]
-            payload['addr'] = args_ns.args[1]
-            if len(args_ns.args) > 2:
-                payload['length'] = args_ns.args[2]
-        elif cmd == 'poke':
-            if len(args_ns.args) < 3:
-                parser.error('poke requires pid, addr, data')
-            payload['pid'] = args_ns.args[0]
-            payload['addr'] = args_ns.args[1]
-            payload['data'] = args_ns.args[2]
-        elif cmd == 'dumpregs':
-            payload['pid'] = args_ns.args[0]
-        elif cmd in {'pause', 'resume', 'kill'}:
-            payload['pid'] = args_ns.args[0]
-        elif cmd == 'sched':
-            payload['pid'] = args_ns.args[0]
-            remaining = args_ns.args[1:]
-            i = 0
-            while i < len(remaining):
-                token = remaining[i].lower()
-                if token == 'priority' and i + 1 < len(remaining):
-                    payload['priority'] = remaining[i + 1]
-                    i += 2
-                elif token == 'quantum' and i + 1 < len(remaining):
-                    payload['quantum'] = remaining[i + 1]
-                    i += 2
-                else:
-                    parser.error('sched usage: sched <pid> [priority <n>] [quantum <n>]')
-        elif cmd == 'info':
-            try:
-                payload['pid'] = int(args_ns.args[0])
-            except ValueError:
-                parser.error('info requires integer pid')
-    resp = send_request(args_ns.host, args_ns.port, payload)
+    if cmd in {'load', 'exec'} and args_ns.path and not args:
+        args = [args_ns.path]
+    if cmd == 'step' and args_ns.cycles is not None and not args:
+        args = [str(args_ns.cycles)]
+
+    try:
+        payload = _build_payload(cmd, args, Path.cwd())
+    except ValueError as exc:
+        parser.error(str(exc))
+
+    if cmd == 'load' and args_ns.verbose:
+        payload['verbose'] = True
+
+    try:
+        resp = send_request(args_ns.host, args_ns.port, payload)
+    except Exception as exc:
+        parser.error(str(exc))
+
     handler = PRETTY_HANDLERS.get(cmd)
     if handler:
         handler(resp)
@@ -367,3 +411,12 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
+
+
+

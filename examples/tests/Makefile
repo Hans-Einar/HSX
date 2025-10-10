@@ -5,7 +5,8 @@ PYTHON ?= $(if $(HSX_PY),$(HSX_PY),python)
 CLANG ?= $(if $(HSX_CLANG),$(HSX_CLANG),clang)
 VM := $(REPO_ROOT)/platforms/python/host_vm.py
 BUILD_DIR ?= build
-CLANGFLAGS ?= -S -emit-llvm -O0 -fno-builtin
+HXE_BUILDER := $(REPO_ROOT)/python/build_hxe.py
+CLANGFLAGS ?= -S -emit-llvm -O0 -fno-builtin -fno-ms-compatibility -fno-ms-extensions -target wasm32-unknown-unknown -I$(REPO_ROOT)/examples/lib -I$(REPO_ROOT)/include
 RUN_ARGS ?=
 MKDIR_CMD = $(PYTHON) -c "import os, sys; os.makedirs(os.path.dirname(os.path.abspath(sys.argv[1])), exist_ok=True)" "$@"
 
@@ -22,6 +23,10 @@ LINKER_MVA := $(LINKER_LL:.ll=.mvasm)
 LINKER_HXO := $(LINKER_LL:.ll=.hxo)
 HXE_ARTIFACTS := $(LL_ARTIFACTS:.ll=.hxe)
 .SECONDARY: $(LL_ARTIFACTS) $(MVA_ARTIFACTS) $(HXE_ARTIFACTS) $(LINKER_LL) $(LINKER_MVA) $(LINKER_HXO)
+
+HSX_EXTRA_MVASM_test_stdio_mailbox_c := $(REPO_ROOT)/examples/lib/hsx_mailbox.mvasm $(REPO_ROOT)/examples/lib/hsx_stdio.mvasm
+HSX_EXTRA_MVASM_test_mailbox_producer_c := $(REPO_ROOT)/examples/lib/hsx_mailbox.mvasm
+HSX_EXTRA_MVASM_test_mailbox_consumer_c := $(REPO_ROOT)/examples/lib/hsx_mailbox.mvasm $(REPO_ROOT)/examples/lib/hsx_stdio.mvasm
 
 .PHONY: all tests run-% clean list
 
@@ -57,7 +62,7 @@ $(BUILD_DIR)/$(LINKER_TEST)/%.ll: $(LINKER_TEST)/%.c
 
 $(BUILD_DIR)/%/main.hxe: $(BUILD_DIR)/%/main.mvasm
 	$(MKDIR_CMD)
-	$(PYTHON) "$(REPO_ROOT)/python/asm.py" $< -o $@
+	$(PYTHON) "$(HXE_BUILDER)" --asm "$(REPO_ROOT)/python/asm.py" --linker "$(REPO_ROOT)/python/hld.py" --main "$<" --out "$@" $(foreach lib,$(HSX_EXTRA_MVASM_$*),--extra "$(lib)")
 
 $(BUILD_DIR)/%/main.mvasm: $(BUILD_DIR)/%/main.ll
 	$(MKDIR_CMD)

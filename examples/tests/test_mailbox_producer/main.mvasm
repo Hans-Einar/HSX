@@ -1,0 +1,27 @@
+.entry main
+.text
+main:
+    ; Open or bind the shared app:demo mailbox
+    LDI32 R1, target_demo
+    LDI R2, 0
+    SVC MOD=0x5, FN=0x0
+    MOV R8, R1
+
+    ; Send a short payload into the mailbox (descriptor cached in R8)
+    LDI32 R2, msg_payload
+    LDI R3, 18
+    LDI R4, 0
+    LDI R5, 0
+    MOV R1, R8
+    SVC MOD=0x5, FN=0x2
+
+    ; Exit cleanly
+    LDI R0, 0
+    RET
+
+.data
+    .align 2
+target_demo:
+    .asciz "app:demo"
+msg_payload:
+    .asciz "ping from producer"

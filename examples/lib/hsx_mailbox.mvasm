@@ -1,0 +1,172 @@
+.export hsx_mailbox_open
+.export hsx_mailbox_close
+.export hsx_mailbox_send
+.export hsx_mailbox_recv
+.export hsx_mailbox_open_stdout
+.export hsx_mailbox_open_stdin
+.export hsx_mailbox_open_app_demo
+.export hsx_mailbox_send_basic
+.export hsx_mailbox_recv_basic
+
+.data
+    .align 2
+hsx_mailbox_target_stdout:
+    .asciz "svc:stdio.out"
+hsx_mailbox_target_stdin:
+    .asciz "svc:stdio.in"
+hsx_mailbox_target_app_demo:
+    .asciz "app:demo"
+
+.text
+hsx_mailbox_open:
+    MOV R8, R1
+    MOV R9, R2
+    MOV R1, R8
+    MOV R2, R9
+    SVC MOD=0x5, FN=0x0
+    MOV R8, R0
+    LDI R9, 0
+    CMP R8, R9
+    JNZ hsx_mailbox_open_error
+    MOV R0, R1
+    RET
+hsx_mailbox_open_error:
+    LDI R9, 0
+    SUB R0, R9, R8
+    RET
+
+hsx_mailbox_close:
+    MOV R8, R1
+    MOV R1, R8
+    SVC MOD=0x5, FN=0x6
+    MOV R8, R0
+    LDI R9, 0
+    CMP R8, R9
+    JNZ hsx_mailbox_close_error
+    RET
+hsx_mailbox_close_error:
+    LDI R9, 0
+    SUB R0, R9, R8
+    RET
+
+hsx_mailbox_send:
+    MOV R8, R1
+    MOV R9, R2
+    MOV R10, R3
+    MOV R11, R4
+    MOV R12, R5
+    MOV R1, R8
+    MOV R2, R9
+    MOV R3, R10
+    MOV R4, R11
+    MOV R5, R12
+    SVC MOD=0x5, FN=0x2
+    MOV R8, R0
+    LDI R9, 0
+    CMP R8, R9
+    JNZ hsx_mailbox_send_error
+    MOV R0, R1
+    RET
+hsx_mailbox_send_error:
+    LDI R9, 0
+    SUB R0, R9, R8
+    RET
+
+hsx_mailbox_recv:
+    MOV R8, R1
+    MOV R9, R2
+    MOV R10, R3
+    MOV R11, R4
+    MOV R12, R5
+    MOV R1, R8
+    MOV R2, R9
+    MOV R3, R10
+    MOV R4, R11
+    LDI R5, 0
+    SVC MOD=0x5, FN=0x3
+    MOV R13, R0
+    LDI R14, 0
+    CMP R13, R14
+    JNZ hsx_mailbox_recv_error
+    CMP R12, R14
+    JZ hsx_mailbox_recv_return
+    ST [R12+0], R13
+    ST [R12+4], R1
+    ST [R12+8], R2
+    ST [R12+12], R3
+    ST [R12+16], R4
+hsx_mailbox_recv_return:
+    MOV R0, R13
+    RET
+hsx_mailbox_recv_error:
+    CMP R12, R14
+    JZ hsx_mailbox_recv_error_return
+    ST [R12+0], R13
+    ST [R12+4], R14
+    ST [R12+8], R14
+    ST [R12+12], R14
+    ST [R12+16], R14
+hsx_mailbox_recv_error_return:
+    LDI R15, 0
+    SUB R0, R15, R13
+    RET
+
+hsx_mailbox_open_stdout:
+    LDI32 R1, hsx_mailbox_target_stdout
+    LDI R2, 0
+    CALL hsx_mailbox_open
+    RET
+
+hsx_mailbox_open_stdin:
+    LDI32 R1, hsx_mailbox_target_stdin
+    LDI R2, 0
+    CALL hsx_mailbox_open
+    RET
+
+hsx_mailbox_open_app_demo:
+    LDI32 R1, hsx_mailbox_target_app_demo
+    LDI R2, 0
+    CALL hsx_mailbox_open
+    RET
+
+hsx_mailbox_send_basic:
+    MOV R8, R1
+    MOV R9, R2
+    MOV R10, R3
+    MOV R1, R8
+    MOV R2, R9
+    MOV R3, R10
+    LDI R4, 0
+    LDI R5, 0
+    SVC MOD=0x5, FN=0x2
+    MOV R8, R0
+    LDI R9, 0
+    CMP R8, R9
+    JNZ hsx_mailbox_send_basic_error
+    MOV R0, R1
+    RET
+hsx_mailbox_send_basic_error:
+    LDI R9, 0
+    SUB R0, R9, R8
+    RET
+
+hsx_mailbox_recv_basic:
+    MOV R8, R1
+    MOV R9, R2
+    MOV R10, R3
+    MOV R1, R8
+    MOV R2, R9
+    MOV R3, R10
+    LDI R4, 0
+    LDI R5, 0
+    SVC MOD=0x5, FN=0x3
+    MOV R8, R0
+    LDI R9, 0
+    CMP R8, R9
+    JNZ hsx_mailbox_recv_basic_error
+    MOV R0, R1
+    RET
+hsx_mailbox_recv_basic_error:
+    LDI R9, 0
+    SUB R0, R9, R8
+    RET

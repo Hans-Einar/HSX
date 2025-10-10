@@ -1,9 +1,0 @@
-.entry main
-.extern main
-.text
-; -- function main --
-main:
-main__entry:
-LDI R4, 0
-LDI R0, 5
-RET

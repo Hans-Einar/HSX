@@ -1,4 +1,4 @@
-﻿# HSX repository Makefile entry point
+# HSX repository Makefile entry point
 
 PYTHON_SYS ?= $(if $(HSX_PY),$(HSX_PY),python)
 DOXYGEN ?= doxygen
@@ -94,6 +94,7 @@ include = [
     "platforms/python",
     "examples",
     "docs",
+    "include",
 ]
 for item in include:
     src = root / item
@@ -118,3 +119,4 @@ release: tests package
 	@echo "Release artefact available under $(PACKAGE_DIR)/"
 
 tests: pytest examples-tests
+

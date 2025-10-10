@@ -18,11 +18,6 @@ longrun: $(BUILD_DIR)/longrun/main.hxe
 runlongrun: longrun
 	$(PYTHON) "$(VM)" $(BUILD_DIR)/longrun/main.hxe $(RUN_ARGS)
 
-shell:
-	$(MAKE) -C shell
-
-runshell:
-	$(MAKE) -C shell run RUN_ARGS="$(RUN_ARGS)"
 
 $(BUILD_DIR)/longrun/main.hxe: $(BUILD_DIR)/longrun/main.mvasm
 	$(MKDIR_CMD)
@@ -38,4 +33,4 @@ $(BUILD_DIR)/longrun/main.ll: longrun/main.c
 
 clean:
 	$(PYTHON) -c "import shutil, sys; shutil.rmtree(sys.argv[1], ignore_errors=True)" $(BUILD_DIR)
-	$(MAKE) -C shell clean
+

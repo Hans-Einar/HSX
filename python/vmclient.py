@@ -121,3 +121,51 @@ class VMClient:
         if targets:
             payload["targets"] = targets
         return _check_ok(self.request(payload))
+    def mailbox_snapshot(self) -> list[dict]:
+        return _check_ok(self.request({"cmd": "mailbox_snapshot"})).get("descriptors", [])
+
+    def mailbox_open(self, pid: int, target: str, flags: int = 0) -> dict:
+        payload: Dict[str, Any] = {"cmd": "mailbox_open", "pid": pid, "target": target}
+        if flags:
+            payload["flags"] = flags
+        return _check_ok(self.request(payload))
+
+    def mailbox_close(self, pid: int, handle: int) -> dict:
+        return _check_ok(self.request({"cmd": "mailbox_close", "pid": pid, "handle": handle}))
+
+    def mailbox_bind(self, pid: int, target: str, *, capacity: int | None = None, mode: int = 0) -> dict:
+        payload: Dict[str, Any] = {"cmd": "mailbox_bind", "pid": pid, "target": target}
+        if capacity is not None:
+            payload["capacity"] = capacity
+        if mode:
+            payload["mode"] = mode
+        return _check_ok(self.request(payload))
+
+    def mailbox_config_stdio(self, stream: str, mode: int, update_existing: bool = True) -> dict:
+        payload: Dict[str, Any] = {
+            "cmd": "mailbox_config_stdio",
+            "stream": stream,
+            "mode": mode,
+            "update_existing": 1 if update_existing else 0,
+        }
+        return _check_ok(self.request(payload))
+
+    def mailbox_send(self, pid: int, handle: int, *, data: str | None = None, data_hex: str | None = None, flags: int = 0, channel: int = 0) -> dict:
+        payload: Dict[str, Any] = {"cmd": "mailbox_send", "pid": pid, "handle": handle, "flags": flags, "channel": channel}
+        if data_hex is not None:
+            payload["data_hex"] = data_hex
+        elif data is not None:
+            payload["data"] = data
+        return _check_ok(self.request(payload))
+
+    def mailbox_recv(self, pid: int, handle: int, *, max_len: int = 512, timeout: int = 0) -> dict:
+        payload: Dict[str, Any] = {"cmd": "mailbox_recv", "pid": pid, "handle": handle, "max_len": max_len, "timeout": timeout}
+        return _check_ok(self.request(payload))
+
+    def mailbox_peek(self, pid: int, handle: int) -> dict:
+        payload: Dict[str, Any] = {"cmd": "mailbox_peek", "pid": pid, "handle": handle}
+        return _check_ok(self.request(payload))
+
+    def mailbox_tap(self, pid: int, handle: int, enable: bool = True) -> dict:
+        payload: Dict[str, Any] = {"cmd": "mailbox_tap", "pid": pid, "handle": handle, "enable": 1 if enable else 0}
+        return _check_ok(self.request(payload))

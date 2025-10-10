@@ -1,0 +1,218 @@
+; HSX stdio shim implemented in assembly.
+; Provides helpers for routing stdout/stderr/stdin through mailbox channels.
+
+.export hsx_stdio_send_core
+.export hsx_stdio_write
+.export hsx_stdio_write_err
+.export hsx_stdio_puts
+.export hsx_stdio_puts_err
+.export hsx_stdio_read
+.export hsx_stdio_read_basic
+
+.data
+    .align 2
+hsx_stdio_target_out:
+    .asciz "svc:stdio.out"
+hsx_stdio_target_err:
+    .asciz "svc:stdio.err"
+hsx_stdio_target_in:
+    .asciz "svc:stdio.in"
+hsx_stdio_newline:
+    .byte 0x0A, 0x00
+
+.text
+hsx_stdio_send_core:
+    ; R1=data ptr, R2=len, R3=flags, R4=ignored, R5=target, R6=channel
+    MOV R8, R1
+    MOV R9, R2
+    MOV R10, R3
+    MOV R12, R5
+    MOV R13, R6
+    MOV R1, R12
+    LDI R2, 0
+    SVC MOD=0x5, FN=0x0
+    MOV R14, R0
+    LDI R15, 0
+    CMP R14, R15
+    JNZ hsx_stdio_send_return
+    MOV R14, R1
+    MOV R1, R14
+    MOV R2, R8
+    MOV R3, R9
+    MOV R4, R10
+    MOV R5, R13
+    SVC MOD=0x5, FN=0x2
+    MOV R15, R0
+    MOV R1, R14
+    SVC MOD=0x5, FN=0x6
+    MOV R0, R15
+hsx_stdio_send_return:
+    RET
+
+hsx_stdio_write:
+    LDI R4, 0
+    LDI32 R5, hsx_stdio_target_out
+    LDI R6, 0
+    CALL hsx_stdio_send_core
+    RET
+
+hsx_stdio_write_err:
+    LDI R4, 0
+    LDI32 R5, hsx_stdio_target_err
+    LDI R6, 0
+    CALL hsx_stdio_send_core
+    RET
+
+hsx_stdio_puts:
+    MOV R8, R1
+    MOV R9, R1
+    LDI R10, 0
+    LDI R11, 1
+hsx_stdio_puts_loop:
+    LDB R12, [R9+0]
+    LDI R13, 0
+    CMP R12, R13
+    JZ hsx_stdio_puts_len_ready
+    ADD R9, R9, R11
+    ADD R10, R10, R11
+    JMP hsx_stdio_puts_loop
+hsx_stdio_puts_len_ready:
+    MOV R1, R8
+    MOV R2, R10
+    LDI R3, 0
+    CALL hsx_stdio_write
+    MOV R14, R0
+    LDI R15, 0
+    CMP R14, R15
+    JNZ hsx_stdio_puts_return
+    LDI32 R1, hsx_stdio_newline
+    LDI R2, 1
+    LDI R3, 0
+    CALL hsx_stdio_write
+hsx_stdio_puts_return:
+    RET
+
+hsx_stdio_puts_err:
+    MOV R8, R1
+    MOV R9, R1
+    LDI R10, 0
+    LDI R11, 1
+hsx_stdio_puts_err_loop:
+    LDB R12, [R9+0]
+    LDI R13, 0
+    CMP R12, R13
+    JZ hsx_stdio_puts_err_len_ready
+    ADD R9, R9, R11
+    ADD R10, R10, R11
+    JMP hsx_stdio_puts_err_loop
+hsx_stdio_puts_err_len_ready:
+    MOV R1, R8
+    MOV R2, R10
+    LDI R3, 0
+    CALL hsx_stdio_write_err
+    MOV R14, R0
+    LDI R15, 0
+    CMP R14, R15
+    JNZ hsx_stdio_puts_err_return
+    LDI32 R1, hsx_stdio_newline
+    LDI R2, 1
+    LDI R3, 0
+    CALL hsx_stdio_write_err
+hsx_stdio_puts_err_return:
+    RET
+
+hsx_stdio_read:
+    MOV R8, R1
+    MOV R9, R2
+    MOV R10, R3
+    MOV R11, R4
+    LDI32 R12, hsx_stdio_target_in
+    MOV R1, R12
+    LDI R2, 0
+    SVC MOD=0x5, FN=0x0
+    MOV R13, R0
+    LDI R14, 0
+    CMP R13, R14
+    JNZ hsx_stdio_read_return
+    MOV R13, R1
+    LDI R10, 0
+hsx_stdio_read_try:
+    MOV R1, R13
+    MOV R2, R8
+    MOV R3, R9
+    MOV R4, R10
+    LDI R5, 0
+    SVC MOD=0x5, FN=0x3
+    MOV R6, R0
+    LDI R14, 0
+    CMP R6, R14
+    JZ hsx_stdio_read_store
+    LDI R15, 3
+    CMP R6, R15
+    JNZ hsx_stdio_read_close
+    SVC MOD=0x7, FN=0x0
+    JMP hsx_stdio_read_try
+hsx_stdio_read_store:
+    MOV R15, R0
+    MOV R7, R1
+    MOV R1, R13
+    SVC MOD=0x5, FN=0x6
+    MOV R0, R15
+    MOV R1, R7
+    LDI R14, 0
+    CMP R11, R14
+    JZ hsx_stdio_read_return
+    ST [R11+0], R1
+    RET
+hsx_stdio_read_close:
+    MOV R1, R13
+    SVC MOD=0x5, FN=0x6
+hsx_stdio_read_return:
+    RET
+
+hsx_stdio_read_basic:
+    MOV R8, R1
+    MOV R9, R2
+    MOV R10, R3
+    LDI32 R12, hsx_stdio_target_in
+    MOV R1, R12
+    LDI R2, 0
+    SVC MOD=0x5, FN=0x0
+    MOV R13, R0
+    LDI R14, 0
+    CMP R13, R14
+    JNZ hsx_stdio_read_basic_open_error
+    MOV R13, R1
+    MOV R1, R13
+    MOV R2, R8
+    MOV R3, R9
+    MOV R4, R10
+    LDI R5, 0
+    SVC MOD=0x5, FN=0x3
+    MOV R6, R0
+    MOV R7, R1
+    MOV R1, R13
+    SVC MOD=0x5, FN=0x6
+    MOV R8, R0
+    LDI R14, 0
+    CMP R6, R14
+    JNZ hsx_stdio_read_basic_recv_error
+    CMP R8, R14
+    JNZ hsx_stdio_read_basic_close_error
+    MOV R0, R7
+    RET
+
+hsx_stdio_read_basic_recv_error:
+    LDI R9, 0
+    SUB R0, R9, R6
+    RET
+
+hsx_stdio_read_basic_close_error:
+    LDI R9, 0
+    SUB R0, R9, R8
+    RET
+
+hsx_stdio_read_basic_open_error:
+    LDI R15, 0
+    SUB R0, R15, R13
+    RET

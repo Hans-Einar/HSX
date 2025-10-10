@@ -10,7 +10,17 @@ from pathlib import Path
 import struct
 import sys
 import zlib
-from typing import Any, Dict, Optional, List
+from typing import Any, Callable, Dict, Optional, List
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+try:
+    from python.mailbox import MailboxManager, MailboxError, MailboxMessage
+    from python import hsx_mailbox_constants as mbx_const
+except ImportError as exc:  # pragma: no cover - require repo sources
+    raise ImportError("HSX repo modules not found; ensure repository root on PYTHONPATH") from exc
 
 HSX_MAGIC = 0x48535845  # 'HSXE'
 HEADER = struct.Struct(">IHHIIIIII")
@@ -43,6 +53,11 @@ class TaskContext:
     state: str = "ready"
     priority: int = 10
     pid: Optional[int] = None
+    wait_kind: Optional[str] = None
+    wait_mailbox: Optional[int] = None
+    wait_deadline: Optional[float] = None
+    wait_handle: Optional[int] = None
+    fd_table: Dict[int, int] = field(default_factory=dict)
 
 
 def clone_context(ctx: TaskContext) -> TaskContext:
@@ -59,6 +74,11 @@ def clone_context(ctx: TaskContext) -> TaskContext:
         state=ctx.state,
         priority=ctx.priority,
         pid=ctx.pid,
+        wait_kind=ctx.wait_kind,
+        wait_mailbox=ctx.wait_mailbox,
+        wait_deadline=ctx.wait_deadline,
+        wait_handle=ctx.wait_handle,
+        fd_table=dict(ctx.fd_table),
     )
 
 
@@ -76,6 +96,11 @@ def context_to_dict(ctx: TaskContext) -> Dict[str, Any]:
         "state": ctx.state,
         "priority": ctx.priority,
         "pid": ctx.pid,
+        "wait_kind": ctx.wait_kind,
+        "wait_mailbox": ctx.wait_mailbox,
+        "wait_deadline": ctx.wait_deadline,
+        "wait_handle": ctx.wait_handle,
+        "fd_table": dict(ctx.fd_table),
     }
 
 
@@ -93,6 +118,11 @@ def dict_to_context(data: Dict[str, Any]) -> TaskContext:
         state=str(data.get("state", "ready")),
         priority=int(data.get("priority", 10)) & 0xFF,
         pid=data.get("pid"),
+        wait_kind=data.get("wait_kind"),
+        wait_mailbox=data.get("wait_mailbox"),
+        wait_deadline=data.get("wait_deadline"),
+        wait_handle=data.get("wait_handle"),
+        fd_table={int(k): int(v) for k, v in dict(data.get("fd_table", {})).items()},
     )
 
 def f16_to_f32(h):
@@ -196,7 +226,20 @@ class FSStub:
     def mkdir(self, path): return 0
 
 class MiniVM:
-    def __init__(self, code: bytes, *, entry: int = 0, rodata: bytes = b"", trace: bool = False, svc_trace: bool = False, dev_libm: bool = False, trace_file=None, exec_root=None):
+    def __init__(
+        self,
+        code: bytes,
+        *,
+        entry: int = 0,
+        rodata: bytes = b"",
+        trace: bool = False,
+        svc_trace: bool = False,
+        dev_libm: bool = False,
+        trace_file=None,
+        exec_root=None,
+        mailboxes: Optional[MailboxManager] = None,
+        mailbox_handler: Optional[Callable[[int], None]] = None,
+    ):
         self.code = bytearray(code)
         self.entry = entry
         self.context: TaskContext = TaskContext(pc=entry)
@@ -214,6 +257,10 @@ class MiniVM:
         self.attached = False
         self.trace_out = trace_file
         self.exec_root = Path(exec_root).resolve() if exec_root else None
+        self.mailboxes = mailboxes or MailboxManager()
+        self._mailbox_handler: Optional[Callable[[int], None]] = mailbox_handler
+        self.pid: Optional[int] = None
+        self.call_stack: List[int] = []
         if rodata:
             self._load_rodata(rodata)
 
@@ -259,7 +306,11 @@ class MiniVM:
         self.pc = ctx.pc
         self.sp = ctx.sp
         self.flags = ctx.psw
+        self.pid = ctx.pid
         ctx.state = "running" if self.running else ctx.state
+
+    def set_mailbox_handler(self, handler: Optional[Callable[[int], None]]) -> None:
+        self._mailbox_handler = handler
 
     def save_context(self) -> None:
         ctx = self.context
@@ -281,6 +332,10 @@ class MiniVM:
                 "reg_base": ctx.reg_base,
                 "stack_base": ctx.stack_base,
                 "stack_limit": ctx.stack_limit,
+                "wait_kind": ctx.wait_kind,
+                "wait_mailbox": ctx.wait_mailbox,
+                "wait_deadline": ctx.wait_deadline,
+                "wait_handle": ctx.wait_handle,
             }
         return {
             "pc": self.pc,
@@ -326,6 +381,7 @@ class MiniVM:
             "sleep_pending_ms": self.sleep_pending_ms,
             "cycles": self.cycles,
             "pending_events": list(self.pending_events),
+            "call_stack": list(self.call_stack),
         }
 
     def restore_state(self, state: Dict[str, Any]) -> None:
@@ -337,6 +393,7 @@ class MiniVM:
         self.sleep_until = state.get("sleep_until")
         self.sleep_pending_ms = state.get("sleep_pending_ms")
         self.pending_events = list(state.get("pending_events", []))
+        self.call_stack = list(state.get("call_stack", []))
         ctx_dict = state.get("context")
         if ctx_dict:
             ctx = dict_to_context(ctx_dict)
@@ -495,11 +552,17 @@ class MiniVM:
             if not (self.flags & 0x1):
                 self.pc = imm & 0xFFFFFFFF
                 adv = 0
-        elif op == 0x24:  # CALL (no stack yet)
+        elif op == 0x24:  # CALL
+            return_addr = (self.pc + adv) & 0xFFFFFFFF
+            self.call_stack.append(return_addr)
             self.pc = imm & 0xFFFFFFFF
             adv = 0
-        elif op == 0x25:  # RET (placeholder: stop VM)
-            self.running = False
+        elif op == 0x25:  # RET
+            if self.call_stack:
+                self.pc = self.call_stack.pop()
+                adv = 0
+            else:
+                self.running = False
         elif op == 0x30:  # SVC
             mod = (imm >> 8) & 0x0F
             fn = imm & 0xFF
@@ -589,6 +652,8 @@ class MiniVM:
             else:
                 self._log(f"[SVC] dev-libm fn={fn} unsupported")
                 self.regs[0] = 0
+        elif mod == mbx_const.HSX_MBX_MODULE_ID:
+            self._svc_mailbox(fn)
         elif mod == 0x7:
             self._svc_exec(fn)
         elif mod == 0x3:
@@ -637,6 +702,43 @@ class MiniVM:
             ptr = self.regs[2] & 0xFFFF
             ln = self.regs[3] & 0xFFFF
             buf = bytes(self.mem[ptr : ptr + ln])
+            ctx = self.context
+            mailbox_handle = None
+            if ctx is not None and ctx.fd_table:
+                mailbox_handle = ctx.fd_table.get(fd)
+            if mailbox_handle is not None and ln > 0:
+                flags = 0
+                if fd == 1:
+                    flags |= mbx_const.HSX_MBX_FLAG_STDOUT
+                elif fd == 2:
+                    flags |= mbx_const.HSX_MBX_FLAG_STDERR
+                try:
+                    ok, descriptor_id = self.mailboxes.send(
+                        pid=self.pid or 0,
+                        handle=mailbox_handle,
+                        payload=buf,
+                        flags=flags,
+                    )
+                except MailboxError as exc:
+                    self._log(f"[STDIO] mailbox send failed fd={fd}: {exc}")
+                    ok = False
+                    descriptor_id = None
+                if ok:
+                    self.regs[0] = len(buf)
+                    if descriptor_id is not None:
+                        self.emit_event(
+                            {
+                                "type": "mailbox_send",
+                                "pid": self.pid or 0,
+                                "descriptor": descriptor_id,
+                                "length": len(buf),
+                                "flags": flags,
+                                "channel": 0,
+                            }
+                        )
+                    return
+                self.regs[0] = 0
+                return
             self.regs[0] = self.fs.write(fd, buf)
         elif fn == 3:  # close(fd)
             fd = self.regs[1] & 0xFFFF
@@ -735,6 +837,88 @@ class MiniVM:
         self.regs[0] = 0
 
 
+    def _svc_mailbox(self, fn: int) -> None:
+        handler = self._mailbox_handler
+        if handler is not None:
+            handler(fn)
+        else:
+            self._svc_mailbox_default(fn)
+
+    def _svc_mailbox_default(self, fn: int) -> None:
+        pid = self.pid or 0
+        try:
+            if fn == mbx_const.HSX_MBX_FN_OPEN:
+                target = self._read_c_string(self.regs[1])
+                flags = self.regs[2] & 0xFFFF
+                handle = self.mailboxes.open(pid=pid, target=target or "", flags=flags)
+                self.regs[0] = mbx_const.HSX_MBX_STATUS_OK
+                self.regs[1] = handle
+                return
+            if fn == mbx_const.HSX_MBX_FN_BIND:
+                target = self._read_c_string(self.regs[1])
+                capacity = self.regs[2] & 0xFFFF
+                mode = self.regs[3] & 0xFFFF
+                desc = self.mailboxes.bind_target(pid=pid, target=target or "", capacity=capacity or None, mode_mask=mode)
+                self.regs[0] = mbx_const.HSX_MBX_STATUS_OK
+                self.regs[1] = desc.descriptor_id
+                return
+            if fn == mbx_const.HSX_MBX_FN_CLOSE:
+                handle = self.regs[1] & 0xFFFF
+                self.mailboxes.close(pid=pid, handle=handle)
+                self.regs[0] = mbx_const.HSX_MBX_STATUS_OK
+                return
+            if fn == mbx_const.HSX_MBX_FN_SEND:
+                handle = self.regs[1] & 0xFFFF
+                ptr = self.regs[2] & 0xFFFF
+                length = self.regs[3] & 0xFFFF
+                flags = self.regs[4] & 0xFFFF
+                channel = self.regs[5] & 0xFFFF
+                payload = bytes(self.mem[ptr : ptr + length])
+                ok, _ = self.mailboxes.send(pid=pid, handle=handle, payload=payload, flags=flags, channel=channel)
+                if ok:
+                    self.regs[0] = mbx_const.HSX_MBX_STATUS_OK
+                    self.regs[1] = len(payload)
+                else:
+                    self.regs[0] = mbx_const.HSX_MBX_STATUS_WOULDBLOCK
+                return
+            if fn == mbx_const.HSX_MBX_FN_RECV:
+                handle = self.regs[1] & 0xFFFF
+                ptr = self.regs[2] & 0xFFFF
+                max_len = self.regs[3] & 0xFFFF
+                msg = self.mailboxes.recv(pid=pid, handle=handle)
+                if msg is None:
+                    self.regs[0] = mbx_const.HSX_MBX_STATUS_NO_DATA
+                    self.regs[1] = 0
+                    return
+                length = min(max_len, msg.length)
+                self.mem[ptr : ptr + length] = msg.payload[:length]
+                self.regs[0] = mbx_const.HSX_MBX_STATUS_OK
+                self.regs[1] = length
+                self.regs[2] = msg.flags
+                self.regs[3] = msg.channel
+                self.regs[4] = msg.src_pid
+                return
+            if fn == mbx_const.HSX_MBX_FN_PEEK:
+                handle = self.regs[1] & 0xFFFF
+                info = self.mailboxes.peek(pid=pid, handle=handle)
+                self.regs[0] = mbx_const.HSX_MBX_STATUS_OK
+                self.regs[1] = info.get("depth", 0)
+                self.regs[2] = info.get("bytes_used", 0)
+                self.regs[3] = info.get("next_len", 0)
+                return
+            if fn == mbx_const.HSX_MBX_FN_TAP:
+                handle = self.regs[1] & 0xFFFF
+                enable = bool(self.regs[2] & 0x1)
+                self.mailboxes.tap(pid=pid, handle=handle, enable=enable)
+                self.regs[0] = mbx_const.HSX_MBX_STATUS_OK
+                return
+        except MailboxError as exc:
+            self._log(f"[MBX] pid={pid} fn={fn} error: {exc}")
+            self.regs[0] = mbx_const.HSX_MBX_STATUS_INTERNAL_ERROR
+            return
+        self.regs[0] = mbx_const.HSX_MBX_STATUS_INTERNAL_ERROR
+
+
 class VMController:
     def __init__(self, *, trace: bool = False, svc_trace: bool = False, dev_libm: bool = False):
         self.trace = trace
@@ -752,6 +936,8 @@ class VMController:
         self.restart_requested: bool = False
         self.restart_targets: Optional[List[str]] = None
         self.server: Optional["VMServer"] = None
+        self.mailboxes = MailboxManager()
+        self.waiting_tasks: Dict[int, Dict[str, Any]] = {}
 
     def reset(self) -> Dict[str, Any]:
         self.vm = None
@@ -761,9 +947,487 @@ class VMController:
         self.paused = False
         self.tasks.clear()
         self.task_states.clear()
+        self.waiting_tasks.clear()
+        self.mailboxes = MailboxManager()
         self.current_pid = None
         self.next_pid = 1
         return {"status": "ok"}
+
+    def mailbox_snapshot(self) -> List[Dict[str, Any]]:
+        return self.mailboxes.descriptor_snapshot()
+
+    def mailbox_open(self, pid: int, target: str, flags: int = 0) -> Dict[str, Any]:
+        try:
+            handle = self.mailboxes.open(pid=pid, target=target, flags=flags)
+        except MailboxError as exc:
+            return {"status": "error", "error": str(exc)}
+        return {
+            "status": "ok",
+            "mbx_status": mbx_const.HSX_MBX_STATUS_OK,
+            "handle": handle,
+            "target": target,
+            "pid": pid,
+        }
+
+    def mailbox_close(self, pid: int, handle: int) -> Dict[str, Any]:
+        try:
+            self.mailboxes.close(pid=pid, handle=handle)
+        except MailboxError as exc:
+            return {"status": "error", "error": str(exc)}
+        return {"status": "ok", "mbx_status": mbx_const.HSX_MBX_STATUS_OK}
+
+    def mailbox_bind(self, pid: int, target: str, *, capacity: Optional[int] = None, mode: int = 0) -> Dict[str, Any]:
+        try:
+            desc = self.mailboxes.bind_target(pid=pid, target=target, capacity=capacity, mode_mask=mode)
+        except MailboxError as exc:
+            return {"status": "error", "error": str(exc)}
+        return {
+            "status": "ok",
+            "mbx_status": mbx_const.HSX_MBX_STATUS_OK,
+            "descriptor": desc.descriptor_id,
+            "capacity": desc.capacity,
+            "mode": desc.mode_mask,
+        }
+
+    def mailbox_config_stdio(self, stream: str, mode: int, *, update_existing: bool = True) -> Dict[str, Any]:
+        try:
+            updated = self.mailboxes.set_default_stdio_mode(stream, mode, update_existing=update_existing)
+        except MailboxError as exc:
+            return {"status": "error", "error": str(exc)}
+        return {
+            "status": "ok",
+            "mbx_status": mbx_const.HSX_MBX_STATUS_OK,
+            "mode": mode,
+            "stream": stream,
+            "updated_descriptors": updated,
+        }
+
+    def mailbox_send(
+        self,
+        pid: int,
+        handle: Optional[int],
+        *,
+        data: Optional[str] = None,
+        data_hex: Optional[str] = None,
+        flags: int = 0,
+        channel: int = 0,
+        target: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        if data_hex is not None:
+            payload = bytes.fromhex(data_hex)
+        elif data is not None:
+            payload = data.encode("utf-8")
+        else:
+            payload = b""
+
+        working_handle = handle if isinstance(handle, int) and handle > 0 else None
+        auto_handles: List[int] = []
+
+        def _close_auto_handles() -> None:
+            seen: set[int] = set()
+            for auto in auto_handles:
+                if auto in seen:
+                    continue
+                seen.add(auto)
+                try:
+                    self.mailboxes.close(pid=pid, handle=auto)
+                except MailboxError:
+                    continue
+
+        if working_handle is None:
+            if not target:
+                return {"status": "error", "error": "mailbox_send requires handle or target"}
+            try:
+                working_handle = self.mailboxes.open(pid=pid, target=target)
+            except MailboxError as exc:
+                return {"status": "error", "error": str(exc)}
+            auto_handles.append(working_handle)
+
+        try:
+            ok, descriptor_id = self.mailboxes.send(
+                pid=pid,
+                handle=working_handle,
+                payload=payload,
+                flags=flags,
+                channel=channel,
+            )
+        except MailboxError as exc:
+            if not target:
+                _close_auto_handles()
+                return {"status": "error", "error": str(exc)}
+            try:
+                self.mailboxes.bind_target(pid=pid, target=target, capacity=None)
+                working_handle = self.mailboxes.open(pid=pid, target=target)
+                auto_handles.append(working_handle)
+                ok, descriptor_id = self.mailboxes.send(
+                    pid=pid,
+                    handle=working_handle,
+                    payload=payload,
+                    flags=flags,
+                    channel=channel,
+                )
+            except MailboxError as bind_exc:
+                _close_auto_handles()
+                return {"status": "error", "error": str(bind_exc)}
+
+        _close_auto_handles()
+
+        status = mbx_const.HSX_MBX_STATUS_OK if ok else mbx_const.HSX_MBX_STATUS_WOULDBLOCK
+        if ok:
+            self._deliver_mailbox_messages(descriptor_id)
+        result = {
+            "status": "ok",
+            "mbx_status": status,
+            "length": len(payload) if ok else 0,
+            "descriptor": descriptor_id,
+        }
+        if target:
+            result["target"] = target
+        return result
+
+    def mailbox_recv(
+        self,
+        pid: int,
+        handle: int,
+        *,
+        max_len: int = 512,
+        timeout: int = mbx_const.HSX_MBX_TIMEOUT_POLL,
+    ) -> Dict[str, Any]:
+        # Initial implementation honours poll semantics only; blocking handled during scheduler updates.
+        if timeout not in (mbx_const.HSX_MBX_TIMEOUT_POLL, 0):
+            # Placeholder: future revisions will support blocking/timeouts via scheduler.
+            timeout = mbx_const.HSX_MBX_TIMEOUT_POLL
+        try:
+            msg = self.mailboxes.recv(pid=pid, handle=handle, record_waiter=False)
+        except MailboxError as exc:
+            return {"status": "error", "error": str(exc)}
+        if msg is None:
+            return {
+                "status": "ok",
+                "mbx_status": mbx_const.HSX_MBX_STATUS_NO_DATA,
+                "length": 0,
+            }
+        length = min(max_len, msg.length)
+        payload = msg.payload[:length]
+        try:
+            text = payload.decode("utf-8")
+        except UnicodeDecodeError:
+            text = ""
+        return {
+            "status": "ok",
+            "mbx_status": mbx_const.HSX_MBX_STATUS_OK,
+            "length": length,
+            "flags": msg.flags,
+            "channel": msg.channel,
+            "src_pid": msg.src_pid,
+            "data_hex": payload.hex(),
+            "text": text,
+        }
+
+    def mailbox_peek(self, pid: int, handle: int) -> Dict[str, Any]:
+        try:
+            info = self.mailboxes.peek(pid=pid, handle=handle)
+        except MailboxError as exc:
+            return {"status": "error", "error": str(exc)}
+        return {"status": "ok", "info": info}
+
+    def mailbox_tap(self, pid: int, handle: int, enable: bool = True) -> Dict[str, Any]:
+        try:
+            self.mailboxes.tap(pid=pid, handle=handle, enable=enable)
+        except MailboxError as exc:
+            return {"status": "error", "error": str(exc)}
+        return {"status": "ok", "mbx_status": mbx_const.HSX_MBX_STATUS_OK}
+
+    def _svc_mailbox_controller(self, vm: MiniVM, fn: int) -> None:
+        pid = self.current_pid or vm.pid or (vm.context.pid if vm.context else 0) or 0
+        try:
+            if fn == mbx_const.HSX_MBX_FN_OPEN:
+                target = vm._read_c_string(vm.regs[1])
+                flags = vm.regs[2] & 0xFFFF
+                handle = self.mailboxes.open(pid=pid, target=target or "", flags=flags)
+                vm.regs[0] = mbx_const.HSX_MBX_STATUS_OK
+                vm.regs[1] = handle
+                return
+            if fn == mbx_const.HSX_MBX_FN_BIND:
+                target = vm._read_c_string(vm.regs[1])
+                capacity = vm.regs[2] & 0xFFFF
+                mode = vm.regs[3] & 0xFFFF
+                desc = self.mailboxes.bind_target(pid=pid, target=target or "", capacity=capacity or None, mode_mask=mode)
+                vm.regs[0] = mbx_const.HSX_MBX_STATUS_OK
+                vm.regs[1] = desc.descriptor_id
+                return
+            if fn == mbx_const.HSX_MBX_FN_CLOSE:
+                handle = vm.regs[1] & 0xFFFF
+                self.mailboxes.close(pid=pid, handle=handle)
+                vm.regs[0] = mbx_const.HSX_MBX_STATUS_OK
+                return
+            if fn == mbx_const.HSX_MBX_FN_PEEK:
+                handle = vm.regs[1] & 0xFFFF
+                info = self.mailboxes.peek(pid=pid, handle=handle)
+                vm.regs[0] = mbx_const.HSX_MBX_STATUS_OK
+                vm.regs[1] = info.get("depth", 0)
+                vm.regs[2] = info.get("bytes_used", 0)
+                vm.regs[3] = info.get("next_len", 0)
+                return
+            if fn == mbx_const.HSX_MBX_FN_TAP:
+                handle = vm.regs[1] & 0xFFFF
+                enable = bool(vm.regs[2] & 0x1)
+                self.mailboxes.tap(pid=pid, handle=handle, enable=enable)
+                vm.regs[0] = mbx_const.HSX_MBX_STATUS_OK
+                return
+            if fn == mbx_const.HSX_MBX_FN_SEND:
+                handle = vm.regs[1] & 0xFFFF
+                ptr = vm.regs[2] & 0xFFFF
+                length = vm.regs[3] & 0xFFFF
+                flags = vm.regs[4] & 0xFFFF
+                channel = vm.regs[5] & 0xFFFF
+                payload = bytes(vm.mem[ptr : ptr + length])
+                ok, descriptor_id = self.mailboxes.send(pid=pid, handle=handle, payload=payload, flags=flags, channel=channel)
+                if ok:
+                    vm.regs[0] = mbx_const.HSX_MBX_STATUS_OK
+                    vm.regs[1] = len(payload)
+                    vm.emit_event({
+                        "type": "mailbox_send",
+                        "pid": pid,
+                        "descriptor": descriptor_id,
+                        "length": len(payload),
+                        "flags": flags,
+                        "channel": channel,
+                    })
+                    self._deliver_mailbox_messages(descriptor_id)
+                else:
+                    vm.regs[0] = mbx_const.HSX_MBX_STATUS_WOULDBLOCK
+                return
+            if fn == mbx_const.HSX_MBX_FN_RECV:
+                handle = vm.regs[1] & 0xFFFF
+                ptr = vm.regs[2] & 0xFFFF
+                max_len = vm.regs[3] & 0xFFFF
+                timeout = vm.regs[4] & 0xFFFF
+                msg = self.mailboxes.recv(pid=pid, handle=handle, record_waiter=False)
+                if msg is None:
+                    if not self._prepare_mailbox_wait(vm, pid, handle, ptr, max_len, timeout):
+                        vm.regs[0] = mbx_const.HSX_MBX_STATUS_NO_DATA
+                        vm.regs[1] = 0
+                    return
+                length = min(max_len, msg.length)
+                vm.mem[ptr : ptr + length] = msg.payload[:length]
+                vm.regs[0] = mbx_const.HSX_MBX_STATUS_OK
+                vm.regs[1] = length
+                vm.regs[2] = msg.flags
+                vm.regs[3] = msg.channel
+                vm.regs[4] = msg.src_pid
+                vm.emit_event({
+                    "type": "mailbox_recv",
+                    "pid": pid,
+                    "length": length,
+                    "flags": msg.flags,
+                    "channel": msg.channel,
+                    "src_pid": msg.src_pid,
+                })
+                return
+        except MailboxError as exc:
+            vm.regs[0] = mbx_const.HSX_MBX_STATUS_INTERNAL_ERROR
+            vm.emit_event({"type": "mailbox_error", "pid": pid, "fn": fn, "error": str(exc)})
+            return
+        vm.regs[0] = mbx_const.HSX_MBX_STATUS_INTERNAL_ERROR
+
+    def _prepare_mailbox_wait(self, vm: MiniVM, pid: int, handle: int, ptr: int, max_len: int, timeout: int) -> bool:
+        if timeout in (mbx_const.HSX_MBX_TIMEOUT_POLL, 0):
+            return False
+        try:
+            desc = self.mailboxes.descriptor_for_handle(pid, handle)
+        except MailboxError as exc:
+            vm.regs[0] = mbx_const.HSX_MBX_STATUS_INVALID_HANDLE
+            vm.emit_event({"type": "mailbox_error", "pid": pid, "fn": mbx_const.HSX_MBX_FN_RECV, "error": str(exc)})
+            return False
+        descriptor_id = desc.descriptor_id
+        if pid not in desc.waiters:
+            desc.waiters.append(pid)
+        now = time.monotonic()
+        deadline: Optional[float]
+        if timeout == mbx_const.HSX_MBX_TIMEOUT_INFINITE:
+            deadline = None
+        else:
+            deadline = now + (max(timeout, 1) / 1000.0)
+        wait_info = {
+            "pid": pid,
+            "descriptor_id": descriptor_id,
+            "handle": handle,
+            "buffer_ptr": ptr & 0xFFFF,
+            "max_len": max_len & 0xFFFF,
+            "timeout": timeout,
+            "requested_at": now,
+            "deadline": deadline,
+        }
+        self.waiting_tasks[pid] = wait_info
+        ctx = vm.context
+        ctx.state = "waiting_mbx"
+        ctx.wait_kind = "mailbox"
+        ctx.wait_mailbox = descriptor_id
+        ctx.wait_handle = handle
+        ctx.wait_deadline = deadline
+        vm.running = False
+        state = self.task_states.get(pid)
+        if state:
+            state["context"] = context_to_dict(ctx)
+            state["wait_info"] = wait_info
+        task = self.tasks.get(pid)
+        if task:
+            task["state"] = "waiting_mbx"
+            task["wait_mailbox"] = descriptor_id
+            task["wait_deadline"] = deadline
+            task["wait_handle"] = handle
+        vm.emit_event(
+            {
+                "type": "mailbox_wait",
+                "pid": pid,
+                "descriptor": descriptor_id,
+                "handle": handle,
+                "timeout": timeout,
+            }
+        )
+        return True
+
+    def _complete_mailbox_wait(
+        self,
+        pid: int,
+        *,
+        status: int,
+        descriptor_id: Optional[int],
+        message: Optional[MailboxMessage],
+        timed_out: bool = False,
+    ) -> None:
+        wait_info = self.waiting_tasks.pop(pid, None)
+        if wait_info is None:
+            return
+        if descriptor_id is None:
+            descriptor_id = wait_info.get("descriptor_id")
+        if descriptor_id is not None:
+            self.mailboxes.remove_waiter(descriptor_id, pid)
+        buffer_ptr = wait_info.get("buffer_ptr", 0) & 0xFFFF
+        max_len = wait_info.get("max_len", 0) & 0xFFFF
+        length = 0
+        flags = 0
+        channel = 0
+        src_pid = 0
+        payload = b""
+        if message is not None:
+            length = min(max_len, message.length)
+            flags = message.flags
+            channel = message.channel
+            src_pid = message.src_pid
+            payload = message.payload[:length]
+        state = self.task_states.get(pid)
+        if state is None:
+            state = self.tasks.get(pid, {}).get("vm_state")
+        if state is not None:
+            mem = state.get("mem")
+            if mem is None:
+                mem = bytearray(64 * 1024)
+                state["mem"] = mem
+            if payload:
+                mem[buffer_ptr : buffer_ptr + length] = payload
+            ctx_dict = state.get("context") or {}
+            regs = list(ctx_dict.get("regs", [0] * 16))
+            while len(regs) < 16:
+                regs.append(0)
+            regs[0] = status & 0xFFFF
+            regs[1] = length & 0xFFFF
+            regs[2] = flags & 0xFFFF
+            regs[3] = channel & 0xFFFF
+            regs[4] = src_pid & 0xFFFF
+            ctx_dict["regs"] = regs
+            ctx_dict["state"] = "ready"
+            ctx_dict["wait_kind"] = None
+            ctx_dict["wait_mailbox"] = None
+            ctx_dict["wait_deadline"] = None
+            ctx_dict["wait_handle"] = None
+            state["context"] = ctx_dict
+            state.pop("wait_info", None)
+            self.task_states[pid] = state
+        task = self.tasks.get(pid)
+        if task:
+            task["state"] = "ready"
+            task["wait_mailbox"] = None
+            task["wait_deadline"] = None
+            task["wait_handle"] = None
+        if self.current_pid == pid and self.vm is not None and self.vm.context.pid == pid:
+            if payload:
+                self.vm.mem[buffer_ptr : buffer_ptr + length] = payload
+            self.vm.regs[0] = status & 0xFFFF
+            self.vm.regs[1] = length & 0xFFFF
+            self.vm.regs[2] = flags & 0xFFFF
+            self.vm.regs[3] = channel & 0xFFFF
+            self.vm.regs[4] = src_pid & 0xFFFF
+            self.vm.context.state = "ready"
+            self.vm.context.wait_kind = None
+            self.vm.context.wait_mailbox = None
+            self.vm.context.wait_handle = None
+            self.vm.context.wait_deadline = None
+            self.vm.running = True
+        event_type = "mailbox_timeout" if timed_out else "mailbox_wake"
+        event_payload = {
+            "type": event_type,
+            "pid": pid,
+            "descriptor": descriptor_id,
+            "status": status,
+            "length": length,
+            "flags": flags,
+            "channel": channel,
+            "src_pid": src_pid,
+        }
+        if self.vm is not None:
+            self.vm.emit_event(event_payload)
+
+    def _deliver_mailbox_messages(self, descriptor_id: int) -> None:
+        try:
+            desc = self.mailboxes.descriptor_by_id(descriptor_id)
+        except MailboxError:
+            return
+        while desc.waiters:
+            waiter_pid = desc.waiters[0]
+            wait_info = self.waiting_tasks.get(waiter_pid)
+            if wait_info is None:
+                desc.waiters.pop(0)
+                continue
+            handle = wait_info.get("handle")
+            try:
+                message = self.mailboxes.recv(pid=waiter_pid, handle=handle, record_waiter=False)
+            except MailboxError:
+                desc.waiters.pop(0)
+                self.waiting_tasks.pop(waiter_pid, None)
+                continue
+            if message is None:
+                break
+            self._complete_mailbox_wait(
+                waiter_pid,
+                status=mbx_const.HSX_MBX_STATUS_OK,
+                descriptor_id=descriptor_id,
+                message=message,
+                timed_out=False,
+            )
+
+    def _check_mailbox_timeouts(self) -> None:
+        if not self.waiting_tasks:
+            return
+        now = time.monotonic()
+        expired: List[int] = []
+        for pid, wait_info in list(self.waiting_tasks.items()):
+            deadline = wait_info.get("deadline")
+            if deadline is not None and now >= deadline:
+                expired.append(pid)
+        for pid in expired:
+            info = self.waiting_tasks.get(pid)
+            if not info:
+                continue
+            descriptor_id = info.get("descriptor_id")
+            self._complete_mailbox_wait(
+                pid,
+                status=mbx_const.HSX_MBX_STATUS_NO_DATA,
+                descriptor_id=descriptor_id,
+                message=None,
+                timed_out=True,
+            )
 
     def info(self, pid: Optional[int] = None) -> Dict[str, Any]:
         vm = self.vm
@@ -825,6 +1489,21 @@ class VMController:
             "vm_state": state,
         }
         self.task_states[pid] = state
+        self.mailboxes.register_task(pid)
+        stdio_handles = self.mailboxes.ensure_stdio_handles(pid)
+        fd_table = {int(k): int(v) for k, v in dict(ctx.get("fd_table", {})).items()}
+        fd_table.update(
+            {
+                fd: handle
+                for fd, handle in (
+                    (0, stdio_handles.get("stdin")),
+                    (1, stdio_handles.get("stdout")),
+                    (2, stdio_handles.get("stderr")),
+                )
+                if handle is not None
+            }
+        )
+        ctx["fd_table"] = fd_table
         self.program_path = self.tasks[pid]["program"]
         self._activate_task(pid, state_override=state)
         return {
@@ -862,12 +1541,28 @@ class VMController:
             if self.paused:
                 task["state"] = "paused"
                 ctx["state"] = "paused"
-            elif self.vm.running:
-                task["state"] = "ready"
-                ctx["state"] = "ready"
             else:
-                task["state"] = "stopped"
-                ctx["state"] = "stopped"
+                context_state = ctx.get("state")
+                if context_state == "waiting_mbx" or self.waiting_tasks.get(self.current_pid):
+                    task["state"] = "waiting_mbx"
+                    ctx["state"] = "waiting_mbx"
+                elif self.vm.running:
+                    task["state"] = "ready"
+                    ctx["state"] = "ready"
+                else:
+                    task["state"] = "stopped"
+                    ctx["state"] = "stopped"
+        wait_info = self.waiting_tasks.get(self.current_pid)
+        if wait_info is not None:
+            state["wait_info"] = wait_info
+            ctx = state["context"]
+            ctx["wait_kind"] = "mailbox"
+            ctx["wait_mailbox"] = wait_info.get("descriptor_id")
+            ctx["wait_handle"] = wait_info.get("handle")
+            ctx["wait_deadline"] = wait_info.get("deadline")
+            state["context"] = ctx
+        else:
+            state.pop("wait_info", None)
 
     def _activate_task(self, pid: int, state_override: Optional[Dict[str, Any]] = None) -> None:
         task = self._get_task(pid)
@@ -877,7 +1572,15 @@ class VMController:
         if self.vm is None:
             initial_code = bytes(state.get("code", bytearray()))
             entry = state.get("context", {}).get("pc", task.get("pc", 0))
-            self.vm = MiniVM(initial_code, entry=entry, trace=self.trace, svc_trace=self.svc_trace, dev_libm=self.dev_libm)
+            self.vm = MiniVM(
+                initial_code,
+                entry=entry,
+                trace=self.trace,
+                svc_trace=self.svc_trace,
+                dev_libm=self.dev_libm,
+                mailboxes=self.mailboxes,
+            )
+        self.vm.set_mailbox_handler(lambda fn, vm=self.vm: self._svc_mailbox_controller(vm, fn))
         self.vm.restore_state(state)
         self.vm.attached = self.attached
         self.current_pid = pid
@@ -920,6 +1623,7 @@ class VMController:
         }
 
     def step(self, cycles: int) -> Dict[str, Any]:
+        self._check_mailbox_timeouts()
         if not self.tasks:
             return {
                 "executed": 0,
@@ -931,9 +1635,20 @@ class VMController:
                 "paused": self.paused,
                 "current_pid": self.current_pid,
             }
-        if self.current_pid is None:
-            first_pid = next(iter(self.tasks))
-            self._activate_task(first_pid)
+        runnable = self._runnable_pids()
+        if not runnable:
+            return {
+                "executed": 0,
+                "running": False,
+                "pc": None,
+                "cycles": 0,
+                "sleep_pending": False,
+                "events": [],
+                "paused": self.paused,
+                "current_pid": self.current_pid,
+            }
+        if self.current_pid is None or self.current_pid not in runnable:
+            self._activate_task(runnable[0])
         vm = self._require_vm()
         if self.paused:
             snapshot = vm.snapshot_registers()
@@ -960,6 +1675,7 @@ class VMController:
         events.extend(vm.consume_events())
         snapshot = vm.snapshot_registers()
         self._store_active_state()
+        self._check_mailbox_timeouts()
         self._rotate_active()
         return {
             "executed": executed,
@@ -1222,6 +1938,69 @@ class VMController:
                 quantum = request.get("quantum")
                 task = self.set_task_attrs(pid, priority=priority, quantum=quantum)
                 return {"status": "ok", "task": task}
+            if cmd == "mailbox_snapshot":
+                return {"status": "ok", "descriptors": self.mailbox_snapshot()}
+            if cmd == "mailbox_open":
+                pid = int(request.get("pid", 0))
+                target = str(request.get("target", ""))
+                flags = int(request.get("flags", 0))
+                return self.mailbox_open(pid, target, flags)
+            if cmd == "mailbox_close":
+                pid = int(request.get("pid", 0))
+                handle = int(request.get("handle"))
+                return self.mailbox_close(pid, handle)
+            if cmd == "mailbox_bind":
+                pid = int(request.get("pid", 0))
+                target = str(request.get("target", ""))
+                capacity = request.get("capacity")
+                capacity_int = int(capacity) if capacity is not None else None
+                mode = int(request.get("mode", 0))
+                return self.mailbox_bind(pid, target, capacity=capacity_int, mode=mode)
+            if cmd == "mailbox_config_stdio":
+                stream = str(request.get("stream", "out"))
+                mode = int(request.get("mode", mbx_const.HSX_MBX_MODE_RDWR))
+                update_existing = bool(request.get("update_existing", True))
+                return self.mailbox_config_stdio(stream, mode, update_existing=update_existing)
+            if cmd == "mailbox_send":
+                pid = int(request.get("pid", 0))
+                handle_value = request.get("handle")
+                handle = None
+                if isinstance(handle_value, int):
+                    handle = handle_value
+                elif isinstance(handle_value, str) and handle_value.strip():
+                    try:
+                        handle = int(handle_value, 0)
+                    except ValueError:
+                        handle = None
+                data = request.get("data")
+                data_hex = request.get("data_hex")
+                flags = int(request.get("flags", 0))
+                channel = int(request.get("channel", 0))
+                target = request.get("target") if isinstance(request.get("target"), str) else None
+                return self.mailbox_send(
+                    pid,
+                    handle,
+                    data=data if isinstance(data, str) else None,
+                    data_hex=data_hex if isinstance(data_hex, str) else None,
+                    flags=flags,
+                    channel=channel,
+                    target=target,
+                )
+            if cmd == "mailbox_recv":
+                pid = int(request.get("pid", 0))
+                handle = int(request.get("handle"))
+                max_len = int(request.get("max_len", 512))
+                timeout = int(request.get("timeout", mbx_const.HSX_MBX_TIMEOUT_POLL))
+                return self.mailbox_recv(pid, handle, max_len=max_len, timeout=timeout)
+            if cmd == "mailbox_peek":
+                pid = int(request.get("pid", 0))
+                handle = int(request.get("handle"))
+                return self.mailbox_peek(pid, handle)
+            if cmd == "mailbox_tap":
+                pid = int(request.get("pid", 0))
+                handle = int(request.get("handle"))
+                enable = bool(int(request.get("enable", 1)))
+                return self.mailbox_tap(pid, handle, enable=enable)
             if cmd == "restart":
                 targets = request.get("targets")
                 if isinstance(targets, str):

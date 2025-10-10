@@ -37,3 +37,34 @@ def test_fptosi_after_half_ops():
     lines = compile_lines(ir)
     assert any(line.startswith('FADD ') for line in lines)
     assert any(line.startswith('F2I ') for line in lines)
+
+
+def test_fp16_intrinsics_float_path():
+    ir = """declare i16 @llvm.convert.to.fp16.f32(float)
+declare float @llvm.convert.from.fp16.f32(i16)
+
+define dso_local i32 @use_intrinsics(float %f, i16 %bits) {
+entry:
+  %h = call i16 @llvm.convert.to.fp16.f32(float %f)
+  %res = call float @llvm.convert.from.fp16.f32(i16 %bits)
+  %out = fptosi float %res to i32
+  ret i32 %out
+}
+"""
+    lines = compile_lines(ir)
+    assert any(line.startswith('F2I ') for line in lines)
+    assert not any('llvm.convert' in line for line in lines)
+
+
+def test_fp16_intrinsics_literal():
+    ir = """declare i16 @llvm.convert.to.fp16.f32(float)
+
+define dso_local i16 @use_literal() {
+entry:
+  %h = call i16 @llvm.convert.to.fp16.f32(float 1.500000e+00)
+  ret i16 %h
+}
+"""
+    lines = compile_lines(ir)
+    assert any(line.startswith('LDI') or line.startswith('LDI32') for line in lines)
+    assert not any('llvm.convert' in line for line in lines)

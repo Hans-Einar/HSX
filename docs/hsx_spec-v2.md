@@ -68,12 +68,13 @@ Context switches simply retarget `reg_base` (no copying). Each task owns a slice
 ## 4. Executive Kernel
 
 ### Purpose
-The executive runs inside the VM (compiled C) and implements:
+The executive runs alongside the VM (native firmware on-device or the host \execd\ process) and implements:
 - Process/task table, ready queues, and scheduling.
 - Memory arenas (task stacks/heaps, mailbox pool, value table).
 - Syscall dispatch to HAL drivers (FS, UART, CAN) and higher-level services (mailboxes, values, exec).
-- IPC via mailbox subsystem and shared value registry.
+- IPC via the mailbox subsystem and shared value registry.
 
+The VM itself remains single-task. The executive selects which task runs by updating the active register/stack bases and then invoking \m.step()\. When no executive is attached, the VM defaults to a single foreground task with local stdio/mailbox shims.
 ### Process Descriptor
 ```
 typedef int32_t hsx_pid_t;
@@ -98,6 +99,7 @@ typedef struct {
 - **Register window indirection:** the VM always reads/writes `R0..R15` via `reg_base + N*4`. Swapping `reg_base` repoints the register bank without copying.
 - **Stack relocation:** the guest-visible SP is computed as `stack_base + (vm.sp & 0xFFFF)`. Swapping `stack_base` yields an O(1) context switch.
 - **Context switch API:** the executive updates `pc`, `psw`, `reg_base`, and `stack_base` then calls `vm.step()` (or a multi-step loop). Python exposes `set_context()`; C mirrors this with `hsx_vm_load_context()`.
+- **No bulk snapshot:** register windows live in VM RAM, so swapping `reg_base`/`stack_base` is sufficient; the executive does not copy register files between tasks.
 - **Isolation:** each task’s memory arena (stack/heap) is disjoint. `stack_limit` enables overflow detection and debugging.
 
 ### Scheduling Model
@@ -129,15 +131,29 @@ Mailboxes remain kernel-owned circular queues built on the static descriptor poo
 - Each entry stores a fixed header (`struct hsx_mbx_msg { uint16_t len; uint16_t flags; uint16_t src_pid; uint16_t channel; }`) followed by payload bytes. Payload length is clamped to the descriptor capacity minus the header size.
 - Flag bits include `MBX_FL_STDOUT`, `MBX_FL_STDERR`, and `MBX_FL_OOB` so stdio and control traffic can share the transport without ambiguity.
 
+**Blocking semantics**
+- `MAILBOX_RECV` with an empty queue transitions the task to WAIT_MBX. The executive parks the task until a sender enqueues data, or a timeout (poll/finite/infinite) expires.
+- `MAILBOX_SEND` wakes exactly one waiter per descriptor on successful enqueue; additional waiters remain queued. Non-blocking sends report `HSX_MBX_STATUS_WOULDBLOCK`.
+- The VM reports wait/wake events (`mailbox_wait`, `mailbox_wake`, `mailbox_timeout`) so an attached executive can update run queues. In standalone mode the VM simply keeps the task paused until a message arrives.
+
 **Scheduling interactions**
-- `MAILBOX_RECV` on an empty queue moves the task to `WAIT_MBX`. The syscall accepts a timeout in scheduler ticks (`0` = poll, `>0` = bounded wait, `0xFFFF` = infinite).
-- `MAILBOX_SEND` wakes exactly one waiter per descriptor. Remaining waiters stay in FIFO order. Non-blocking sends return `HSX_E_WOULDBLOCK` when the ring is full.
+- The executive observes mailbox events and schedules tasks accordingly; standalone mode performs the same transitions internally.
 - Blocking sends respect the same timeout semantics; a timeout transitions the task back to READY with an error code.
+
+
+
+**Profiles**
+- Embedded targets can enable only the `svc:` namespace plus per-task control mailboxes to conserve RAM; optional features such as taps or `shared:` mailboxes are host-prototype extras.
+- Regardless of profile, blocking receive semantics remain available so HSX tasks can sleep until messages arrive without consuming VM cycles.
 
 **Shell and stdio integration**
 - The executive may register passive taps (`MAILBOX_TAP`) to mirror traffic to the shell or telemetry sinks without consuming the message.
 - Default channels created at spawn are `svc:stdio.in`, `svc:stdio.out`, `svc:stdio.err`, and `pid:<pid>` (control). The HSX stdio shim maps `stdin`/`stdout`/`stderr` onto these handles and exposes `listen`/`send` shell commands for operator interaction.
+- Shell access to another task's stdio uses an explicit pid suffix (e.g. `svc:stdio.out@5`); without a suffix the call resolves to the caller's private channel.
+- Shell commands `listen` and `send` wrap the mailbox OPEN/SEND/RECV calls to stream stdout and inject stdin from the executive shell.
+- Status codes and MAILBOX_* function IDs are sourced from `include/hsx_mailbox.h`; syscalls return status in `R0` (0 = ok) with result values placed in `R1`-`R3` depending on the call.
 - Trace hooks record `{timestamp, src_pid, dst_handle, flags, len}` when tracing is enabled, providing visibility into inter-task communication.
+- Constants live in `include/hsx_mailbox.h`; Python tooling scrapes the header so both runtimes stay aligned.
 
 This design reuses the prior circular-buffer implementation while extending the naming model and stdio routing needed by the multi-task executive.
 
@@ -277,6 +293,9 @@ C source ? clang -emit-llvm ? hsx-llc.py ? .mvasm ? asm.py ? .hxe ? host_vm.py
 - [ ] Doxygen / docs automation.
 
 ---
+
+
+
 
 
 

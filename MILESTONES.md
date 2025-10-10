@@ -54,14 +54,21 @@ Wire in inter-task communication and stdio routing via the mailbox subsystem (Mi
 
 ---
 
-## Milestone 4 - Mailbox & STDIO Integration *(Planned)*
-Create a mailbox subsystem and stdio abstraction so HSX applications can exchange messages and stream output through the executive.
+## Milestone 4 - Mailbox & STDIO Integration *(In Progress)*
+Build out the mailbox subsystem and stdio abstraction so HSX tasks can exchange messages and stream I/O through the executive.
 
-### Objectives
-- Implement mailbox SVCs (0x05) with wait/wake semantics, bounded queues, and scheduler hooks.
-- Provide an HSX stdio library that maps stdout/stderr onto mailboxes and routes stdin injection through mailbox events.
-- Extend shell tooling with `listen` (optional PID filter, default broadcast) and `send` commands for interacting with task I/O.
-- Ship sample HSX applications demonstrating mailbox-based communication, stdio logging, and shell-driven interaction.
+### Progress
+- Mailbox SVC 0x05 is implemented end-to-end with descriptor namespaces, bounded queues, and scheduler wait/wake handling (`platforms/python/host_vm.py`).
+- Shell RPC and CLI already expose `listen`/`send`, and unit tests cover the exec-side helpers plus blocking receive/timeout behaviour (`python/tests/test_exec_mailbox.py`, `python/tests/test_mailbox_wait.py`).
+- Common constants live in `include/hsx_mailbox.h` and are mirrored automatically into the Python stack.
+- Added an assembly stdio shim (`examples/lib/hsx_stdio.mvasm`) with helpers for stdout/stderr plus a sample that streams greeting output (`examples/tests/test_stdio_mailbox`).
+- Producer sample demonstrates mailbox messaging (`examples/tests/test_mailbox_producer`), and integration tests exercise stdio output and host-side mailbox inspection (`python/tests/test_mailbox_integration.py`).
+- Assembly-backed C wrapper library (`examples/lib/hsx_mailbox.h`, `examples/lib/hsx_stdio.h`) and mirrored mailbox/stdio samples in C (`examples/tests/test_mailbox_producer_c`, `examples/tests/test_mailbox_consumer_c`, `examples/tests/test_stdio_mailbox_c`).
+
+### Remaining Objectives
+- Expand the stdio shim with fuller stdin helpers and canonical C wrappers (current `hsx_stdio_read` still polls/yields).
+- Promote the new C consumer sample to use blocking stdin/mailbox helpers once read-side buffering moves beyond polling.
+- Broaden integration coverage for mailbox back-pressure and tap tracing beyond the current host-inspection tests.
 
 ---
 

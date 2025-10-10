@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """HSX process manager.
 
 Provides an interactive prompt for launching/stopping the HSX VM, executive
@@ -16,7 +17,6 @@ Commands (type `help` after launching for the list):
   quit
 """
 
-from __future__ import annotations
 
 import argparse
 import json

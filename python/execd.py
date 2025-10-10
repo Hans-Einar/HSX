@@ -1,4 +1,14 @@
 #!/usr/bin/env python3
+try:
+    from .vmclient import VMClient
+except ImportError:
+    from vmclient import VMClient
+
+try:
+    from . import hsx_mailbox_constants as mbx_const
+except ImportError:
+    import hsx_mailbox_constants as mbx_const
+
 """HSX executive daemon.
 
 Connects to the HSX VM RPC server, takes over scheduling (attach/pause/resume),
@@ -16,7 +26,6 @@ from typing import List
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from vmclient import VMClient
 
 
 class ExecutiveState:
@@ -31,6 +40,7 @@ class ExecutiveState:
         self.restart_requested: bool = False
         self.restart_targets: Optional[List[str]] = None
         self.server: Optional["ExecutiveServer"] = None
+        self.task_states: Dict[int, Dict[str, Any]] = {}
 
     def _refresh_tasks(self) -> None:
         try:
@@ -45,11 +55,18 @@ class ExecutiveState:
             tasks = tasks_block
             self.current_pid = snapshot.get("current_pid")
         self.tasks = {}
+        new_states: Dict[int, Dict[str, Any]] = {}
         for task in tasks:
             if not isinstance(task, dict):
                 continue
             pid = int(task.get("pid", 0))
             self.tasks[pid] = task
+            state_entry = self.task_states.get(pid, {})
+            context = state_entry.get("context", {})
+            context["state"] = task.get("state")
+            state_entry["context"] = context
+            new_states[pid] = state_entry
+        self.task_states = new_states
 
     def attach(self) -> Dict[str, Any]:
         info = self.vm.attach()
@@ -75,6 +92,8 @@ class ExecutiveState:
         budget = cycles if cycles is not None else self.step_cycles
         with self.lock:
             result = self.vm.step(budget)
+        events = result.get('events') or []
+        self._process_vm_events(events)
         self._refresh_tasks()
         return result
 
@@ -146,6 +165,164 @@ class ExecutiveState:
         self._refresh_tasks()
         return attrs
 
+    def mailbox_snapshot(self) -> List[Dict[str, Any]]:
+        return self.vm.mailbox_snapshot()
+
+    def mailbox_open(self, pid: int, target: str, flags: int = 0) -> dict:
+        return self.vm.mailbox_open(pid, target, flags)
+
+    def mailbox_close(self, pid: int, handle: int) -> dict:
+        return self.vm.mailbox_close(pid, handle)
+
+    def mailbox_bind(self, pid: int, target: str, *, capacity: int | None = None, mode: int = 0) -> dict:
+        return self.vm.mailbox_bind(pid, target, capacity=capacity, mode=mode)
+
+    def mailbox_send(self, pid: int, handle: int, *, data: str | None = None, data_hex: str | None = None, flags: int = 0, channel: int = 0) -> dict:
+        return self.vm.mailbox_send(pid, handle, data=data, data_hex=data_hex, flags=flags, channel=channel)
+
+    def mailbox_recv(self, pid: int, handle: int, *, max_len: int = 512, timeout: int = 0) -> dict:
+        return self.vm.mailbox_recv(pid, handle, max_len=max_len, timeout=timeout)
+
+    def mailbox_peek(self, pid: int, handle: int) -> dict:
+        return self.vm.mailbox_peek(pid, handle)
+
+    def mailbox_tap(self, pid: int, handle: int, enable: bool = True) -> dict:
+        return self.vm.mailbox_tap(pid, handle, enable=enable)
+
+    def configure_stdio_fanout(self, mode: str, *, stream: str = "out", pid: Optional[int] = None) -> Dict[str, Any]:
+        mode_mask = self._fanout_mode_mask(mode)
+        streams = self._normalize_stdio_streams(stream)
+        results: List[Dict[str, Any]] = []
+        if pid is None:
+            for item in streams:
+                resp = self.vm.mailbox_config_stdio(item, mode_mask, update_existing=True)
+                results.append(resp)
+        else:
+            for item in streams:
+                target = f"svc:stdio.{item}@{pid}"
+                resp = self.mailbox_bind(0, target, mode=mode_mask)
+                result = dict(resp)
+                result["target"] = target
+                results.append(result)
+        return {
+            "mode": mode,
+            "mode_mask": mode_mask,
+            "streams": streams,
+            "pid": pid,
+            "results": results,
+        }
+
+    @staticmethod
+    def _normalize_stdio_streams(stream: str) -> List[str]:
+        normalized = (stream or "out").lower()
+        if normalized in {"both", "all"}:
+            return ["out", "err"]
+        if normalized in {"out", "stdout"}:
+            return ["out"]
+        if normalized in {"err", "stderr"}:
+            return ["err"]
+        if normalized in {"in", "stdin"}:
+            return ["in"]
+        raise ValueError(f"unknown stdio stream '{stream}'")
+
+    @staticmethod
+    def _fanout_mode_mask(mode: str) -> int:
+        normalized = (mode or "off").lower()
+        base = mbx_const.HSX_MBX_MODE_RDWR
+        if normalized in {"off", "none", "default"}:
+            return base
+        if normalized in {"drop", "fanout", "fanout_drop"}:
+            return base | mbx_const.HSX_MBX_MODE_FANOUT | mbx_const.HSX_MBX_MODE_FANOUT_DROP
+        if normalized in {"block", "fanout_block"}:
+            return base | mbx_const.HSX_MBX_MODE_FANOUT | mbx_const.HSX_MBX_MODE_FANOUT_BLOCK
+        raise ValueError(f"unknown fan-out mode '{mode}'")
+
+    def _process_vm_events(self, events: List[Dict[str, Any]]) -> None:
+        for event in events:
+            etype = event.get('type')
+            pid_value = event.get('pid')
+            pid = int(pid_value) if pid_value is not None else None
+            if etype == 'mailbox_wait' and pid is not None:
+                self._mark_task_wait_mailbox(pid, event)
+            elif etype in {'mailbox_wake', 'mailbox_timeout'} and pid is not None:
+                self._mark_task_ready(pid, event)
+
+    def _mark_task_wait_mailbox(self, pid: int, event: Dict[str, Any]) -> None:
+        descriptor = event.get('descriptor')
+        handle = event.get('handle')
+        task = self.tasks.get(pid)
+        if task is not None:
+            task['state'] = 'waiting_mbx'
+            task['wait_mailbox'] = descriptor
+            if handle is not None:
+                task['wait_handle'] = handle
+        state = self.task_states.get(pid)
+        if state is not None:
+            state['running'] = False
+            ctx = state.setdefault('context', {})
+            ctx['state'] = 'waiting_mbx'
+            ctx['wait_kind'] = 'mailbox'
+            ctx['wait_mailbox'] = descriptor
+            if handle is not None:
+                ctx['wait_handle'] = handle
+
+    def _mark_task_ready(self, pid: int, event: Dict[str, Any]) -> None:
+        task = self.tasks.get(pid)
+        if task is not None:
+            task['state'] = 'ready'
+            task.pop('wait_mailbox', None)
+            task.pop('wait_handle', None)
+        state = self.task_states.get(pid)
+        if state is not None:
+            ctx = state.setdefault('context', {})
+            ctx['state'] = 'ready'
+            ctx['wait_kind'] = None
+            ctx['wait_mailbox'] = None
+            ctx['wait_deadline'] = None
+            ctx['wait_handle'] = None
+            state['running'] = True
+
+    def listen_stdout(self, pid: Optional[int], *, limit: int = 1, max_len: int = 512) -> Dict[str, Any]:
+        descriptors = self.mailbox_snapshot()
+        if pid is not None:
+            targets = [f"svc:stdio.out@{pid}"]
+        else:
+            targets = [f"svc:stdio.out@{desc['owner_pid']}" for desc in descriptors if desc.get('name') == 'stdio.out' and desc.get('owner_pid') is not None]
+        messages: List[Dict[str, Any]] = []
+        for target in targets:
+            open_resp = self.mailbox_open(0, target)
+            handle = int(open_resp.get("handle", 0))
+            try:
+                for _ in range(max(1, limit)):
+                    recv_resp = self.mailbox_recv(0, handle, max_len=max_len, timeout=0)
+                    if recv_resp.get("mbx_status") != mbx_const.HSX_MBX_STATUS_OK:
+                        break
+                    messages.append({
+                        "target": target,
+                        "text": recv_resp.get("text", ""),
+                        "data_hex": recv_resp.get("data_hex", ""),
+                        "flags": recv_resp.get("flags"),
+                        "channel": recv_resp.get("channel"),
+                        "length": recv_resp.get("length"),
+                        "src_pid": recv_resp.get("src_pid"),
+                    })
+            finally:
+                self.mailbox_close(0, handle)
+        return {"messages": messages}
+
+    def send_stdin(self, pid: int, *, data: str | None = None, data_hex: str | None = None, channel: Optional[str] = None) -> Dict[str, Any]:
+        if data is None and data_hex is None:
+            raise ValueError("send_stdin requires data or data_hex")
+        target = channel or f"svc:stdio.in@{pid}"
+        open_resp = self.mailbox_open(0, target)
+        handle = int(open_resp.get("handle", 0))
+        try:
+            send_resp = self.mailbox_send(0, handle, data=data, data_hex=data_hex)
+        finally:
+            self.mailbox_close(0, handle)
+        send_resp["target"] = target
+        return send_resp
+
     def _auto_loop(self) -> None:
         while not self.auto_event.is_set():
             result = self.step()
@@ -204,7 +381,6 @@ class _ShellHandler(socketserver.StreamRequestHandler):
         data = json.dumps(payload, separators=(",", ":")).encode("utf-8") + b"\n"
         self.wfile.write(data)
         self.wfile.flush()
-
 
 class ExecutiveServer(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
@@ -280,6 +456,31 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 return {"version": 1, "status": "ok", "task": task}
             if cmd == "ps":
                 return {"version": 1, "status": "ok", "tasks": self.state.task_list()}
+            if cmd == "stdio_fanout":
+                mode = str(request.get("mode", "off"))
+                stream = str(request.get("stream", "out"))
+                pid_value = request.get("pid")
+                pid = int(pid_value) if pid_value is not None else None
+                result = self.state.configure_stdio_fanout(mode, stream=stream, pid=pid)
+                return {"version": 1, "status": "ok", "config": result}
+            if cmd == "listen":
+                pid_value = request.get("pid")
+                pid = int(pid_value) if pid_value is not None else None
+                limit = int(request.get("limit", 5))
+                max_len = int(request.get("max_len", 512))
+                result = self.state.listen_stdout(pid, limit=limit, max_len=max_len)
+                return {"version": 1, "status": "ok", **result}
+            if cmd == "send":
+                pid_value = request.get("pid")
+                if pid_value is None:
+                    raise ValueError("send requires 'pid'")
+                data = request.get("data")
+                data_hex = request.get("data_hex")
+                channel = request.get("channel")
+                if data_hex is None and not isinstance(data, str):
+                    raise ValueError("send requires 'data' or 'data_hex'")
+                result = self.state.send_stdin(int(pid_value), data=data if isinstance(data, str) else None, data_hex=data_hex if isinstance(data_hex, str) else None, channel=channel)
+                return {"version": 1, "status": "ok", **result}
             if cmd == "sched":
                 pid_value = request.get("pid")
                 if pid_value is None:
@@ -344,3 +545,28 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

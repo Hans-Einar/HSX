@@ -1,0 +1,58 @@
+; Reuse stdio helpers so the consumer can print what it receives
+.include "../../lib/hsx_stdio.mvasm"
+
+.entry main
+.text
+main:
+    ; Open the shared mailbox used by the producer app
+    LDI32 R1, target_demo
+    LDI R2, 0
+    SVC MOD=0x5, FN=0x0
+    MOV R8, R1
+
+    ; Poll for a message and record the returned length
+    LDI32 R2, inbox_buffer
+    LDI R3, 32
+    LDI32 R4, 0x0000FFFF
+    LDI32 R5, inbox_len
+    MOV R6, R5
+    MOV R1, R8
+    SVC MOD=0x5, FN=0x3
+
+    ST [R6+0], R1
+
+    ; Exit early if the receive failed
+    MOV R6, R0
+    LDI R7, 0
+    CMP R6, R7
+    JNZ consumer_done
+
+    ; Null-terminate and print the received payload
+    LDI32 R9, inbox_len
+    LD R9, [R9+0]
+    LDI32 R10, inbox_buffer
+    ADD R10, R10, R9
+    STB [R10+0], R7
+
+    LDI32 R1, inbox_buffer
+    CALL hsx_stdio_puts
+
+consumer_done:
+    LDI R0, 0
+    RET
+
+.data
+    .align 2
+target_demo:
+    .asciz "app:demo"
+inbox_buffer:
+    .word 0
+    .word 0
+    .word 0
+    .word 0
+    .word 0
+    .word 0
+    .word 0
+    .word 0
+inbox_len:
+    .word 0

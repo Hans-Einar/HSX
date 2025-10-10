@@ -39,7 +39,7 @@ merge:
     else_block = lines[else_idx: else_idx + 4]
     assert any(line.startswith('MOV') and 'R3' in line for line in else_block), "phi move missing for else predecessor"
     merge_idx = lines.index('phi_example__merge:')
-    assert lines[merge_idx + 1] == 'MOV R0, R7'
+    assert lines[merge_idx + 1] == 'MOV R0, R4'
     assert lines[merge_idx + 2] == 'RET'
 
 
@@ -55,8 +55,8 @@ entry:
     lines = compile_to_lines(ll)
     assert 'LDI R2, 5' in lines
     assert 'CALL callee' in lines
-    assert 'MOV R5, R0' in lines
-    assert lines[-2:] == ['MOV R0, R5', 'RET']
+    assert 'MOV R4, R0' in lines
+    assert lines[-2:] == ['MOV R0, R4', 'RET']
 
 
 def test_half_ops_lowering():
@@ -86,11 +86,43 @@ def test_externs_for_defined_functions():
     asm = _load_hsx_llc().compile_ll_to_mvasm(ll, trace=False)
     lines = [line for line in asm.splitlines() if line and not line.startswith(';')]
     assert lines[0] == '.entry main'
-    assert lines[1] == '.extern foo'
-    assert lines[2] == '.extern main'
+    assert lines[1] == '.export foo'
+    assert lines[2] == '.export main'
     assert lines[3] == '.text'
 
 def test_imports_for_external_call():
     ll = """declare i32 @ext(i32)\n\ndefine dso_local i32 @wrap(i32 %x) {\nentry:\n  %r = call i32 @ext(i32 %x)\n  ret i32 %r\n}\n"""
     asm = _load_hsx_llc().compile_ll_to_mvasm(ll, trace=False)
     assert '.import ext' in asm.splitlines()
+
+
+def test_spill_data_emitted_for_many_temps():
+    ll = """define dso_local i32 @spill(i32 %a) {
+entry:
+  %t0 = add i32 %a, 1
+  %t1 = add i32 %a, 2
+  %t2 = add i32 %a, 3
+  %t3 = add i32 %a, 4
+  %t4 = add i32 %a, 5
+  %t5 = add i32 %a, 6
+  %t6 = add i32 %a, 7
+  %t7 = add i32 %a, 8
+  %t8 = add i32 %a, 9
+  %t9 = add i32 %a, 10
+  %u0 = add i32 %t0, %t5
+  %u1 = add i32 %t1, %t6
+  %u2 = add i32 %t2, %t7
+  %u3 = add i32 %t3, %t8
+  %u4 = add i32 %t4, %t9
+  %s0 = add i32 %u0, %u1
+  %s1 = add i32 %u2, %u3
+  %s2 = add i32 %s0, %s1
+  %result = add i32 %s2, %u4
+  ret i32 %result
+}
+"""
+    asm = _load_hsx_llc().compile_ll_to_mvasm(ll, trace=False)
+    assert '__spill_' in asm
+    assert '.data' in asm
+    spill_lines = [line for line in asm.splitlines() if line.startswith('__spill_')]
+    assert spill_lines, 'expected spill slots in data section'

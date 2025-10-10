@@ -1,0 +1,55 @@
+; Bring in shared stdio helpers for sending/receiving via mailbox channels
+.include "../../lib/hsx_stdio.mvasm"
+
+.entry main
+.text
+main:
+    ; Announce that the task is alive
+    LDI32 R1, hello_msg
+    CALL hsx_stdio_puts
+
+    ; Attempt to read up to 32 bytes from stdin (polling helper)
+    LDI32 R1, stdin_buffer
+    LDI R2, 32
+    LDI32 R3, 0x0000FFFF
+    LDI R4, 0
+    CALL hsx_stdio_read
+
+    ; Bail out early if the read failed (non-zero status in R0)
+    MOV R5, R0
+    LDI R6, 0
+    CMP R5, R6
+    JNZ main_done
+
+    ; Null-terminate the received payload
+    MOV R7, R1
+    LDI32 R8, stdin_buffer
+    ADD R8, R8, R7
+    STB [R8+0], R6
+
+    ; Prefix the echoed content and print it back
+    LDI32 R1, stdin_prefix
+    CALL hsx_stdio_puts
+
+    LDI32 R1, stdin_buffer
+    CALL hsx_stdio_puts
+
+main_done:
+    LDI R0, 0
+    RET
+
+.data
+    .align 2
+hello_msg:
+    .asciz "hello from hsx stdio"
+stdin_prefix:
+    .asciz "echo: "
+stdin_buffer:
+    .word 0
+    .word 0
+    .word 0
+    .word 0
+    .word 0
+    .word 0
+    .word 0
+    .word 0
