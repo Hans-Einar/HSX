@@ -650,6 +650,7 @@ def assemble(lines, *, include_base: Path | None = None, for_object: bool = Fals
         name: {
             'section': info['section'],
             'offset': info['offset'],
+            'abs_addr': info['abs_addr'],
         }
         for name, info in symtab.items()
     }

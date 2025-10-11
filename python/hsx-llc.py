@@ -16,7 +16,9 @@ R_RET = "R0"
 ATTR_TOKENS = {"nsw", "nuw", "noundef", "dso_local", "local_unnamed_addr", "volatile"}
 
 MOV_RE = re.compile(r"MOV\s+(R\d{1,2}),\s*(R\d{1,2})$", re.IGNORECASE)
-LDI_RE = re.compile(r"LDI\s+(R\d{1,2}),\s*([-]?\d+)$", re.IGNORECASE)
+IMM_TOKEN = r"(?:-?\d+|0x[0-9A-Fa-f]+)"
+LDI_RE = re.compile(rf"LDI\s+(R\d{{1,2}}),\s*({IMM_TOKEN})$", re.IGNORECASE)
+LDI32_RE = re.compile(rf"LDI32\s+(R\d{{1,2}}),\s*({IMM_TOKEN})$", re.IGNORECASE)
 
 ARG_REGS = ["R1","R2","R3"]  # more via stack later
 
@@ -255,8 +257,15 @@ def combine_ldi_movs(lines: List[str]) -> List[str]:
                 result.append(line)
                 i += 1
                 continue
+            instr = None
             ldi_match = LDI_RE.match(stripped)
             if ldi_match:
+                instr = "LDI"
+            else:
+                ldi_match = LDI32_RE.match(stripped)
+                if ldi_match:
+                    instr = "LDI32"
+            if ldi_match and instr:
                 src_reg = ldi_match.group(1).upper()
                 imm = ldi_match.group(2)
                 next_idx = next_instruction_index(work, i + 1)
@@ -273,7 +282,7 @@ def combine_ldi_movs(lines: List[str]) -> List[str]:
                                 origin_idx=i,
                                 labels=label_positions,
                             ):
-                                result.append(f"LDI {dst_reg}, {imm}")
+                                result.append(f"{instr} {dst_reg}, {imm}")
                                 for filler in work[i + 1:next_idx]:
                                     result.append(filler)
                                 i = next_idx + 1

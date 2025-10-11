@@ -10,6 +10,7 @@ from pathlib import Path
 import struct
 import sys
 import zlib
+from pathlib import PurePosixPath
 from typing import Any, Callable, Dict, Optional, List
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -23,6 +24,14 @@ except ImportError as exc:  # pragma: no cover - require repo sources
     raise ImportError("HSX repo modules not found; ensure repository root on PYTHONPATH") from exc
 
 HSX_MAGIC = 0x48535845  # 'HSXE'
+HSX_VERSION = 0x0001
+MAX_CODE_LEN = 0x10000
+MAX_RODATA_LEN = 0x10000
+MAX_BSS_SIZE = 0x10000
+HSX_ERR_ENOSYS = 0xFFFF_FF01
+HSX_ERR_STACK_UNDERFLOW = 0xFFFF_FF02
+HSX_ERR_STACK_OVERFLOW = 0xFFFF_FF03
+HSX_ERR_MEM_FAULT = 0xFFFF_FF04
 HEADER = struct.Struct(">IHHIIIIII")
 HEADER_FIELDS = (
     "magic",
@@ -163,10 +172,12 @@ def f32_to_f16(val):
         return (s<<15) | 0x7C00  # overflow to inf
     if e < -14:
         # subnormal
-        frac = a / (2 ** (-14))
-        f = int(round(frac * (1<<10))) - (1<<10)
-        if f < 0: f = 0
-        return (s<<15) | (f & 0x3FF)
+        mant = int(round(a * (1 << 24)))
+        if mant <= 0:
+            return s << 15
+        if mant > 0x3FF:
+            mant = 0x3FF
+        return (s << 15) | mant
     # normal
     bias_e = e + 15
     mant = a / (2 ** e) - 1.0
@@ -188,7 +199,23 @@ class FSStub:
         self.files = {"/hello.txt": bytearray(b"Hi from FS!\n")}
         self.fds = {}
         self.next_fd = 3
+        self.err_invalid_path = -22
+
+    @staticmethod
+    def _is_safe_path(path: str) -> bool:
+        if not path:
+            return False
+        candidate = path.replace('\\', '/').strip()
+        if ':' in candidate:
+            return False
+        p = PurePosixPath(candidate)
+        if p.is_absolute():
+            return False
+        return all(part not in ('', '..') for part in p.parts)
+
     def open(self, path, flags=0):
+        if not self._is_safe_path(path):
+            return self.err_invalid_path
         if path not in self.files:
             self.files[path] = bytearray()
         fd = self.next_fd; self.next_fd += 1
@@ -468,31 +495,55 @@ class MiniVM:
             if v == 0:
                 self.flags |= 1  # Z flag
 
+        def ensure_range(addr, size):
+            if addr < 0 or addr + size > len(self.mem):
+                raise MemoryError
+
         def ld32(addr):
             a = addr & 0xFFFF
-            return (self.mem[a] << 24) | (self.mem[(a + 1) & 0xFFFF] << 16) | (self.mem[(a + 2) & 0xFFFF] << 8) | self.mem[(a + 3) & 0xFFFF]
+            ensure_range(a, 4)
+            return (
+                self.mem[a]
+                | (self.mem[a + 1] << 8)
+                | (self.mem[a + 2] << 16)
+                | (self.mem[a + 3] << 24)
+            )
 
         def st32(addr, val):
             a = addr & 0xFFFF
-            self.mem[a] = (val >> 24) & 0xFF
-            self.mem[(a + 1) & 0xFFFF] = (val >> 16) & 0xFF
-            self.mem[(a + 2) & 0xFFFF] = (val >> 8) & 0xFF
-            self.mem[(a + 3) & 0xFFFF] = val & 0xFF
+            ensure_range(a, 4)
+            self.mem[a] = val & 0xFF
+            self.mem[a + 1] = (val >> 8) & 0xFF
+            self.mem[a + 2] = (val >> 16) & 0xFF
+            self.mem[a + 3] = (val >> 24) & 0xFF
 
         def ld8(addr):
-            return self.mem[addr & 0xFFFF]
+            a = addr & 0xFFFF
+            ensure_range(a, 1)
+            return self.mem[a]
 
         def st8(addr, v):
-            self.mem[addr & 0xFFFF] = v & 0xFF
+            a = addr & 0xFFFF
+            ensure_range(a, 1)
+            self.mem[a] = v & 0xFF
 
         def ld16(addr):
             a = addr & 0xFFFF
-            return (self.mem[a] << 8) | self.mem[(a + 1) & 0xFFFF]
+            ensure_range(a, 2)
+            return self.mem[a] | (self.mem[a + 1] << 8)
 
         def st16(addr, v):
             a = addr & 0xFFFF
-            self.mem[a] = (v >> 8) & 0xFF
-            self.mem[(a + 1) & 0xFFFF] = v & 0xFF
+            ensure_range(a, 2)
+            self.mem[a] = v & 0xFF
+            self.mem[a + 1] = (v >> 8) & 0xFF
+
+        def trap_memory_fault():
+            if self.trace or self.trace_out:
+                self._log("[VM] memory access out of range")
+            self.regs[0] = HSX_ERR_MEM_FAULT
+            self.running = False
+            self.save_context()
 
         if self.trace or self.trace_out:
             self._log(f"[TRACE] pc=0x{self.pc:04X} op=0x{op:02X} rd=R{rd} rs1=R{rs1} rs2=R{rs2} imm={imm}")
@@ -501,19 +552,43 @@ class MiniVM:
         if op == 0x01:  # LDI
             self.regs[rd] = imm & 0xFFFFFFFF
         elif op == 0x02:  # LD
-            self.regs[rd] = ld32((self.regs[rs1] + imm) & 0xFFFFFFFF)
+            try:
+                self.regs[rd] = ld32((self.regs[rs1] + imm) & 0xFFFFFFFF)
+            except MemoryError:
+                trap_memory_fault()
+                return
         elif op == 0x03:  # ST
-            st32((self.regs[rs1] + imm) & 0xFFFFFFFF, self.regs[rs2])
+            try:
+                st32((self.regs[rs1] + imm) & 0xFFFFFFFF, self.regs[rs2])
+            except MemoryError:
+                trap_memory_fault()
+                return
         elif op == 0x04:  # MOV
             self.regs[rd] = self.regs[rs1]
         elif op == 0x06:  # LDB
-            self.regs[rd] = ld8((self.regs[rs1] + imm) & 0xFFFFFFFF)
+            try:
+                self.regs[rd] = ld8((self.regs[rs1] + imm) & 0xFFFFFFFF)
+            except MemoryError:
+                trap_memory_fault()
+                return
         elif op == 0x07:  # LDH
-            self.regs[rd] = ld16((self.regs[rs1] + imm) & 0xFFFFFFFF)
+            try:
+                self.regs[rd] = ld16((self.regs[rs1] + imm) & 0xFFFFFFFF)
+            except MemoryError:
+                trap_memory_fault()
+                return
         elif op == 0x08:  # STB
-            st8((self.regs[rs1] + imm) & 0xFFFFFFFF, self.regs[rs2])
+            try:
+                st8((self.regs[rs1] + imm) & 0xFFFFFFFF, self.regs[rs2])
+            except MemoryError:
+                trap_memory_fault()
+                return
         elif op == 0x09:  # STH
-            st16((self.regs[rs1] + imm) & 0xFFFFFFFF, self.regs[rs2])
+            try:
+                st16((self.regs[rs1] + imm) & 0xFFFFFFFF, self.regs[rs2])
+            except MemoryError:
+                trap_memory_fault()
+                return
         elif op == 0x10:  # ADD
             v = (self.regs[rs1] + self.regs[rs2]) & 0xFFFFFFFF
             self.regs[rd] = v
@@ -559,7 +634,14 @@ class MiniVM:
         elif op == 0x24:  # CALL
             return_addr = (self.pc + 4) & 0xFFFFFFFF
             target = imm & 0xFFFFFFFF
-            new_sp = (self.sp - 4) & 0xFFFFFFFF
+            raw_sp = self.sp - 4
+            if raw_sp < 0 or raw_sp < (self.context.stack_limit or 0) or raw_sp + 4 > len(self.mem):
+                self._log("[CALL] stack overflow")
+                self.regs[0] = HSX_ERR_STACK_OVERFLOW
+                self.running = False
+                self.save_context()
+                return
+            new_sp = raw_sp & 0xFFFFFFFF
             st32(new_sp, return_addr)
             self.sp = new_sp
             if len(self.regs) >= 16:
@@ -577,10 +659,15 @@ class MiniVM:
                 self._log(f"[RET] pc=0x{(self.pc & 0xFFFF):04X} sp=0x{self.sp:04X}")
             if not self.call_stack:
                 self.running = False
+                self.save_context()
+                return
             else:
                 if self.sp >= len(self.mem):
                     self._log("[RET] stack underflow")
+                    self.regs[0] = HSX_ERR_STACK_UNDERFLOW
                     self.running = False
+                    self.save_context()
+                    return
                 else:
                     return_addr = ld32(self.sp)
                     self.sp = (self.sp + 4) & 0xFFFFFFFF
@@ -698,7 +785,7 @@ class MiniVM:
             self._svc_fs(fn)
         else:
             self._log(f"[SVC] mod=0x{mod:X} fn=0x{fn:X} (stub)")
-            self.regs[0] = 0
+            self.regs[0] = HSX_ERR_ENOSYS
 
     def _read_c_string(self, addr):
         out = bytearray()
@@ -2088,22 +2175,54 @@ def load_hxe(path, *, verbose: bool = False):
     data = Path(path).read_bytes()
     if len(data) < HEADER.size:
         raise ValueError(".hxe file too small")
+
     fields = HEADER.unpack_from(data)
     header = dict(zip(HEADER_FIELDS, fields))
+
     if header["magic"] != HSX_MAGIC:
         raise ValueError(f"Bad magic 0x{header['magic']:08X}")
+    if header["version"] != HSX_VERSION:
+        raise ValueError(f"Unsupported HSXE version 0x{header['version']:04X}")
+
     crc_input = data[: HEADER.size - 4] + data[HEADER.size :]
     calc_crc = zlib.crc32(crc_input) & 0xFFFFFFFF
     if calc_crc != header["crc32"]:
         raise ValueError(f"CRC mismatch: file=0x{header['crc32']:08X} calc=0x{calc_crc:08X}")
+
+    code_len = header["code_len"]
+    ro_len = header["ro_len"]
+    bss_size = header["bss_size"]
+    entry = header["entry"]
+
+    if code_len < 0 or ro_len < 0 or bss_size < 0:
+        raise ValueError("Negative section length not permitted")
+    if code_len > MAX_CODE_LEN:
+        raise ValueError("Code section exceeds VM capacity")
+    if ro_len > MAX_RODATA_LEN:
+        raise ValueError("RODATA section exceeds VM capacity")
+    if bss_size > MAX_BSS_SIZE:
+        raise ValueError("BSS size exceeds VM capacity")
+    if code_len % 4 != 0:
+        raise ValueError("Code section must be 4-byte aligned")
+    if entry % 4 != 0:
+        raise ValueError("Entry address must be 4-byte aligned")
+
     code_start = HEADER.size
-    code_end = code_start + header["code_len"]
-    ro_end = code_end + header["ro_len"]
+    code_end = code_start + code_len
+    ro_end = code_end + ro_len
+
+    if ro_end > len(data):
+        raise ValueError(".hxe truncated: sections exceed file length")
+
+    if entry < 0 or entry >= code_len:
+        raise ValueError("Entry point outside code section")
+
     code = data[code_start:code_end]
     rodata = data[code_end:ro_end]
+
     if verbose:
         print(
-            f"[HXE] entry=0x{header['entry']:08X} code_len={header['code_len']} ro_len={header['ro_len']} bss={header['bss_size']} caps=0x{header['req_caps']:08X}"
+            f"[HXE] entry=0x{entry:08X} code_len={code_len} ro_len={ro_len} bss={bss_size} caps=0x{header['req_caps']:08X}"
         )
     return header, code, rodata
 

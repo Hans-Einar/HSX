@@ -237,6 +237,8 @@ class MailboxManager:
         state = self._handle_state(pid, handle)
         desc = self.descriptor_by_id(state.descriptor_id)
         state.is_sender = True
+        if not payload:
+            return True, desc.descriptor_id
         message = MailboxMessage(
             length=len(payload),
             flags=flags,
@@ -520,6 +522,5 @@ class MailboxManager:
 
 def _message_cost(message: MailboxMessage) -> int:
     return message.length + 8
-
 
 
