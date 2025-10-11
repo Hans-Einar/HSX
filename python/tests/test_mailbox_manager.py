@@ -1,5 +1,20 @@
+import importlib.util
+from pathlib import Path
+
 from python.mailbox import MailboxManager, MailboxError
 from python import hsx_mailbox_constants as mbx_const
+
+
+def _load_hsx_llc():
+    root = Path(__file__).resolve().parents[1] / "hsx-llc.py"
+    spec = importlib.util.spec_from_file_location("hsx_llc", root)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+HSX_LLC = _load_hsx_llc()
 
 
 def test_bind_creates_descriptor():
@@ -169,3 +184,41 @@ def test_set_default_stdio_mode_updates_existing():
     handle = mgr.open(pid=99, target="svc:stdio.out@5")
     state_info = mgr.peek(pid=99, handle=handle)
     assert state_info["mode_mask"] & mbx_const.HSX_MBX_MODE_FANOUT
+
+
+def test_register_allocator_spill_sequence_detected():
+    ir = """
+define dso_local i32 @main() {
+entry:
+  %v1 = add i32 0, 1
+  %v2 = add i32 0, 2
+  %v3 = add i32 0, 3
+  %v4 = add i32 0, 4
+  %v5 = add i32 0, 5
+  %v6 = add i32 0, 6
+  %v7 = add i32 0, 7
+  %v8 = add i32 0, 8
+  %v9 = add i32 0, 9
+  %v10 = add i32 0, 10
+  %s1 = add i32 %v1, %v2
+  %s2 = add i32 %s1, %v3
+  %s3 = add i32 %s2, %v4
+  %s4 = add i32 %s3, %v5
+  %s5 = add i32 %s4, %v6
+  %s6 = add i32 %s5, %v7
+  %s7 = add i32 %s6, %v8
+  %s8 = add i32 %s7, %v9
+  %s9 = add i32 %s8, %v10
+  ret i32 %s9
+}
+"""
+
+    asm_text = HSX_LLC.compile_ll_to_mvasm(ir, trace=False)
+    assert "__spill_" in asm_text
+
+    mgr = MailboxManager()
+    handle = mgr.open(pid=1, target="svc:stdio.out")
+    ok, _ = mgr.send(pid=1, handle=handle, payload=b"ok")
+    assert ok is True
+    msg = mgr.recv(pid=1, handle=handle)
+    assert msg is not None and msg.payload == b"ok"

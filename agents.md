@@ -144,9 +144,9 @@
 ## TODO - Mailbox System Compiler Enablement (Active)
 - [x] Introduce a lightweight SSA liveness tracker in `python/hsx-llc.py` to recycle registers once values reach zero remaining uses.
 - [x] Add a register allocator shim in `python/hsx-llc.py` that spills to compiler-managed stack slots and reloads on demand when the pool is exhausted.
-- [ ] Extend IR lowering to cover dynamic-index getelementptr, float loads/stores, %union allocas, and the other deferred patterns once allocation is stable.
-- [ ] Exercise spill/reload flows via `python/tests/test_host_vm_cli.py` and `python/tests/test_mailbox_manager.py`, updating `examples/tests/` inputs as needed.
-- [ ] After each capability lands, rerun `make -C python test` and targeted integration suites to confirm mailbox and half demos stay green.
+- [x] Extend IR lowering to cover dynamic-index getelementptr, float loads/stores, %union allocas, and the other deferred patterns once allocation is stable.
+- [x] Exercise spill/reload flows via `python/tests/test_host_vm_cli.py` and `python/tests/test_mailbox_manager.py`, updating `examples/tests/` inputs as needed.
+- [x] After each capability lands, rerun `make -C python test` and targeted integration suites to confirm mailbox and half demos stay green.
 
 ## TODO - Mailbox Fan-Out Follow-Up (Open)
 - [x] Prototype fan-out sequence tracking and retention policies in the Python mailbox manager with pytest coverage.
@@ -154,7 +154,6 @@
 - [ ] Update docs/hsx_spec.md and HSX_SVC_API references once behavior is validated.
 
 <3
-
 
 
 

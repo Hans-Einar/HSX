@@ -61,6 +61,17 @@ def parse_global_definition(line: str):
         value_str = value_str.strip()
         value = 0 if value_str == 'zeroinitializer' else int(value_str)
         return {"name": name, "kind": "int", "bits": int(bits), "value": value, "align": int(align) if align else None}
+    float_match = re.match(r'@([A-Za-z0-9_.]+)\s*=\s*(?:[\w.]+\s+)*global\s+float\s+([^,]+)(?:,\s*align\s*(\d+))?', line)
+    if float_match:
+        name, value_str, align = float_match.groups()
+        value_str = value_str.strip()
+        if value_str == 'zeroinitializer':
+            bits = 0
+        elif value_str.lower().startswith('0x'):
+            bits = int(value_str, 16) & 0xFFFFFFFF
+        else:
+            bits = struct.unpack('<I', struct.pack('<f', float(value_str)))[0]
+        return {"name": name, "kind": "float", "bits": 32, "value": bits, "align": int(align) if align else None}
     return None
 
 
@@ -90,6 +101,9 @@ def render_globals(globals_list):
                 lines.append(f"    .half {value}")
             else:
                 lines.append(f"    .word {value}")
+        elif entry['kind'] == 'float':
+            value = entry['value'] & 0xFFFFFFFF
+            lines.append(f"    .word 0x{value:08X}")
     return lines
 
 def parse_ir(lines: List[str]) -> Dict:
@@ -489,8 +503,10 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
         tname = canonical_type(type_name)
         if tname in {'i1', 'i8'}:
             return 'byte'
-        if tname in {'i16', 'half', 'float'}:
+        if tname in {'i16', 'half'}:
             return 'half'
+        if tname in {'i32', 'float', 'ptr'}:
+            return 'word'
         return 'word'
 
     def type_to_store_instr(type_name: Optional[str]) -> str:
