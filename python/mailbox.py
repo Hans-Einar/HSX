@@ -413,6 +413,34 @@ class MailboxManager:
             return HSX_MBX_STDIO_ERR
         raise MailboxError(f"unknown stdio stream '{stream}'")
 
+    def default_stdio_modes(self) -> Dict[str, int]:
+        result: Dict[str, int] = {}
+        for stream, target in (("in", HSX_MBX_STDIO_IN), ("out", HSX_MBX_STDIO_OUT), ("err", HSX_MBX_STDIO_ERR)):
+            result[stream] = self._default_stdio_modes.get(target, HSX_MBX_MODE_RDWR)
+        return result
+
+    def stdio_modes_for_pid(self, pid: int) -> Dict[str, int]:
+        result: Dict[str, int] = {}
+        for stream, target in (("in", HSX_MBX_STDIO_IN), ("out", HSX_MBX_STDIO_OUT), ("err", HSX_MBX_STDIO_ERR)):
+            result[stream] = self._stdio_mode_for_target(pid, target)
+        return result
+
+    def _stdio_mode_for_target(self, pid: Optional[int], target: str) -> int:
+        if ":" in target:
+            _, _, name = target.partition(":")
+        else:
+            name = target
+        owner = pid
+        key = (HSX_MBX_NAMESPACE_SVC, name, owner)
+        desc_id = self._lookup.get(key)
+        if desc_id is not None:
+            desc = self._descriptors.get(desc_id)
+            if desc is not None:
+                return desc.mode_mask
+        if pid is None:
+            return self._default_stdio_modes.get(target, HSX_MBX_MODE_RDWR)
+        return self._default_stdio_modes.get(target, HSX_MBX_MODE_RDWR)
+
     def _handle_state(self, pid: int, handle: int) -> HandleState:
         table = self._handles.get(pid)
         if not table or handle not in table:
@@ -522,5 +550,4 @@ class MailboxManager:
 
 def _message_cost(message: MailboxMessage) -> int:
     return message.length + 8
-
 

@@ -1,0 +1,2 @@
+kill <pid>
+Terminate the task and reclaim its resources. Auto stepping is stopped first to keep the VM consistent.

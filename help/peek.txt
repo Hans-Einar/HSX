@@ -1,0 +1,2 @@
+peek <pid> <addr> [len]
+Read memory from the task starting at addr. Length defaults to 16 bytes when omitted.

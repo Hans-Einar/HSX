@@ -1,0 +1,2 @@
+stop_auto
+Stop the background stepping loop. Tasks remain paused until you resume or step manually.

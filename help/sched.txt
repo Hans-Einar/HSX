@@ -1,0 +1,2 @@
+sched <pid> [priority <n>] [quantum <n>]
+Update the scheduler priority and/or quantum for a task. Values are decimal.

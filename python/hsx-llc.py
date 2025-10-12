@@ -49,11 +49,15 @@ def parse_global_definition(line: str):
         name, _, body, align = string_match.groups()
         data = parse_llvm_string_literal(body)
         return {"name": name, "kind": "bytes", "data": data, "align": int(align) if align else None}
-    zero_array_match = re.match(r'@([A-Za-z0-9_.]+)\s*=\s*(?:[\w.]+\s+)*global\s+\[(\d+)\s+x\s+i8\]\s+zeroinitializer(?:,\s*align\s*(\d+))?', line)
+    zero_array_match = re.match(
+        r'@([A-Za-z0-9_.]+)\s*=\s*(?:[\w.]+\s+)*global\s+\[(\d+)\s+x\s+i(8|16|32)\]\s+zeroinitializer(?:,\s*align\s*(\d+))?',
+        line,
+    )
     if zero_array_match:
-        name, count, align = zero_array_match.groups()
+        name, count, bits, align = zero_array_match.groups()
         count = int(count)
-        data = bytes([0] * count)
+        elem_size = int(bits) // 8
+        data = bytes([0] * (count * elem_size))
         return {"name": name, "kind": "bytes", "data": data, "align": int(align) if align else None}
     int_match = re.match(r'@([A-Za-z0-9_.]+)\s*=\s*(?:[\w.]+\s+)*global\s+i(8|16|32)\s+([^,]+)(?:,\s*align\s*(\d+))?', line)
     if int_match:
@@ -1098,34 +1102,31 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 maybe_release(dst)
                 continue
 
-            m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*sext\s+i(8|16|32)\s+(%[A-Za-z0-9_]+)\s+to\s+i(32|64)', line)
+            m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*sext\s+i(8|16|32)\s+([^,]+?)\s+to\s+i(32|64)', line)
             if m:
                 dst, src_bits, src, dst_bits = m.groups()
                 src_bits = int(src_bits)
                 dst_bits = int(dst_bits)
                 clear_alias(dst)
-                rs = resolve_operand(src, "R12")
-                if src_bits == 8 and dst_bits >= 32:
+                rs = resolve_operand(src.strip(), "R12")
+                if src_bits in (8, 16) and dst_bits >= 32:
                     rd = alloc_vreg(dst, 'i32')
-                    mask_name = new_label("sext8_mask")
-                    mask_reg = alloc_vreg(mask_name, 'i32')
-                    load_const(mask_reg, 0x80)
-                    bias_name = new_label("sext8_bias")
-                    bias_reg = alloc_vreg(bias_name, 'i32')
-                    load_const(bias_reg, 0x100)
-                    zero_name = new_label("sext8_zero")
-                    zero_reg = alloc_vreg(zero_name, 'i32')
-                    load_const(zero_reg, 0)
-                    asm.append(f"MOV {rd}, {rs}")
-                    asm.append(f"AND {mask_reg}, {rs}, {mask_reg}")
-                    asm.append(f"CMP {mask_reg}, {zero_reg}")
-                    pos_label = new_label("sext8_pos")
-                    asm.append(f"JZ {pos_label}")
-                    asm.append(f"SUB {rd}, {rd}, {bias_reg}")
-                    asm.append(f"{pos_label}:")
-                    release_reg(mask_name)
-                    release_reg(bias_name)
-                    release_reg(zero_name)
+                    if rd != rs:
+                        asm.append(f"MOV {rd}, {rs}")
+                    mask = (1 << src_bits) - 1
+                    load_const('R13', mask)
+                    asm.append(f"AND {rd}, {rd}, R13")
+                    sign_bit = 1 << (src_bits - 1)
+                    load_const('R13', sign_bit)
+                    asm.append(f"AND R13, {rd}, R13")
+                    nonneg_label = new_label("sext_nonneg")
+                    load_const('R12', 0)
+                    asm.append(f"CMP R13, R12")
+                    asm.append(f"JZ {nonneg_label}")
+                    extend = 1 << src_bits
+                    load_const('R12', extend)
+                    asm.append(f"SUB {rd}, {rd}, R12")
+                    asm.append(f"{nonneg_label}:")
                     maybe_release(dst)
                     continue
                 if src_bits == 32 and dst_bits == 64:
@@ -1169,6 +1170,24 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 maybe_release(dst)
                 continue
 
+            m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*trunc\s+i(32|16)\s+([^,]+)\s+to\s+i(8|16)', line)
+            if m:
+                dst, src_bits, src, dst_bits = m.groups()
+                src_bits = int(src_bits)
+                dst_bits = int(dst_bits)
+                if dst_bits >= src_bits:
+                    raise ISelError(f"Unsupported trunc: {orig_line}")
+                clear_alias(dst)
+                rd = alloc_vreg(dst, f"i{dst_bits}")
+                rs = resolve_operand(src, rd)
+                if rd != rs:
+                    asm.append(f"MOV {rd}, {rs}")
+                mask = (1 << dst_bits) - 1
+                load_const('R13', mask)
+                asm.append(f"AND {rd}, {rd}, R13")
+                maybe_release(dst)
+                continue
+
             m = re.match(r'br\s+label\s+%([A-Za-z0-9_]+)', line)
             if m:
                 target_label = m.group(1)
@@ -1195,9 +1214,12 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 asm.append(f"JMP {label_map.get(flabel, flabel)}")
                 continue
 
-            m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*getelementptr\s+inbounds\s+\[([0-9]+)\s+x\s+i8\],\s*ptr\s+([@%][A-Za-z0-9_.]+),\s*i(?:32|64)\s+0,\s*i(?:32|64)\s+([^,]+)', line)
+            m = re.match(
+                r'(%[A-Za-z0-9_]+)\s*=\s*getelementptr\s+inbounds\s+\[(\d+)\s+x\s+([A-Za-z0-9_.]+)\],\s*ptr\s+([@%][A-Za-z0-9_.]+),\s*i(?:32|64)\s+0,\s*i(?:32|64)\s+([^,]+)',
+                line,
+            )
             if m:
-                dst, _, base_name, index = m.groups()
+                dst, _, elem_type, base_name, index = m.groups()
                 clear_alias(dst)
                 rd = alloc_vreg(dst, 'ptr')
                 if base_name.startswith('@'):
@@ -1208,10 +1230,14 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     asm.append(f"MOV {rd}, {base_reg}")
                 index = index.strip()
                 if index not in ('0', '0LL', '0l'):
+                    stride = type_size(elem_type)
                     idx_reg = resolve_operand(index, "R12")
                     if idx_reg != 'R12':
                         asm.append(f"MOV R12, {idx_reg}")
                         idx_reg = 'R12'
+                    if stride != 1:
+                        load_const('R13', stride)
+                        asm.append(f"MUL {idx_reg}, {idx_reg}, R13")
                     asm.append(f"ADD {rd}, {rd}, {idx_reg}")
                 maybe_release(dst)
                 continue

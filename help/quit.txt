@@ -1,0 +1,2 @@
+quit
+Exit the shell client. The alias 'exit' is also accepted.

@@ -1,0 +1,2 @@
+listen [pid] [limit] [max_len]
+Fetch recent stdout mailbox messages from the target PID (or all tasks if PID is omitted). 'limit' controls how many messages are returned; 'max_len' clamps payload size.

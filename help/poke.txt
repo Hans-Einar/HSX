@@ -1,0 +1,2 @@
+poke <pid> <addr> <hex>
+Write hex-encoded bytes into the task memory starting at addr. Use with care.

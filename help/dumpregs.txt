@@ -1,0 +1,2 @@
+dumpregs <pid>
+Dump the register file and task context for the given PID.

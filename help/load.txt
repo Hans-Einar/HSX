@@ -1,0 +1,2 @@
+load <path>
+Resolve the path relative to the shell working directory, load the .hxe image, and activate the resulting task immediately.

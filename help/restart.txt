@@ -1,0 +1,2 @@
+restart [vm|exec|shell|all]
+Request a restart of the VM and/or executive. Include 'shell' to respawn the local client.

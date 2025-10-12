@@ -1,0 +1,2 @@
+cd <path>
+Change the shell working directory. Relative paths are resolved from the current directory.

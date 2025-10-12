@@ -1,0 +1,6 @@
+mbox [pid]
+List known mailboxes. Without a PID, every descriptor is shown; provide a PID to filter by owner.
+
+Example
+  mbox        # list all mailboxes
+  mbox 3      # show mailboxes owned by PID 3

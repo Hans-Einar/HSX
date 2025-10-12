@@ -1,10 +1,237 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import math
 import os
 import socket
 import sys
+from datetime import datetime
 from pathlib import Path
+
+
+HELP_DIR = Path(__file__).resolve().parents[1] / "help"
+HELP_ALIASES = {
+    "stdiofanout": "stdio",
+    "exit": "quit",
+}
+COMMAND_NAMES = sorted(
+    [
+        "attach",
+        "cd",
+        "detach",
+        "dumpregs",
+        "dmesg",
+        "exec",
+        "exit",
+        "help",
+        "info",
+        "kill",
+        "mbox",
+        "list",
+        "listen",
+        "load",
+        "ls",
+        "pause",
+        "peek",
+        "poke",
+        "ps",
+        "pwd",
+        "quit",
+        "reload",
+        "restart",
+        "resume",
+        "save",
+        "sched",
+        "send",
+        "shutdown",
+        "start_auto",
+        "stdio",
+        "stop_auto",
+        "step",
+    ]
+)
+def _command_usage(name: str) -> str:
+    filename = HELP_ALIASES.get(name, name)
+    path = HELP_DIR / f"{filename}.txt"
+    try:
+        with path.open("r", encoding="utf-8") as fp:
+            for line in fp:
+                usage = line.strip()
+                if usage:
+                    return usage
+    except FileNotFoundError:
+        pass
+    return name
+
+
+USAGE_BY_COMMAND = {name: _command_usage(name) for name in COMMAND_NAMES}
+
+
+def _format_command_table(entries: list[str], columns: int = 3) -> str:
+    if not entries:
+        return ""
+    column_count = min(columns, len(entries))
+    rows = math.ceil(len(entries) / column_count)
+    widths: list[int] = []
+    for col in range(column_count):
+        column_entries = [
+            entries[index]
+            for index in range(col * rows, min((col + 1) * rows, len(entries)))
+        ]
+        widths.append(max(len(text) for text in column_entries))
+    lines: list[str] = []
+    for row in range(rows):
+        parts: list[str] = []
+        for col in range(column_count):
+            index = col * rows + row
+            if index >= len(entries):
+                continue
+            text = entries[index]
+            parts.append(f"{text:<{widths[col]}}")
+        lines.append("  ".join(parts).rstrip())
+    return "\n".join(lines)
+
+
+def _print_general_help() -> None:
+    print("Commands:")
+    usages = [USAGE_BY_COMMAND.get(name, name) for name in COMMAND_NAMES]
+    print(_format_command_table(usages))
+    print("Use 'help <command>' for detailed help on a specific command.")
+
+
+def _print_topic_help(topic: str) -> None:
+    normalized = topic.lower()
+    filename = HELP_ALIASES.get(normalized, normalized)
+    path = HELP_DIR / f"{filename}.txt"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        print(f"help: no help available for '{topic}'")
+        return
+    print(text.rstrip())
+
+
+def _query_loaded_images(host: str, port: int) -> list[str]:
+    try:
+        resp = send_request(host, port, {"cmd": "ps"})
+    except Exception as exc:
+        raise ValueError(f"save: unable to query executive ({exc})") from exc
+    block = resp.get("tasks")
+    tasks: list[dict] = []
+    if isinstance(block, dict):
+        tasks = block.get("tasks", [])
+    elif isinstance(block, list):
+        tasks = block
+    for task in tasks or []:
+        program = task.get("program")
+        if isinstance(program, str) and program:
+            try:
+                resolved = str(Path(program).resolve(strict=False))
+            except Exception:
+                resolved = program
+            images.append(resolved)
+    unique: list[str] = []
+    seen: set[str] = set()
+    for path in images:
+        if path not in seen:
+            unique.append(path)
+            seen.add(path)
+    return unique
+
+
+def _save_loaded_images(name: str, base_dir: Path, host: str, port: int) -> tuple[Path, int]:
+    if not name:
+        raise ValueError("save: requires bundle name")
+    images = _query_loaded_images(host, port)
+    if not images:
+        raise ValueError("save: no .hxe images available to save")
+    bundle = name if name.lower().endswith(".txt") else f"{name}.txt"
+    save_dir = (base_dir / "savefiles").resolve(strict=False)
+    save_dir.mkdir(parents=True, exist_ok=True)
+    target = save_dir / bundle
+    with target.open("w", encoding="utf-8") as fp:
+        for path in images:
+            fp.write(path + "\n")
+    return target, len(images)
+
+
+def _resolve_load_targets(token: str, base_dir: Path) -> list[Path]:
+    if not token:
+        raise ValueError("load: requires <path|bundle> argument")
+    raw = Path(token)
+    if raw.is_absolute():
+        candidate = raw.resolve(strict=False)
+    else:
+        candidate = (base_dir / raw).resolve(strict=False)
+    if candidate.exists():
+        return [candidate]
+    if candidate.suffix == "" and (candidate.with_suffix(".hxe")).exists():
+        return [candidate.with_suffix(".hxe").resolve(strict=False)]
+    bundle = _resolve_saved_bundle(token, base_dir)
+    if bundle:
+        return bundle
+    raise ValueError(f"load: no .hxe file or bundle named '{token}'")
+
+
+def _resolve_saved_bundle(token: str, base_dir: Path) -> list[Path]:
+    save_dir = (base_dir / "savefiles").resolve(strict=False)
+    candidates = []
+    bundle_names = [f"{token}.txt", token] if not token.lower().endswith(".txt") else [token]
+    for name in bundle_names:
+        candidate = (save_dir / name).resolve(strict=False)
+        if candidate.exists():
+            candidates.append(candidate)
+    for candidate in candidates:
+        try:
+            return _read_bundle_file(candidate)
+        except FileNotFoundError:
+            continue
+    return []
+
+
+def _read_bundle_file(path: Path) -> list[Path]:
+    lines = path.read_text(encoding="utf-8").splitlines()
+    result: list[Path] = []
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        item = Path(line)
+        if item.is_absolute():
+            resolved = item.resolve(strict=False)
+        else:
+            resolved = (path.parent / item).resolve(strict=False)
+        if not resolved.exists():
+            raise ValueError(f"load: saved path '{line}' not found for bundle '{path.name}'")
+        result.append(resolved)
+    if not result:
+        raise ValueError(f"load: bundle '{path.name}' does not list any .hxe files")
+    return result
+
+
+def _perform_load_sequence(
+    host: str,
+    port: int,
+    paths: list[Path],
+    *,
+    verbose: bool = False,
+    rpc_cmd: str = "load",
+) -> list[tuple[Path, dict]]:
+    outputs: list[tuple[Path, dict]] = []
+    for path in paths:
+        payload: dict[str, object] = {"cmd": rpc_cmd, "path": str(path)}
+        if verbose:
+            payload["verbose"] = True
+        resp = send_request(host, port, payload)
+        outputs.append((path, resp))
+    return outputs
+
+
+def _as_int(value, default=0):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
 
 def _pretty_dumpregs(payload: dict) -> None:
@@ -110,11 +337,202 @@ def _pretty_listen(payload: dict) -> None:
         if data_hex and (not text or text.encode('utf-8').hex() != data_hex):
             print(f"    data_hex: {data_hex}")
 
+
+def _pretty_list(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    block = payload.get("channels", {})
+    pid = block.get("pid")
+    channels = block.get("channels", [])
+    print("list:")
+    print(f"  pid       : {pid}")
+    if not channels:
+        print("  (no channels)")
+        return
+    header = "    Descriptor  Target                          Mode  Capacity  Depth  Bytes  Subs"
+    print(header)
+    print("    " + "-" * (len(header) - 4))
+
+    for entry in channels:
+        descriptor = entry.get("descriptor_id")
+        descriptor_val = _as_int(descriptor, -1)
+        descriptor_str = "-" if descriptor_val < 0 else str(descriptor_val)
+        target = entry.get("target", "")
+        mode = _as_int(entry.get("mode_mask"), 0) & 0xFFFF
+        capacity = _as_int(entry.get("capacity"), 0)
+        depth = _as_int(entry.get("queue_depth"), 0)
+        bytes_used = _as_int(entry.get("bytes_used"), 0)
+        subscribers = _as_int(entry.get("subscriber_count"), 0)
+        print(
+            f"  {descriptor_str:>10}  {target:<30}  0x{mode:04X}  "
+            f"{capacity:8}  {depth:5}  {bytes_used:5}  {subscribers:4}"
+        )
+
+
+def _pretty_reload(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    block = payload.get("reload", {})
+    print("reload:")
+    print(f"  old_pid   : {block.get('old_pid')}")
+    print(f"  new_pid   : {block.get('new_pid')}")
+    print(f"  program   : {block.get('program')}")
+    image = block.get("image") or {}
+    if image:
+        entry = _as_int(image.get("entry"), 0) & 0xFFFFFFFF
+        code_len = _as_int(image.get("code_len"), 0)
+        ro_len = _as_int(image.get("ro_len"), 0)
+        bss = _as_int(image.get("bss"), 0)
+        image_pid = image.get("pid")
+        try:
+            pid_display = int(image_pid)
+        except (TypeError, ValueError):
+            pid_display = image_pid
+        print(f"  image     : pid={pid_display} entry=0x{entry:08X} code={code_len} ro={ro_len} bss={bss}")
+    task = block.get("task")
+    if task:
+        state = task.get("state")
+        program = task.get("program")
+        print(f"  task      : state={state} program={program}")
+
+
+def _print_stdio_streams(entries: list[dict], indent: str = "  ") -> None:
+    for entry in entries:
+        stream = entry.get("stream", "?")
+        mode_name = entry.get("mode", "?")
+        mask = _as_int(entry.get("mode_mask"), 0)
+        print(f"{indent}{stream:<6}: {mode_name} (0x{mask:04X})")
+
+
+def _pretty_stdio(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    config = payload.get("config", {})
+    print("stdio:")
+    scope = config.get("scope")
+    if scope:
+        print(f"  scope     : {scope}")
+    pid = config.get("pid")
+    if pid is not None and scope != "default":
+        print(f"  pid       : {pid}")
+    streams = config.get("streams") or []
+    if streams:
+        print("  streams:")
+        _print_stdio_streams(streams, indent="    ")
+    default_streams = config.get("default") or []
+    if default_streams:
+        print("  default:")
+        _print_stdio_streams(default_streams, indent="    ")
+    tasks = config.get("tasks") or []
+    if tasks:
+        print("  tasks:")
+        for entry in tasks:
+            entry_pid = entry.get("pid")
+            print(f"    pid {entry_pid}:")
+            _print_stdio_streams(entry.get("streams") or [], indent="      ")
+    mode_name = config.get("mode")
+    if mode_name:
+        print(f"  mode      : {mode_name}")
+    mode_mask = config.get("mode_mask")
+    if mode_mask is not None:
+        print(f"  mode_mask : 0x{_as_int(mode_mask):04X}")
+    applied = config.get("applied") or []
+    if applied:
+        print("  applied:")
+        for entry in applied:
+            stream = entry.get("stream")
+            target = entry.get("target")
+            status = entry.get("mbx_status", entry.get("status"))
+            line = f"    {stream or '?'}"
+            if target:
+                line += f" -> {target}"
+        if status is not None:
+            line += f" status={status}"
+        print(line)
+
+
+def _pretty_dmesg(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    logs = payload.get("logs") or []
+    print("dmesg:")
+    if not logs:
+        print("  (empty)")
+        return
+    for entry in logs:
+        ts = entry.get("ts")
+        if isinstance(ts, (int, float)):
+            timestamp = datetime.fromtimestamp(ts).strftime("%H:%M:%S")
+        else:
+            timestamp = "--:--:--"
+        level = (entry.get("level") or "").upper()
+        message = entry.get("message", "")
+        seq = entry.get("seq")
+        extra = {k: v for k, v in entry.items() if k not in {"ts", "level", "message", "seq"}}
+        print(f"  [{seq}] {timestamp} {level:<7} {message}")
+        if extra:
+            print(f"        {json.dumps(extra, sort_keys=True)}")
+
+
+_MAILBOX_NAMESPACE_NAMES = {
+    0: "pid",
+    1: "svc",
+    2: "app",
+    3: "shared",
+}
+
+
+def _mailbox_namespace_name(value: int) -> str:
+    return _MAILBOX_NAMESPACE_NAMES.get(value, str(value))
+
+
+def _pretty_mbox(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    descriptors = payload.get("descriptors") or []
+    filter_pid = payload.get("_filter_pid")
+    filtered: list[dict] = []
+    for desc in descriptors:
+        owner = desc.get("owner_pid")
+        owner_pid = _as_int(owner, None) if owner is not None else None
+        if filter_pid is not None and owner_pid != filter_pid:
+            continue
+        filtered.append(desc)
+    print("mbox:")
+    if filter_pid is not None:
+        print(f"  filter_pid: {filter_pid}")
+    if not filtered:
+        print("  (no mailboxes)" if filter_pid is None else "  (no mailboxes for specified pid)")
+        return
+    header = "    ID  Namespace  Owner  Depth  Bytes  Mode   Name"
+    print(header)
+    print("    " + "-" * (len(header) - 4))
+    for desc in filtered:
+        descriptor_id = desc.get("descriptor_id")
+        namespace = _mailbox_namespace_name(_as_int(desc.get("namespace"), -1))
+        owner = desc.get("owner_pid")
+        owner_str = str(owner) if owner is not None else "-"
+        depth = _as_int(desc.get("queue_depth"), 0)
+        bytes_used = _as_int(desc.get("bytes_used"), 0)
+        mode = _as_int(desc.get("mode_mask"), 0)
+        name = desc.get("name", "")
+        print(f"  {descriptor_id:5}  {namespace:<9}  {owner_str:>5}  {depth:5}  {bytes_used:5}  0x{mode:04X}  {name}")
+
 PRETTY_HANDLERS = {
     'dumpregs': _pretty_dumpregs,
     'info': _pretty_info,
     'attach': _pretty_info,
     'ps': _pretty_ps,
+    'list': _pretty_list,
+    'reload': _pretty_reload,
+    'dmesg': _pretty_dmesg,
+    'stdio': _pretty_stdio,
+    'mbox': _pretty_mbox,
 }
 
 
@@ -160,7 +578,7 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
     payload_cmd = cmd
     payload: dict[str, object] = {"cmd": payload_cmd}
 
-    if cmd in {"attach", "detach", "ps", "start_auto", "stop_auto", "shutdown", "pause", "resume", "kill", "load", "exec", "step", "listen", "send", "sched", "info", "peek", "poke", "dumpregs", "stdiofanout", "mailboxes", "mailbox_snapshot", "mailbox_open", "mailbox_close", "mailbox_bind", "mailbox_send", "mailbox_recv", "mailbox_peek", "mailbox_tap"}:
+    if cmd in {"attach", "detach", "ps", "start_auto", "stop_auto", "shutdown", "pause", "resume", "kill", "load", "exec", "reload", "list", "step", "listen", "send", "sched", "info", "peek", "poke", "dumpregs", "stdio", "mbox", "mailboxes", "mailbox_snapshot", "mailbox_open", "mailbox_close", "mailbox_bind", "mailbox_send", "mailbox_recv", "mailbox_peek", "mailbox_tap"}:
         pass
 
     if cmd == "info":
@@ -196,6 +614,24 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
                 raise ValueError("step cycles must be integer") from exc
         return payload
 
+    if cmd == "reload":
+        if not args:
+            raise ValueError("reload requires <pid>")
+        payload["pid"] = args[0]
+        if len(args) > 1:
+            flag = args[1].lower()
+            if flag in {"verbose", "--verbose"}:
+                payload["verbose"] = True
+            else:
+                raise ValueError("reload usage: reload <pid> [verbose]")
+        return payload
+
+    if cmd == "list":
+        if not args:
+            raise ValueError("list requires <pid>")
+        payload["pid"] = args[0]
+        return payload
+
     if cmd == "listen":
         remaining = list(args)
         for key in ("pid", "limit", "max_len"):
@@ -220,15 +656,54 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
             payload["data"] = " ".join(args[2:])
         return payload
 
-    if cmd == "stdiofanout":
-        if not args:
-            raise ValueError("stdiofanout requires <mode> [stream] [pid]")
+    if cmd == "mbox":
+        payload["cmd"] = "mailbox_snapshot"
+        if args:
+            token = args[0].strip()
+            if token and token.lower() not in {"all", "*"}:
+                try:
+                    payload["_filter_pid"] = int(token, 0)
+                except ValueError as exc:
+                    raise ValueError("mbox pid must be an integer") from exc
+        return payload
+
+    if cmd == "dmesg":
+        if args:
+            try:
+                payload["limit"] = int(args[0])
+            except ValueError as exc:
+                raise ValueError("dmesg limit must be an integer") from exc
+        return payload
+
+    if cmd == "stdio":
         payload["cmd"] = "stdio_fanout"
-        payload["mode"] = args[0]
-        if len(args) > 1:
-            payload["stream"] = args[1]
-        if len(args) > 2:
-            payload["pid"] = args[2]
+        tokens = list(args)
+        if not tokens:
+            return payload
+        stream_keywords = {"in", "stdin", "out", "stdout", "err", "stderr", "both", "all"}
+        if tokens:
+            first = tokens[0].strip()
+            lower = first.lower()
+            if lower in {"default", "global", "template"}:
+                payload["pid"] = "default"
+                tokens.pop(0)
+            elif lower in {"all", "*"}:
+                tokens.pop(0)
+            else:
+                try:
+                    payload["pid"] = int(first, 0)
+                    tokens.pop(0)
+                except ValueError:
+                    if lower in stream_keywords:
+                        pass
+                    else:
+                        raise ValueError("stdio usage: stdio [pid|default|all] [stream] [mode]")
+        if tokens:
+            payload["stream"] = tokens.pop(0)
+        if tokens:
+            payload["mode"] = tokens.pop(0)
+        if tokens:
+            raise ValueError("stdio usage: stdio [pid|default|all] [stream] [mode]")
         return payload
 
     if cmd == "sched":
@@ -278,7 +753,7 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
     return payload
 def cmd_loop(host: str, port: int, cwd: Path | None = None) -> None:
     current_dir = (cwd or Path.cwd()).resolve()
-    print(f"Connected to executive at {host}:{port}. Type 'help' for commands.")
+    print(f"Connected to executive at {host}:{port}. Type 'help' for commands or 'help <command>' for details.")
     while True:
         try:
             line = input('hsx> ').strip()
@@ -290,12 +765,60 @@ def cmd_loop(host: str, port: int, cwd: Path | None = None) -> None:
         if line.lower() in {'quit', 'exit'}:
             break
         if line.lower() == 'help':
-            print("Commands: info [pid], attach, detach, ps, load <path>, exec <path>, start_auto, stop_auto, step [cycles], pause <pid>, resume <pid>, kill <pid>, sched <pid> [priority <n>] [quantum <n>], restart [targets], listen [pid] [limit] [max_len], send <pid> [channel] <data>, stdiofanout <mode> [stream] [pid], peek <pid> <addr> [len], poke <pid> <addr> <hex>, dumpregs <pid>, ls [path], cd <path>, pwd, shutdown, quit")
+            _print_general_help()
             continue
         parts = line.split()
         cmd = parts[0].lower()
         args = parts[1:]
+        if cmd == 'stdiofanout':
+            cmd = 'stdio'
 
+        if cmd == 'help':
+            if args:
+                _print_topic_help(args[0])
+            else:
+                _print_general_help()
+            continue
+        if cmd in {'load', 'exec'}:
+            tokens = list(args)
+            verbose_flag = False
+            if tokens and tokens[-1].lower() in {"verbose", "--verbose"}:
+                verbose_flag = True
+                tokens = tokens[:-1]
+            if not tokens:
+                print(f"usage: {cmd} <path|bundle> [verbose]")
+                continue
+            try:
+                targets = _resolve_load_targets(tokens[0], current_dir)
+            except ValueError as exc:
+                print(exc)
+                continue
+            rpc_cmd = 'exec' if cmd == 'exec' else 'load'
+            try:
+                results = _perform_load_sequence(host, port, targets, verbose=verbose_flag, rpc_cmd=rpc_cmd)
+            except Exception as exc:
+                print(f"error: {exc}")
+                continue
+            for path, resp in results:
+                print(f"[{rpc_cmd}] {path}")
+                handler = PRETTY_HANDLERS.get(rpc_cmd)
+                if handler:
+                    handler(resp)
+                else:
+                    print(json.dumps(resp, indent=2, sort_keys=True))
+            continue
+        if cmd == 'save':
+            if not args:
+                print("usage: save <name>")
+                continue
+            try:
+                target, count = _save_loaded_images(args[0], current_dir, host, port)
+            except ValueError as exc:
+                print(exc)
+                continue
+            noun = "entry" if count == 1 else "entries"
+            print(f"Saved {count} {noun} to {target}")
+            continue
         if cmd == 'pwd':
             print(current_dir)
             continue
@@ -344,11 +867,18 @@ def cmd_loop(host: str, port: int, cwd: Path | None = None) -> None:
             print(exc)
             continue
 
+        filter_pid = None
+        if cmd == 'mbox':
+            filter_pid = payload.pop("_filter_pid", None)
+
         try:
             resp = send_request(host, port, payload)
         except Exception as exc:
             print(f"error: {exc}")
             continue
+        if cmd == 'mbox':
+            resp = dict(resp)
+            resp["_filter_pid"] = filter_pid
         handler = PRETTY_HANDLERS.get(cmd)
         if handler:
             handler(resp)
@@ -370,7 +900,60 @@ def main() -> None:
         return
 
     cmd = args_ns.cmd.lower()
+    if cmd == 'stdiofanout':
+        cmd = 'stdio'
     args = list(args_ns.args)
+
+    if cmd == 'help':
+        if args:
+            _print_topic_help(args[0])
+        else:
+            _print_general_help()
+        return
+
+    if cmd in {'load', 'exec'}:
+        tokens = list(args)
+        if args_ns.path and not tokens:
+            tokens = [args_ns.path]
+        verbose_flag = args_ns.verbose
+        if tokens and tokens[-1].lower() in {"verbose", "--verbose"}:
+            verbose_flag = True
+            tokens = tokens[:-1]
+        if not tokens:
+            parser.error(f"{cmd} requires <path|bundle>")
+        try:
+            targets = _resolve_load_targets(tokens[0], Path.cwd())
+        except ValueError as exc:
+            parser.error(str(exc))
+        try:
+            results = _perform_load_sequence(
+                args_ns.host,
+                args_ns.port,
+                targets,
+                verbose=verbose_flag,
+                rpc_cmd='exec' if cmd == 'exec' else 'load',
+            )
+        except Exception as exc:
+            parser.error(str(exc))
+        for path, resp in results:
+            print(f"[{cmd}] {path}")
+            handler = PRETTY_HANDLERS.get(cmd)
+            if handler:
+                handler(resp)
+            else:
+                print(json.dumps(resp, indent=2, sort_keys=True))
+        return
+
+    if cmd == 'save':
+        if not args:
+            parser.error("save requires <name>")
+        try:
+            target, count = _save_loaded_images(args[0], Path.cwd(), args_ns.host, args_ns.port)
+        except ValueError as exc:
+            parser.error(str(exc))
+        noun = "entry" if count == 1 else "entries"
+        print(f"Saved {count} {noun} to {target}")
+        return
 
     if cmd == 'restart':
         targets = [arg.lower() for arg in args] if args else ['vm', 'exec', 'shell']
@@ -384,8 +967,6 @@ def main() -> None:
             os.execv(sys.executable, [sys.executable] + sys.argv)
         return
 
-    if cmd in {'load', 'exec'} and args_ns.path and not args:
-        args = [args_ns.path]
     if cmd == 'step' and args_ns.cycles is not None and not args:
         args = [str(args_ns.cycles)]
 
@@ -394,13 +975,21 @@ def main() -> None:
     except ValueError as exc:
         parser.error(str(exc))
 
-    if cmd == 'load' and args_ns.verbose:
+    if cmd == 'reload' and args_ns.verbose:
         payload['verbose'] = True
+
+    filter_pid = None
+    if cmd == 'mbox':
+        filter_pid = payload.pop("_filter_pid", None)
 
     try:
         resp = send_request(args_ns.host, args_ns.port, payload)
     except Exception as exc:
         parser.error(str(exc))
+
+    if cmd == 'mbox':
+        resp = dict(resp)
+        resp["_filter_pid"] = filter_pid
 
     handler = PRETTY_HANDLERS.get(cmd)
     if handler:
@@ -411,12 +1000,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-

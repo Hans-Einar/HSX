@@ -150,6 +150,16 @@ class VMClient:
         }
         return _check_ok(self.request(payload))
 
+    def mailbox_stdio_summary(self, *, pid: int | None = None, stream: str | None = None, default_only: bool = False) -> dict:
+        payload: Dict[str, Any] = {"cmd": "mailbox_stdio_summary"}
+        if pid is not None:
+            payload["pid"] = pid
+        if stream is not None:
+            payload["stream"] = stream
+        if default_only:
+            payload["default_only"] = 1
+        return _check_ok(self.request(payload)).get("summary", {})
+
     def mailbox_send(self, pid: int, handle: int, *, data: str | None = None, data_hex: str | None = None, flags: int = 0, channel: int = 0) -> dict:
         payload: Dict[str, Any] = {"cmd": "mailbox_send", "pid": pid, "handle": handle, "flags": flags, "channel": channel}
         if data_hex is not None:

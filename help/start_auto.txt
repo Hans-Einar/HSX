@@ -1,0 +1,2 @@
+start_auto
+Start the background stepping loop so tasks run continuously without manual step commands.

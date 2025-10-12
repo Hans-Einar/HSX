@@ -141,12 +141,23 @@
 - [x] Add integration tests covering mailbox send flows and shell listen workflows (polling + host inspection).
 - [x] Mirrored mailbox/stdio samples in C with reusable wrappers (`examples/tests/test_mailbox_*_c`, `examples/tests/test_stdio_mailbox_c`).
 
-## TODO - Mailbox System Compiler Enablement (Active)
+## TODO - Milestone 4 Follow-Up
+- [ ] Expand the stdio shim with blocking stdin helpers and finalize the canonical C wrappers.
+- [ ] Update consumer samples to exercise the blocking helpers once they land (replace current polling loops).
+- [ ] Broaden integration coverage for mailbox back-pressure and tap tracing scenarios.
+
+## TODO - Mailbox System Compiler Enablement (Completed)
 - [x] Introduce a lightweight SSA liveness tracker in `python/hsx-llc.py` to recycle registers once values reach zero remaining uses.
 - [x] Add a register allocator shim in `python/hsx-llc.py` that spills to compiler-managed stack slots and reloads on demand when the pool is exhausted.
 - [x] Extend IR lowering to cover dynamic-index getelementptr, float loads/stores, %union allocas, and the other deferred patterns once allocation is stable.
 - [x] Exercise spill/reload flows via `python/tests/test_host_vm_cli.py` and `python/tests/test_mailbox_manager.py`, updating `examples/tests/` inputs as needed.
 - [x] After each capability lands, rerun `make -C python test` and targeted integration suites to confirm mailbox and half demos stay green.
+
+## TODO - hsx-llc IR Expansion (Active)
+- [ ] Lower integer `trunc` from i32→i16/i8 (and related paths) without dropping sign bits.
+- [ ] Extend `sext`/`zext` handling for i8/i16 operands so results land in i32 registers.
+- [ ] Teach dynamic-index GEP lowering to scale offsets for 2- and 4-byte element types.
+- [ ] Restore pytest coverage for the new lowering (casts + GEP) once the implementation is stable.
 
 ## TODO - Mailbox Fan-Out Follow-Up (Open)
 - [x] Prototype fan-out sequence tracking and retention policies in the Python mailbox manager with pytest coverage.
@@ -154,6 +165,4 @@
 - [ ] Update docs/hsx_spec.md and HSX_SVC_API references once behavior is validated.
 
 <3
-
-
 

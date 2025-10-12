@@ -1,0 +1,11 @@
+stdio [pid] [stream] [mode]
+Inspect or update stdio mailbox routing.
+
+No arguments: list the default template plus every task's current stdin/stdout/stderr modes.
+Provide a PID to inspect a single task (use 'default' for the template only). Add a stream name (in/stdin, out/stdout, err/stderr, both, all) to limit the view. Append a mode (off, fanout, fanout_block) to update that stream for the selected PID or template.
+
+Examples
+  stdio                 # list default + all tasks
+  stdio 3               # show PID 3's stdio configuration
+  stdio default stdout fanout  # change template for future tasks
+  stdio 3 stdout fanout        # mirror PID 3's stdout to multiple listeners

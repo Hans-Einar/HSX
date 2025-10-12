@@ -1,0 +1,2 @@
+save <name>
+Persist the list of .hxe images loaded during this shell session to savefiles/<name>.txt (paths are stored one per line).

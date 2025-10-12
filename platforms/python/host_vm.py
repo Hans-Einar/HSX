@@ -1125,6 +1125,54 @@ class VMController:
             "updated_descriptors": updated,
         }
 
+    def mailbox_stdio_summary(self, *, pid: Optional[int] = None, stream: Optional[str] = None, default_only: bool = False) -> Dict[str, Any]:
+        streams = self._normalize_stdio_summary_streams(stream)
+        default_modes = self.mailboxes.default_stdio_modes()
+        summary: Dict[str, Any] = {
+            "streams": streams,
+            "default": {name: default_modes.get(name, mbx_const.HSX_MBX_MODE_RDWR) for name in streams},
+        }
+        if default_only:
+            return summary
+        if pid is None:
+            tasks_summary: List[Dict[str, Any]] = []
+            for task_pid in sorted(self.tasks):
+                modes = self.mailboxes.stdio_modes_for_pid(task_pid)
+                tasks_summary.append(
+                    {
+                        "pid": task_pid,
+                        "streams": {name: modes.get(name, mbx_const.HSX_MBX_MODE_RDWR) for name in streams},
+                    }
+                )
+            summary["tasks"] = tasks_summary
+            return summary
+        task_pid = int(pid)
+        if task_pid not in self.tasks:
+            raise ValueError(f"unknown pid {task_pid}")
+        modes = self.mailboxes.stdio_modes_for_pid(task_pid)
+        summary["task"] = {
+            "pid": task_pid,
+            "streams": {name: modes.get(name, mbx_const.HSX_MBX_MODE_RDWR) for name in streams},
+        }
+        return summary
+
+    @staticmethod
+    def _normalize_stdio_summary_streams(stream: Optional[str]) -> List[str]:
+        if stream is None:
+            return ["in", "out", "err"]
+        normalized = stream.lower()
+        if normalized in {"both"}:
+            return ["out", "err"]
+        if normalized in {"all", "any"}:
+            return ["in", "out", "err"]
+        if normalized in {"out", "stdout"}:
+            return ["out"]
+        if normalized in {"err", "stderr"}:
+            return ["err"]
+        if normalized in {"in", "stdin"}:
+            return ["in"]
+        raise ValueError(f"unknown stdio stream '{stream}'")
+
     def mailbox_send(
         self,
         pid: int,
@@ -1630,6 +1678,7 @@ class VMController:
         self.program_path = self.tasks[pid]["program"]
         self._activate_task(pid, state_override=state)
         return {
+            "pid": pid,
             "entry": header["entry"],
             "code_len": header["code_len"],
             "ro_len": header["ro_len"],
@@ -1797,9 +1846,16 @@ class VMController:
                 break
         events.extend(vm.consume_events())
         snapshot = vm.snapshot_registers()
+        executed_pid = self.current_pid
         self._store_active_state()
         self._check_mailbox_timeouts()
         self._rotate_active()
+        next_pid = self.current_pid
+        current_pid_field = executed_pid if executed_pid is not None else next_pid
+        if current_pid_field is None:
+            current_pid_field = next_pid
+        if next_pid is None:
+            next_pid = current_pid_field
         return {
             "executed": executed,
             "running": snapshot["running"],
@@ -1808,7 +1864,8 @@ class VMController:
             "sleep_pending": bool((vm.sleep_until is not None) or (vm.sleep_pending_ms is not None)),
             "events": events,
             "paused": self.paused,
-            "current_pid": self.current_pid,
+            "current_pid": current_pid_field,
+            "next_pid": next_pid,
         }
 
     def read_regs(self, pid: Optional[int] = None) -> Dict[str, Any]:
@@ -2063,6 +2120,26 @@ class VMController:
                 return {"status": "ok", "task": task}
             if cmd == "mailbox_snapshot":
                 return {"status": "ok", "descriptors": self.mailbox_snapshot()}
+            if cmd == "mailbox_stdio_summary":
+                pid_value = request.get("pid")
+                stream_value = request.get("stream")
+                default_only = bool(request.get("default_only", False))
+                pid: Optional[int] = None
+                if isinstance(pid_value, str):
+                    stripped = pid_value.strip()
+                    if stripped:
+                        lower = stripped.lower()
+                        if lower in {"default", "global", "template"}:
+                            default_only = True
+                        elif lower in {"all", "*"}:
+                            pid = None
+                        else:
+                            pid = int(stripped, 0)
+                elif pid_value is not None:
+                    pid = int(pid_value)
+                stream_arg = str(stream_value) if isinstance(stream_value, str) else None
+                summary = self.mailbox_stdio_summary(pid=pid, stream=stream_arg, default_only=default_only)
+                return {"status": "ok", "summary": summary}
             if cmd == "mailbox_open":
                 pid = int(request.get("pid", 0))
                 target = str(request.get("target", ""))

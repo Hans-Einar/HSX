@@ -1,0 +1,2 @@
+exec <path>
+Alias for 'load'; kept for compatibility with earlier scripts and tooling.

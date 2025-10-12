@@ -1,0 +1,37 @@
+*** Begin Patch
+*** Update File: python/shell_client.py
+@@
+ def _pretty_stdio(payload: dict) -> None:
+     if payload.get("status") != "ok":
+         print(json.dumps(payload, indent=2, sort_keys=True))
+         return
+     config = payload.get("config", {})
+@@
+             if status is not None:
+                 line += f" status={status}"
+             print(line)
++
++
++def _pretty_dmesg(payload: dict) -> None:
++    if payload.get("status") != "ok":
++        print(json.dumps(payload, indent=2, sort_keys=True))
++        return
++    logs = payload.get("logs") or []
++    print("dmesg:")
++    if not logs:
++        print("  (empty)")
++        return
++    for entry in logs:
++        ts = entry.get("ts")
++        if isinstance(ts, (int, float)):
++            timestamp = datetime.fromtimestamp(ts).strftime("%H:%M:%S")
++        else:
++            timestamp = "--:--:--"
++        level = (entry.get("level") or "").upper()
++        message = entry.get("message", "")
++        seq = entry.get("seq")
++        extra = {k: v for k, v in entry.items() if k not in {"ts", "level", "message", "seq"}}
++        print(f"  [{seq}] {timestamp} {level:<7} {message}")
++        if extra:
++            print(f"        {json.dumps(extra, sort_keys=True)}")
+*** End Patch

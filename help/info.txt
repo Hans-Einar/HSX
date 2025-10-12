@@ -1,0 +1,2 @@
+info [pid]
+Show VM status, current task table, and optionally dump registers for the selected PID.

@@ -1,0 +1,2 @@
+ps
+Display the scheduler task table with PID, state, priority, quantum, and image path.

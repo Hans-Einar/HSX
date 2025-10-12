@@ -1,0 +1,2 @@
+list <pid>
+List mailbox descriptors owned by the task. Targets in the output can be used as the channel parameter for 'send'.
