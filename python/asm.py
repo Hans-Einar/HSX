@@ -57,7 +57,13 @@ def emit_word(op, rd=0, rs1=0, rs2=0, imm=0):
 
 def set_imm12(word, imm):
     mask = 0x0FFF
-    return (word & ~mask) | (sign12(imm) & mask)
+    if imm < 0:
+        encoded = sign12(imm)
+    else:
+        if imm > 0x0FFF:
+            raise ValueError(f"Immediate out of 12-bit range: {imm}")
+        encoded = imm & mask
+    return (word & ~mask) | encoded
 
 
 def split_args(arg_str):
