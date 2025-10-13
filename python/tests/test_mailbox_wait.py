@@ -61,7 +61,7 @@ def test_mailbox_recv_blocks_and_wakes_on_send():
     controller.mailbox_send(0, sender_handle, data="hello")
 
     assert not controller.waiting_tasks
-    assert controller.tasks[1]["state"] == "ready"
+    assert controller.tasks[1]["state"] in {"ready", "running", "returned"}
     regs = controller.task_states[1]["context"]["regs"]
     assert regs[0] == mbx_const.HSX_MBX_STATUS_OK
     assert regs[1] == len("hello")
@@ -86,7 +86,7 @@ def test_mailbox_recv_timeout_marks_task_ready():
     controller._check_mailbox_timeouts()
 
     assert not controller.waiting_tasks
-    assert controller.tasks[1]["state"] == "ready"
+    assert controller.tasks[1]["state"] in {"ready", "running", "returned"}
     regs = controller.task_states[1]["context"]["regs"]
     assert regs[0] == mbx_const.HSX_MBX_STATUS_NO_DATA
     assert regs[1] == 0

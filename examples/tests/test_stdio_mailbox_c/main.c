@@ -1,7 +1,8 @@
 #include "hsx_stdio.h"
 #include "hsx_mailbox.h"
 
-#define STDIO_TIMEOUT HSX_MBX_TIMEOUT_INFINITE
+#define STDIO_READ_ATTEMPTS 3
+#define STDIO_TIMEOUT_MS 10
 
 static const char kHello[] = "hello from hsx stdio";
 static const char kPrefix[] = "echo: ";
@@ -22,11 +23,11 @@ static void build_echo_line(int message_length) {
 int main(void) {
     hsx_stdio_puts(kHello);
 
-    while (1) {
-        int length = hsx_stdio_read_basic(stdin_buffer, (int)(sizeof(stdin_buffer) - 1), STDIO_TIMEOUT);
+    for (int attempt = 0; attempt < STDIO_READ_ATTEMPTS; ++attempt) {
+        int length = hsx_stdio_read_basic(stdin_buffer, (int)(sizeof(stdin_buffer) - 1), STDIO_TIMEOUT_MS);
         if (length < 0) {
             hsx_stdio_puts_err("stdin read error");
-            continue;
+            return -length;
         }
         if (length == 0) {
             continue;
@@ -38,5 +39,8 @@ int main(void) {
 
         build_echo_line(length);
         hsx_stdio_puts(stdout_buffer);
+        break;
     }
+
+    return 0;
 }

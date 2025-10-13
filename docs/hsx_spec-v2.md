@@ -80,19 +80,20 @@ HSX uses a register-first calling convention with a spill-to-stack extension so 
 4. Overflow arguments (starting with argument #4) are written to the caller's stack frame in 4-byte words.
 
 #### Overflow stack layout
-- The caller allocates space for overflow arguments before issuing `CALL`. Slots are 4-byte aligned and populated left-to-right (argument #4 closest to the return address).
-- On entry the callee reads overflow arguments relative to the incoming `SP`. The layout is stable across varargs, native shims, and hand-written MVASM.
+- The caller pushes overflow arguments (starting with the highest index) using `PUSH`; the VM decrements `SP` by 4 for each word.
+- `CALL` pushes the return address after the overflow arguments, so the callee observes the layout below (stack grows downward, lowest addresses at the bottom of the diagram).
+- After the callee returns, the caller pops the overflow slots (or otherwise increments `SP`) to restore its original stack depth.
 
 ```
-; higher addresses            <-- stack grows downward
+; higher addresses (larger addresses)
 | caller locals / saved regs |
 |----------------------------|
-| argument #6 (word)         |  SP + 8
-| argument #5 (word)         |  SP + 4
-| argument #4 (word)         |  SP + 0  <-- SP after CALL
-| return address             |  SP - 4  (pushed by CALL)
+| argument #6 (word)         |  SP + 12
+| argument #5 (word)         |  SP + 8
+| argument #4 (word)         |  SP + 4
+| return address             |  SP + 0  <-- SP value on entry
 | callee frame ...           |
-; lower addresses
+; lower addresses (smaller addresses)
 ```
 
 The callee may create a traditional frame by saving callee-saved registers and adjusting `SP` downward. Leaf functions that do not touch overflow slots are free to leave `SP` unchanged.
@@ -103,8 +104,9 @@ The callee may create a traditional frame by saving callee-saved registers and a
 - Both the Python VM and native toolchain will synthesise a `va_list` shim that points at the first stacked slot, matching the layout shown above.
 
 #### Toolchain status
-- The Python VM already honours the register/stack split when invoking native shims. `python/hsx-llc.py` currently rejects calls with more than three arguments; the active milestone work is enabling automatic spill/reload so compiled C code follows the ABI without manual assembly.
-- Hand-written MVASM should begin adopting the spill layout now to avoid future breaks. Helper libraries (`hsx_stdio_*`, mailbox wrappers, SVC shims) should load overflow arguments from `[SP + 0]`, `[SP + 4]`, ... as the new tooling lands.
+- The Python VM implements `PUSH`/`POP` alongside `CALL`, so compiled code and hand-written MVASM can manage stack slots for overflow arguments without bespoke helpers.
+- `python/hsx-llc.py` now emits `PUSH`/`POP` sequences to spill arguments four and beyond and keeps the caller stack balanced after the call returns.
+- Hand-written MVASM should adopt the same pattern (`PUSH` overflow arguments, `CALL`, then `POP` to unwind) so that runtime helpers (`hsx_stdio_*`, mailbox wrappers, SVC shims) observe a consistent layout at `[SP + 4]`, `[SP + 8]`, and so on.
 
 This ABI keeps three-argument syscalls fast while guaranteeing a deterministic path for argument #4 and beyond. Once the compiler and libraries adopt the spill logic, existing helpers can remove ad-hoc buffers and rely on the shared calling convention.
 
@@ -324,9 +326,6 @@ C source ? clang -emit-llvm ? hsx-llc.py ? .mvasm ? asm.py ? .hxe ? host_vm.py
 ## 11. Security & Isolation (Future Work)
 - Optional memory bounds checks on loads/stores within task arenas.
 - Watchdog/time quotas to kill runaway tasks.
-- Capability tokens for FS/FD access control.
-- Stronger separation between user tasks and executive (MPU/MMU on capable MCUs).
-
 ---
 
 ## 12. Roadmap Snapshot

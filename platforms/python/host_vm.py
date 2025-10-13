@@ -70,6 +70,14 @@ class TaskContext:
     exit_status: Optional[int] = None
 
 
+@dataclass
+class DebugState:
+    attached: bool = False
+    breakpoints: Set[int] = field(default_factory=set)
+    halted: bool = False
+    last_stop: Optional[Dict[str, Any]] = None
+
+
 def clone_context(ctx: TaskContext) -> TaskContext:
     return TaskContext(
         regs=list(ctx.regs),
@@ -294,6 +302,14 @@ class MiniVM:
         self.call_stack: List[int] = []
         self._last_pc: Optional[int] = None
         self._repeat_pc_count: int = 0
+        self.debug_enabled: bool = False
+        self.debug_breakpoints: Set[int] = set()
+        self.debug_temp_breakpoints: Set[int] = set()
+        self.debug_skip_bp_once: Optional[int] = None
+        self.debug_single_step_remaining: int = 0
+        self.debug_async_break: bool = False
+        self.debug_halted: bool = False
+        self.debug_last_stop: Optional[Dict[str, Any]] = None
         if rodata:
             self._load_rodata(rodata)
 
@@ -310,6 +326,68 @@ class MiniVM:
     def set_entry(self, entry):
         self.pc = entry
         self.context.pc = entry
+
+    def configure_debug(self, *, enabled: bool, breakpoints: Optional[Set[int]] = None) -> None:
+        self.debug_enabled = bool(enabled)
+        if not enabled:
+            self.debug_breakpoints.clear()
+            self.debug_temp_breakpoints.clear()
+            self.debug_skip_bp_once = None
+            self.debug_single_step_remaining = 0
+            self.debug_async_break = False
+            self.debug_halted = False
+            self.debug_last_stop = None
+            return
+        if breakpoints is not None:
+            self.set_debug_breakpoints(breakpoints)
+
+    def set_debug_breakpoints(self, breakpoints: Set[int]) -> None:
+        self.debug_breakpoints = {addr & 0xFFFF for addr in breakpoints}
+
+    def request_debug_break(self) -> None:
+        if self.debug_enabled:
+            self.debug_async_break = True
+
+    def prepare_debug_run(self, *, step_count: int = 0, skip_break_at_pc: Optional[int] = None) -> None:
+        if not self.debug_enabled:
+            return
+        self.debug_skip_bp_once = (skip_break_at_pc & 0xFFFF) if skip_break_at_pc is not None else None
+        self.debug_single_step_remaining = max(int(step_count), 0)
+        self.debug_halted = False
+        self.running = True
+
+    def _debug_halt(
+        self,
+        reason: str,
+        *,
+        halt_pc: int,
+        opcode: Optional[int] = None,
+        extra: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        info: Dict[str, Any] = {
+            "type": "debug_stop",
+            "reason": reason,
+            "pc": halt_pc & 0xFFFFFFFF,
+            "next_pc": self.pc & 0xFFFFFFFF,
+            "cycles": self.cycles,
+        }
+        if opcode is not None:
+            info["opcode"] = opcode & 0xFFFFFFFF
+        if extra:
+            info.update(extra)
+        ctx = self.context
+        if ctx is not None and ctx.pid is not None:
+            info["pid"] = ctx.pid
+        self.debug_last_stop = info
+        self.debug_halted = True
+        self.debug_async_break = False
+        self.debug_single_step_remaining = 0
+        self.debug_skip_bp_once = None
+        self.emit_event(info)
+        self.running = False
+        self.save_context()
+        if ctx is not None:
+            ctx.state = "paused"
 
     # ------------------------------------------------------------------
     # Context handling helpers
@@ -433,6 +511,10 @@ class MiniVM:
             ctx = dict_to_context(ctx_dict)
             self.set_context(ctx)
         self.running = bool(state.get("running", True))
+        self.debug_halted = False
+        self.debug_async_break = False
+        self.debug_skip_bp_once = None
+        self.debug_single_step_remaining = 0
 
     def emit_event(self, event: Dict[str, Any]) -> None:
         self.pending_events.append(event)
@@ -468,6 +550,21 @@ class MiniVM:
         self.mem[a:end] = data[: end - a]
 
     def step(self):
+        if self.debug_enabled:
+            if self.debug_async_break:
+                self._debug_halt("async_break", halt_pc=self.pc)
+                return
+            current_pc16 = self.pc & 0xFFFF
+            if self.debug_skip_bp_once is not None and current_pc16 == self.debug_skip_bp_once:
+                self.debug_skip_bp_once = None
+            else:
+                if current_pc16 in self.debug_temp_breakpoints:
+                    self.debug_temp_breakpoints.discard(current_pc16)
+                    self._debug_halt("breakpoint", halt_pc=self.pc)
+                    return
+                if current_pc16 in self.debug_breakpoints:
+                    self._debug_halt("breakpoint", halt_pc=self.pc)
+                    return
         if self.sleep_until is not None:
             remaining = self.sleep_until - time.monotonic()
             if remaining > 0:
@@ -479,6 +576,7 @@ class MiniVM:
             self.emit_event({"type": "sleep_complete"})
 
         prev_pc = self.pc
+        debug_halt_pending: Optional[Dict[str, Any]] = None
 
         if self.pc + 4 > len(self.code):
             pid = self.context.pid if self.context else None
@@ -698,6 +796,40 @@ class MiniVM:
             if self.svc_trace:
                 self._log(f"[SVC] mod=0x{mod:X} fn=0x{fn:X} R0..R3={self.regs[:4]}")
             self.handle_svc(mod, fn)
+        elif op == 0x40:  # PUSH
+            raw_sp = self.sp - 4
+            if raw_sp < 0 or raw_sp < (self.context.stack_limit or 0) or raw_sp + 4 > len(self.mem):
+                if self.trace or self.trace_out:
+                    self._log("[PUSH] stack overflow")
+                self.regs[0] = HSX_ERR_STACK_OVERFLOW
+                self.running = False
+                self.save_context()
+                return
+            try:
+                st32(raw_sp, self.regs[rs1])
+            except MemoryError:
+                trap_memory_fault()
+                return
+            self.sp = raw_sp & 0xFFFFFFFF
+            if len(self.regs) >= 16:
+                self.regs[15] = self.sp & 0xFFFFFFFF
+        elif op == 0x41:  # POP
+            if self.sp >= len(self.mem):
+                if self.trace or self.trace_out:
+                    self._log("[POP] stack underflow")
+                self.regs[0] = HSX_ERR_STACK_UNDERFLOW
+                self.running = False
+                self.save_context()
+                return
+            try:
+                value = ld32(self.sp)
+            except MemoryError:
+                trap_memory_fault()
+                return
+            self.sp = (self.sp + 4) & 0xFFFFFFFF
+            if len(self.regs) >= 16:
+                self.regs[15] = self.sp & 0xFFFFFFFF
+            self.regs[rd] = value & 0xFFFFFFFF
         elif op == 0x50:  # FADD
             a = f16_to_f32(self.regs[rs1] & 0xFFFF)
             b = f16_to_f32(self.regs[rs2] & 0xFFFF)
@@ -735,9 +867,19 @@ class MiniVM:
             full = be32(self.code, self.pc + 4)
             self.regs[rd] = full & 0xFFFFFFFF
             adv = 8
+        elif op == 0x7F:  # BRK
+            debug_halt_pending = {
+                "reason": "brk",
+                "halt_pc": prev_pc,
+                "opcode": ins,
+                "extra": {"code": imm & 0xFF},
+            }
         else:
             print(f"[VM] Illegal opcode 0x{op:02X} at PC=0x{self.pc:04X}")
             self.running = False
+
+        if op == 0x7F:
+            adv = 4
 
         self.pc = (self.pc + adv) & 0xFFFFFFFF
         self.cycles += 1
@@ -749,6 +891,22 @@ class MiniVM:
             ctx.psw = self.flags
             if not self.running:
                 ctx.state = "stopped"
+
+        if debug_halt_pending is not None:
+            info = debug_halt_pending
+            self._debug_halt(
+                info["reason"],
+                halt_pc=info["halt_pc"],
+                opcode=info.get("opcode"),
+                extra=info.get("extra"),
+            )
+            return
+
+        if self.debug_enabled and self.debug_single_step_remaining > 0:
+            self.debug_single_step_remaining -= 1
+            if self.debug_single_step_remaining == 0:
+                self._debug_halt("step", halt_pc=self.pc)
+                return
 
         if self.pc == prev_pc:
             self._repeat_pc_count += 1
@@ -1079,6 +1237,7 @@ class VMController:
         self.waiting_tasks: Dict[int, Dict[str, Any]] = {}
         self.default_trace = trace
         self.traced_pids: Set[int] = set()
+        self.debug_sessions: Dict[int, DebugState] = {}
 
     def reset(self) -> Dict[str, Any]:
         self.vm = None
@@ -1092,6 +1251,7 @@ class VMController:
         self.mailboxes = MailboxManager()
         self.current_pid = None
         self.next_pid = 1
+        self.debug_sessions.clear()
         return {"status": "ok"}
 
     def mailbox_snapshot(self) -> List[Dict[str, Any]]:
@@ -1723,6 +1883,28 @@ class VMController:
             raise ValueError(f"unknown pid {pid}")
         return task
 
+    def _debug_state(self, pid: int) -> DebugState:
+        state = self.debug_sessions.get(pid)
+        if state is None:
+            state = DebugState()
+            self.debug_sessions[pid] = state
+        return state
+
+    def _apply_debug_state(self, pid: int) -> None:
+        vm = self.vm
+        if vm is None:
+            return
+        dbg = self.debug_sessions.get(pid)
+        if dbg and dbg.attached:
+            vm.configure_debug(enabled=True, breakpoints=dbg.breakpoints)
+            if dbg.halted:
+                vm.debug_halted = True
+                vm.running = False
+                if dbg.last_stop is not None:
+                    vm.debug_last_stop = dbg.last_stop
+        else:
+            vm.configure_debug(enabled=False)
+
     def _store_active_state(self) -> None:
         if self.current_pid is None or self.vm is None:
             return
@@ -1796,6 +1978,7 @@ class VMController:
         self.vm.restore_state(state)
         self.vm.trace = trace_enabled
         self.vm.attached = self.attached
+        self._apply_debug_state(pid)
         self.current_pid = pid
         task["vm_state"] = state
         ctx = state.get("context", {})
@@ -1920,10 +2103,28 @@ class VMController:
         events.extend(vm.consume_events())
         snapshot = vm.snapshot_registers()
         executed_pid = self.current_pid
+        debug_event = None
+        for event in events:
+            if event.get("type") == "debug_stop":
+                debug_event = event
+                break
+        if debug_event is not None:
+            self.paused = True
+            if executed_pid is not None:
+                dbg = self._debug_state(executed_pid)
+                dbg.last_stop = debug_event
+                dbg.halted = True
+        elif executed_pid is not None:
+            dbg = self.debug_sessions.get(executed_pid)
+            if dbg is not None:
+                dbg.halted = False
         self._store_active_state()
         self._check_mailbox_timeouts()
-        self._rotate_active()
-        next_pid = self.current_pid
+        if not self.paused:
+            self._rotate_active()
+            next_pid = self.current_pid
+        else:
+            next_pid = executed_pid if executed_pid is not None else self.current_pid
         current_pid_field = executed_pid if executed_pid is not None else next_pid
         if current_pid_field is None:
             current_pid_field = next_pid
@@ -1939,6 +2140,7 @@ class VMController:
             "paused": self.paused,
             "current_pid": current_pid_field,
             "next_pid": next_pid,
+            "debug_event": debug_event,
         }
 
     def read_regs(self, pid: Optional[int] = None) -> Dict[str, Any]:
@@ -2014,6 +2216,7 @@ class VMController:
             self.current_pid = None
         self.tasks.pop(pid, None)
         self.task_states.pop(pid, None)
+        self.debug_sessions.pop(pid, None)
         summary["state"] = "terminated"
         if self.tasks:
             remaining = sorted(self.tasks)
@@ -2075,6 +2278,131 @@ class VMController:
         if task:
             task["vm_state"] = state
 
+    def _run_debug(self, pid: int, *, step_count: int = 0, max_cycles: Optional[int] = None, assume_active: bool = False) -> Dict[str, Any]:
+        dbg = self._debug_state(pid)
+        if not dbg.attached:
+            raise ValueError(f"pid {pid} is not attached to debugger")
+        if not assume_active:
+            if pid != self.current_pid:
+                self._store_active_state()
+                self._activate_task(pid)
+        elif self.vm is None or self.current_pid != pid:
+            self._store_active_state()
+            self._activate_task(pid)
+        vm = self._require_vm()
+        skip_pc = None
+        last_stop = dbg.last_stop
+        if last_stop is not None:
+            pc_value = last_stop.get("pc")
+            if isinstance(pc_value, int):
+                skip_pc = pc_value
+        vm.prepare_debug_run(step_count=step_count, skip_break_at_pc=skip_pc)
+        dbg.halted = False
+        self.paused = False
+        task = self.tasks.get(pid)
+        if task is not None:
+            task["state"] = "running"
+        state = self.task_states.get(pid)
+        if state is not None:
+            ctx = state.get("context")
+            if isinstance(ctx, dict):
+                ctx["state"] = "running"
+                state["context"] = ctx
+        budget = max_cycles if max_cycles is not None else (step_count if step_count > 0 else 1000)
+        budget = max(int(budget), 1)
+        return self.step(budget)
+
+    def debug_attach(self, pid: int) -> Dict[str, Any]:
+        pid_int = int(pid)
+        self._get_task(pid_int)
+        dbg = self._debug_state(pid_int)
+        dbg.attached = True
+        self._store_active_state()
+        self._activate_task(pid_int)
+        registers = self.read_regs(pid_int)
+        return {
+            "pid": pid_int,
+            "attached": True,
+            "breakpoints": sorted(dbg.breakpoints),
+            "halted": dbg.halted,
+            "stop": dbg.last_stop,
+            "registers": registers,
+        }
+
+    def debug_detach(self, pid: int) -> Dict[str, Any]:
+        pid_int = int(pid)
+        state = self.debug_sessions.pop(pid_int, None)
+        if pid_int == self.current_pid and self.vm is not None:
+            self.vm.configure_debug(enabled=False)
+            if self.vm.running is False:
+                self.vm.running = True
+        if state is None:
+            state = DebugState()
+        if state.halted and self.paused:
+            if not any(other.halted for other in self.debug_sessions.values()):
+                self.paused = False
+        return {
+            "pid": pid_int,
+            "attached": False,
+            "breakpoints": [],
+            "halted": False,
+        }
+
+    def debug_list_breakpoints(self, pid: int) -> Dict[str, Any]:
+        pid_int = int(pid)
+        dbg = self._debug_state(pid_int)
+        return {"pid": pid_int, "breakpoints": sorted(dbg.breakpoints)}
+
+    def debug_add_breakpoint(self, pid: int, addr: int) -> Dict[str, Any]:
+        pid_int = int(pid)
+        dbg = self._debug_state(pid_int)
+        if not dbg.attached:
+            raise ValueError(f"pid {pid_int} is not attached to debugger")
+        addr_int = int(addr) & 0xFFFF
+        dbg.breakpoints.add(addr_int)
+        if pid_int == self.current_pid and self.vm is not None:
+            self.vm.set_debug_breakpoints(dbg.breakpoints)
+        return self.debug_list_breakpoints(pid_int)
+
+    def debug_remove_breakpoint(self, pid: int, addr: int) -> Dict[str, Any]:
+        pid_int = int(pid)
+        dbg = self._debug_state(pid_int)
+        if not dbg.attached:
+            raise ValueError(f"pid {pid_int} is not attached to debugger")
+        addr_int = int(addr) & 0xFFFF
+        dbg.breakpoints.discard(addr_int)
+        if pid_int == self.current_pid and self.vm is not None:
+            self.vm.set_debug_breakpoints(dbg.breakpoints)
+        return self.debug_list_breakpoints(pid_int)
+
+    def debug_continue(self, pid: int, *, max_cycles: Optional[int] = None) -> Dict[str, Any]:
+        pid_int = int(pid)
+        result = self._run_debug(pid_int, step_count=0, max_cycles=max_cycles)
+        return {"pid": pid_int, "result": result}
+
+    def debug_step(self, pid: int, *, count: int = 1) -> Dict[str, Any]:
+        pid_int = int(pid)
+        step_count = max(int(count), 1)
+        result = self._run_debug(pid_int, step_count=step_count, max_cycles=step_count)
+        return {"pid": pid_int, "result": result}
+
+    def debug_break(self, pid: int) -> Dict[str, Any]:
+        pid_int = int(pid)
+        dbg = self._debug_state(pid_int)
+        if not dbg.attached:
+            raise ValueError(f"pid {pid_int} is not attached to debugger")
+        if pid_int != self.current_pid:
+            self._store_active_state()
+            self._activate_task(pid_int)
+        vm = self._require_vm()
+        vm.request_debug_break()
+        result = self._run_debug(pid_int, step_count=0, max_cycles=1, assume_active=True)
+        return {"pid": pid_int, "result": result}
+
+    def debug_registers(self, pid: int) -> Dict[str, Any]:
+        pid_int = int(pid)
+        return {"pid": pid_int, "registers": self.read_regs(pid_int)}
+
     def handle_command(self, request: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(request, dict):
             return {"status": "error", "error": "invalid_request"}
@@ -2134,6 +2462,62 @@ class VMController:
             if cmd == "step":
                 cycles = int(request.get("cycles", 1))
                 return {"status": "ok", "result": self.step(cycles)}
+            if cmd == "dbg":
+                op_value = request.get("op")
+                op = str(op_value or "").lower()
+                if not op:
+                    raise ValueError("dbg requires 'op'")
+                pid_value = request.get("pid")
+                if pid_value is None and op not in {"attach", "detach"}:
+                    raise ValueError("dbg requires 'pid'")
+                if op == "attach":
+                    if pid_value is None:
+                        raise ValueError("dbg attach requires 'pid'")
+                    info = self.debug_attach(int(pid_value))
+                    return {"status": "ok", "debug": {"op": "attach", **info}}
+                if op == "detach":
+                    if pid_value is None:
+                        raise ValueError("dbg detach requires 'pid'")
+                    info = self.debug_detach(int(pid_value))
+                    return {"status": "ok", "debug": {"op": "detach", **info}}
+                if pid_value is None:
+                    raise ValueError("dbg requires 'pid'")
+                pid_int = int(pid_value)
+                if op in {"regs", "registers"}:
+                    info = self.debug_registers(pid_int)
+                    return {"status": "ok", "debug": {"op": "regs", **info}}
+                if op in {"cont", "continue"}:
+                    cycles_value = request.get("cycles")
+                    max_cycles = None if cycles_value is None else int(cycles_value)
+                    info = self.debug_continue(pid_int, max_cycles=max_cycles)
+                    return {"status": "ok", "debug": {"op": "cont", **info}}
+                if op == "step":
+                    count_value = request.get("count")
+                    count = int(count_value) if count_value is not None else 1
+                    info = self.debug_step(pid_int, count=count)
+                    return {"status": "ok", "debug": {"op": "step", **info}}
+                if op == "break":
+                    info = self.debug_break(pid_int)
+                    return {"status": "ok", "debug": {"op": "break", **info}}
+                if op == "bp":
+                    action = str(request.get("action", "")).lower()
+                    if action in {"", "list"}:
+                        info = self.debug_list_breakpoints(pid_int)
+                        return {"status": "ok", "debug": {"op": "bp", "action": "list", **info}}
+                    if action == "add":
+                        addr_value = request.get("addr")
+                        if addr_value is None:
+                            raise ValueError("dbg bp add requires 'addr'")
+                        info = self.debug_add_breakpoint(pid_int, int(addr_value))
+                        return {"status": "ok", "debug": {"op": "bp", "action": "add", **info}}
+                    if action in {"remove", "rm", "del", "delete"}:
+                        addr_value = request.get("addr")
+                        if addr_value is None:
+                            raise ValueError("dbg bp remove requires 'addr'")
+                        info = self.debug_remove_breakpoint(pid_int, int(addr_value))
+                        return {"status": "ok", "debug": {"op": "bp", "action": "remove", **info}}
+                    raise ValueError(f"unknown dbg bp action '{action}'")
+                raise ValueError(f"unknown dbg op '{op}'")
             if cmd == "trace":
                 pid_value = request.get("pid")
                 if pid_value is None:
