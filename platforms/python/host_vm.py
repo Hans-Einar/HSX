@@ -698,6 +698,40 @@ class MiniVM:
             if self.svc_trace:
                 self._log(f"[SVC] mod=0x{mod:X} fn=0x{fn:X} R0..R3={self.regs[:4]}")
             self.handle_svc(mod, fn)
+        elif op == 0x40:  # PUSH
+            raw_sp = self.sp - 4
+            if raw_sp < 0 or raw_sp < (self.context.stack_limit or 0) or raw_sp + 4 > len(self.mem):
+                if self.trace or self.trace_out:
+                    self._log("[PUSH] stack overflow")
+                self.regs[0] = HSX_ERR_STACK_OVERFLOW
+                self.running = False
+                self.save_context()
+                return
+            try:
+                st32(raw_sp, self.regs[rs1])
+            except MemoryError:
+                trap_memory_fault()
+                return
+            self.sp = raw_sp & 0xFFFFFFFF
+            if len(self.regs) >= 16:
+                self.regs[15] = self.sp & 0xFFFFFFFF
+        elif op == 0x41:  # POP
+            if self.sp >= len(self.mem):
+                if self.trace or self.trace_out:
+                    self._log("[POP] stack underflow")
+                self.regs[0] = HSX_ERR_STACK_UNDERFLOW
+                self.running = False
+                self.save_context()
+                return
+            try:
+                value = ld32(self.sp)
+            except MemoryError:
+                trap_memory_fault()
+                return
+            self.sp = (self.sp + 4) & 0xFFFFFFFF
+            if len(self.regs) >= 16:
+                self.regs[15] = self.sp & 0xFFFFFFFF
+            self.regs[rd] = value & 0xFFFFFFFF
         elif op == 0x50:  # FADD
             a = f16_to_f32(self.regs[rs1] & 0xFFFF)
             b = f16_to_f32(self.regs[rs2] & 0xFFFF)

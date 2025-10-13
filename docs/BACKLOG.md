@@ -9,4 +9,4 @@ Items we want to track, but which are not currently on the active TODO list:
 - Implement `hsx-llc` lowering for integer `trunc`/`sext`/`zext` flows and dynamic-index GEPs, then bring back the corresponding pytest coverage.
 - Evaluate documentation pipeline options (Doxygen theming vs Sphinx/MkDocs hybrid) before public hosting.
 - Plan documentation publishing strategy (commit HTML artifacts vs. deploy via GitHub Pages).
-
+- Produce a consolidated VM/EXEC/SHELL reference update covering the new calling convention (overflow stack layout, PUSH/POP opcodes), task state transitions (`running`/`ready`/`returned`), and mailbox wait/wake behaviour so users see a single authoritative source.

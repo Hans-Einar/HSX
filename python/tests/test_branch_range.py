@@ -24,7 +24,7 @@ def assemble_source(src: str):
 
 
 def test_forward_branch_beyond_imm12_range_fails():
-    filler_lines = "\n".join("    ADD R0, R0, R0" for _ in range(600))
+    filler_lines = "\n".join("    ADD R0, R0, R0" for _ in range(1100))
     source = f"""
     .text
     .entry start
@@ -34,5 +34,5 @@ def test_forward_branch_beyond_imm12_range_fails():
     far_label:
         RET
     """
-    with pytest.raises(ValueError, match="Immediate out of 12-bit signed range"):
+    with pytest.raises(ValueError, match="Immediate out of 12-bit range"):
         assemble_source(source)
