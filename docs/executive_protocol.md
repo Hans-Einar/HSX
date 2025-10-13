@@ -32,9 +32,13 @@ Core Commands
 | `load` | `{ "version": 1, "cmd": "load", "path": "/abs/app.hxe" }` | `{ "version": 1, "status": "ok", "image": { "pid": <int>, ... } }` | Loads `.hxe` into VM (works while attached). |
 | `exec` | Same as `load` | Same as `load` | Alias used by shell clients. |
 | `ps` | `{ "version": 1, "cmd": "ps" }` | `{ "version": 1, "status": "ok", "tasks": {"tasks": [...], "current_pid": n} }` | Returns scheduler snapshot (task list + active pid). |
-| `step` | `{ "version": 1, "cmd": "step", "cycles": 500 }` | `{ "version": 1, "status": "ok", "result": { "executed": n, ... } }` | Respects pause flag (`result["paused"]`). |
-| `start_auto` | `{ "version": 1, "cmd": "start_auto" }` | `{ "version": 1, "status": "ok" }` | Starts auto stepping thread. |
-| `stop_auto` | `{ "version": 1, "cmd": "stop_auto" }` | `{ "version": 1, "status": "ok" }` | Stops auto stepping thread. |
+| `clock` | `{ "version": 1, "cmd": "clock" }` | `{ "version": 1, "status": "ok", "clock": { ... } }` | Reports clock status (state, rate, auto/manual step counters). |
+| `clock` | `{ "version": 1, "cmd": "clock", "op": "start" }` | `{ "version": 1, "status": "ok", "clock": { ... } }` | Starts the auto-step clock loop (alias `op: "run"`). |
+| `clock` | `{ "version": 1, "cmd": "clock", "op": "stop" }` | `{ "version": 1, "status": "ok", "clock": { ... } }` | Stops the auto-step clock loop (alias `op: "halt"`). |
+| `clock` | `{ "version": 1, "cmd": "clock", "op": "step", "cycles": 500 }` | `{ "version": 1, "status": "ok", "result": { "executed": n, ... }, "clock": { ... } }` | Runs a manual step; omit `cycles` to use the default budget. |
+| `clock` | `{ "version": 1, "cmd": "clock", "op": "rate", "rate": 10 }` | `{ "version": 1, "status": "ok", "clock": { ... } }` | Sets auto-loop rate in Hz (`0` = unlimited). |
+| `step` | `{ "version": 1, "cmd": "step", "cycles": 500 }` | `{ "version": 1, "status": "ok", "result": { ... }, "clock": { ... } }` | Backwards-compatible alias for `clock` `op: "step"`. |
+| `trace` | `{ "version": 1, "cmd": "trace", "pid": 1, "mode": "on" }` | `{ "version": 1, "status": "ok", "trace": { "pid": 1, "enabled": true } }` | Enable or disable instruction tracing for a task (`mode` optional to toggle). |
 | `pause` | `{ "version": 1, "cmd": "pause", "pid": 1 }` | `{ "version": 1, "status": "ok", "task": { ... } }` | Pauses the specified task (global pause if `pid` omitted). |
 | `resume` | `{ "version": 1, "cmd": "resume", "pid": 1 }` | `{ "version": 1, "status": "ok", "task": { ... } }` | Resumes the specified task (global resume if `pid` omitted). |
 | `kill` | `{ "version": 1, "cmd": "kill", "pid": 1 }` | `{ "version": 1, "status": "ok", "task": { ... } }` | Stops auto loop, resets VM, removes task. |
@@ -91,4 +95,3 @@ Example Session
 
 Clients are encouraged to reuse TCP connections and throttle polling (`info`,
 `ps`, `dumpregs`) to avoid hammering the executive.
-

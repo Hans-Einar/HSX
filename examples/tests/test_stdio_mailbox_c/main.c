@@ -1,27 +1,42 @@
-#include "hsx_mailbox.h"
 #include "hsx_stdio.h"
+#include "hsx_mailbox.h"
 
 #define STDIO_TIMEOUT HSX_MBX_TIMEOUT_INFINITE
 
 static const char kHello[] = "hello from hsx stdio";
 static const char kPrefix[] = "echo: ";
-static char stdin_buffer[64];
+static char stdin_buffer[128];
+static char stdout_buffer[(sizeof(kPrefix) - 1) + 128 + 1];
+
+static void build_echo_line(int message_length) {
+    int offset = 0;
+    for (int i = 0; i < (int)(sizeof(kPrefix) - 1) && offset < (int)sizeof(stdout_buffer) - 1; ++i) {
+        stdout_buffer[offset++] = kPrefix[i];
+    }
+    for (int i = 0; i < message_length && offset < (int)sizeof(stdout_buffer) - 1; ++i) {
+        stdout_buffer[offset++] = stdin_buffer[i];
+    }
+    stdout_buffer[offset] = '\0';
+}
 
 int main(void) {
     hsx_stdio_puts(kHello);
 
-    int length = hsx_stdio_read_basic(stdin_buffer, (int)(sizeof(stdin_buffer) - 1), STDIO_TIMEOUT);
-    if (length < 0) {
-        return -length;
+    while (1) {
+        int length = hsx_stdio_read_basic(stdin_buffer, (int)(sizeof(stdin_buffer) - 1), STDIO_TIMEOUT);
+        if (length < 0) {
+            hsx_stdio_puts_err("stdin read error");
+            continue;
+        }
+        if (length == 0) {
+            continue;
+        }
+        if (length >= (int)sizeof(stdin_buffer)) {
+            length = (int)sizeof(stdin_buffer) - 1;
+        }
+        stdin_buffer[length] = '\0';
+
+        build_echo_line(length);
+        hsx_stdio_puts(stdout_buffer);
     }
-
-    if (length >= (int)(sizeof(stdin_buffer))) {
-        length = (int)(sizeof(stdin_buffer) - 1);
-    }
-    stdin_buffer[length] = '\0';
-
-    hsx_stdio_puts(kPrefix);
-    hsx_stdio_puts(stdin_buffer);
-
-    return 0;
 }

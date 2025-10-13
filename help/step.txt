@@ -1,2 +1,2 @@
 step [cycles]
-Execute a scheduler quantum. Provide a cycle count to override the default budget for this single step.
+Compatibility alias for `clock step`. Runs a manual clock slice; provide a cycle count to override the default budget.

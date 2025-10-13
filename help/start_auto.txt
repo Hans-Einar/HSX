@@ -1,2 +1,2 @@
 start_auto
-Start the background stepping loop so tasks run continuously without manual step commands.
+Deprecated. Use `clock start` to enable the background stepping loop (or `clock stop` to halt it).

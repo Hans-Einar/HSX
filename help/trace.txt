@@ -1,0 +1,2 @@
+trace <pid> [on|off]
+Toggle instruction tracing for the specified task. Without a mode it flips the current state; use 'on' or 'off' to force a value.

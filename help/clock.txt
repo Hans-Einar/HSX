@@ -1,0 +1,2 @@
+clock [status|start|stop|step [cycles]|rate <hz>]
+Inspect and control the executive clock. No arguments show current state with auto/manual counters. `clock start`/`clock stop` toggle the background stepping loop. `clock step [cycles]` runs a manual slice (defaulting to the configured cycle budget). `clock rate <hz>` throttles the auto loop; use `0` for unlimited.

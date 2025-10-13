@@ -110,14 +110,23 @@ class ShellRPC:
     def kill(self, pid: int) -> None:
         self.request({"cmd": "kill", "pid": pid})
 
-    def start_auto(self) -> None:
-        self.request({"cmd": "start_auto"})
+    def clock_status(self) -> Dict[str, object]:
+        return self.request({"cmd": "clock"}).get("clock", {})
 
-    def stop_auto(self) -> None:
-        self.request({"cmd": "stop_auto"})
+    def clock_start(self) -> Dict[str, object]:
+        return self.request({"cmd": "clock", "op": "start"}).get("clock", {})
 
-    def step(self, cycles: int) -> None:
-        self.request({"cmd": "step", "cycles": cycles})
+    def clock_stop(self) -> Dict[str, object]:
+        return self.request({"cmd": "clock", "op": "stop"}).get("clock", {})
+
+    def clock_step(self, cycles: Optional[int] = None) -> Dict[str, object]:
+        payload: Dict[str, object] = {"cmd": "clock", "op": "step"}
+        if cycles is not None:
+            payload["cycles"] = cycles
+        return self.request(payload)
+
+    def clock_rate(self, hz: float) -> Dict[str, object]:
+        return self.request({"cmd": "clock", "op": "rate", "rate": hz}).get("clock", {})
 
     def attach(self) -> Dict[str, object]:
         return self.request({"cmd": "attach"}).get("info", {})
@@ -200,9 +209,9 @@ class BlinkenlightsApp:
             ("Detach", self._detach_cmd),
             ("Load", self._load_cmd),
             ("Refresh", self.manual_refresh),
-            ("Start Auto", self.rpc.start_auto),
-            ("Stop Auto", self.rpc.stop_auto),
-            ("Step 100", lambda: self.rpc.step(100)),
+            ("Clock Start", self._clock_start_cmd),
+            ("Clock Stop", self._clock_stop_cmd),
+            ("Clock Step 100", lambda: self._clock_step_cmd(100)),
         ]
         top = 40
         for label, cb in btn_specs:
@@ -248,6 +257,34 @@ class BlinkenlightsApp:
             raise RuntimeError("load cancelled")
         info = self.rpc.load(path)
         return f"Loaded pid {info.get('pid')}"
+
+    def _format_clock_summary(self, status: Dict[str, object]) -> str:
+        if not status:
+            return "Clock status unavailable"
+        state = status.get("state", "unknown")
+        rate = status.get("rate_hz")
+        if isinstance(rate, (int, float)) and rate and rate > 0:
+            rate_text = f"{rate:g} Hz"
+        else:
+            rate_text = "unlimited"
+        return f"Clock {state} ({rate_text})"
+
+    def _clock_start_cmd(self) -> str:
+        status = self.rpc.clock_start()
+        return self._format_clock_summary(status)
+
+    def _clock_stop_cmd(self) -> str:
+        status = self.rpc.clock_stop()
+        return self._format_clock_summary(status)
+
+    def _clock_step_cmd(self, cycles: int) -> str:
+        resp = self.rpc.clock_step(cycles)
+        result = resp.get("result", {}) if isinstance(resp, dict) else {}
+        executed = result.get("executed")
+        executed_text = f"{executed}" if executed is not None else "?"
+        clock = resp.get("clock", {}) if isinstance(resp, dict) else {}
+        summary = self._format_clock_summary(clock if isinstance(clock, dict) else {})
+        return f"{summary}; executed {executed_text} cycles"
 
     def manual_refresh(self) -> None:
         self.last_poll = 0

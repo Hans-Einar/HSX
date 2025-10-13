@@ -413,7 +413,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     continue
                 use_counts[tok] += 1
 
-    AVAILABLE_REGS = ["R4", "R5", "R6", "R8", "R9", "R10", "R11", "R15"]
+    AVAILABLE_REGS = ["R4", "R5", "R6", "R8", "R9", "R10", "R11"]
     free_regs: List[str] = AVAILABLE_REGS.copy()
     value_types: Dict[str, str] = {}
     spilled_values: Dict[str, Tuple[str, str]] = {}
@@ -434,6 +434,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
     # Map arguments (if any) to R1..R3 (MVP ignores types)
     arg_regs = {}
     initial_float_alias = {}
+    stack_args: List[Tuple[str, int, str]] = []
     for i, a in enumerate(fn["args"]):
         arg = a.strip()
         if not arg:
@@ -442,24 +443,20 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
         if not m:
             continue
         name = "%" + m.group(1)
+        arg_type_token = arg.split()[0] if arg else ''
+        val_type = deduce_value_type(arg_type_token)
         if i < len(ARG_REGS):
             reg = ARG_REGS[i]
             vmap[name] = reg
             arg_regs[name] = reg
-            if arg.startswith('half '):
-                value_types[name] = 'half'
-            elif arg.startswith('float '):
-                value_types[name] = 'float'
+            value_types[name] = val_type
+            if val_type == 'float':
                 initial_float_alias[name] = reg
-            elif arg.startswith('i8 '):
-                value_types[name] = 'i8'
-            elif arg.startswith('i16 '):
-                value_types[name] = 'i16'
-            elif arg.startswith('ptr '):
-                value_types[name] = 'ptr'
-            else:
-                value_types[name] = 'i32'
             mark_used(name)
+        else:
+            value_types[name] = val_type
+            stack_offset = 4 * (i - len(ARG_REGS) + 1)
+            stack_args.append((name, stack_offset, val_type))
 
     label_map = {}
     stack_slots = set()

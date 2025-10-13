@@ -1,0 +1,3 @@
+./examples/tests/build/test_stdio_mailbox_c/main.hxe 
+./examples/tests/build/test_mailbox_producer_c/main.hxe
+./examples/tests/build/test_mailbox_consumer_c/main.hxe

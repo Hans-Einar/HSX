@@ -1,6 +1,6 @@
 import json
 import socket
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 def _check_ok(response: Dict[str, Any]) -> Dict[str, Any]:
@@ -115,6 +115,12 @@ class VMClient:
         if quantum is not None:
             payload["quantum"] = quantum
         return _check_ok(self.request(payload)).get("task", {})
+
+    def trace(self, pid: int, enable: Optional[bool] = None) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {"cmd": "trace", "pid": pid}
+        if enable is not None:
+            payload["mode"] = 1 if enable else 0
+        return _check_ok(self.request(payload)).get("trace", {})
 
     def restart(self, targets: list[str] | None = None) -> Dict[str, Any]:
         payload: Dict[str, Any] = {"cmd": "restart"}

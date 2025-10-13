@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "hsx_mailbox.h": "c",
+        "hsx_stdio.h": "c"
+    }
+}

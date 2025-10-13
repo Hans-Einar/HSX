@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import atexit
 import json
 import math
 import os
@@ -7,6 +8,18 @@ import socket
 import sys
 from datetime import datetime
 from pathlib import Path
+
+try:
+    import readline  # type: ignore
+except ImportError:  # pragma: no cover - platform dependent
+    readline = None  # type: ignore
+    try:  # pragma: no cover - optional dependency
+        import pyreadline3 as readline  # type: ignore
+    except ImportError:
+        try:
+            import pyreadline as readline  # type: ignore
+        except ImportError:
+            readline = None  # type: ignore
 
 
 HELP_DIR = Path(__file__).resolve().parents[1] / "help"
@@ -18,6 +31,7 @@ COMMAND_NAMES = sorted(
     [
         "attach",
         "cd",
+        "clock",
         "detach",
         "dumpregs",
         "dmesg",
@@ -44,9 +58,8 @@ COMMAND_NAMES = sorted(
         "sched",
         "send",
         "shutdown",
-        "start_auto",
         "stdio",
-        "stop_auto",
+        "trace",
         "step",
     ]
 )
@@ -65,6 +78,34 @@ def _command_usage(name: str) -> str:
 
 
 USAGE_BY_COMMAND = {name: _command_usage(name) for name in COMMAND_NAMES}
+
+
+HISTORY_FILE = Path.home() / ".hsx_shell_history"
+_HISTORY_INITIALIZED = False
+
+
+def _init_history() -> None:
+    global _HISTORY_INITIALIZED
+    if _HISTORY_INITIALIZED or readline is None:
+        return
+    _HISTORY_INITIALIZED = True
+    try:
+        readline.set_history_length(1000)  # type: ignore[attr-defined]
+    except Exception:
+        pass
+    try:
+        if HISTORY_FILE.exists():
+            readline.read_history_file(str(HISTORY_FILE))  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
+    def _save_history() -> None:
+        try:
+            readline.write_history_file(str(HISTORY_FILE))  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
+    atexit.register(_save_history)
 
 
 def _format_command_table(entries: list[str], columns: int = 3) -> str:
@@ -264,7 +305,7 @@ def _pretty_info(payload: dict) -> None:
     tasks = info.get('tasks', [])
     if tasks:
         print("  tasks:")
-        header = "      PID   State      Prio  Quantum  Cycles     Sleep  Program"
+        header = "      PID   State         Prio  Quantum  Cycles     Sleep     Exit  Trace  Program"
         print(header)
         print("      " + "-" * (len(header) - 6))
         for task in tasks:
@@ -274,9 +315,19 @@ def _pretty_info(payload: dict) -> None:
             quantum = task.get("quantum", "-")
             cycles = task.get("accounted_cycles", "-")
             sleep = task.get("sleep_pending", False)
+            exit_status = task.get("exit_status")
+            exit_text = "-" if exit_status is None else str(exit_status)
+            trace_text = "on" if task.get("trace") else "off"
             program = task.get("program", "")
             marker = "*" if current is not None and pid == current else " "
-            print(f"    {marker} {pid:4}  {state:<8}  {prio:>4}  {quantum:>7}  {cycles:>8}  {str(sleep):<5}  {program}")
+            print(f"    {marker} {pid:4}  {state:<12}  {prio:>4}  {quantum:>7}  {cycles:>8}  {str(sleep):<5}  {exit_text:>8}  {trace_text:>5}  {program}")
+    clock = info.get('clock')
+    if isinstance(clock, dict):
+        print("  clock:")
+        print(f"    state       : {clock.get('state')}  running: {clock.get('running')}")
+        print(f"    rate_hz     : {clock.get('rate_hz')}  step_cycles: {clock.get('step_cycles')}")
+        print(f"    auto        : steps={clock.get('auto_steps')}  cycles={clock.get('auto_cycles')}")
+        print(f"    manual      : steps={clock.get('manual_steps')}  cycles={clock.get('manual_cycles')}")
     selected = info.get('selected_registers')
     if isinstance(selected, dict):
         print(f"  selected_pid: {info.get('selected_pid')}")
@@ -300,7 +351,7 @@ def _pretty_ps(payload: dict) -> None:
     if not tasks:
         print("  (no tasks)")
         return
-    header = "    PID   State      Prio  Quantum  Cycles     Sleep  Program"
+    header = "    PID   State         Prio  Quantum  Cycles     Sleep     Exit  Trace  Program"
     print(header)
     print("    " + "-" * (len(header) - 4))
     for task in tasks:
@@ -310,10 +361,56 @@ def _pretty_ps(payload: dict) -> None:
         quantum = task.get("quantum", "-")
         cycles = task.get("accounted_cycles", task.get("context", {}).get("accounted_cycles") if isinstance(task.get("context"), dict) else "-")
         sleep = task.get("sleep_pending", False)
+        exit_status = task.get("exit_status")
+        exit_text = "-" if exit_status is None else str(exit_status)
+        trace_text = "on" if task.get("trace") else "off"
         program = task.get("program", "")
         marker = "*" if current_pid is not None and pid == current_pid else " "
-        print(f"  {marker} {pid:4}  {state:<8}  {prio:>4}  {quantum:>7}  {cycles:>8}  {str(sleep):<5}  {program}")
+        print(f"  {marker} {pid:4}  {state:<12}  {prio:>4}  {quantum:>7}  {cycles:>8}  {str(sleep):<5}  {exit_text:>8}  {trace_text:>5}  {program}")
 
+
+def _pretty_clock(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    clock = payload.get("clock", {})
+    print("clock:")
+    if not isinstance(clock, dict) or not clock:
+        print("  (no clock data)")
+    else:
+        state = clock.get("state")
+        running = clock.get("running")
+        rate_hz = clock.get("rate_hz")
+        step_cycles = clock.get("step_cycles")
+        auto_steps = clock.get("auto_steps")
+        auto_cycles = clock.get("auto_cycles")
+        manual_steps = clock.get("manual_steps")
+        manual_cycles = clock.get("manual_cycles")
+        print(f"  state       : {state}  running: {running}")
+        print(f"  rate_hz     : {rate_hz}  step_cycles: {step_cycles}")
+        print(f"  auto        : steps={auto_steps}  cycles={auto_cycles}")
+        print(f"  manual      : steps={manual_steps}  cycles={manual_cycles}")
+    result = payload.get("result")
+    if isinstance(result, dict):
+        executed = result.get("executed")
+        paused = result.get("paused")
+        running = result.get("running")
+        print("  last_step:")
+        print(f"    executed : {executed}")
+        print(f"    running  : {running}  paused: {paused}")
+        for key in ("current_pid", "sleep_pending"):
+            if key in result:
+                print(f"    {key:<10}: {result.get(key)}")
+
+
+def _pretty_trace(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    info = payload.get("trace", {})
+    print("trace:")
+    print(f"  pid     : {info.get('pid')}")
+    print(f"  enabled : {info.get('enabled')}")
 
 
 def _pretty_listen(payload: dict) -> None:
@@ -325,17 +422,33 @@ def _pretty_listen(payload: dict) -> None:
     if not messages:
         print("  (no messages)")
         return
-    for msg in messages:
+    for idx, msg in enumerate(messages, start=1):
         target = msg.get("target")
-        text = msg.get("text", "")
-        data_hex = msg.get("data_hex", "")
+        channel = msg.get("channel")
         length = msg.get("length")
         src_pid = msg.get("src_pid")
-        print(f"  target={target} len={length} src={src_pid}")
-        if text:
-            print(f"    text: {text}")
-        if data_hex and (not text or text.encode('utf-8').hex() != data_hex):
-            print(f"    data_hex: {data_hex}")
+        flags = msg.get("flags")
+        header_parts = []
+        if target is not None:
+            header_parts.append(f"target={target}")
+        if src_pid is not None:
+            header_parts.append(f"src={src_pid}")
+        if channel is not None:
+            header_parts.append(f"channel={channel}")
+        if length is not None:
+            header_parts.append(f"len={length}")
+        if flags:
+            header_parts.append(f"flags=0x{int(flags):X}")
+        header = " ".join(header_parts) if header_parts else "(no metadata)"
+        print(f"  [{idx}] {header}")
+        text = msg.get("text", "")
+        data_hex = msg.get("data_hex", "")
+        if isinstance(text, str) and text:
+            print(f"    text : {repr(text)}")
+        if isinstance(data_hex, str) and data_hex:
+            text_hex = text.encode("utf-8").hex() if isinstance(text, str) else None
+            if text_hex is None or text_hex.lower() != data_hex.lower():
+                print(f"    hex  : {data_hex}")
 
 
 def _pretty_list(payload: dict) -> None:
@@ -472,8 +585,20 @@ def _pretty_dmesg(payload: dict) -> None:
         level = (entry.get("level") or "").upper()
         message = entry.get("message", "")
         seq = entry.get("seq")
-        extra = {k: v for k, v in entry.items() if k not in {"ts", "level", "message", "seq"}}
-        print(f"  [{seq}] {timestamp} {level:<7} {message}")
+        clock_cycles = entry.get("clock_cycles")
+        clock_text = "-" if clock_cycles is None else str(clock_cycles)
+        event = entry.get("event") if isinstance(entry.get("event"), dict) else None
+        pid = entry.get("pid")
+        if pid is None and isinstance(event, dict):
+            pid = event.get("pid") or event.get("src_pid")
+        if pid is None:
+            pid = entry.get("current_pid")
+        pid_text = "-" if pid is None else str(pid)
+        event_type = message
+        if isinstance(event, dict):
+            event_type = event.get("type", event_type)
+        print(f"  [{seq}] {pid_text} ({clock_text}) {timestamp} \"{level}\" \"{event_type}\"")
+        extra = {k: v for k, v in entry.items() if k not in {"ts", "level", "message", "seq", "clock_cycles"}}
         if extra:
             print(f"        {json.dumps(extra, sort_keys=True)}")
 
@@ -533,11 +658,14 @@ PRETTY_HANDLERS = {
     'dmesg': _pretty_dmesg,
     'stdio': _pretty_stdio,
     'mbox': _pretty_mbox,
+    'clock': _pretty_clock,
+    'step': _pretty_clock,
+    'trace': _pretty_trace,
 }
 
 
 def _render_context(context: dict, indent: str = "  ") -> None:
-    for key in ("pid", "state", "priority", "time_slice_cycles", "accounted_cycles", "reg_base", "stack_base", "stack_limit"):
+    for key in ("pid", "state", "priority", "time_slice_cycles", "accounted_cycles", "reg_base", "stack_base", "stack_limit", "exit_status", "trace"):
         if key in context:
             value = context[key]
             if key.endswith('_base') or key.endswith('_limit'):
@@ -578,13 +706,52 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
     payload_cmd = cmd
     payload: dict[str, object] = {"cmd": payload_cmd}
 
-    if cmd in {"attach", "detach", "ps", "start_auto", "stop_auto", "shutdown", "pause", "resume", "kill", "load", "exec", "reload", "list", "step", "listen", "send", "sched", "info", "peek", "poke", "dumpregs", "stdio", "mbox", "mailboxes", "mailbox_snapshot", "mailbox_open", "mailbox_close", "mailbox_bind", "mailbox_send", "mailbox_recv", "mailbox_peek", "mailbox_tap"}:
+    if cmd in {"attach", "detach", "ps", "clock", "shutdown", "pause", "resume", "kill", "load", "exec", "reload", "list", "step", "listen", "send", "sched", "info", "peek", "poke", "dumpregs", "stdio", "mbox", "mailboxes", "mailbox_snapshot", "mailbox_open", "mailbox_close", "mailbox_bind", "mailbox_send", "mailbox_recv", "mailbox_peek", "mailbox_tap"}:
         pass
 
     if cmd == "info":
         if args:
             payload["pid"] = args[0]
         return payload
+
+    if cmd == "trace":
+        if not args:
+            raise ValueError("trace requires <pid> [on|off]")
+        payload["pid"] = args[0]
+        if len(args) > 1:
+            payload["mode"] = args[1]
+        return payload
+
+    if cmd == "clock":
+        if not args:
+            return payload
+        subcmd = args[0].lower()
+        payload["op"] = subcmd
+        tokens = args[1:]
+        if subcmd in {"start", "run", "stop", "halt", "status"}:
+            if tokens:
+                raise ValueError("clock usage: clock start|stop|status|run|halt [no extra arguments]")
+            return payload
+        if subcmd == "step":
+            if tokens:
+                try:
+                    payload["cycles"] = int(tokens[0], 0)
+                except ValueError as exc:
+                    raise ValueError("clock step cycles must be integer") from exc
+                if len(tokens) > 1:
+                    raise ValueError("clock step usage: clock step [cycles]")
+            return payload
+        if subcmd == "rate":
+            if not tokens:
+                raise ValueError("clock rate requires <hz>")
+            try:
+                payload["rate"] = float(tokens[0])
+            except ValueError as exc:
+                raise ValueError("clock rate must be numeric") from exc
+            if len(tokens) > 1:
+                raise ValueError("clock rate usage: clock rate <hz>")
+            return payload
+        raise ValueError("clock usage: clock [status|start|stop|step [cycles]|rate <hz>]")
 
     if cmd == "load":
         if not args:
@@ -751,15 +918,17 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
         return payload
 
     return payload
-def cmd_loop(host: str, port: int, cwd: Path | None = None) -> None:
+def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: bool = False) -> None:
+    _init_history()
     current_dir = (cwd or Path.cwd()).resolve()
     print(f"Connected to executive at {host}:{port}. Type 'help' for commands or 'help <command>' for details.")
     while True:
         try:
-            line = input('hsx> ').strip()
+            line = input('hsx> ')
         except EOFError:
             print()
             break
+        line = line.strip()
         if not line:
             continue
         if line.lower() in {'quit', 'exit'}:
@@ -769,9 +938,17 @@ def cmd_loop(host: str, port: int, cwd: Path | None = None) -> None:
             continue
         parts = line.split()
         cmd = parts[0].lower()
-        args = parts[1:]
+        raw_args = parts[1:]
         if cmd == 'stdiofanout':
             cmd = 'stdio'
+
+        force_json = default_json
+        args: list[str] = []
+        for token in raw_args:
+            if token == '--json':
+                force_json = True
+            else:
+                args.append(token)
 
         if cmd == 'help':
             if args:
@@ -802,7 +979,7 @@ def cmd_loop(host: str, port: int, cwd: Path | None = None) -> None:
             for path, resp in results:
                 print(f"[{rpc_cmd}] {path}")
                 handler = PRETTY_HANDLERS.get(rpc_cmd)
-                if handler:
+                if handler and not force_json:
                     handler(resp)
                 else:
                     print(json.dumps(resp, indent=2, sort_keys=True))
@@ -855,7 +1032,10 @@ def cmd_loop(host: str, port: int, cwd: Path | None = None) -> None:
                 except Exception as exc:
                     print(f"error: {exc}")
                 else:
-                    print(json.dumps(resp, indent=2, sort_keys=True))
+                    if force_json:
+                        print(json.dumps(resp, indent=2, sort_keys=True))
+                    else:
+                        print(json.dumps(resp, indent=2, sort_keys=True))
             if 'shell' in targets:
                 print('[shell] restarting')
                 os.execv(sys.executable, [sys.executable] + sys.argv)
@@ -880,7 +1060,7 @@ def cmd_loop(host: str, port: int, cwd: Path | None = None) -> None:
             resp = dict(resp)
             resp["_filter_pid"] = filter_pid
         handler = PRETTY_HANDLERS.get(cmd)
-        if handler:
+        if handler and not force_json:
             handler(resp)
         else:
             print(json.dumps(resp, indent=2, sort_keys=True))
@@ -894,15 +1074,17 @@ def main() -> None:
     parser.add_argument("--cycles", type=int, help="cycles for step command")
     parser.add_argument("--path", help="path for load/exec commands")
     parser.add_argument("--verbose", action="store_true", help="verbose load")
+    parser.add_argument("--json", action="store_true", help="print raw JSON responses")
     args_ns = parser.parse_args()
     if not args_ns.cmd:
-        cmd_loop(args_ns.host, args_ns.port)
+        cmd_loop(args_ns.host, args_ns.port, default_json=args_ns.json)
         return
 
     cmd = args_ns.cmd.lower()
     if cmd == 'stdiofanout':
         cmd = 'stdio'
-    args = list(args_ns.args)
+    args = [token for token in args_ns.args if token != "--json"]
+    force_json = args_ns.json
 
     if cmd == 'help':
         if args:
@@ -938,7 +1120,7 @@ def main() -> None:
         for path, resp in results:
             print(f"[{cmd}] {path}")
             handler = PRETTY_HANDLERS.get(cmd)
-            if handler:
+            if handler and not force_json:
                 handler(resp)
             else:
                 print(json.dumps(resp, indent=2, sort_keys=True))
@@ -992,7 +1174,7 @@ def main() -> None:
         resp["_filter_pid"] = filter_pid
 
     handler = PRETTY_HANDLERS.get(cmd)
-    if handler:
+    if handler and not force_json:
         handler(resp)
     else:
         print(json.dumps(resp, indent=2, sort_keys=True))

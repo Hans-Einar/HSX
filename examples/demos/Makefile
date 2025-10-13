@@ -1,5 +1,17 @@
 REPO_ROOT := $(abspath $(CURDIR)/../..)
-PYTHON ?= $(if $(HSX_PY),$(HSX_PY),python)
+ifeq ($(origin PYTHON), undefined)
+  ifneq ($(HSX_PY),)
+    PYTHON := $(HSX_PY)
+  else
+    PYTHON := $(shell command -v python 2>/dev/null)
+    ifeq ($(PYTHON),)
+      PYTHON := $(shell command -v python3 2>/dev/null)
+    endif
+    ifeq ($(PYTHON),)
+      PYTHON := python
+    endif
+  endif
+endif
 CLANG ?= $(if $(HSX_CLANG),$(HSX_CLANG),clang)
 VM := $(REPO_ROOT)/platforms/python/host_vm.py
 BUILD_DIR ?= build
@@ -33,4 +45,3 @@ $(BUILD_DIR)/longrun/main.ll: longrun/main.c
 
 clean:
 	$(PYTHON) -c "import shutil, sys; shutil.rmtree(sys.argv[1], ignore_errors=True)" $(BUILD_DIR)
-

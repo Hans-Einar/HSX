@@ -1,10 +1,10 @@
 # HSX Specification v2
-*(Merged architecture, runtime, and execution model – updated 2025-10-06)*
+*(Merged architecture, runtime, and execution model - updated 2025-10-06)*
 
 ---
 
 ## 1. Overview
-HSX (HansEinar Executive) is a hybrid of a **virtual machine (VM)** and a **native executive kernel** that executes portable `.hxe` applications on both embedded targets (e.g. AVR128DA28) and host simulators. Applications are written in C, compiled to LLVM IR, lowered to MVASM, assembled into `.hxe`, and executed by the VM. A compact executive—written in C—provides scheduling, process control, IPC, and device access.
+HSX (HansEinar Executive) is a hybrid of a **virtual machine (VM)** and a **native executive kernel** that executes portable `.hxe` applications on both embedded targets (e.g. AVR128DA28) and host simulators. Applications are written in C, compiled to LLVM IR, lowered to MVASM, assembled into `.hxe`, and executed by the VM. A compact executive--written in C--provides scheduling, process control, IPC, and device access.
 
 Key characteristics:
 - Deterministic runtime with fast native syscalls.
@@ -19,21 +19,21 @@ This revision promotes a **native shell / control plane outside the VM**: HSX ap
 ## 2. Layered Architecture
 ```
 +-------------------------------+
-¦ Native Shell / Supervisor     ¦  ? CLI or service that manages HSX tasks (exec, ps, kill)
+| Native Shell / Supervisor     |  ? CLI or service that manages HSX tasks (exec, ps, kill)
 +-------------------------------+
-                ¦ control plane
+                | control plane
 +---------------?---------------+
-¦ HSX Executive (C microkernel) ¦  ? scheduler, memory arenas, IPC, syscalls
-+-------------------------------¦
-¦ HAL Drivers                   ¦  ? UART, CAN, FS, timers, GPIO
+| HSX Executive (C microkernel) |  ? scheduler, memory arenas, IPC, syscalls
++-------------------------------|
+| HAL Drivers                   |  ? UART, CAN, FS, timers, GPIO
 +-------------------------------+
-                ¦ SVC traps (fast)
+                | SVC traps (fast)
 +---------------?---------------+
-¦ HSX VM Core                   ¦  ? executes MVASM instructions from .hxe images
+| HSX VM Core                   |  ? executes MVASM instructions from .hxe images
 +-------------------------------+
-                ¦
+                |
 +---------------?---------------+
-¦ HSX Applications (.hxe)       ¦  ? domain logic, portable modules
+| HSX Applications (.hxe)       |  ? domain logic, portable modules
 +-------------------------------+
 ```
 
@@ -61,7 +61,53 @@ struct VMState {
 Context switches simply retarget `reg_base` (no copying). Each task owns a slice of memory containing its registers, stack, and heap region.
 
 ### Syscall Trap
-`SVC imm12` splits into module + function fields (`mod = imm[11:8]`, `fn = imm[7:0]`). The VM captures argument registers (R0–R3) and forwards the trap to native handlers (Python host or C executive).
+`SVC imm12` splits into module + function fields (`mod = imm[11:8]`, `fn = imm[7:0]`). The VM captures argument registers (R0-R3) and forwards the trap to native handlers (Python host or C executive).
+### Calling Convention
+HSX uses a register-first calling convention with a spill-to-stack extension so functions can accept an arbitrary number of word-sized arguments without bespoke glue. All general-purpose registers (`R0`-`R15`) are 32-bit.
+
+#### Register classes
+- `R0` â€“ primary return value, caller-saved. Multi-word results extend into `R1` and `R2`.
+- `R1`, `R2`, `R3` â€“ first three argument registers, caller-saved. Callers place the first three words of argument data here.
+- `R4`, `R5`, `R6`, `R7` â€“ callee-saved general registers. Callees must restore these if they modify them.
+- `R8`, `R9`, `R10`, `R11` â€“ caller-saved temporaries. The compiler/runtime may freely use them across calls.
+- `R12`, `R13`, `R14`, `R15` â€“ reserved for platform/ABI extensions (frame pointer, TLS, scratch) and are caller-saved unless a specific profile documents otherwise.
+- `SP` â€“ dedicated stack pointer (not part of the `R0`-`R15` window). The VM enforces 4-byte alignment for every call boundary.
+
+#### Argument placement
+1. Word-sized integer, pointer, and floating-point arguments are placed in `R1`, `R2`, then `R3` in left-to-right order.
+2. Narrower integers (`i1`, `i8`, `i16`) are sign- or zero-extended to 32 bits according to the originating language semantics before being written to the register or stack slot. `half` (f16) arguments occupy the lower 16 bits of the slot with the upper bits cleared.
+3. Aggregates larger than 32 bits are passed by reference: the caller materialises the object in memory and passes a pointer (consuming one argument slot). Small structs/unions that fit in 32 bits may be passed by value.
+4. Overflow arguments (starting with argument #4) are written to the caller's stack frame in 4-byte words.
+
+#### Overflow stack layout
+- The caller allocates space for overflow arguments before issuing `CALL`. Slots are 4-byte aligned and populated left-to-right (argument #4 closest to the return address).
+- On entry the callee reads overflow arguments relative to the incoming `SP`. The layout is stable across varargs, native shims, and hand-written MVASM.
+
+```
+; higher addresses            <-- stack grows downward
+| caller locals / saved regs |
+|----------------------------|
+| argument #6 (word)         |  SP + 8
+| argument #5 (word)         |  SP + 4
+| argument #4 (word)         |  SP + 0  <-- SP after CALL
+| return address             |  SP - 4  (pushed by CALL)
+| callee frame ...           |
+; lower addresses
+```
+
+The callee may create a traditional frame by saving callee-saved registers and adjusting `SP` downward. Leaf functions that do not touch overflow slots are free to leave `SP` unchanged.
+
+#### Variadic functions
+- Named parameters follow the normal register/stack rules. The caller then continues to push additional arguments so they appear immediately after the last named stack argument.
+- Callees expecting varargs must copy any register arguments they wish to treat as part of the vararg list into the stack save area before iterating.
+- Both the Python VM and native toolchain will synthesise a `va_list` shim that points at the first stacked slot, matching the layout shown above.
+
+#### Toolchain status
+- The Python VM already honours the register/stack split when invoking native shims. `python/hsx-llc.py` currently rejects calls with more than three arguments; the active milestone work is enabling automatic spill/reload so compiled C code follows the ABI without manual assembly.
+- Hand-written MVASM should begin adopting the spill layout now to avoid future breaks. Helper libraries (`hsx_stdio_*`, mailbox wrappers, SVC shims) should load overflow arguments from `[SP + 0]`, `[SP + 4]`, ... as the new tooling lands.
+
+This ABI keeps three-argument syscalls fast while guaranteeing a deterministic path for argument #4 and beyond. Once the compiler and libraries adopt the spill logic, existing helpers can remove ad-hoc buffers and rely on the shared calling convention.
+
 
 ---
 
@@ -100,7 +146,7 @@ typedef struct {
 - **Stack relocation:** the guest-visible SP is computed as `stack_base + (vm.sp & 0xFFFF)`. Swapping `stack_base` yields an O(1) context switch.
 - **Context switch API:** the executive updates `pc`, `psw`, `reg_base`, and `stack_base` then calls `vm.step()` (or a multi-step loop). Python exposes `set_context()`; C mirrors this with `hsx_vm_load_context()`.
 - **No bulk snapshot:** register windows live in VM RAM, so swapping `reg_base`/`stack_base` is sufficient; the executive does not copy register files between tasks.
-- **Isolation:** each task’s memory arena (stack/heap) is disjoint. `stack_limit` enables overflow detection and debugging.
+- **Isolation:** each task's memory arena (stack/heap) is disjoint. `stack_limit` enables overflow detection and debugging.
 
 ### Scheduling Model
 - **Round-robin with quanta:** each runnable task receives a configurable quantum in VM cycles. When exhausted, the executive preempts and requeues the task.
@@ -172,7 +218,7 @@ The canonical mapping for this revision is as follows. HSX tasks use the FD abst
 | FD     | 0x0A | File descriptors / stdio | `OPENFD_DEV`, `WRITE(fd,buf,len)`, `READ`, `DUP2`, `SETSTDIO`
 | MATH   | 0x0E | Optional dev math   | `sinf`, `cosf`, `expf` (host/dev tools)
 
-Arguments pass in R0–R3 (additional buffers via pointers); results return in R0. The executive may extend the table with experimental modules, but apps should rely only on the IDs above for portable behaviour.
+Arguments pass in R0-R3 (additional buffers via pointers); results return in R0. The executive may extend the table with experimental modules, but apps should rely only on the IDs above for portable behaviour.
 
 ---
 
@@ -263,7 +309,7 @@ For development, the same architecture runs under `platforms/python/host_vm.py`:
 - Filesystem mapped to host directories for `/apps`.
 - Optional dev math functions (module 0x0E) for `sin/cos/exp`.
 
-The new `--exec-root` flag lets the host VM enumerate payload `.hxe` files and run them via an exec syscall shim—mirroring the embedded design.
+The new `--exec-root` flag lets the host VM enumerate payload `.hxe` files and run them via an exec syscall shim--mirroring the embedded design.
 
 ---
 
@@ -285,7 +331,7 @@ C source ? clang -emit-llvm ? hsx-llc.py ? .mvasm ? asm.py ? .hxe ? host_vm.py
 
 ## 12. Roadmap Snapshot
 - [ ] Finalize syscall module numbering (resolve 0x07 vs 0x03, 0x0A vs 0x06 conflict).
-- [ ] Complete Python “native” shell + task manager (ps/exec/kill/stdio).
+- [ ] Complete Python "native" shell + task manager (ps/exec/kill/stdio).
 - [ ] Mailbox & value pools with FRAM persistence.
 - [ ] AVR executive port using FatFs/UART/CAN drivers.
 - [ ] Optional preemption via timer tick.
@@ -293,7 +339,6 @@ C source ? clang -emit-llvm ? hsx-llc.py ? .mvasm ? asm.py ? .hxe ? host_vm.py
 - [ ] Doxygen / docs automation.
 
 ---
-
 
 
 

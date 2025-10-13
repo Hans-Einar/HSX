@@ -159,10 +159,15 @@
 - [ ] Teach dynamic-index GEP lowering to scale offsets for 2- and 4-byte element types.
 - [ ] Restore pytest coverage for the new lowering (casts + GEP) once the implementation is stable.
 
+## TODO - Calling Convention & ABI Enhancements (Open)
+- [ ] Document the canonical HSX calling convention in `docs/hsx_spec-v2.md`, covering register roles (caller vs callee saved), argument/return placement, overflow stack layout for arguments ≥4, and the rules for aggregates/varargs.
+- [ ] Extend `python/hsx-llc.py` (and the native assembler/linker) so calls with more than three arguments automatically spill overflow parameters to the caller stack frame using 4-byte slots and generate callee-side loads/stores that honour the spec.
+- [ ] Update assembly shims (`examples/lib/hsx_stdio.mvasm`, `examples/lib/hsx_mailbox.mvasm`, etc.) and runtime helpers so they read overflow arguments from the stack, preserve callee-saved registers, and expose helper macros for hand-written MVASM.
+- [ ] Add regression samples/tests (C + MVASM) that exercise four-plus argument calls, mixed-width arguments, and varargs stubs to verify round-tripping through the VM and executive.
+
 ## TODO - Mailbox Fan-Out Follow-Up (Open)
 - [x] Prototype fan-out sequence tracking and retention policies in the Python mailbox manager with pytest coverage.
 - [x] Extend shell listen/send tooling to expose fan-out policy selection for stdio channels.
 - [ ] Update docs/hsx_spec.md and HSX_SVC_API references once behavior is validated.
 
 <3
-

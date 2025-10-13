@@ -69,10 +69,23 @@ Build out the mailbox subsystem and stdio abstraction so HSX tasks can exchange 
 - Expand the stdio shim with fuller stdin helpers and canonical C wrappers (current `hsx_stdio_read` still polls/yields).
 - Promote the new C consumer sample to use blocking stdin/mailbox helpers once read-side buffering moves beyond polling.
 - Broaden integration coverage for mailbox back-pressure and tap tracing beyond the current host-inspection tests.
+- Coordinate with Milestone 5 to land the calling convention extension (register/stack overflow rules) so stdio/mailbox helpers can rely on arbitrary argument counts once the ABI is committed.
 
 ---
 
-## Milestone 5 - Value/Command System *(Planned)*
+## Milestone 5 - ABI & Calling Convention Stabilization *(In Progress)*
+Define and implement a robust HSX calling convention that supports functions with more than three parameters without ad-hoc workarounds.
+
+### Objectives
+- Lock down the ABI reference in `docs/hsx_spec-v2.md` (register classes, caller/callee responsibilities, overflow layout for arguments ≥4, aggregate/varargs handling) and mirror the summary in contributor docs.
+- Teach `python/hsx-llc.py` (plus MVASM assembler/linker) to spill overflow arguments onto 4-byte aligned stack slots, emit callee reload stubs, and preserve callee-saved registers as defined by the spec.
+- Update runtime helpers and libraries (`include/hsx_*`, `examples/lib/*.mvasm`) so stdio/mailbox shims, exec syscalls, and native bridges honour the revised calling convention.
+- Add regression coverage spanning C/MVASM samples, pytest scenarios, and integration tests that exercise >3 argument calls, mixed-width arguments, and varargs entry points.
+- Re-run the full toolchain (`make -C examples/tests`, `make -C python test`) and update release notes once the ABI changes land to verify compatibility across prior milestones.
+
+---
+
+## Milestone 6 - Value/Command System *(Planned)*
 Introduce the Value/Command SVC modules (0x07/0x08) on top of the mailbox/stdio infrastructure.
 
 ### Objectives
@@ -82,7 +95,7 @@ Introduce the Value/Command SVC modules (0x07/0x08) on top of the mailbox/stdio 
 
 ---
 
-## Milestone 6 - HAL Integration *(Planned)*
+## Milestone 7 - HAL Integration *(Planned)*
 Unify device-level I/O through the HAL.
 
 ### Components
@@ -92,7 +105,7 @@ Unify device-level I/O through the HAL.
 
 ---
 
-## Milestone 7 - Hardware Deployment / FRAM + NOR *(Planned)*
+## Milestone 8 - Hardware Deployment / FRAM + NOR *(Planned)*
 Port the HSX Executive to AVR128DA28 and manage hybrid flash/FRAM memory.
 
 ### Tasks
@@ -102,7 +115,7 @@ Port the HSX Executive to AVR128DA28 and manage hybrid flash/FRAM memory.
 
 ---
 
-## Milestone 8 - Debugger & Tooling *(Planned)*
+## Milestone 9 - Debugger & Tooling *(Planned)*
 Develop interactive debugging support and richer developer ergonomics across the HSX toolchain.
 
 ### Objectives

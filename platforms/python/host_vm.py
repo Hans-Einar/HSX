@@ -11,7 +11,7 @@ import struct
 import sys
 import zlib
 from pathlib import PurePosixPath
-from typing import Any, Callable, Dict, Optional, List
+from typing import Any, Callable, Dict, Optional, List, Set
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
@@ -67,6 +67,7 @@ class TaskContext:
     wait_deadline: Optional[float] = None
     wait_handle: Optional[int] = None
     fd_table: Dict[int, int] = field(default_factory=dict)
+    exit_status: Optional[int] = None
 
 
 def clone_context(ctx: TaskContext) -> TaskContext:
@@ -88,6 +89,7 @@ def clone_context(ctx: TaskContext) -> TaskContext:
         wait_deadline=ctx.wait_deadline,
         wait_handle=ctx.wait_handle,
         fd_table=dict(ctx.fd_table),
+        exit_status=ctx.exit_status,
     )
 
 
@@ -110,6 +112,7 @@ def context_to_dict(ctx: TaskContext) -> Dict[str, Any]:
         "wait_deadline": ctx.wait_deadline,
         "wait_handle": ctx.wait_handle,
         "fd_table": dict(ctx.fd_table),
+        "exit_status": ctx.exit_status,
     }
 
 
@@ -132,6 +135,7 @@ def dict_to_context(data: Dict[str, Any]) -> TaskContext:
         wait_deadline=data.get("wait_deadline"),
         wait_handle=data.get("wait_handle"),
         fd_table={int(k): int(v) for k, v in dict(data.get("fd_table", {})).items()},
+        exit_status=(lambda val: int(val) & 0xFFFFFFFF if val is not None else None)(data.get("exit_status")),
     )
 
 def f16_to_f32(h):
@@ -365,6 +369,7 @@ class MiniVM:
                 "wait_mailbox": ctx.wait_mailbox,
                 "wait_deadline": ctx.wait_deadline,
                 "wait_handle": ctx.wait_handle,
+                "exit_status": ctx.exit_status,
             }
         return {
             "pc": self.pc,
@@ -476,6 +481,14 @@ class MiniVM:
         prev_pc = self.pc
 
         if self.pc + 4 > len(self.code):
+            pid = self.context.pid if self.context else None
+            self.emit_event({
+                "type": "vm_error",
+                "pid": pid,
+                "error": "pc_out_of_range",
+                "pc": self.pc,
+                "code_len": len(self.code),
+            })
             print(f"[VM] PC 0x{self.pc:04X} is outside code length {len(self.code)}")
             self.running = False
             self.save_context()
@@ -658,6 +671,9 @@ class MiniVM:
             if self.trace:
                 self._log(f"[RET] pc=0x{(self.pc & 0xFFFF):04X} sp=0x{self.sp:04X}")
             if not self.call_stack:
+                if self.context is not None:
+                    self.context.state = "returned"
+                    self.context.exit_status = self.regs[0] & 0xFFFFFFFF
                 self.running = False
                 self.save_context()
                 return
@@ -1061,6 +1077,8 @@ class VMController:
         self.server: Optional["VMServer"] = None
         self.mailboxes = MailboxManager()
         self.waiting_tasks: Dict[int, Dict[str, Any]] = {}
+        self.default_trace = trace
+        self.traced_pids: Set[int] = set()
 
     def reset(self) -> Dict[str, Any]:
         self.vm = None
@@ -1513,8 +1531,10 @@ class VMController:
             ctx_dict["wait_mailbox"] = None
             ctx_dict["wait_deadline"] = None
             ctx_dict["wait_handle"] = None
+            ctx_dict["state"] = "ready"
             state["context"] = ctx_dict
             state.pop("wait_info", None)
+            state["running"] = True
             self.task_states[pid] = state
         task = self.tasks.get(pid)
         if task:
@@ -1522,6 +1542,7 @@ class VMController:
             task["wait_mailbox"] = None
             task["wait_deadline"] = None
             task["wait_handle"] = None
+            task["vm_state"] = state
         if self.current_pid == pid and self.vm is not None and self.vm.context.pid == pid:
             if payload:
                 self.vm.mem[buffer_ptr : buffer_ptr + length] = payload
@@ -1549,6 +1570,10 @@ class VMController:
         }
         if self.vm is not None:
             self.vm.emit_event(event_payload)
+        if self.current_pid == pid:
+            refreshed_state = self.task_states.get(pid)
+            if refreshed_state is not None:
+                self._activate_task(pid, state_override=refreshed_state)
 
     def _deliver_mailbox_messages(self, descriptor_id: int) -> None:
         try:
@@ -1647,6 +1672,8 @@ class VMController:
         self.next_pid += 1
         ctx = state["context"]
         ctx["pid"] = pid
+        ctx["exit_status"] = None
+        ctx["trace"] = self.default_trace
         state["context"] = ctx
         self.tasks[pid] = {
             "pid": pid,
@@ -1658,6 +1685,8 @@ class VMController:
             "stdout": "uart0",
             "sleep_pending": False,
             "vm_state": state,
+            "exit_status": None,
+            "trace": self.default_trace,
         }
         self.task_states[pid] = state
         self.mailboxes.register_task(pid)
@@ -1700,7 +1729,6 @@ class VMController:
         state = self.vm.snapshot_state()
         ctx = state["context"]
         ctx["pid"] = self.current_pid
-        ctx["state"] = "paused" if self.paused else ("running" if self.vm.running else "stopped")
         state["context"] = ctx
         state["running"] = self.vm.running
         state["cycles"] = self.vm.cycles
@@ -1710,20 +1738,30 @@ class VMController:
             task["vm_state"] = state
             task["pc"] = ctx.get("pc", task.get("pc"))
             task["sleep_pending"] = bool(self.vm.sleep_until or self.vm.sleep_pending_ms)
-            if self.paused:
-                task["state"] = "paused"
-                ctx["state"] = "paused"
+            exit_status = ctx.get("exit_status")
+            if exit_status is not None:
+                task["exit_status"] = exit_status
             else:
-                context_state = ctx.get("state")
-                if context_state == "waiting_mbx" or self.waiting_tasks.get(self.current_pid):
-                    task["state"] = "waiting_mbx"
-                    ctx["state"] = "waiting_mbx"
-                elif self.vm.running:
-                    task["state"] = "ready"
-                    ctx["state"] = "ready"
+                task.pop("exit_status", None)
+            waiting = ctx.get("state") == "waiting_mbx" or self.waiting_tasks.get(self.current_pid)
+            if self.paused:
+                new_state = "paused"
+            elif exit_status is not None and ctx.get("state") in {"returned", "exited"}:
+                new_state = "returned"
+            elif waiting:
+                new_state = "waiting_mbx"
+            elif self.vm.running:
+                new_state = "ready"
+            else:
+                fallback_state = ctx.get("state") or task.get("state")
+                if fallback_state in {"returned", "exited", "terminated"}:
+                    new_state = fallback_state
+                elif fallback_state in {"waiting_mbx", "running", "ready", "paused"}:
+                    new_state = fallback_state
                 else:
-                    task["state"] = "stopped"
-                    ctx["state"] = "stopped"
+                    new_state = "stopped"
+            task["state"] = new_state
+            ctx["state"] = new_state
         wait_info = self.waiting_tasks.get(self.current_pid)
         if wait_info is not None:
             state["wait_info"] = wait_info
@@ -1741,25 +1779,31 @@ class VMController:
         state = state_override or self.task_states.get(pid) or task.get("vm_state")
         if state is None:
             raise ValueError(f"no state for pid {pid}")
+        trace_enabled = self.default_trace or (pid in self.traced_pids)
+        self.trace = trace_enabled
         if self.vm is None:
             initial_code = bytes(state.get("code", bytearray()))
             entry = state.get("context", {}).get("pc", task.get("pc", 0))
             self.vm = MiniVM(
                 initial_code,
                 entry=entry,
-                trace=self.trace,
+                trace=trace_enabled,
                 svc_trace=self.svc_trace,
                 dev_libm=self.dev_libm,
                 mailboxes=self.mailboxes,
             )
         self.vm.set_mailbox_handler(lambda fn, vm=self.vm: self._svc_mailbox_controller(vm, fn))
         self.vm.restore_state(state)
+        self.vm.trace = trace_enabled
         self.vm.attached = self.attached
         self.current_pid = pid
         task["vm_state"] = state
         ctx = state.get("context", {})
         task["pc"] = ctx.get("pc", task.get("pc"))
         task["state"] = "running" if self.vm.running else ctx.get("state", task.get("state", "stopped"))
+        task["trace"] = trace_enabled
+        ctx["trace"] = trace_enabled
+        state["context"] = ctx
         self.task_states[pid] = state
 
     def _runnable_pids(self) -> List[int]:
@@ -1792,7 +1836,36 @@ class VMController:
             "quantum": task.get("quantum"),
             "accounted_cycles": ctx.get("accounted_cycles", 0),
             "sleep_pending": task.get("sleep_pending", False),
+            "exit_status": task.get("exit_status"),
+            "trace": task.get("trace"),
         }
+
+    def trace_task(self, pid: int, enable: Optional[bool]) -> Dict[str, Any]:
+        self._get_task(pid)
+        if enable is None:
+            if pid in self.traced_pids:
+                self.traced_pids.discard(pid)
+            else:
+                self.traced_pids.add(pid)
+        elif enable:
+            self.traced_pids.add(pid)
+        else:
+            self.traced_pids.discard(pid)
+        trace_enabled = self.default_trace or (pid in self.traced_pids)
+        task = self.tasks.get(pid)
+        if task is not None:
+            task["trace"] = trace_enabled
+        state = self.task_states.get(pid)
+        if state is not None:
+            ctx = state.get("context", {})
+            ctx["trace"] = trace_enabled
+            state["context"] = ctx
+            self.task_states[pid] = state
+        if self.current_pid == pid:
+            self.trace = trace_enabled
+            if self.vm is not None:
+                self.vm.trace = trace_enabled
+        return {"pid": pid, "enabled": trace_enabled}
 
     def step(self, cycles: int) -> Dict[str, Any]:
         self._check_mailbox_timeouts()
@@ -2061,6 +2134,25 @@ class VMController:
             if cmd == "step":
                 cycles = int(request.get("cycles", 1))
                 return {"status": "ok", "result": self.step(cycles)}
+            if cmd == "trace":
+                pid_value = request.get("pid")
+                if pid_value is None:
+                    raise ValueError("trace requires 'pid'")
+                mode_value = request.get("mode")
+                if isinstance(mode_value, bool):
+                    enable = mode_value
+                elif mode_value is None:
+                    enable = None
+                else:
+                    mode_str = str(mode_value).strip().lower()
+                    if mode_str in {"on", "true", "1"}:
+                        enable = True
+                    elif mode_str in {"off", "false", "0"}:
+                        enable = False
+                    else:
+                        raise ValueError("trace mode must be 'on' or 'off'")
+                trace_info = self.trace_task(int(pid_value), enable)
+                return {"status": "ok", "trace": trace_info}
             if cmd == "read_regs":
                 pid_value = request.get("pid")
                 pid = int(pid_value) if pid_value is not None else None

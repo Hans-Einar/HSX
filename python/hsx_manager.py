@@ -22,6 +22,7 @@ import argparse
 import json
 import os
 import shlex
+import shutil
 import socket
 import subprocess
 import sys
@@ -135,7 +136,7 @@ class Manager:
             ),
             "shell": ManagedProcess(
                 "shell",
-                [sys.executable, str(root / "python" / "shell_client.py"), "--host", host, "--port", str(exec_port)],
+                self._build_shell_command(root, host, exec_port),
                 cwd=root,
             ),
         }
@@ -151,6 +152,14 @@ class Manager:
                 self.components["vm"].start()
                 time.sleep(0.5)
             proc.start()
+            if name == "vm":
+                if not self._wait_for_port(self.host, self.vm_port, "vm"):
+                    print("[vm] start aborted; port did not open")
+                    break
+            elif name == "exec":
+                if not self._wait_for_port(self.host, self.exec_port, "exec"):
+                    print("[exec] start aborted; port did not open")
+                    break
 
     def stop(self, targets: List[str]) -> None:
         for name in targets:
@@ -239,6 +248,45 @@ class Manager:
             else:
                 print(f"unknown target '{name}'")
         return result
+
+    def _build_shell_command(self, root: Path, host: str, port: int) -> List[str]:
+        base_cmd = [
+            sys.executable,
+            str(root / "python" / "shell_client.py"),
+            "--host",
+            host,
+            "--port",
+            str(port),
+        ]
+        if os.name == "posix":
+            configured = os.environ.get("HSX_SHELL_TERMINAL")
+            candidates: List[List[str]] = []
+            if configured:
+                candidates.append(shlex.split(configured))
+            for program in ("x-terminal-emulator", "xterm"):
+                path = shutil.which(program)
+                if path:
+                    candidates.append([path])
+            for prefix in candidates:
+                cmd = prefix + ["-e"] + base_cmd
+                return cmd
+        return base_cmd
+
+    def _wait_for_port(self, host: str, port: int, name: str, timeout: float = 5.0) -> bool:
+        deadline = time.monotonic() + timeout
+        last_error: Optional[Exception] = None
+        while time.monotonic() < deadline:
+            try:
+                with socket.create_connection((host, port), timeout=0.5):
+                    return True
+            except OSError as exc:
+                last_error = exc
+                time.sleep(0.1)
+        message = f"[{name}] timed out waiting for TCP port {port} on {host} ({timeout:.1f}s)"
+        if last_error:
+            message += f": {last_error}"
+        print(message)
+        return False
 
 
 def main() -> None:
