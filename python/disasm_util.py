@@ -9,7 +9,7 @@ OPCODES: Dict[str, int] = {
     "CMP": 0x20, "JMP": 0x21, "JZ": 0x22, "JNZ": 0x23, "CALL": 0x24, "RET": 0x25,
     "SVC": 0x30, "PUSH": 0x40, "POP": 0x41,
     "FADD": 0x50, "FSUB": 0x51, "FMUL": 0x52, "FDIV": 0x53, "I2F": 0x54, "F2I": 0x55,
-    "LDI32": 0x60
+    "LDI32": 0x60, "BRK": 0x7F
 }
 
 OPCODE_NAMES: Dict[int, str] = {code: name for name, code in OPCODES.items()}

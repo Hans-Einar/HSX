@@ -326,9 +326,6 @@ C source ? clang -emit-llvm ? hsx-llc.py ? .mvasm ? asm.py ? .hxe ? host_vm.py
 ## 11. Security & Isolation (Future Work)
 - Optional memory bounds checks on loads/stores within task arenas.
 - Watchdog/time quotas to kill runaway tasks.
-- Capability tokens for FS/FD access control.
-- Stronger separation between user tasks and executive (MPU/MMU on capable MCUs).
-
 ---
 
 ## 12. Roadmap Snapshot

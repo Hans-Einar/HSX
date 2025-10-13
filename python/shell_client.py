@@ -33,6 +33,7 @@ COMMAND_NAMES = sorted(
         "cd",
         "clock",
         "detach",
+        "dbg",
         "dumpregs",
         "dmesg",
         "exec",
@@ -562,9 +563,60 @@ def _pretty_stdio(payload: dict) -> None:
             line = f"    {stream or '?'}"
             if target:
                 line += f" -> {target}"
-        if status is not None:
-            line += f" status={status}"
+            if status is not None:
+                line += f" status={status}"
         print(line)
+
+
+def _pretty_dbg(payload: dict) -> None:
+    block = payload.get("debug") or {}
+    op = block.get("op", "")
+    pid = block.get("pid")
+    header = f"dbg {op}" if op else "dbg"
+    if pid is not None:
+        header += f" pid={pid}"
+    print(header)
+    halted = block.get("halted")
+    if halted is not None:
+        print(f"  halted: {halted}")
+    stop = block.get("stop")
+    if isinstance(stop, dict) and stop:
+        print("  last_stop:")
+        for key in sorted(stop):
+            print(f"    {key}: {stop[key]}")
+    breakpoints = block.get("breakpoints")
+    if breakpoints is not None:
+        if breakpoints:
+            print("  breakpoints:")
+            for addr in breakpoints:
+                try:
+                    value = int(addr)
+                except (TypeError, ValueError):
+                    print(f"    {addr}")
+                else:
+                    print(f"    0x{value:04X}")
+        else:
+            print("  breakpoints: (none)")
+    registers = block.get("registers")
+    if isinstance(registers, dict) and registers:
+        print("  registers:")
+        _render_register_block(registers, indent="    ")
+    result = block.get("result")
+    if isinstance(result, dict) and result:
+        print("  result:")
+        for key in ("executed", "running", "pc", "cycles", "paused", "current_pid", "next_pid"):
+            if key in result:
+                print(f"    {key}: {result[key]}")
+        debug_event = result.get("debug_event")
+        if isinstance(debug_event, dict) and debug_event:
+            print("    debug_event:")
+            for key, value in debug_event.items():
+                print(f"      {key}: {value}")
+        events = result.get("events") or []
+        if events:
+            print("    events:")
+            for event in events:
+                print(f"      {event}")
 
 
 def _pretty_dmesg(payload: dict) -> None:
@@ -661,6 +713,7 @@ PRETTY_HANDLERS = {
     'clock': _pretty_clock,
     'step': _pretty_clock,
     'trace': _pretty_trace,
+    'dbg': _pretty_dbg,
 }
 
 
@@ -706,13 +759,86 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
     payload_cmd = cmd
     payload: dict[str, object] = {"cmd": payload_cmd}
 
-    if cmd in {"attach", "detach", "ps", "clock", "shutdown", "pause", "resume", "kill", "load", "exec", "reload", "list", "step", "listen", "send", "sched", "info", "peek", "poke", "dumpregs", "stdio", "mbox", "mailboxes", "mailbox_snapshot", "mailbox_open", "mailbox_close", "mailbox_bind", "mailbox_send", "mailbox_recv", "mailbox_peek", "mailbox_tap"}:
+    if cmd in {"attach", "detach", "ps", "clock", "shutdown", "pause", "resume", "kill", "load", "exec", "reload", "list", "step", "listen", "send", "sched", "info", "peek", "poke", "dumpregs", "stdio", "mbox", "mailboxes", "mailbox_snapshot", "mailbox_open", "mailbox_close", "mailbox_bind", "mailbox_send", "mailbox_recv", "mailbox_peek", "mailbox_tap", "dbg"}:
         pass
 
     if cmd == "info":
         if args:
             payload["pid"] = args[0]
         return payload
+
+    if cmd == "dbg":
+        if not args:
+            raise ValueError("dbg usage: dbg <attach|detach|regs|cont|step|break|bp> ...")
+        subcmd = args[0].lower()
+        tokens = args[1:]
+        if subcmd in {"attach", "detach"}:
+            if not tokens:
+                raise ValueError(f"dbg {subcmd} requires <pid>")
+            payload["op"] = subcmd
+            payload["pid"] = int(tokens[0], 0)
+            return payload
+        if subcmd in {"regs", "registers"}:
+            if not tokens:
+                raise ValueError("dbg regs requires <pid>")
+            payload["op"] = "regs"
+            payload["pid"] = int(tokens[0], 0)
+            return payload
+        if subcmd in {"cont", "continue"}:
+            if not tokens:
+                raise ValueError("dbg cont requires <pid> [cycles]")
+            payload["op"] = "cont"
+            payload["pid"] = int(tokens[0], 0)
+            if len(tokens) > 1:
+                payload["cycles"] = int(tokens[1], 0)
+            return payload
+        if subcmd == "step":
+            if not tokens:
+                raise ValueError("dbg step requires <pid> [count]")
+            payload["op"] = "step"
+            payload["pid"] = int(tokens[0], 0)
+            if len(tokens) > 1:
+                payload["count"] = int(tokens[1], 0)
+            return payload
+        if subcmd == "break":
+            if not tokens:
+                raise ValueError("dbg break requires <pid>")
+            payload["op"] = "break"
+            payload["pid"] = int(tokens[0], 0)
+            return payload
+        if subcmd == "bp":
+            if not tokens:
+                raise ValueError("dbg bp usage: dbg bp <list|add|remove> ...")
+            action = tokens[0].lower()
+            rest = tokens[1:]
+            payload["op"] = "bp"
+            if action in {"list", "ls"}:
+                if not rest:
+                    raise ValueError("dbg bp list requires <pid>")
+                payload["action"] = "list"
+                payload["pid"] = int(rest[0], 0)
+                return payload
+            if action == "add":
+                if len(rest) < 2:
+                    raise ValueError("dbg bp add requires <pid> <addr>")
+                payload["action"] = "add"
+                payload["pid"] = int(rest[0], 0)
+                payload["addr"] = int(rest[1], 0)
+                return payload
+            if action in {"remove", "rm", "del", "delete"}:
+                if len(rest) < 2:
+                    raise ValueError("dbg bp remove requires <pid> <addr>")
+                payload["action"] = "remove"
+                payload["pid"] = int(rest[0], 0)
+                payload["addr"] = int(rest[1], 0)
+                return payload
+            raise ValueError(f"dbg bp unknown action '{action}'")
+        if subcmd in {"list", "ls"} and tokens:
+            payload["op"] = "bp"
+            payload["action"] = "list"
+            payload["pid"] = int(tokens[0], 0)
+            return payload
+        raise ValueError(f"dbg unknown subcommand '{subcmd}'")
 
     if cmd == "trace":
         if not args:

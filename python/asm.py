@@ -14,7 +14,7 @@ OPC = {
     "CMP": 0x20, "JMP": 0x21, "JZ": 0x22, "JNZ": 0x23, "CALL": 0x24, "RET": 0x25,
     "SVC": 0x30, "PUSH": 0x40, "POP": 0x41,
     "FADD": 0x50, "FSUB": 0x51, "FMUL": 0x52, "FDIV": 0x53, "I2F": 0x54, "F2I": 0x55,
-    "LDI32": 0x60
+    "LDI32": 0x60, "BRK": 0x7F
 }
 
 REGISTER_RE = re.compile(r"R([0-9]|1[0-5])\b", re.IGNORECASE)
@@ -569,6 +569,15 @@ def assemble(lines, *, include_base: Path | None = None, for_object: bool = Fals
                 fn = kv.get('FN', 0) & 0xFF
                 imm_val = ((mod << 8) | fn) & 0x0FFF
                 add_code_word(emit_word(op, 0, 0, 0, imm_val))
+        elif mnem == 'BRK':
+            if len(args) > 1:
+                raise ValueError('BRK takes at most one operand')
+            imm_val = 0
+            if args:
+                imm_val = parse_int(args[0])
+                if imm_val < 0 or imm_val > 0xFF:
+                    raise ValueError('BRK immediate must be in range 0..255')
+            add_code_word(emit_word(op, 0, 0, 0, imm_val & 0x0FFF))
         else:
             raise ValueError(f"Unhandled mnemonic: {mnem}")
 

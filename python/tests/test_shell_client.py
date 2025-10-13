@@ -1,6 +1,9 @@
+import sys
 from pathlib import Path
 
 import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from python.shell_client import _build_payload
 
@@ -33,3 +36,19 @@ def test_mbox_allows_all_keyword(tmp_path: Path) -> None:
 def test_load_payload_resolves_relative_path(tmp_path: Path) -> None:
     payload = _build_payload("load", ["prog.hxe"], tmp_path)
     assert Path(payload["path"]).parent == tmp_path.resolve()
+
+
+def test_dbg_attach_payload(tmp_path: Path) -> None:
+    payload = _build_payload("dbg", ["attach", "7"], tmp_path)
+    assert payload["cmd"] == "dbg"
+    assert payload["op"] == "attach"
+    assert payload["pid"] == 7
+
+
+def test_dbg_bp_add_payload(tmp_path: Path) -> None:
+    payload = _build_payload("dbg", ["bp", "add", "3", "0x120"], tmp_path)
+    assert payload["cmd"] == "dbg"
+    assert payload["op"] == "bp"
+    assert payload["action"] == "add"
+    assert payload["pid"] == 3
+    assert payload["addr"] == 0x120
