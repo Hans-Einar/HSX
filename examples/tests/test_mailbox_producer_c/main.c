@@ -1,9 +1,10 @@
 #include "hsx_mailbox.h"
 
+static const char kTargetMailbox[] = "app:procon";
 static const char kMessage[] = "ping from producer";
 
 int main(void) {
-    int handle = hsx_mailbox_open_app_demo();
+    int handle = hsx_mailbox_open(kTargetMailbox, 0);
     if (handle < 0) {
         return -handle;
     }

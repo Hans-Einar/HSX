@@ -1,4 +1,5 @@
 .export hsx_mailbox_open
+.export hsx_mailbox_bind
 .export hsx_mailbox_close
 .export hsx_mailbox_send
 .export hsx_mailbox_recv
@@ -31,6 +32,25 @@ hsx_mailbox_open:
     MOV R0, R1
     RET
 hsx_mailbox_open_error:
+    LDI R9, 0
+    SUB R0, R9, R8
+    RET
+
+hsx_mailbox_bind:
+    MOV R8, R1
+    MOV R9, R2
+    MOV R10, R3
+    MOV R1, R8
+    MOV R2, R9
+    MOV R3, R10
+    SVC MOD=0x5, FN=0x1
+    MOV R8, R0
+    LDI R9, 0
+    CMP R8, R9
+    JNZ hsx_mailbox_bind_error
+    MOV R0, R1
+    RET
+hsx_mailbox_bind_error:
     LDI R9, 0
     SUB R0, R9, R8
     RET

@@ -1,5 +1,6 @@
 #include "hsx_mailbox.h"
 #include "hsx_stdio.h"
+#include "procon.h"
 
 #define BUFFER_SIZE 192
 
@@ -20,6 +21,19 @@ static int trim_line(char* buffer, int length) {
     return trimmed;
 }
 
+static int is_exit_command(const char* data, int length) {
+    static const char kExit[] = "exit";
+    if (length != 4) {
+        return 0;
+    }
+    for (int i = 0; i < 4; ++i) {
+        if (data[i] != kExit[i]) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 int main(void) {
     int stdin_handle = hsx_mailbox_open_stdin();
     if (stdin_handle < 0) {
@@ -27,7 +41,7 @@ int main(void) {
         return -stdin_handle;
     }
 
-    int handle = hsx_mailbox_open_app_demo();
+    int handle = hsx_mailbox_open(PROCON_MAILBOX_TARGET, 0);
     if (handle < 0) {
         hsx_stdio_puts_err("mailbox producer: failed to open target mailbox");
         hsx_mailbox_close(stdin_handle);
@@ -60,8 +74,15 @@ int main(void) {
         int rc = hsx_mailbox_send_basic(handle, g_buffer, payload_length);
         if (rc < 0) {
             hsx_stdio_puts_err("mailbox producer: send failed");
+            continue;
+        }
+        if (is_exit_command(g_buffer, payload_length)) {
+            hsx_stdio_puts("mailbox producer: exit requested");
+            break;
         }
     }
 
+    hsx_mailbox_close(handle);
+    hsx_mailbox_close(stdin_handle);
     return 0;
 }

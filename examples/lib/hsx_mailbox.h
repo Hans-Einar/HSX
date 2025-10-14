@@ -16,6 +16,7 @@ typedef struct hsx_mailbox_recv_info {
 } hsx_mailbox_recv_info;
 
 int hsx_mailbox_open(const char* target, unsigned flags);
+int hsx_mailbox_bind(const char* target, unsigned capacity, unsigned mode);
 int hsx_mailbox_close(int handle);
 int hsx_mailbox_send(int handle, const void* data, int length, unsigned flags, unsigned channel);
 int hsx_mailbox_recv(int handle, void* buffer, int max_len, unsigned timeout, hsx_mailbox_recv_info* out);

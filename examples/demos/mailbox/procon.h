@@ -1,0 +1,9 @@
+#ifndef PROCON_MAILBOX_CONFIG_H
+#define PROCON_MAILBOX_CONFIG_H
+
+#include "hsx_mailbox.h"
+
+#define PROCON_MAILBOX_TARGET "app:procon"
+#define PROCON_MAILBOX_CAPACITY HSX_MBX_DEFAULT_RING_CAPACITY
+
+#endif /* PROCON_MAILBOX_CONFIG_H */

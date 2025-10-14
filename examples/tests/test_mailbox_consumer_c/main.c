@@ -2,6 +2,7 @@
 #include "hsx_stdio.h"
 
 static char inbox_buffer[64];
+static const char kTargetMailbox[] = "app:procon";
 
 static void clear_buffer(void) {
     for (int i = 0; i < (int)sizeof(inbox_buffer); ++i) {
@@ -12,7 +13,7 @@ static void clear_buffer(void) {
 int main(void) {
     clear_buffer();
 
-    int handle = hsx_mailbox_open_app_demo();
+    int handle = hsx_mailbox_open(kTargetMailbox, 0);
     if (handle < 0) {
         return -handle;
     }
