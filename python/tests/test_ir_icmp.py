@@ -34,7 +34,8 @@ entry:
     # mask load for signed comparison
     assert any(line.startswith("LDI32 ") and "2147483648" in line for line in lines)
     assert any(line.startswith("AND ") for line in lines)
-    assert lines[-2].startswith("MOV R0,")
+    assert lines[-3].startswith("MOV R0,")
+    assert lines[-2] == "POP R7"
     assert lines[-1] == "RET"
 
 
@@ -49,5 +50,6 @@ entry:
     assert any(line.startswith("SUB ") and ", R1, R2" in line for line in lines)
     assert any(line.startswith("LDI32 ") and "2147483648" in line for line in lines)
     assert any(line.startswith("AND ") for line in lines)
-    assert lines[-2].startswith("MOV R0,")
+    assert lines[-3].startswith("MOV R0,")
+    assert lines[-2] == "POP R7"
     assert lines[-1] == "RET"

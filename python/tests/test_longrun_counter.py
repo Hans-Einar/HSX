@@ -51,12 +51,22 @@ cont:
     code, entry, rodata = _assemble(lines)
     vm = MiniVM(code, entry=entry, rodata=rodata)
 
-    observed = []
+    observed: list[int] = []
+    slot_addr: int | None = None
     for _ in range(256):
         vm.step()
-        observed.append(vm.regs[7] & 0xFFFFFFFF)
+        fp = vm.regs[7] & 0xFFFF
+        if fp and slot_addr is None:
+            slot_addr = (fp - 4) & 0xFFFF
+        if slot_addr is not None:
+            word = (
+                vm.mem[slot_addr]
+                | (vm.mem[(slot_addr + 1) & 0xFFFF] << 8)
+                | (vm.mem[(slot_addr + 2) & 0xFFFF] << 16)
+                | (vm.mem[(slot_addr + 3) & 0xFFFF] << 24)
+            )
+            observed.append(word & 0xFFFFFFFF)
 
-    nonzero = [value for value in observed if value > 0]
-    assert nonzero, "R7 never advanced beyond zero"
-    assert max(nonzero) > 1, f"R7 did not count up: {nonzero[:8]}"
-    assert len(set(nonzero)) > 1, "R7 stayed constant despite running the loop"
+    assert observed, "stack slot was never initialised"
+    assert any(value > 0 for value in observed), "counter never incremented above zero"
+    assert len(set(observed)) > 1, "counter value did not change over time"

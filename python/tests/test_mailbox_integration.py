@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 from platforms.python.host_vm import VMController
 
@@ -12,6 +15,8 @@ ASM_TOOL = REPO_ROOT / "python" / "asm.py"
 EXAMPLES_DIR = REPO_ROOT / "examples" / "tests"
 STDIO_SAMPLE = EXAMPLES_DIR / "test_stdio_mailbox_c"
 PRODUCER_SAMPLE = EXAMPLES_DIR / "test_mailbox_producer_c"
+
+CLANG_AVAILABLE = shutil.which("clang") is not None
 
 
 def _build_hxe(source: Path, build_dir: Path) -> Path:
@@ -48,6 +53,8 @@ def _load_task(controller: VMController, image: Path) -> int:
 
 
 def test_stdio_puts(tmp_path):
+    if not CLANG_AVAILABLE:
+        pytest.skip("clang not installed; mailbox C samples cannot be built")
     image = _build_hxe(STDIO_SAMPLE, tmp_path)
     controller = VMController()
     pid = _load_task(controller, image)
@@ -70,6 +77,8 @@ def test_stdio_puts(tmp_path):
 
 
 def test_producer_mailbox_message(tmp_path):
+    if not CLANG_AVAILABLE:
+        pytest.skip("clang not installed; mailbox C samples cannot be built")
     producer_img = _build_hxe(PRODUCER_SAMPLE, tmp_path)
 
     controller = VMController()

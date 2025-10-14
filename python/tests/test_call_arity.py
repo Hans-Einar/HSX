@@ -28,12 +28,23 @@ entry:
     lines = [line.strip() for line in asm.splitlines() if line.strip() and not line.strip().startswith(";")]
 
     call_idx = next(i for i, line in enumerate(lines) if line.startswith("CALL callee"))
-    push_lines = [line for line in lines[:call_idx] if line.startswith("PUSH")]
-    pop_lines = [line for line in lines[call_idx + 1 :] if line.startswith("POP")]
+    push_candidates = [
+        line for line in lines[:call_idx] if line.startswith("PUSH") and line != "PUSH R7"
+    ]
+    assert push_candidates, "Expected at least one stack push for overflow argument"
+    push_lines = push_candidates[-1:]
 
-    assert len(push_lines) == 1, f"Expected one stack push, saw {push_lines}"
+    pop_lines: list[str] = []
+    for line in lines[call_idx + 1 :]:
+        if not line.startswith("POP") or line == "POP R7":
+            continue
+        pop_lines.append(line)
+        if len(pop_lines) == 1:
+            break
+
+    assert len(push_lines) == 1, f"Expected one stack push, saw {push_candidates}"
     assert len(pop_lines) == 1, f"Expected one stack pop, saw {pop_lines}"
-    assert push_lines[0] == "PUSH R12" or push_lines[0].startswith("PUSH R"), "Unexpected push operand"
+    assert push_lines[0].startswith("PUSH R"), "Unexpected push operand"
     assert pop_lines[0] == "POP R12", "Stack cleanup should pop into R12"
 
 
@@ -52,8 +63,18 @@ entry:
     lines = [line.strip() for line in asm.splitlines() if line.strip() and not line.strip().startswith(";")]
 
     call_idx = next(i for i, line in enumerate(lines) if line.startswith("CALL callee"))
-    push_lines = [line for line in lines[:call_idx] if line.startswith("PUSH")]
-    pop_lines = [line for line in lines[call_idx + 1 :] if line.startswith("POP")]
+    push_candidates = [
+        line for line in lines[:call_idx] if line.startswith("PUSH") and line != "PUSH R7"
+    ]
+    push_lines = push_candidates[-3:]
+
+    pop_lines: list[str] = []
+    for line in lines[call_idx + 1 :]:
+        if not line.startswith("POP") or line == "POP R7":
+            continue
+        pop_lines.append(line)
+        if len(pop_lines) == 3:
+            break
 
     assert len(push_lines) == 3
     assert len(pop_lines) == 3

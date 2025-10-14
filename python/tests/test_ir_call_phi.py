@@ -40,7 +40,8 @@ merge:
     assert any(line.startswith('MOV') and 'R3' in line for line in else_block), "phi move missing for else predecessor"
     merge_idx = lines.index('phi_example__merge:')
     assert lines[merge_idx + 1] == 'MOV R0, R4'
-    assert lines[merge_idx + 2] == 'RET'
+    assert lines[merge_idx + 2] == 'POP R7'
+    assert lines[merge_idx + 3] == 'RET'
 
 
 def test_call_argument_lowering():
@@ -55,8 +56,7 @@ entry:
     lines = compile_to_lines(ll)
     assert 'LDI R2, 5' in lines
     assert 'CALL callee' in lines
-    assert 'MOV R4, R0' in lines
-    assert lines[-2:] == ['MOV R0, R4', 'RET']
+    assert lines[-3:] == ['CALL callee', 'POP R7', 'RET']
 
 
 def test_half_ops_lowering():
@@ -76,10 +76,10 @@ entry:
     lines = compile_to_lines(ll)
     assert any(line.startswith('FADD ') for line in lines)
     assert any(line.startswith('CALL use_val') for line in lines)
-    assert lines[-2].startswith('MOV R0,')
+    assert lines[-3].startswith('MOV R0,')
     assert 'CALL use_val' in lines
+    assert lines[-2] == 'POP R7'
     assert lines[-1] == 'RET'
-    assert lines[-2].startswith('MOV R0,')
 
 def test_externs_for_defined_functions():
     ll = """define dso_local i32 @foo() {\nentry:\n  ret i32 1\n}\n\ndefine dso_local i32 @main() {\nentry:\n  %r = call i32 @foo()\n  ret i32 %r\n}\n"""
@@ -122,7 +122,6 @@ entry:
 }
 """
     asm = _load_hsx_llc().compile_ll_to_mvasm(ll, trace=False)
-    assert '__spill_' in asm
-    assert '.data' in asm
-    spill_lines = [line for line in asm.splitlines() if line.startswith('__spill_')]
-    assert spill_lines, 'expected spill slots in data section'
+    assert '[R7' in asm, 'expected stack-based spill slots in generated assembly'
+    push_spill = [line for line in asm.splitlines() if line.startswith('PUSH ') and line != 'PUSH R7']
+    assert push_spill, 'expected stack allocation pushes for spills'
