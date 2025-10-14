@@ -18,12 +18,13 @@ BUILD_DIR ?= build
 CLANGFLAGS ?= -S -emit-llvm -O0 -fno-builtin
 RUN_ARGS ?=
 MKDIR_CMD = $(PYTHON) -c "import os, sys; os.makedirs(os.path.dirname(os.path.abspath(sys.argv[1])), exist_ok=True)" "$@"
+INCLUDE_FLAGS := -I$(REPO_ROOT)/examples/lib -I$(REPO_ROOT)/include
 
 .SECONDARY:
 
-.PHONY: all longrun runlongrun shell runshell clean
+.PHONY: all longrun runlongrun mailbox_producer mailbox_consumer run_mailbox_producer run_mailbox_consumer shell runshell clean
 
-all: longrun
+all: longrun mailbox_producer mailbox_consumer
 
 longrun: $(BUILD_DIR)/longrun/main.hxe
 
@@ -41,7 +42,41 @@ $(BUILD_DIR)/longrun/main.mvasm: $(BUILD_DIR)/longrun/main.ll
 
 $(BUILD_DIR)/longrun/main.ll: longrun/main.c
 	$(MKDIR_CMD)
-	$(CLANG) $(CLANGFLAGS) $< -o $@
+	$(CLANG) $(CLANGFLAGS) $(INCLUDE_FLAGS) $< -o $@
+
+mailbox_producer: $(BUILD_DIR)/mailbox/producer.hxe
+
+mailbox_consumer: $(BUILD_DIR)/mailbox/consumer.hxe
+
+run_mailbox_producer: mailbox_producer
+	$(PYTHON) "$(VM)" $(BUILD_DIR)/mailbox/producer.hxe $(RUN_ARGS)
+
+run_mailbox_consumer: mailbox_consumer
+	$(PYTHON) "$(VM)" $(BUILD_DIR)/mailbox/consumer.hxe $(RUN_ARGS)
+
+$(BUILD_DIR)/mailbox/producer.hxe: $(BUILD_DIR)/mailbox/producer.mvasm
+	$(MKDIR_CMD)
+	$(PYTHON) "$(REPO_ROOT)/python/asm.py" $< -o $@
+
+$(BUILD_DIR)/mailbox/producer.mvasm: $(BUILD_DIR)/mailbox/producer.ll
+	$(MKDIR_CMD)
+	$(PYTHON) "$(REPO_ROOT)/python/hsx-llc.py" $< -o $@
+
+$(BUILD_DIR)/mailbox/producer.ll: mailbox/producer.c
+	$(MKDIR_CMD)
+	$(CLANG) $(CLANGFLAGS) $(INCLUDE_FLAGS) $< -o $@
+
+$(BUILD_DIR)/mailbox/consumer.hxe: $(BUILD_DIR)/mailbox/consumer.mvasm
+	$(MKDIR_CMD)
+	$(PYTHON) "$(REPO_ROOT)/python/asm.py" $< -o $@
+
+$(BUILD_DIR)/mailbox/consumer.mvasm: $(BUILD_DIR)/mailbox/consumer.ll
+	$(MKDIR_CMD)
+	$(PYTHON) "$(REPO_ROOT)/python/hsx-llc.py" $< -o $@
+
+$(BUILD_DIR)/mailbox/consumer.ll: mailbox/consumer.c
+	$(MKDIR_CMD)
+	$(CLANG) $(CLANGFLAGS) $(INCLUDE_FLAGS) $< -o $@
 
 clean:
 	$(PYTHON) -c "import shutil, sys; shutil.rmtree(sys.argv[1], ignore_errors=True)" $(BUILD_DIR)
