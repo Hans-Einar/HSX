@@ -28,7 +28,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 DEFAULT_VM_PORT = 9999
 DEFAULT_EXEC_PORT = 9998
@@ -54,13 +54,34 @@ def json_dumps(obj: object) -> str:
 
 
 class ManagedProcess:
-    def __init__(self, name: str, cmd: List[str], cwd: Path) -> None:
+    def __init__(
+        self,
+        name: str,
+        cmd: List[str],
+        cwd: Path,
+        *,
+        inline_runner: Optional[Callable[[], None]] = None,
+    ) -> None:
         self.name = name
         self.cmd = cmd
         self.cwd = cwd
         self.process: Optional[subprocess.Popen] = None
+        self._inline_runner = inline_runner
+        self._inline_active = False
 
     def start(self, additional_env: Optional[Dict[str, str]] = None) -> None:
+        if self._inline_runner is not None:
+            if self._inline_active:
+                print(f"[{self.name}] inline session already active")
+                return
+            print(f"[{self.name}] entering inline session. Type 'exit' to return.")
+            self._inline_active = True
+            try:
+                self._inline_runner()
+            finally:
+                self._inline_active = False
+                print(f"[{self.name}] inline session ended.")
+            return
         if self.is_running:
             print(f"[{self.name}] already running (pid {self.process.pid})")
             return
@@ -79,6 +100,12 @@ class ManagedProcess:
         )
 
     def stop(self, graceful: bool = True) -> None:
+        if self._inline_runner is not None:
+            if not self._inline_active:
+                print(f"[{self.name}] inline session not active")
+            else:
+                print(f"[{self.name}] inline session active; exit from shell to return")
+            return
         if not self.is_running:
             print(f"[{self.name}] not running")
             return
@@ -99,9 +126,13 @@ class ManagedProcess:
 
     @property
     def is_running(self) -> bool:
+        if self._inline_runner is not None:
+            return self._inline_active
         return self.process is not None and self.process.poll() is None
 
     def status(self) -> str:
+        if self._inline_runner is not None:
+            return "active (inline)" if self._inline_active else "idle (inline)"
         if self.process is None:
             return "stopped"
         code = self.process.poll()
@@ -116,6 +147,7 @@ class Manager:
         self.host = host
         self.vm_port = vm_port
         self.exec_port = exec_port
+        shell_cmd, shell_inline_runner = self._build_shell_command(root, host, exec_port)
         self.components: Dict[str, ManagedProcess] = {
             "vm": ManagedProcess(
                 "vm",
@@ -136,10 +168,13 @@ class Manager:
             ),
             "shell": ManagedProcess(
                 "shell",
-                self._build_shell_command(root, host, exec_port),
+                shell_cmd,
                 cwd=root,
+                inline_runner=shell_inline_runner,
             ),
         }
+        if shell_inline_runner is not None:
+            print("[shell] no external terminal detected; running inline shell in manager console")
 
     def start(self, targets: List[str]) -> None:
         for name in targets:
@@ -208,9 +243,9 @@ class Manager:
                     break
                 if cmd == "help":
                     print("Commands:")
-                    print("  start [vm|exec|shell|all]")
-                    print("  stop  [vm|exec|shell|all]")
-                    print("  restart [vm|exec|shell|all]")
+                    print("  start [vm|exec|shell|console|all]")
+                    print("  stop  [vm|exec|shell|console|all]")
+                    print("  restart [vm|exec|shell|console|all]")
                     print("  status")
                     print("  load <path>  (send load command to exec)")
                     print("  shell        (spawn shell client)")
@@ -241,15 +276,19 @@ class Manager:
         if not args or args == ["all"]:
             return ["vm", "exec", "shell"]
         result = []
+        aliases = {"console": "shell"}
         for name in args:
             lower = name.lower()
+            lower = aliases.get(lower, lower)
             if lower in {"vm", "exec", "shell"}:
                 result.append(lower)
             else:
                 print(f"unknown target '{name}'")
         return result
 
-    def _build_shell_command(self, root: Path, host: str, port: int) -> List[str]:
+    def _build_shell_command(
+        self, root: Path, host: str, port: int
+    ) -> tuple[List[str], Optional[Callable[[], None]]]:
         base_cmd = [
             sys.executable,
             str(root / "python" / "shell_client.py"),
@@ -258,6 +297,7 @@ class Manager:
             "--port",
             str(port),
         ]
+        inline_runner: Optional[Callable[[], None]] = None
         if os.name == "posix":
             configured = os.environ.get("HSX_SHELL_TERMINAL")
             candidates: List[List[str]] = []
@@ -269,8 +309,25 @@ class Manager:
                     candidates.append([path])
             for prefix in candidates:
                 cmd = prefix + ["-e"] + base_cmd
-                return cmd
-        return base_cmd
+                return cmd, None
+            inline_runner = lambda: self._run_inline_shell(root, host, port)
+        elif os.name == "nt":
+            comspec = os.environ.get("COMSPEC")
+            candidate = Path(comspec).expanduser() if comspec else None
+            if not candidate or not candidate.exists():
+                which_cmd = shutil.which("cmd.exe")
+                candidate = Path(which_cmd) if which_cmd else None
+            if not candidate or not candidate.exists():
+                inline_runner = lambda: self._run_inline_shell(root, host, port)
+        return base_cmd, inline_runner
+
+    def _run_inline_shell(self, root: Path, host: str, port: int) -> None:
+        try:
+            import shell_client
+        except ImportError as exc:  # pragma: no cover - import guard
+            print(f"[shell] unable to import shell_client: {exc}")
+            return
+        shell_client.cmd_loop(host, port, cwd=root)
 
     def _wait_for_port(self, host: str, port: int, name: str, timeout: float = 5.0) -> bool:
         deadline = time.monotonic() + timeout
