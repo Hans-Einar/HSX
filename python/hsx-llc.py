@@ -417,12 +417,13 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
     free_regs: List[str] = AVAILABLE_REGS.copy()
     value_types: Dict[str, str] = {}
     spilled_values: Dict[str, Tuple[str, str]] = {}
-    spill_slots: Dict[str, str] = {}
+    spill_slots: Dict[str, int] = {}
     spill_data_lines: List[str] = []
-    spill_slot_counter = 0
+    frame_ptr_offsets: Dict[str, int] = {}
+    frame_size = 0
+    frame_committed = 0
     pinned_values = set()
     pinned_registers: Dict[str, str] = {}
-    first_stack_slot: Optional[str] = None
     reg_lru: List[str] = []
     spilled_float_alias = set()
 
@@ -432,7 +433,6 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
         reg_lru.append(name)
 
     label_map = {}
-    stack_slots = set()
     for block in fn["blocks"]:
         orig = block["label"]
         unique = f"{fn['name']}__{orig}"
@@ -443,6 +443,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
         label_map[orig] = unique
 
     is_first_block = True
+    prologue_emitted = False
     temp_label_counter = 0
 
     def new_label(tag: str) -> str:
@@ -558,27 +559,48 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
             return name
         return None
 
-    def allocate_spill_slot(name: str, val_type: str) -> str:
-        nonlocal spill_slot_counter
+    def align_up(value: int, alignment: int) -> int:
+        if alignment <= 0:
+            alignment = 1
+        return ((value + alignment - 1) // alignment) * alignment
+
+    def format_stack_offset(offset: int) -> str:
+        if offset < 0:
+            return f"+-{abs(offset)}"
+        return f"+{offset}"
+
+    def ensure_frame_capacity(target_bytes: int) -> None:
+        nonlocal frame_committed
+        while frame_committed < target_bytes:
+            asm.append("PUSH R12")
+            frame_committed += 4
+
+    def allocate_frame_slot_bytes(size: int, align: int) -> int:
+        nonlocal frame_size
+        eff_align = max(align, 4)
+        size = align_up(size, 4)
+        frame_size = align_up(frame_size, eff_align)
+        frame_size += size
+        frame_size = align_up(frame_size, eff_align)
+        ensure_frame_capacity(frame_size)
+        return -frame_size
+
+    def record_frame_slot(name: str, val_type: str, align: int) -> int:
         if name in spill_slots:
             return spill_slots[name]
-        label = f"__spill_{fn['name']}_{spill_slot_counter}"
-        spill_slot_counter += 1
-        spill_slots[name] = label
-        directive = type_to_directive(val_type)
-        spill_data_lines.append(f"{label}:")
-        spill_data_lines.append(f"    {directive} 0")
-        return label
+        slot_size = type_size(val_type)
+        offset = allocate_frame_slot_bytes(slot_size, align)
+        spill_slots[name] = offset
+        return offset
 
     def spill_value(name: str) -> None:
         reg = vmap.get(name)
         if not reg or reg not in AVAILABLE_REGS:
             return
         val_type = value_types.get(name, 'i32')
-        slot_label = allocate_spill_slot(name, val_type)
-        asm.append(f"LDI32 R14, {slot_label}")
+        slot_offset = record_frame_slot(name, val_type, 4)
         store_instr = type_to_store_instr(val_type)
-        asm.append(f"{store_instr} [R14+0], {reg}")
+        asm.append(f"{store_instr} [R7{format_stack_offset(slot_offset)}], {reg}")
         vmap.pop(name, None)
         add_free_reg(reg)
         if name in reg_lru:
@@ -586,7 +608,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
         if name in float_alias:
             spilled_float_alias.add(name)
         float_alias.pop(name, None)
-        spilled_values[name] = (slot_label, val_type)
+        spilled_values[name] = (slot_offset, val_type)
 
     def ensure_register_available(exclude: Optional[set] = None) -> None:
         blocked = set(exclude or ())
@@ -616,11 +638,10 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
             reg = free_regs.pop(0)
             vmap[name] = reg
             mark_used(name)
-            slot_label, stored_type = spilled_values.pop(name)
+            slot_offset, stored_type = spilled_values.pop(name)
             value_types[name] = stored_type
-            asm.append(f"LDI32 R14, {slot_label}")
             load_instr = type_to_load_instr(stored_type)
-            asm.append(f"{load_instr} {reg}, [R14+0]")
+            asm.append(f"{load_instr} {reg}, [R7{format_stack_offset(slot_offset)}]")
             if name in spilled_float_alias:
                 float_alias[name] = reg
                 spilled_float_alias.remove(name)
@@ -726,6 +747,15 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
             reg = ensure_value_in_reg(value)
             consume_use(value)
             return reg
+        if value in frame_ptr_offsets:
+            offset = frame_ptr_offsets[value]
+            reg = alloc_vreg(value, 'ptr')
+            asm.append(f"MOV {reg}, R7")
+            if offset != 0:
+                load_const('R14', offset)
+                asm.append(f"ADD {reg}, {reg}, R14")
+            consume_use(value)
+            return reg
         if value.startswith('@'):
             return materialize_global(value[1:], tmp)
         m = re.match(r'inttoptr\s*\(i\d+\s+([-]?\d+)\s+to\s+ptr\)', value)
@@ -771,6 +801,14 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
     def clear_alias(name: str) -> None:
         float_alias.pop(name, None)
         spilled_float_alias.discard(name)
+        frame_ptr_offsets.pop(name, None)
+
+    def emit_stack_teardown() -> None:
+        if frame_committed > 0:
+            words = frame_committed // 4
+            for _ in range(words):
+                asm.append("POP R12")
+        asm.append("POP R7")
 
     for block in fn["blocks"]:
         remaining_ins = []
@@ -811,6 +849,10 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
             asm.append(f"{fn['name']}:")
             is_first_block = False
         asm.append(label_map[b["label"]] + ":")
+        if not prologue_emitted:
+            asm.append("PUSH R7")
+            asm.append("MOV R7, R15")
+            prologue_emitted = True
         if trace and phi_comments.get(b["label"]):
             for phi_line in phi_comments[b["label"]]:
                 asm.append(f"; PHI: {phi_line}")
@@ -818,53 +860,52 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
             orig_line = line
             line = normalize_ir_line(line)
             if trace: asm.append(f"; IR: {orig_line}")
-            m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*alloca\b', line)
+            m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*alloca\s+([A-Za-z0-9_.]+)', line)
             if m:
-                slot = m.group(1)
-                stack_slots.add(slot)
-                pinned_values.add(slot)
+                slot, elem_type = m.groups()
                 value_types[slot] = 'ptr'
-                if first_stack_slot is None:
-                    first_stack_slot = slot
-                    pinned_registers[slot] = 'R7'
-                    if 'R7' in free_regs:
-                        free_regs.remove('R7')
-                    vmap[slot] = 'R7'
-                    mark_used(slot)
-                else:
-                    alloc_vreg(slot, 'ptr')
+                align_match = re.search(r'align\s+(\d+)', line)
+                align_val = int(align_match.group(1)) if align_match else type_size(elem_type)
+                slot_size = type_size(elem_type)
+                offset = allocate_frame_slot_bytes(slot_size, align_val)
+                frame_ptr_offsets[slot] = offset
+                rd = alloc_vreg(slot, 'ptr')
+                asm.append(f"MOV {rd}, R7")
+                if offset != 0:
+                    load_const('R14', offset)
+                    asm.append(f"ADD {rd}, {rd}, R14")
+                maybe_release(slot)
                 continue
 
             if line.startswith("ret "):
                 if " i32 " in line and "%" in line:
                     m = re.search(r'ret\s+i32\s+(%[A-Za-z0-9_]+)', line)
-                    if not m: raise ISelError("Unsupported ret: "+orig_line)
+                    if not m:
+                        raise ISelError("Unsupported ret: " + orig_line)
                     v = m.group(1)
                     r = ensure_value_in_reg(v)
                     consume_use(v)
                     if r != R_RET:
                         asm.append(f"MOV {R_RET}, {r}")
-                    asm.append("RET")
                 elif re.match(r'ret\s+i32\s+[-]?\d+', line):
                     imm = int(line.split()[-1])
                     asm.append(f"LDI {R_RET}, {imm}")
-                    asm.append("RET")
                 elif line.startswith("ret half "):
                     value = line.split(" ", 2)[2]
                     src_reg = resolve_operand(value, R_RET)
                     if src_reg != R_RET:
                         asm.append(f"MOV {R_RET}, {src_reg}")
-                    asm.append("RET")
                 elif re.match(r'ret\s+i16\s+(%[A-Za-z0-9_]+)', line):
                     value = line.split()[-1]
                     src_reg = resolve_operand(value, R_RET)
                     if src_reg != R_RET:
                         asm.append(f"MOV {R_RET}, {src_reg}")
-                    asm.append("RET")
                 elif re.match(r'ret\s+void', line):
-                    asm.append("RET")
+                    pass
                 else:
-                    raise ISelError("Unsupported ret form: "+orig_line)
+                    raise ISelError("Unsupported ret form: " + orig_line)
+                emit_stack_teardown()
+                asm.append("RET")
                 continue
 
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*(add|sub|mul)(?:\s+[A-Za-z]+)*\s+i32\s+([^,]+),\s*([^,]+)', line)
@@ -1235,7 +1276,8 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 if rd != base_reg:
                     asm.append(f"MOV {rd}, {base_reg}")
                 index = index.strip()
-                if index not in ('0', '0LL', '0l'):
+                index_clean = index.strip()
+                if index_clean not in ('0', '0LL', '0l'):
                     stride = type_size(elem_type)
                     idx_reg = resolve_operand(index, "R12")
                     if idx_reg != 'R12':
@@ -1245,6 +1287,19 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                         load_const('R13', stride)
                         asm.append(f"MUL {idx_reg}, {idx_reg}, R13")
                     asm.append(f"ADD {rd}, {rd}, {idx_reg}")
+                    if base_name in frame_ptr_offsets:
+                        try:
+                            idx_const = int(index_clean, 0)
+                        except ValueError:
+                            frame_ptr_offsets.pop(dst, None)
+                        else:
+                            stride_bytes = type_size(elem_type)
+                            frame_ptr_offsets[dst] = frame_ptr_offsets[base_name] + idx_const * stride_bytes
+                    else:
+                        frame_ptr_offsets.pop(dst, None)
+                else:
+                    if base_name in frame_ptr_offsets:
+                        frame_ptr_offsets[dst] = frame_ptr_offsets[base_name]
                 maybe_release(dst)
                 continue
 
@@ -1260,7 +1315,8 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 if rd != base_reg:
                     asm.append(f"MOV {rd}, {base_reg}")
                 index = index.strip()
-                if index not in ('0', '0LL', '0l'):
+                index_clean = index.strip()
+                if index_clean not in ('0', '0LL', '0l'):
                     stride = type_size(elem_type)
                     idx_reg = resolve_operand(index, 'R12')
                     if idx_reg != 'R12':
@@ -1270,6 +1326,19 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                         load_const('R13', stride)
                         asm.append(f"MUL {idx_reg}, {idx_reg}, R13")
                     asm.append(f"ADD {rd}, {rd}, {idx_reg}")
+                    if base_name in frame_ptr_offsets:
+                        try:
+                            idx_const = int(index_clean, 0)
+                        except ValueError:
+                            frame_ptr_offsets.pop(dst, None)
+                        else:
+                            stride_bytes = type_size(elem_type)
+                            frame_ptr_offsets[dst] = frame_ptr_offsets[base_name] + idx_const * stride_bytes
+                    else:
+                        frame_ptr_offsets.pop(dst, None)
+                else:
+                    if base_name in frame_ptr_offsets:
+                        frame_ptr_offsets[dst] = frame_ptr_offsets[base_name]
                 maybe_release(dst)
                 continue
 
@@ -1284,6 +1353,8 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     base_reg = materialize_ptr(base_name, rd)
                 if rd != base_reg:
                     asm.append(f"MOV {rd}, {base_reg}")
+                if base_name in frame_ptr_offsets:
+                    frame_ptr_offsets[dst] = frame_ptr_offsets[base_name]
                 maybe_release(dst)
                 continue
 
@@ -1294,11 +1365,12 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 dst_type = deduce_value_type(dtype)
                 value_types[dst] = dst_type
                 rd = alloc_vreg(dst, dst_type)
-                if ptr in stack_slots:
-                    src_reg = alloc_vreg(ptr, 'ptr')
+                if ptr in frame_ptr_offsets:
+                    offset = frame_ptr_offsets[ptr]
+                    op_map = {"i8": "LDB", "i16": "LDH", "half": "LDH"}
+                    instr = op_map.get(dtype, "LD")
+                    asm.append(f"{instr} {rd}, [R7{format_stack_offset(offset)}]")
                     consume_use(ptr)
-                    if rd != src_reg:
-                        asm.append(f"MOV {rd}, {src_reg}")
                 else:
                     rp = materialize_ptr(ptr, "R14")
                     op_map = {"i8": "LDB", "i16": "LDH", "half": "LDH"}
@@ -1312,15 +1384,16 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
             m = re.match(r'store(?:\s+volatile)?\s+(i8|i16|i32|ptr|half|float)\s+([^,]+),\s*(?:i\d+\*|ptr)\s+([^,]+)(?:,\s*align\s+\d+)?', line)
             if m:
                 dtype, src, ptr = m.groups()
-                if ptr in stack_slots:
-                    dst_reg = alloc_vreg(ptr, 'ptr')
-                    consume_use(ptr)
+                if ptr in frame_ptr_offsets:
+                    offset = frame_ptr_offsets[ptr]
                     if dtype == 'ptr':
                         rs = materialize_ptr(src, "R12")
                     else:
                         rs = resolve_operand(src, "R12")
-                    if dst_reg != rs:
-                        asm.append(f"MOV {dst_reg}, {rs}")
+                    op_map = {"i8": "STB", "i16": "STH", "half": "STH"}
+                    instr = op_map.get(dtype, "ST")
+                    asm.append(f"{instr} [R7{format_stack_offset(offset)}], {rs}")
+                    consume_use(ptr)
                 else:
                     rp = materialize_ptr(ptr, "R14")
                     if dtype == 'ptr':

@@ -109,7 +109,7 @@ entry:
 """
 
     asm_text = HSX_LLC.compile_ll_to_mvasm(ir_source, trace=False)
-    assert "__spill_" in asm_text, "expected spill slots in generated assembly"
+    assert "[R7" in asm_text, "expected stack-based spill slots in generated assembly"
     hxe = _build_hxe(tmp_path, asm_text)
 
     result = _run_vm(tmp_path, [str(hxe)])

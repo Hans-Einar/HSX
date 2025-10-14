@@ -21,7 +21,8 @@ def test_fptosi_direct_half():
     ir = """define dso_local i32 @conv(half %h) {\nentry:\n  %r = fptosi half %h to i32\n  ret i32 %r\n}\n"""
     lines = compile_lines(ir)
     assert any(line.startswith('F2I ') for line in lines)
-    assert lines[-2].startswith('MOV R0,')
+    assert lines[-3].startswith('MOV R0,')
+    assert lines[-2] == 'POP R7'
     assert lines[-1] == 'RET'
 
 

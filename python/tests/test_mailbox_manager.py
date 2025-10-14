@@ -214,7 +214,7 @@ entry:
 """
 
     asm_text = HSX_LLC.compile_ll_to_mvasm(ir, trace=False)
-    assert "__spill_" in asm_text
+    assert "[R7" in asm_text
 
     mgr = MailboxManager()
     handle = mgr.open(pid=1, target="svc:stdio.out")

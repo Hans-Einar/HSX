@@ -1,11 +1,16 @@
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 
+import pytest
+
 
 def test_half_main_runs():
+    if shutil.which("clang") is None:
+        pytest.skip("clang not installed; C integration tests require clang")
     repo_root = pathlib.Path(__file__).resolve().parents[2]
     examples_dir = repo_root / "examples" / "tests"
     env = os.environ.copy()
