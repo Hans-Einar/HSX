@@ -22,7 +22,9 @@ except ImportError:  # pragma: no cover - platform dependent
             readline = None  # type: ignore
 
 
-HELP_DIR = Path(__file__).resolve().parents[1] / "help"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+HELP_DIR = REPO_ROOT / "help"
+SAVE_DIR = REPO_ROOT / "savefiles"
 HELP_ALIASES = {
     "stdiofanout": "stdio",
     "exit": "quit",
@@ -164,6 +166,7 @@ def _query_loaded_images(host: str, port: int) -> list[str]:
         tasks = block.get("tasks", [])
     elif isinstance(block, list):
         tasks = block
+    images: list[str] = []
     for task in tasks or []:
         program = task.get("program")
         if isinstance(program, str) and program:
@@ -188,12 +191,17 @@ def _save_loaded_images(name: str, base_dir: Path, host: str, port: int) -> tupl
     if not images:
         raise ValueError("save: no .hxe images available to save")
     bundle = name if name.lower().endswith(".txt") else f"{name}.txt"
-    save_dir = (base_dir / "savefiles").resolve(strict=False)
+    save_dir = SAVE_DIR.resolve(strict=False)
     save_dir.mkdir(parents=True, exist_ok=True)
     target = save_dir / bundle
     with target.open("w", encoding="utf-8") as fp:
         for path in images:
-            fp.write(path + "\n")
+            resolved = Path(path).resolve(strict=False)
+            try:
+                rel = resolved.relative_to(REPO_ROOT)
+                fp.write(rel.as_posix() + "\n")
+            except ValueError:
+                fp.write(str(resolved) + "\n")
     return target, len(images)
 
 
@@ -201,10 +209,13 @@ def _resolve_load_targets(token: str, base_dir: Path) -> list[Path]:
     if not token:
         raise ValueError("load: requires <path|bundle> argument")
     raw = Path(token)
+    candidate = None
     if raw.is_absolute():
         candidate = raw.resolve(strict=False)
     else:
         candidate = (base_dir / raw).resolve(strict=False)
+        if not candidate.exists():
+            candidate = (REPO_ROOT / raw).resolve(strict=False)
     if candidate.exists():
         return [candidate]
     if candidate.suffix == "" and (candidate.with_suffix(".hxe")).exists():
@@ -216,13 +227,20 @@ def _resolve_load_targets(token: str, base_dir: Path) -> list[Path]:
 
 
 def _resolve_saved_bundle(token: str, base_dir: Path) -> list[Path]:
-    save_dir = (base_dir / "savefiles").resolve(strict=False)
-    candidates = []
     bundle_names = [f"{token}.txt", token] if not token.lower().endswith(".txt") else [token]
-    for name in bundle_names:
-        candidate = (save_dir / name).resolve(strict=False)
-        if candidate.exists():
-            candidates.append(candidate)
+    search_roots = []
+    base_resolved = base_dir.resolve(strict=False)
+    if base_resolved not in search_roots:
+        search_roots.append(base_resolved)
+    save_resolved = SAVE_DIR.resolve(strict=False)
+    if save_resolved not in search_roots:
+        search_roots.append(save_resolved)
+    candidates: list[Path] = []
+    for root in search_roots:
+        for name in bundle_names:
+            candidate = (root / name).resolve(strict=False)
+            if candidate.exists() and candidate not in candidates:
+                candidates.append(candidate)
     for candidate in candidates:
         try:
             return _read_bundle_file(candidate)
@@ -242,7 +260,17 @@ def _read_bundle_file(path: Path) -> list[Path]:
         if item.is_absolute():
             resolved = item.resolve(strict=False)
         else:
-            resolved = (path.parent / item).resolve(strict=False)
+            resolved = None
+            candidates = [
+                (path.parent / item).resolve(strict=False),
+                (REPO_ROOT / item).resolve(strict=False),
+            ]
+            for cand in candidates:
+                if cand.exists():
+                    resolved = cand
+                    break
+            if resolved is None:
+                resolved = candidates[0]
         if not resolved.exists():
             raise ValueError(f"load: saved path '{line}' not found for bundle '{path.name}'")
         result.append(resolved)
