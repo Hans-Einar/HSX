@@ -9,7 +9,7 @@
 
 ## Task Tracker
 
--### T1 Provision per-task arenas (`active`)
+### T1 Provision per-task arenas (`done`)
 - [x] Inspect current task load path (`platforms/python/host_vm.py::VMController.load_from_path`).
   - Notes: Current implementation spawns a temporary `MiniVM`, snapshots state with `reg_base`, `stack_base`, `stack_limit` all zero; tasks share a single register list and stack. Mailbox stdio handles wired via `fd_table`.
 - [x] Design memory layout (register bank + stack slice) per task; document offsets.
@@ -23,11 +23,14 @@
   - Implemented allocator scaffolding in `VMController` (`_allocate_task_memory`, register/stack free lists) and populate register banks in VM memory for each task. MiniVM still needs to consume the bank (see T2).
 - [x] Allocate stack slice, set `stack_base`, `stack_limit`, initialise `vm.sp` / `sp16`.
   - Stack slices allocated top-down (4 KB default), zero-initialised, and `sp` offset set to stack size.
-- [ ] Ensure snapshot/restore paths persist base pointers without copying registers.
-- [ ] Smoke-test by spawning two tasks; verify `dumpregs` shows distinct bases.
+- [x] Ensure snapshot/restore paths persist base pointers without copying registers.
+  - Confirmed via manual `_store_active_state()` call; contexts retain allocated `reg_base`/`stack_base`.
+- [x] Smoke-test by spawning two tasks; verify `dumpregs` shows distinct bases.
+  - Consumer vs. producer bases observed at `0x1000/0xF000` and `0x1040/0xE000` respectively.
 
-### T2 MiniVM register access via base pointers (`not started`)
+### T2 MiniVM register access via base pointers (`active`)
 - [ ] Replace direct list usage (`self.regs`) with memory-backed getters/setters.
+  - Action: Inventory every `self.regs[...]` access (step logic, svc handlers, debugger helpers) and plan pointer-based replacements.
 - [ ] Update `set_context`, `save_context`, and `snapshot_registers` to avoid cloning arrays.
 - [ ] Adjust debugger helpers (`read_regs`, shell `dumpregs`) to read via base offset.
 - [ ] Add runtime assertions: active tasks must have non-zero `reg_base`, `stack_base`, `stack_limit`.
@@ -54,8 +57,8 @@
 - Useful commands: `python python/disassemble.py ...`, HSX shell `clock step`, `dumpregs`, `mbox`, CI test runners.
 
 ## Handover Notes
-- Current status: T1 underway (allocators scaffolded; next step finalize implementation/testing).
+- Current status: T1 complete; T2 active (MiniVM integration).
 - Known blockers: None.
-- Next action when resuming: Begin with T1 inspection/design and update this playbook with findings.
+- Next action when resuming: Map all `self.regs` touchpoints and prototype memory-backed accessors.
 
 Update this document after every working session—note partial progress, open questions, and where to pick up next.
