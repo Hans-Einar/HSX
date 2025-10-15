@@ -4,8 +4,8 @@
 
 ## Overview
 - Issue: Scheduler ignores register-window contract (`issues/#2_scheduler`).
-- Current status: In progress (T1 active).
-- Last updated: 2025-02-14.
+- Current status: In progress (T1 active; next step migrate MiniVM to new reg_base/stack_base).
+- Last updated: 2025-10-15.
 
 ## Task Tracker
 
@@ -19,10 +19,10 @@
     - For task *i*: `reg_base = REG_REGION_START + i * REG_BANK_BYTES`; `stack_base = stack_top - STACK_BYTES`; `stack_limit = stack_base`; guest-visible SP initialised to `stack_top` (so `vm.sp = stack_top & 0xFFFF`, effective SP = `stack_base + sp16` = `stack_top`).
     - Track allocations in `self.task_memory` dict so teardown frees slots; future enhancement: allow custom stack sizes from loader metadata.
     - Ensure stack/heap arenas do not overlap register banks; add assertion that `(stack_base - REG_REGION_START) >= (num_tasks * REG_BANK_BYTES + safety_gap)`.
-- [ ] Implement register-bank allocation and assign `reg_base`.
-  - In progress: Added allocator scaffolding in `VMController` (`_allocate_task_memory`, register/stack free lists) and now store non-zero `reg_base`/`stack_base`/`stack_limit` when loading tasks. Need follow-up validation once MiniVM honours base pointers.
-- [ ] Implement register-bank allocation and assign `reg_base`.
-- [ ] Allocate stack slice, set `stack_base`, `stack_limit`, initialise `vm.sp` / `sp16`.
+- [x] Implement register-bank allocation and assign `reg_base`.
+  - Implemented allocator scaffolding in `VMController` (`_allocate_task_memory`, register/stack free lists) and populate register banks in VM memory for each task. MiniVM still needs to consume the bank (see T2).
+- [x] Allocate stack slice, set `stack_base`, `stack_limit`, initialise `vm.sp` / `sp16`.
+  - Stack slices allocated top-down (4 KB default), zero-initialised, and `sp` offset set to stack size.
 - [ ] Ensure snapshot/restore paths persist base pointers without copying registers.
 - [ ] Smoke-test by spawning two tasks; verify `dumpregs` shows distinct bases.
 

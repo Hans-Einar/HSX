@@ -2075,6 +2075,24 @@ class VMController:
         self.next_pid += 1
         ctx = state["context"]
         allocation = self._allocate_task_memory(pid)
+        mem = state.get("mem")
+        if mem is None:
+            mem = bytearray(VM_ADDRESS_SPACE_SIZE)
+            state["mem"] = mem
+        regs = list(ctx.get("regs", [0] * 16))
+        for idx, value in enumerate(regs):
+            base = allocation["reg_base"] + idx * 4
+            end = base + 4
+            if end > len(mem):
+                raise RuntimeError("register bank exceeds VM memory")
+            mem[base:end] = (int(value) & 0xFFFFFFFF).to_bytes(4, "little")
+        stack_base = allocation["stack_base"]
+        stack_size = allocation["stack_size"]
+        stack_top = stack_base + stack_size
+        if stack_top > len(mem):
+            raise RuntimeError("stack allocation exceeds VM memory")
+        for i in range(stack_base, stack_top):
+            mem[i] = 0
         ctx["pid"] = pid
         ctx["exit_status"] = None
         ctx["trace"] = self.default_trace

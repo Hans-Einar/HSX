@@ -11,7 +11,7 @@
 ## Commit Log
 | Date | Commit hash | Message | Author | Notes |
 | --- | --- | --- | --- | --- |
-|  |  |  |  |  |
+| 2025-10-15 | 11cba7276a357c9090d875cfcc8c9044d84bb80b | scheduler: scaffold task memory allocators and log progress. | Hans Einar | Introduced allocator scaffolding and updated issue docs (T1 design).
 
 ## Pull Request
 - PR URL / ID: _TBD_
