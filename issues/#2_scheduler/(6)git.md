@@ -3,10 +3,10 @@
 > File name: `(6)git.md`. Capture branch, commits, and PR status for this issue.
 
 ## Branch
-- Name: _TBD_
-- Created on: _TBD_
-- Owner: _TBD_
-- Based on commit: _TBD_
+- Name: `Issue_#2_scheduler`
+- Created on: `2025-02-14`
+- Owner: Runtime/Executive team (Codex assisting)
+- Based on commit: `115ed60f74a5451898b5e60736deb5c3d70e3ea3`
 
 ## Commit Log
 | Date | Commit hash | Message | Author | Notes |

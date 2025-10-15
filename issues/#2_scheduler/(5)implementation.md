@@ -9,7 +9,7 @@
 
 ## Task Tracker
 
-### T1 Provision per-task arenas
+### T1 Provision per-task arenas (`active`)
 - [ ] Inspect current task load path (`platforms/python/host_vm.py::VMController.load_from_path`).
 - [ ] Design memory layout (register bank + stack slice) per task; document offsets.
 - [ ] Implement register-bank allocation and assign `reg_base`.
@@ -17,14 +17,14 @@
 - [ ] Ensure snapshot/restore paths persist base pointers without copying registers.
 - [ ] Smoke-test by spawning two tasks; verify `dumpregs` shows distinct bases.
 
-### T2 MiniVM register access via base pointers
+### T2 MiniVM register access via base pointers (`not started`)
 - [ ] Replace direct list usage (`self.regs`) with memory-backed getters/setters.
 - [ ] Update `set_context`, `save_context`, and `snapshot_registers` to avoid cloning arrays.
 - [ ] Adjust debugger helpers (`read_regs`, shell `dumpregs`) to read via base offset.
 - [ ] Add runtime assertions: active tasks must have non-zero `reg_base`, `stack_base`, `stack_limit`.
 - [ ] Run unit tests covering register read/write to ensure behaviour unchanged.
 
-### T3 Scheduler & mailbox contract enforcement
+### T3 Scheduler & mailbox contract enforcement (`not started`)
 - [ ] Simplify `_activate_task` / `_store_active_state` to use base pointers only.
 - [ ] Guarantee `MiniVM.step()` retires exactly one instruction; remove implicit loops.
 - [ ] Update executive loop (`python/execd.py`) to honour one-instruction steps and rotate READY queue.
@@ -32,7 +32,7 @@
 - [ ] Add scheduler instrumentation: trace ring + per-task counters.
 - [ ] Implement CLI hooks (`clock step`, `clock step -p`, `sched stats`) reflecting new metrics.
 
-### T4 Tests, docs, demos
+### T4 Tests, docs, demos (`not started`)
 - [ ] Create/extend unit tests: register-window isolation, stack overflow, trap resume, RR fairness.
 - [ ] Update integration tests/demos (mailbox producer/consumer) to assert behaviour under new scheduler.
 - [ ] Refresh documentation (`docs/hsx_spec-v2.md`, CLI help) to reflect “one step = one instruction” and base-pointer model.
