@@ -11,7 +11,7 @@ import struct
 import sys
 import zlib
 from pathlib import PurePosixPath
-from typing import Any, Callable, Dict, Optional, List, Set
+from typing import Any, Callable, Dict, Optional, List, Set, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
@@ -46,6 +46,18 @@ HEADER_FIELDS = (
 )
 
 RECV_INFO_STRUCT = struct.Struct("<iiIII")
+
+REGISTER_BANK_BYTES = 16 * 4  # 16 GPRs × 32-bit
+DEFAULT_STACK_BYTES = 0x1000  # 4 KiB per task (tunable)
+REGISTER_REGION_START = 0x1000  # leave lower memory for code/data
+VM_ADDRESS_SPACE_SIZE = 0x10000  # 64 KiB
+STACK_ALIGNMENT = 4
+
+
+def _align_down(value: int, alignment: int) -> int:
+    if alignment <= 0:
+        return value
+    return value - (value % alignment)
 
 
 @dataclass
@@ -1250,6 +1262,11 @@ class VMController:
         self.default_trace = trace
         self.traced_pids: Set[int] = set()
         self.debug_sessions: Dict[int, DebugState] = {}
+        self._reg_alloc_next = REGISTER_REGION_START
+        self._stack_alloc_next = VM_ADDRESS_SPACE_SIZE
+        self._reg_free_list: List[int] = []
+        self._stack_free_list: List[Tuple[int, int]] = []  # (base, size)
+        self._task_memory: Dict[int, Dict[str, int]] = {}
 
     def _trace_mailbox_regs(self, label: str, vm: MiniVM, fn: int, *, extra: Optional[Dict[str, Any]] = None) -> None:
         """Append a compact register/PC snapshot to the mailbox trace log."""
@@ -1278,6 +1295,11 @@ class VMController:
         self.current_pid = None
         self.next_pid = 1
         self.debug_sessions.clear()
+        self._reg_alloc_next = REGISTER_REGION_START
+        self._stack_alloc_next = VM_ADDRESS_SPACE_SIZE
+        self._reg_free_list.clear()
+        self._stack_free_list.clear()
+        self._task_memory.clear()
         return {"status": "ok"}
 
     def mailbox_snapshot(self) -> List[Dict[str, Any]]:
@@ -1376,6 +1398,54 @@ class VMController:
         if normalized in {"in", "stdin"}:
             return ["in"]
         raise ValueError(f"unknown stdio stream '{stream}'")
+
+    def _reserve_register_bank(self) -> int:
+        if self._reg_free_list:
+            return self._reg_free_list.pop()
+        base = self._reg_alloc_next
+        next_base = base + REGISTER_BANK_BYTES
+        if next_base >= self._stack_alloc_next:
+            raise RuntimeError("insufficient VM memory for register banks")
+        self._reg_alloc_next = next_base
+        return base
+
+    def _reserve_stack(self, stack_bytes: int = DEFAULT_STACK_BYTES) -> Tuple[int, int, int]:
+        size = max(stack_bytes, STACK_ALIGNMENT)
+        if self._stack_free_list:
+            stack_base, available = self._stack_free_list.pop()
+            if available < size:
+                size = available
+            stack_size = available
+            stack_top = stack_base + stack_size
+        else:
+            stack_top = _align_down(self._stack_alloc_next, STACK_ALIGNMENT)
+            stack_base = stack_top - size
+            if stack_base <= self._reg_alloc_next:
+                raise RuntimeError("insufficient VM memory for stacks")
+            self._stack_alloc_next = stack_base
+            stack_size = size
+        sp_offset = stack_size  # offset from base to top-of-stack
+        return stack_base, stack_size, sp_offset
+
+    def _allocate_task_memory(self, pid: int, stack_bytes: int = DEFAULT_STACK_BYTES) -> Dict[str, int]:
+        reg_base = self._reserve_register_bank()
+        stack_base, stack_size, sp_offset = self._reserve_stack(stack_bytes)
+        allocation = {
+            "reg_base": reg_base,
+            "stack_base": stack_base,
+            "stack_limit": stack_base,
+            "stack_size": stack_size,
+            "sp_offset": sp_offset,
+        }
+        self._task_memory[pid] = allocation
+        return allocation
+
+    def _release_task_memory(self, pid: int) -> None:
+        allocation = self._task_memory.pop(pid, None)
+        if allocation is None:
+            return
+        self._reg_free_list.append(allocation["reg_base"])
+        self._stack_free_list.append((allocation["stack_base"], allocation.get("stack_size", DEFAULT_STACK_BYTES)))
 
     def mailbox_send(
         self,
@@ -2004,9 +2074,14 @@ class VMController:
         pid = self.next_pid
         self.next_pid += 1
         ctx = state["context"]
+        allocation = self._allocate_task_memory(pid)
         ctx["pid"] = pid
         ctx["exit_status"] = None
         ctx["trace"] = self.default_trace
+        ctx["reg_base"] = allocation["reg_base"]
+        ctx["stack_base"] = allocation["stack_base"]
+        ctx["stack_limit"] = allocation["stack_limit"]
+        ctx["sp"] = allocation["sp_offset"]
         state["context"] = ctx
         self.tasks[pid] = {
             "pid": pid,
@@ -2020,6 +2095,10 @@ class VMController:
             "vm_state": state,
             "exit_status": None,
             "trace": self.default_trace,
+            "reg_base": allocation["reg_base"],
+            "stack_base": allocation["stack_base"],
+            "stack_limit": allocation["stack_limit"],
+            "stack_size": allocation["stack_size"],
         }
         self.task_states[pid] = state
         self.mailboxes.register_task(pid)
@@ -2387,6 +2466,7 @@ class VMController:
             self._store_active_state()
             self.vm = None
             self.current_pid = None
+        self._release_task_memory(pid)
         self.tasks.pop(pid, None)
         self.task_states.pop(pid, None)
         self.debug_sessions.pop(pid, None)

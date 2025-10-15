@@ -4,14 +4,23 @@
 
 ## Overview
 - Issue: Scheduler ignores register-window contract (`issues/#2_scheduler`).
-- Current status: Not started.
+- Current status: In progress (T1 active).
 - Last updated: 2025-02-14.
 
 ## Task Tracker
 
-### T1 Provision per-task arenas (`active`)
-- [ ] Inspect current task load path (`platforms/python/host_vm.py::VMController.load_from_path`).
-- [ ] Design memory layout (register bank + stack slice) per task; document offsets.
+-### T1 Provision per-task arenas (`active`)
+- [x] Inspect current task load path (`platforms/python/host_vm.py::VMController.load_from_path`).
+  - Notes: Current implementation spawns a temporary `MiniVM`, snapshots state with `reg_base`, `stack_base`, `stack_limit` all zero; tasks share a single register list and stack. Mailbox stdio handles wired via `fd_table`.
+- [x] Design memory layout (register bank + stack slice) per task; document offsets.
+  - Proposed layout:
+    - Reserve a fixed-size arena per task: `REG_BANK_BYTES = 16 * 4 = 64` bytes for registers, `STACK_BYTES = 0x1000` (4 KB) default stack (configurable later).
+    - Maintain two allocators inside `VMController`: one that hands out register banks from low memory upward (starting at `0x1000`, leaving ROM/header space free) and one that hands out stacks from top-of-memory downward (start at `0xFFFC`, align down to 4-byte boundary).
+    - For task *i*: `reg_base = REG_REGION_START + i * REG_BANK_BYTES`; `stack_base = stack_top - STACK_BYTES`; `stack_limit = stack_base`; guest-visible SP initialised to `stack_top` (so `vm.sp = stack_top & 0xFFFF`, effective SP = `stack_base + sp16` = `stack_top`).
+    - Track allocations in `self.task_memory` dict so teardown frees slots; future enhancement: allow custom stack sizes from loader metadata.
+    - Ensure stack/heap arenas do not overlap register banks; add assertion that `(stack_base - REG_REGION_START) >= (num_tasks * REG_BANK_BYTES + safety_gap)`.
+- [ ] Implement register-bank allocation and assign `reg_base`.
+  - In progress: Added allocator scaffolding in `VMController` (`_allocate_task_memory`, register/stack free lists) and now store non-zero `reg_base`/`stack_base`/`stack_limit` when loading tasks. Need follow-up validation once MiniVM honours base pointers.
 - [ ] Implement register-bank allocation and assign `reg_base`.
 - [ ] Allocate stack slice, set `stack_base`, `stack_limit`, initialise `vm.sp` / `sp16`.
 - [ ] Ensure snapshot/restore paths persist base pointers without copying registers.
@@ -45,7 +54,7 @@
 - Useful commands: `python python/disassemble.py ...`, HSX shell `clock step`, `dumpregs`, `mbox`, CI test runners.
 
 ## Handover Notes
-- Current status: Not started (T1 pending).
+- Current status: T1 underway (allocators scaffolded; next step finalize implementation/testing).
 - Known blockers: None.
 - Next action when resuming: Begin with T1 inspection/design and update this playbook with findings.
 

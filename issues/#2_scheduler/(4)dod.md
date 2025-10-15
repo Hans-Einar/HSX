@@ -17,8 +17,8 @@
 - Git log: `./(6)git.md`
 
 ## Completion Checklist
-- [ ] Review approved (`(2)review.md`)
-- [ ] Remediation plan approved (`(3)remediation.md`)
++ [x] Review approved (`(2)review.md`)
++ [x] Remediation plan approved (`(3)remediation.md`)
 - [ ] Implementation tasks complete (see below)
 - [ ] Tests updated/passing (unit + integration)
 - [ ] Documentation updated (`docs/hsx_spec-v2.md`, CLI help)
