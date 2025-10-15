@@ -52,7 +52,9 @@ def main(argv=None) -> int:
     parser.add_argument("--host", default="127.0.0.1", help="executive host (default 127.0.0.1)")
     parser.add_argument("--port", type=int, default=9998, help="executive port (default 9998)")
     parser.add_argument("--path", required=True, help=".hxe image to load")
-    parser.add_argument("--cycles", type=int, default=1000, help="cycles to step after loading")
+    parser.add_argument("--steps", type=int, default=1000, help="instructions to retire after loading")
+    parser.add_argument("--pid", type=int, help="optional PID to single-step")
+    parser.add_argument("--cycles", type=int, help=argparse.SUPPRESS)  # backwards compatibility
     args = parser.parse_args(argv)
 
     image_path = str(Path(args.path).resolve())
@@ -80,9 +82,15 @@ def main(argv=None) -> int:
             current_pid = None
         summary.append(f"ps -> {task_count} task(s), current={current_pid}")
 
-        step_resp = client.request({"cmd": "step", "cycles": args.cycles})
+        step_budget = args.steps
+        if args.cycles is not None:
+            step_budget = args.cycles
+        step_payload = {"cmd": "step", "steps": step_budget}
+        if args.pid is not None:
+            step_payload["pid"] = args.pid
+        step_resp = client.request(step_payload)
         executed = step_resp.get("result", {}).get("executed")
-        summary.append(f"step -> executed={executed}")
+        summary.append(f"step -> executed={executed} instruction(s)")
 
         if pid is not None:
             pause_resp = client.request({"cmd": "pause", "pid": pid})

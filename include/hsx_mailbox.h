@@ -62,6 +62,46 @@
 #define HSX_MBX_STATUS_MSG_TOO_LARGE 0x0004
 #define HSX_MBX_STATUS_INTERNAL_ERROR 0x00FF
 
+/*
+ * MAILBOX SVC calling convention (ABI summary)
+ *
+ * All mailbox traps use SVC module 0x05.
+ *   R0 : status result (0 == HSX_MBX_STATUS_OK on success)
+ *   R1..R5 : arguments in order (see table below)
+ *   Caller-saved registers (R0..R5) may be clobbered by the trap handler.
+ *
+ * ---------------------------------------------------------------------------
+ *  Call                 R1                R2                R3
+ * ---------------------------------------------------------------------------
+ *  MAILBOX_OPEN         target_ptr        flags             (unused)
+ *  MAILBOX_BIND         target_ptr        capacity          mode
+ *  MAILBOX_SEND         handle            payload_ptr       length
+ *  MAILBOX_RECV         handle            buffer_ptr        max_length
+ *  MAILBOX_PEEK         handle            (unused)          (unused)
+ *  MAILBOX_TAP          handle            enable (0/1)      (unused)
+ *  MAILBOX_CLOSE        handle            (unused)          (unused)
+ * ---------------------------------------------------------------------------
+ *  Call                 R4                R5
+ * ---------------------------------------------------------------------------
+ *  MAILBOX_OPEN         (unused)          (unused)
+ *  MAILBOX_BIND         (unused)          (unused)
+ *  MAILBOX_SEND         flags             channel
+ *  MAILBOX_RECV         timeout           info_ptr (NULL allowed)
+ *  MAILBOX_PEEK         (unused)          (unused)
+ *  MAILBOX_TAP          (unused)          (unused)
+ *  MAILBOX_CLOSE        (unused)          (unused)
+ * ---------------------------------------------------------------------------
+ *
+ * Timeout semantics (MAILBOX_SEND / MAILBOX_RECV):
+ *   HSX_MBX_TIMEOUT_POLL    : do not block; return HSX_MBX_STATUS_NO_DATA /
+ *                             HSX_MBX_STATUS_WOULDBLOCK as appropriate.
+ *   0x0001 .. 0xFFFE        : relative timeout in milliseconds (host VM).
+ *   HSX_MBX_TIMEOUT_INFINITE: block until data is available.
+ *
+ * When MAILBOX_RECV succeeds and info_ptr != NULL, the handler writes
+ * hsx_mailbox_recv_info to the provided buffer before returning.
+ */
+
 typedef struct hsx_mbx_msg_header {
     uint16_t len;       /* payload bytes following this header */
     uint16_t flags;     /* HSX_MBX_FLAG_* bits */

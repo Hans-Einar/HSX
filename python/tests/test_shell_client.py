@@ -25,12 +25,39 @@ def test_mbox_payload_optional_pid(tmp_path: Path) -> None:
     payload = _build_payload("mbox", ["3"], tmp_path)
     assert payload["cmd"] == "mailbox_snapshot"
     assert payload["_filter_pid"] == 3
+    assert "_filter_namespace" not in payload
 
 
 def test_mbox_allows_all_keyword(tmp_path: Path) -> None:
     payload = _build_payload("mbox", ["all"], tmp_path)
     assert payload["cmd"] == "mailbox_snapshot"
     assert "_filter_pid" not in payload
+    assert "_filter_namespace" not in payload
+
+
+def test_mbox_namespace_keyword(tmp_path: Path) -> None:
+    payload = _build_payload("mbox", ["shared"], tmp_path)
+    assert payload["_filter_namespace"] == "shared"
+
+
+def test_mbox_namespace_explicit(tmp_path: Path) -> None:
+    payload = _build_payload("mbox", ["ns", "App"], tmp_path)
+    assert payload["_filter_namespace"] == "app"
+
+
+def test_mbox_owner_keyword(tmp_path: Path) -> None:
+    payload = _build_payload("mbox", ["owner", "0x10"], tmp_path)
+    assert payload["_filter_pid"] == 0x10
+
+
+def test_mbox_pid_assignment(tmp_path: Path) -> None:
+    payload = _build_payload("mbox", ["pid=5"], tmp_path)
+    assert payload["_filter_pid"] == 5
+
+
+def test_mbox_invalid_namespace(tmp_path: Path) -> None:
+    with pytest.raises(ValueError):
+        _build_payload("mbox", ["ns", "invalid"], tmp_path)
 
 
 def test_load_payload_resolves_relative_path(tmp_path: Path) -> None:

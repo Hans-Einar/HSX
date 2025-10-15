@@ -45,6 +45,8 @@ HEADER_FIELDS = (
     "crc32",
 )
 
+RECV_INFO_STRUCT = struct.Struct("<iiIII")
+
 
 @dataclass
 class TaskContext:
@@ -57,8 +59,8 @@ class TaskContext:
     reg_base: int = 0
     stack_base: int = 0
     stack_limit: int = 0
-    time_slice_cycles: int = 1000
-    accounted_cycles: int = 0
+    time_slice_steps: int = 1
+    accounted_steps: int = 0
     state: str = "ready"
     priority: int = 10
     pid: Optional[int] = None
@@ -87,8 +89,8 @@ def clone_context(ctx: TaskContext) -> TaskContext:
         reg_base=ctx.reg_base,
         stack_base=ctx.stack_base,
         stack_limit=ctx.stack_limit,
-        time_slice_cycles=ctx.time_slice_cycles,
-        accounted_cycles=ctx.accounted_cycles,
+        time_slice_steps=ctx.time_slice_steps,
+        accounted_steps=ctx.accounted_steps,
         state=ctx.state,
         priority=ctx.priority,
         pid=ctx.pid,
@@ -110,8 +112,10 @@ def context_to_dict(ctx: TaskContext) -> Dict[str, Any]:
         "reg_base": ctx.reg_base,
         "stack_base": ctx.stack_base,
         "stack_limit": ctx.stack_limit,
-        "time_slice_cycles": ctx.time_slice_cycles,
-        "accounted_cycles": ctx.accounted_cycles,
+        "time_slice_steps": ctx.time_slice_steps,
+        "accounted_steps": ctx.accounted_steps,
+        "time_slice_cycles": ctx.time_slice_steps,  # legacy alias
+        "accounted_cycles": ctx.accounted_steps,    # legacy alias
         "state": ctx.state,
         "priority": ctx.priority,
         "pid": ctx.pid,
@@ -133,8 +137,8 @@ def dict_to_context(data: Dict[str, Any]) -> TaskContext:
         reg_base=int(data.get("reg_base", 0)) & 0xFFFFFFFF,
         stack_base=int(data.get("stack_base", 0)) & 0xFFFFFFFF,
         stack_limit=int(data.get("stack_limit", 0)) & 0xFFFFFFFF,
-        time_slice_cycles=int(data.get("time_slice_cycles", 1000)),
-        accounted_cycles=int(data.get("accounted_cycles", 0)),
+        time_slice_steps=int(data.get("time_slice_steps", data.get("time_slice_cycles", 1))),
+        accounted_steps=int(data.get("accounted_steps", data.get("accounted_cycles", 0))),
         state=str(data.get("state", "ready")),
         priority=int(data.get("priority", 10)) & 0xFF,
         pid=data.get("pid"),
@@ -283,7 +287,8 @@ class MiniVM:
         self.entry = entry
         self.context: TaskContext = TaskContext(pc=entry)
         self.running = True
-        self.cycles = 0
+        self.steps = 0
+        self.cycles = 0  # legacy alias for compatibility
         self.set_context(self.context)
         self.mem = bytearray(64 * 1024)
         self.fs = FSStub()
@@ -369,7 +374,8 @@ class MiniVM:
             "reason": reason,
             "pc": halt_pc & 0xFFFFFFFF,
             "next_pc": self.pc & 0xFFFFFFFF,
-            "cycles": self.cycles,
+            "steps": self.steps,
+            "cycles": self.steps,  # legacy alias
         }
         if opcode is not None:
             info["opcode"] = opcode & 0xFFFFFFFF
@@ -395,7 +401,7 @@ class MiniVM:
     def current_context(self) -> TaskContext:
         return self.context
 
-    def create_context(self, *, entry: Optional[int] = None, stack_base: int = 0, stack_limit: int = 0, priority: int = 10, quantum: int = 1000, pid: Optional[int] = None) -> TaskContext:
+    def create_context(self, *, entry: Optional[int] = None, stack_base: int = 0, stack_limit: int = 0, priority: int = 10, quantum: int = 1, pid: Optional[int] = None) -> TaskContext:
         ctx = TaskContext(
             pc=entry if entry is not None else self.entry,
             sp=0x8000,
@@ -403,8 +409,8 @@ class MiniVM:
             reg_base=0,
             stack_base=stack_base,
             stack_limit=stack_limit,
-            time_slice_cycles=max(1, int(quantum)),
-            accounted_cycles=0,
+            time_slice_steps=max(1, int(quantum)),
+            accounted_steps=0,
             state="ready",
             priority=priority,
             pid=pid,
@@ -438,8 +444,10 @@ class MiniVM:
                 "pid": ctx.pid,
                 "state": ctx.state,
                 "priority": ctx.priority,
-                "time_slice_cycles": ctx.time_slice_cycles,
-                "accounted_cycles": ctx.accounted_cycles,
+                "time_slice_steps": ctx.time_slice_steps,
+                "accounted_steps": ctx.accounted_steps,
+                "time_slice_cycles": ctx.time_slice_steps,
+                "accounted_cycles": ctx.accounted_steps,
                 "reg_base": ctx.reg_base,
                 "stack_base": ctx.stack_base,
                 "stack_limit": ctx.stack_limit,
@@ -455,7 +463,8 @@ class MiniVM:
             "sp": self.sp,
             "flags": self.flags,
             "running": self.running,
-            "cycles": self.cycles,
+            "steps": self.steps,
+            "cycles": self.steps,
             "context": context_meta,
         }
 
@@ -491,7 +500,8 @@ class MiniVM:
             "running": self.running,
             "sleep_until": self.sleep_until,
             "sleep_pending_ms": self.sleep_pending_ms,
-            "cycles": self.cycles,
+            "steps": self.steps,
+            "cycles": self.steps,
             "pending_events": list(self.pending_events),
             "call_stack": list(self.call_stack),
         }
@@ -501,7 +511,8 @@ class MiniVM:
         mem_state = state.get("mem")
         if mem_state is not None:
             self.mem = bytearray(mem_state)
-        self.cycles = int(state.get("cycles", self.cycles))
+        self.steps = int(state.get("steps", state.get("cycles", self.steps)))
+        self.cycles = self.steps
         self.sleep_until = state.get("sleep_until")
         self.sleep_pending_ms = state.get("sleep_pending_ms")
         self.pending_events = list(state.get("pending_events", []))
@@ -882,10 +893,11 @@ class MiniVM:
             adv = 4
 
         self.pc = (self.pc + adv) & 0xFFFFFFFF
-        self.cycles += 1
+        self.steps += 1
+        self.cycles = self.steps
         ctx = self.context
         if ctx is not None:
-            ctx.accounted_cycles += 1
+            ctx.accounted_steps += 1
             ctx.pc = self.pc
             ctx.sp = self.sp
             ctx.psw = self.flags
@@ -920,7 +932,7 @@ class MiniVM:
 
     def handle_svc(self, mod, fn):
         if mod == 0x0 and fn == 0:
-            self.regs[0] = self.cycles
+            self.regs[0] = self.steps
         elif mod == 0x1 and fn == 0:
             exit_code = self.regs[0] & 0xFFFFFFFF
             self._log(f"[EXIT {exit_code}]")
@@ -1239,6 +1251,20 @@ class VMController:
         self.traced_pids: Set[int] = set()
         self.debug_sessions: Dict[int, DebugState] = {}
 
+    def _trace_mailbox_regs(self, label: str, vm: MiniVM, fn: int, *, extra: Optional[Dict[str, Any]] = None) -> None:
+        """Append a compact register/PC snapshot to the mailbox trace log."""
+        try:
+            with open("/tmp/hsx_mailbox_trace.log", "a", encoding="utf-8") as trace_fp:
+                regs = " ".join(f"R{idx}=0x{vm.regs[idx] & 0xFFFF:04X}" for idx in range(6))
+                payload = ""
+                if extra:
+                    payload = " " + " ".join(f"{k}={v}" for k, v in extra.items())
+                trace_fp.write(
+                    f"[MAILBOX_TRACE] {label} fn=0x{fn:02X} pid={vm.context.pid} pc=0x{vm.context.pc & 0xFFFF:04X} {regs}{payload}\n"
+                )
+        except OSError:
+            pass
+
     def reset(self) -> Dict[str, Any]:
         self.vm = None
         self.header = None
@@ -1489,6 +1515,7 @@ class VMController:
 
     def _svc_mailbox_controller(self, vm: MiniVM, fn: int) -> None:
         pid = self.current_pid or vm.pid or (vm.context.pid if vm.context else 0) or 0
+        self._trace_mailbox_regs("svc_entry", vm, fn)
         try:
             if fn == mbx_const.HSX_MBX_FN_OPEN:
                 target = vm._read_c_string(vm.regs[1])
@@ -1530,6 +1557,12 @@ class VMController:
                 length = vm.regs[3] & 0xFFFF
                 flags = vm.regs[4] & 0xFFFF
                 channel = vm.regs[5] & 0xFFFF
+                self._trace_mailbox_regs(
+                    "svc_send_pre",
+                    vm,
+                    fn,
+                    extra={"handle": handle, "ptr": hex(ptr), "len": length, "flags": hex(flags), "channel": channel},
+                )
                 payload = bytes(vm.mem[ptr : ptr + length])
                 ok, descriptor_id = self.mailboxes.send(pid=pid, handle=handle, payload=payload, flags=flags, channel=channel)
                 if ok:
@@ -1544,19 +1577,54 @@ class VMController:
                         "channel": channel,
                     })
                     self._deliver_mailbox_messages(descriptor_id)
+                    self._trace_mailbox_regs(
+                        "svc_send_done",
+                        vm,
+                        fn,
+                        extra={"status": hex(vm.regs[0] & 0xFFFF), "descriptor": descriptor_id},
+                    )
                 else:
                     vm.regs[0] = mbx_const.HSX_MBX_STATUS_WOULDBLOCK
+                    self._trace_mailbox_regs("svc_send_blocked", vm, fn, extra={"status": hex(vm.regs[0] & 0xFFFF)})
                 return
             if fn == mbx_const.HSX_MBX_FN_RECV:
                 handle = vm.regs[1] & 0xFFFF
                 ptr = vm.regs[2] & 0xFFFF
                 max_len = vm.regs[3] & 0xFFFF
                 timeout = vm.regs[4] & 0xFFFF
+                info_ptr = vm.regs[5] & 0xFFFF
+                self._trace_mailbox_regs(
+                    "svc_recv_pre",
+                    vm,
+                    fn,
+                    extra={"handle": handle, "ptr": hex(ptr), "max_len": max_len, "timeout": hex(timeout), "info": hex(info_ptr)},
+                )
+                try:
+                    with open("/tmp/hsx_mailbox_trace.log", "a", encoding="utf-8") as trace_fp:
+                        trace_fp.write(f"[MAILBOX] recv pid={pid} handle={handle} max_len={max_len} timeout=0x{timeout:04X} ptr=0x{ptr:04X} info=0x{info_ptr:04X}\n")
+                except OSError:
+                    pass
                 msg = self.mailboxes.recv(pid=pid, handle=handle, record_waiter=False)
                 if msg is None:
-                    if not self._prepare_mailbox_wait(vm, pid, handle, ptr, max_len, timeout):
+                    if not self._prepare_mailbox_wait(vm, pid, handle, ptr, max_len, timeout, info_ptr):
                         vm.regs[0] = mbx_const.HSX_MBX_STATUS_NO_DATA
                         vm.regs[1] = 0
+                        if info_ptr:
+                            self._write_mailbox_recv_info(
+                                pid,
+                                ptr=info_ptr,
+                                status=mbx_const.HSX_MBX_STATUS_NO_DATA,
+                                length=0,
+                                flags=0,
+                                channel=0,
+                                src_pid=0,
+                            )
+                        self._trace_mailbox_regs("svc_recv_poll_empty", vm, fn, extra={"status": hex(vm.regs[0] & 0xFFFF)})
+                    try:
+                        with open("/tmp/hsx_mailbox_trace.log", "a", encoding="utf-8") as trace_fp:
+                            trace_fp.write(f"[MAILBOX] recv wait pid={pid} handle={handle}\n")
+                    except OSError:
+                        pass
                     return
                 length = min(max_len, msg.length)
                 vm.mem[ptr : ptr + length] = msg.payload[:length]
@@ -1565,6 +1633,22 @@ class VMController:
                 vm.regs[2] = msg.flags
                 vm.regs[3] = msg.channel
                 vm.regs[4] = msg.src_pid
+                if info_ptr:
+                    self._write_mailbox_recv_info(
+                        pid,
+                        ptr=info_ptr,
+                        status=mbx_const.HSX_MBX_STATUS_OK,
+                        length=length,
+                        flags=msg.flags,
+                        channel=msg.channel,
+                        src_pid=msg.src_pid,
+                    )
+                self._trace_mailbox_regs(
+                    "svc_recv_done",
+                    vm,
+                    fn,
+                    extra={"status": hex(vm.regs[0] & 0xFFFF), "length": length, "flags": hex(msg.flags), "src": msg.src_pid},
+                )
                 vm.emit_event({
                     "type": "mailbox_recv",
                     "pid": pid,
@@ -1573,14 +1657,24 @@ class VMController:
                     "channel": msg.channel,
                     "src_pid": msg.src_pid,
                 })
+                try:
+                    with open("/tmp/hsx_mailbox_trace.log", "a", encoding="utf-8") as trace_fp:
+                        trace_fp.write(f"[MAILBOX] recv ok pid={pid} handle={handle} len={length} src={msg.src_pid}\n")
+                except OSError:
+                    pass
                 return
         except MailboxError as exc:
+            try:
+                with open("/tmp/hsx_mailbox_trace.log", "a", encoding="utf-8") as trace_fp:
+                    trace_fp.write(f"[MAILBOX] error fn=0x{fn:02X} pid={pid}: {exc}\n")
+            except OSError:
+                pass
             vm.regs[0] = mbx_const.HSX_MBX_STATUS_INTERNAL_ERROR
             vm.emit_event({"type": "mailbox_error", "pid": pid, "fn": fn, "error": str(exc)})
             return
         vm.regs[0] = mbx_const.HSX_MBX_STATUS_INTERNAL_ERROR
 
-    def _prepare_mailbox_wait(self, vm: MiniVM, pid: int, handle: int, ptr: int, max_len: int, timeout: int) -> bool:
+    def _prepare_mailbox_wait(self, vm: MiniVM, pid: int, handle: int, ptr: int, max_len: int, timeout: int, info_ptr: int) -> bool:
         if timeout in (mbx_const.HSX_MBX_TIMEOUT_POLL, 0):
             return False
         try:
@@ -1607,6 +1701,7 @@ class VMController:
             "timeout": timeout,
             "requested_at": now,
             "deadline": deadline,
+            "info_ptr": info_ptr & 0xFFFF,
         }
         self.waiting_tasks[pid] = wait_info
         ctx = vm.context
@@ -1660,6 +1755,7 @@ class VMController:
         channel = 0
         src_pid = 0
         payload = b""
+        info_ptr = wait_info.get("info_ptr", 0) & 0xFFFF
         if message is not None:
             length = min(max_len, message.length)
             flags = message.flags
@@ -1717,6 +1813,16 @@ class VMController:
             self.vm.context.wait_handle = None
             self.vm.context.wait_deadline = None
             self.vm.running = True
+        if info_ptr:
+            self._write_mailbox_recv_info(
+                pid,
+                ptr=info_ptr,
+                status=status,
+                length=length,
+                flags=flags,
+                channel=channel,
+                src_pid=src_pid,
+            )
         event_type = "mailbox_timeout" if timed_out else "mailbox_wake"
         event_payload = {
             "type": event_type,
@@ -1730,10 +1836,77 @@ class VMController:
         }
         if self.vm is not None:
             self.vm.emit_event(event_payload)
+            if self.vm.context.pid == pid:
+                self._trace_mailbox_regs(
+                    "resume_ready",
+                    self.vm,
+                    mbx_const.HSX_MBX_FN_RECV,
+                    extra={
+                        "status": hex(status & 0xFFFF),
+                        "length": length,
+                        "flags": hex(flags & 0xFFFF),
+                        "channel": channel,
+                        "src": src_pid,
+                    },
+                )
         if self.current_pid == pid:
             refreshed_state = self.task_states.get(pid)
             if refreshed_state is not None:
                 self._activate_task(pid, state_override=refreshed_state)
+
+    def _write_bytes_into_container(self, container: Dict[str, Any], offset: int, end: int, data: bytes) -> None:
+        if not data or not isinstance(container, dict):
+            return
+        mem = container.get("mem")
+        if isinstance(mem, bytearray):
+            if end <= len(mem):
+                mem[offset:end] = data
+        elif isinstance(mem, bytes):
+            if end <= len(mem):
+                buf = bytearray(mem)
+                buf[offset:end] = data
+                container["mem"] = buf
+
+    def _write_bytes_to_task_mem(self, pid: int, ptr: int, data: bytes) -> None:
+        if ptr == 0 or not data:
+            return
+        offset = ptr & 0xFFFF
+        end = offset + len(data)
+        if end > 0x10000:
+            return
+        if self.vm is not None and self.vm.context.pid == pid:
+            if end <= len(self.vm.mem):
+                self.vm.mem[offset:end] = data
+        state = self.task_states.get(pid)
+        if isinstance(state, dict):
+            self._write_bytes_into_container(state, offset, end, data)
+        task = self.tasks.get(pid)
+        if isinstance(task, dict):
+            vm_state = task.get("vm_state")
+            if isinstance(vm_state, dict):
+                self._write_bytes_into_container(vm_state, offset, end, data)
+
+    def _write_mailbox_recv_info(
+        self,
+        pid: int,
+        *,
+        ptr: int,
+        status: int,
+        length: int,
+        flags: int,
+        channel: int,
+        src_pid: int,
+    ) -> None:
+        if ptr == 0:
+            return
+        data = RECV_INFO_STRUCT.pack(
+            status & 0xFFFFFFFF,
+            length & 0xFFFFFFFF,
+            flags & 0xFFFFFFFF,
+            channel & 0xFFFFFFFF,
+            src_pid & 0xFFFFFFFF,
+        )
+        self._write_bytes_to_task_mem(pid, ptr, data)
 
     def _deliver_mailbox_messages(self, descriptor_id: int) -> None:
         try:
@@ -1840,7 +2013,7 @@ class VMController:
             "program": str(Path(path).resolve()),
             "state": "running",
             "priority": ctx.get("priority", 10),
-            "quantum": ctx.get("time_slice_cycles", 1000),
+            "quantum": ctx.get("time_slice_steps", 1),
             "pc": ctx.get("pc", header["entry"]),
             "stdout": "uart0",
             "sleep_pending": False,
@@ -1913,7 +2086,8 @@ class VMController:
         ctx["pid"] = self.current_pid
         state["context"] = ctx
         state["running"] = self.vm.running
-        state["cycles"] = self.vm.cycles
+        state["steps"] = self.vm.steps
+        state["cycles"] = self.vm.steps
         self.task_states[self.current_pid] = state
         task = self.tasks.get(self.current_pid)
         if task:
@@ -2017,7 +2191,8 @@ class VMController:
             "pc": ctx.get("pc", task.get("pc")),
             "priority": task.get("priority"),
             "quantum": task.get("quantum"),
-            "accounted_cycles": ctx.get("accounted_cycles", 0),
+            "accounted_steps": ctx.get("accounted_steps", 0),
+            "accounted_cycles": ctx.get("accounted_steps", 0),
             "sleep_pending": task.get("sleep_pending", False),
             "exit_status": task.get("exit_status"),
             "trace": task.get("trace"),
@@ -2050,95 +2225,92 @@ class VMController:
                 self.vm.trace = trace_enabled
         return {"pid": pid, "enabled": trace_enabled}
 
-    def step(self, cycles: int) -> Dict[str, Any]:
+    def step(self, steps: int, pid: Optional[int] = None) -> Dict[str, Any]:
         self._check_mailbox_timeouts()
+        requested_pid = int(pid) if pid is not None else None
         if not self.tasks:
             return {
                 "executed": 0,
                 "running": False,
                 "pc": None,
-                "cycles": 0,
+                "steps": 0,
                 "sleep_pending": False,
                 "events": [],
                 "paused": self.paused,
                 "current_pid": self.current_pid,
             }
-        runnable = self._runnable_pids()
-        if not runnable:
-            return {
-                "executed": 0,
-                "running": False,
-                "pc": None,
-                "cycles": 0,
-                "sleep_pending": False,
-                "events": [],
-                "paused": self.paused,
-                "current_pid": self.current_pid,
-            }
-        if self.current_pid is None or self.current_pid not in runnable:
-            self._activate_task(runnable[0])
-        vm = self._require_vm()
-        if self.paused:
-            snapshot = vm.snapshot_registers()
-            events = vm.consume_events()
-            self._store_active_state()
-            return {
-                "executed": 0,
-                "running": vm.running,
-                "pc": snapshot["pc"],
-                "cycles": snapshot["cycles"],
-                "sleep_pending": bool((vm.sleep_until is not None) or (vm.sleep_pending_ms is not None)),
-                "events": events,
-                "paused": True,
-                "current_pid": self.current_pid,
-            }
-        budget = max(int(cycles), 0)
         executed = 0
-        events: List[Dict[str, Any]] = []
-        while executed < budget and vm.running:
+        aggregated_events: List[Dict[str, Any]] = []
+        debug_event: Optional[Dict[str, Any]] = None
+        last_snapshot: Dict[str, Any] = {}
+        last_pid: Optional[int] = None
+
+        step_budget = max(int(steps), 0)
+        while executed < step_budget:
+            runnable = self._runnable_pids()
+            if not runnable:
+                break
+            if requested_pid is not None and requested_pid not in runnable:
+                break
+            target_pid = requested_pid if requested_pid is not None else (
+                self.current_pid if self.current_pid in runnable else runnable[0]
+            )
+            if self.current_pid != target_pid or self.vm is None:
+                self._activate_task(target_pid)
+            vm = self._require_vm()
+            if self.paused:
+                last_snapshot = vm.snapshot_registers()
+                aggregated_events.extend(vm.consume_events())
+                last_pid = target_pid
+                break
             vm.step()
             executed += 1
-            if not vm.running:
-                break
-        events.extend(vm.consume_events())
-        snapshot = vm.snapshot_registers()
-        executed_pid = self.current_pid
-        debug_event = None
-        for event in events:
-            if event.get("type") == "debug_stop":
-                debug_event = event
-                break
-        if debug_event is not None:
-            self.paused = True
-            if executed_pid is not None:
-                dbg = self._debug_state(executed_pid)
+            events = vm.consume_events()
+            aggregated_events.extend(events)
+            for event in events:
+                if event.get("type") == "debug_stop":
+                    debug_event = event
+            last_snapshot = vm.snapshot_registers()
+            last_pid = target_pid
+            self._store_active_state()
+            self._check_mailbox_timeouts()
+            if debug_event is not None:
+                self.paused = True
+                dbg = self._debug_state(target_pid)
                 dbg.last_stop = debug_event
                 dbg.halted = True
-        elif executed_pid is not None:
-            dbg = self.debug_sessions.get(executed_pid)
-            if dbg is not None:
-                dbg.halted = False
-        self._store_active_state()
-        self._check_mailbox_timeouts()
-        if not self.paused:
-            self._rotate_active()
-            next_pid = self.current_pid
-        else:
-            next_pid = executed_pid if executed_pid is not None else self.current_pid
-        current_pid_field = executed_pid if executed_pid is not None else next_pid
-        if current_pid_field is None:
-            current_pid_field = next_pid
-        if next_pid is None:
-            next_pid = current_pid_field
+                break
+            if requested_pid is None:
+                self._rotate_active()
+            else:
+                self.current_pid = requested_pid
+            if self.paused:
+                break
+
+        if not last_snapshot and self.vm is not None:
+            last_snapshot = self.vm.snapshot_registers()
+            last_pid = self.current_pid
+
+        next_pid = self.current_pid
+        running_flag = last_snapshot.get("running") if last_snapshot else False
+        sleep_pending = False
+        if self.vm is not None:
+            sleep_pending = bool((self.vm.sleep_until is not None) or (self.vm.sleep_pending_ms is not None))
+        if debug_event is None and last_pid is not None:
+            dbg_state = self.debug_sessions.get(last_pid)
+            if dbg_state is not None:
+                dbg_state.halted = False
+
         return {
             "executed": executed,
-            "running": snapshot["running"],
-            "pc": snapshot["pc"],
-            "cycles": snapshot["cycles"],
-            "sleep_pending": bool((vm.sleep_until is not None) or (vm.sleep_pending_ms is not None)),
-            "events": events,
+            "running": running_flag,
+            "pc": last_snapshot.get("pc") if last_snapshot else None,
+            "steps": last_snapshot.get("steps") if last_snapshot else 0,
+            "cycles": last_snapshot.get("steps") if last_snapshot else 0,
+            "sleep_pending": sleep_pending,
+            "events": aggregated_events,
             "paused": self.paused,
-            "current_pid": current_pid_field,
+            "current_pid": last_pid,
             "next_pid": next_pid,
             "debug_event": debug_event,
         }
@@ -2159,7 +2331,8 @@ class VMController:
             "sp": ctx.sp,
             "flags": ctx.psw,
             "running": state.get("running", ctx.state == "running"),
-            "cycles": state.get("cycles", ctx.accounted_cycles),
+            "steps": state.get("steps", ctx.accounted_steps),
+            "cycles": state.get("cycles", ctx.accounted_steps),
             "context": state["context"],
         }
 
@@ -2237,9 +2410,10 @@ class VMController:
             q = max(1, int(quantum))
             task["quantum"] = q
             if state:
+                state["context"]["time_slice_steps"] = q
                 state["context"]["time_slice_cycles"] = q
             if pid == self.current_pid and self.vm is not None:
-                self.vm.context.time_slice_cycles = q
+                self.vm.context.time_slice_steps = q
         return self._task_summary(pid)
 
     def request_dump_regs(self, pid: Optional[int]) -> Dict[str, Any]:
@@ -2308,9 +2482,13 @@ class VMController:
             if isinstance(ctx, dict):
                 ctx["state"] = "running"
                 state["context"] = ctx
-        budget = max_cycles if max_cycles is not None else (step_count if step_count > 0 else 1000)
-        budget = max(int(budget), 1)
-        return self.step(budget)
+        if max_cycles is not None:
+            budget = max(int(max_cycles), 1)
+        elif step_count > 0:
+            budget = max(step_count, 1)
+        else:
+            budget = 1000
+        return self.step(budget, pid=pid)
 
     def debug_attach(self, pid: int) -> Dict[str, Any]:
         pid_int = int(pid)
@@ -2460,8 +2638,11 @@ class VMController:
             if cmd == "ps":
                 return {"status": "ok", "tasks": self.task_list()}
             if cmd == "step":
-                cycles = int(request.get("cycles", 1))
-                return {"status": "ok", "result": self.step(cycles)}
+                steps_value = request.get("steps", request.get("cycles", 1))
+                steps_int = int(steps_value if steps_value is not None else 1)
+                pid_value = request.get("pid")
+                pid_int = int(pid_value) if pid_value is not None else None
+                return {"status": "ok", "result": self.step(steps_int, pid=pid_int)}
             if cmd == "dbg":
                 op_value = request.get("op")
                 op = str(op_value or "").lower()

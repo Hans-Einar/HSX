@@ -62,8 +62,8 @@ class VMClient:
             payload["verbose"] = True
         return _check_ok(self.request(payload)).get("image", {})
 
-    def step(self, cycles: int) -> Dict[str, Any]:
-        resp = _check_ok(self.request({"cmd": "step", "cycles": cycles}))
+    def step(self, steps: int) -> Dict[str, Any]:
+        resp = _check_ok(self.request({"cmd": "step", "steps": steps}))
         return resp.get("result", {})
 
     def read_regs(self) -> Dict[str, Any]:
@@ -82,28 +82,28 @@ class VMClient:
 
 
 class ExecutiveRunner:
-    def __init__(self, client: VMClient, *, step_cycles: int = 500, max_cycles: Optional[int] = None) -> None:
+    def __init__(self, client: VMClient, *, step_size: int = 1, max_steps: Optional[int] = None) -> None:
         self.client = client
-        self.step_cycles = max(1, step_cycles)
-        self.max_cycles = max_cycles
+        self.step_size = max(1, step_size)
+        self.max_steps = max_steps
 
     def run(self) -> None:
-        total_cycles = 0
+        total_steps = 0
         while True:
-            result = self.client.step(self.step_cycles)
+            result = self.client.step(self.step_size)
             executed = int(result.get("executed", 0))
-            total_cycles += executed
+            total_steps += executed
             running = bool(result.get("running", False))
             pc = result.get("pc")
-            cycles = result.get("cycles")
+            steps = result.get("steps", result.get("cycles"))
             sleep_pending = bool(result.get("sleep_pending"))
             events = result.get("events") or []
-            print(f"[exec] step executed={executed} running={running} pc={pc} cycles={cycles} sleep={sleep_pending}")
+            print(f"[exec] step executed={executed} running={running} pc={pc} steps={steps} sleep={sleep_pending}")
             for event in events:
                 print(f"[event] {event}")
 
-            if self.max_cycles is not None and total_cycles >= self.max_cycles:
-                print(f"[exec] max cycles {self.max_cycles} reached")
+            if self.max_steps is not None and total_steps >= self.max_steps:
+                print(f"[exec] max steps {self.max_steps} reached")
                 break
             if not running:
                 print("[exec] VM reports task halted")
@@ -117,8 +117,8 @@ def main() -> None:
     parser.add_argument("--vm-host", default="127.0.0.1", help="HSX VM host (default: 127.0.0.1)")
     parser.add_argument("--vm-port", type=int, default=9999, help="HSX VM port")
     parser.add_argument("--program", help="Optional .hxe to load before stepping")
-    parser.add_argument("--step", type=int, default=500, help="Cycles per step command (default: 500)")
-    parser.add_argument("--max-cycles", type=int, help="Stop after this many cycles")
+    parser.add_argument("--step", type=int, default=1, help="Instructions per step command (default: 1)")
+    parser.add_argument("--max-steps", type=int, help="Stop after this many instructions")
     parser.add_argument("--verbose-load", action="store_true", help="Request verbose header info on load")
     args = parser.parse_args()
 
@@ -139,7 +139,7 @@ def main() -> None:
         print(f"[exec] attach info: {attach_info}")
         client.resume()
 
-        runner = ExecutiveRunner(client, step_cycles=args.step, max_cycles=args.max_cycles)
+        runner = ExecutiveRunner(client, step_size=args.step, max_steps=args.max_steps)
         runner.run()
     finally:
         if attached:
@@ -152,4 +152,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

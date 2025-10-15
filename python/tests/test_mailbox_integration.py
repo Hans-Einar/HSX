@@ -85,7 +85,7 @@ def test_producer_mailbox_message(tmp_path):
     pid_producer = _load_task(controller, producer_img)
     controller.step(200)
 
-    host_open = controller.mailbox_open(0, "app:demo")
+    host_open = controller.mailbox_open(0, "app:procon")
     handle_id = host_open.get("handle")
     try:
         recv = controller.mailbox_recv(0, handle_id, max_len=64)

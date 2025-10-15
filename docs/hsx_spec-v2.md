@@ -134,8 +134,8 @@ typedef struct {
   uint32_t reg_base;      // base pointer in VM memory for general-purpose regs
   uint32_t stack_base;    // base pointer in VM memory for stack frame
   uint32_t stack_limit;   // guard for overflow checks
-  uint32_t time_slice_cycles;  // scheduler quantum in VM cycles
-  uint32_t accounted_cycles;   // lifetime CPU accounting for load metrics
+  uint32_t time_slice_steps;   // scheduler weight (instructions per rotation)
+  uint32_t accounted_steps;    // lifetime instruction count for load metrics
   uint8_t  state;         // READY/RUN/SLEEP/ZOMBIE
   uint8_t  priority;      // 0 (highest)..255 (lowest)
   uint16_t reserved;
@@ -151,11 +151,16 @@ typedef struct {
 - **Isolation:** each task's memory arena (stack/heap) is disjoint. `stack_limit` enables overflow detection and debugging.
 
 ### Scheduling Model
-- **Round-robin with quanta:** each runnable task receives a configurable quantum in VM cycles. When exhausted, the executive preempts and requeues the task.
-- **Priority weights:** priorities map to quantum length. Higher priority -> larger quantum (e.g., 0 -> 1000 steps, 10 -> 100). This keeps the Python and C implementations aligned.
-- **Tick vs tickless:** the default host executive uses a soft tick (run N steps, reschedule). On hardware a timer ISR can raise a quantum-expired flag so the VM yields at the next safe point. A tickless policy picks the minimum of (remaining quantum, time-to-next-event).
-- **Accounting:** the executive accumulates `accounted_cycles` per task to report CPU usage/load averages to shell clients.
+- **Round-robin, single instruction:** each runnable task executes exactly one HSX instruction per scheduler turn. After the instruction retires, the executive rotates to the next READY task.
+- **Priority weights:** `time_slice_steps` can increase the number of consecutive instructions a task receives before rotating. The default host configuration sets this to `1` for strict fairness.
+- **Tick vs tickless:** the host executive optionally runs in a soft tick (auto step N instructions repeatedly). Hardware ports can use a timer interrupt to request reschedule when a quantum expires or the next event fires.
+- **Accounting:** the executive accumulates `accounted_steps` per task to report instruction usage / load averages to shell clients.
 - Tasks may `yield`, `sleep_ms`, `wait`, `exec_exit`, or block on mailbox receive; the executive moves them between READY/RUN/SLEEP queues accordingly.
+
+#### Executive stepping controls
+- `clock start` / `clock stop` toggle the background loop that repeatedly issues `vm.step()`.
+- `clock step [steps]` (or the legacy `step [steps]`) retires a precise number of guest instructions. Without arguments the command uses the configured batch size; adding `-p <pid>` restricts execution to a single task.
+- Shell status output tracks the cumulative `accounted_steps` per task along with manual/auto step counters, making deterministic replay straightforward.
 
 ### Memory Strategy
 - Fixed arenas per task (stack+heap) reclaimed on `kill`/`exit`.
@@ -172,8 +177,16 @@ Mailboxes remain kernel-owned circular queues built on the static descriptor poo
 
 **Handles and namespaces**
 - `MAILBOX_OPEN` resolves `pid:<pid>` handles for per-task control channels created at spawn.
-- Named channels use the `svc:name` and `app:name` namespaces (for example `svc:stdio.out`, `app:telemetry`). Access control is enforced via bind flags.
-- Handles are small integers scoped to the calling task; they remain valid until `MAILBOX_CLOSE`.
+- Named channels use the `svc:name`, `app:name`, and `shared:name` namespaces (for example `svc:stdio.out`, `app:telemetry`, `shared:events`).
+
+#### Mailbox namespace rules
+- `svc:` descriptors are provisioned per task (`svc:stdio.*`) but may be accessed cross-task with an explicit `@<pid>` suffix (`svc:stdio.out@5`). Binding the bare name yields the caller’s private channel.
+- `app:` descriptors without a suffix are global and reusable. Any task (including PID 0 / host) that calls `MAILBOX_BIND` or `MAILBOX_OPEN` on `app:<name>` receives the same descriptor. Use `app:<name>@<pid>` to create a PID-scoped variant with private ownership.
+- `shared:` descriptors are always global and are the only namespace that supports fan-out semantics (`HSX_MBX_MODE_FANOUT[_DROP|_BLOCK]`). Suffixes are ignored.
+- Access control and delivery policy are governed by the bind mode mask (`HSX_MBX_MODE_RDWR`, `*_FANOUT_*`, `HSX_MBX_MODE_TAP`).
+- Handles are small integers scoped to the calling task; they remain valid until `MAILBOX_CLOSE`. Multiple handles can reference the same descriptor and inherit its namespace/fan-out behaviour.
+
+The shell mirrors the namespace model: `mbox shared`, `mbox ns app`, or `mbox pid 7` surface filtered descriptor snapshots, while `listen`/`send` forward to `MAILBOX_OPEN`/`SEND` using the same naming rules.
 
 **Message frame**
 - Each entry stores a fixed header (`struct hsx_mbx_msg { uint16_t len; uint16_t flags; uint16_t src_pid; uint16_t channel; }`) followed by payload bytes. Payload length is clamped to the descriptor capacity minus the header size.
@@ -199,11 +212,32 @@ Mailboxes remain kernel-owned circular queues built on the static descriptor poo
 - Default channels created at spawn are `svc:stdio.in`, `svc:stdio.out`, `svc:stdio.err`, and `pid:<pid>` (control). The HSX stdio shim maps `stdin`/`stdout`/`stderr` onto these handles and exposes `listen`/`send` shell commands for operator interaction.
 - Shell access to another task's stdio uses an explicit pid suffix (e.g. `svc:stdio.out@5`); without a suffix the call resolves to the caller's private channel.
 - Shell commands `listen` and `send` wrap the mailbox OPEN/SEND/RECV calls to stream stdout and inject stdin from the executive shell.
+- The `mbox` shell command uses `mailbox_snapshot()` and supports namespace filters (`mbox shared`, `mbox ns app`, `mbox pid 3`) to surface global descriptors such as `app:` and `shared:` mailboxes.
+- Calling convention: mailbox traps place arguments in `R1..R5` (see table below) and return a status code in `R0`; when `MAILBOX_RECV` succeeds and an info pointer is provided, the executive writes a `hsx_mailbox_recv_info` record before returning.
 - Status codes and MAILBOX_* function IDs are sourced from `include/hsx_mailbox.h`; syscalls return status in `R0` (0 = ok) with result values placed in `R1`-`R3` depending on the call.
 - Trace hooks record `{timestamp, src_pid, dst_handle, flags, len}` when tracing is enabled, providing visibility into inter-task communication.
 - Constants live in `include/hsx_mailbox.h`; Python tooling scrapes the header so both runtimes stay aligned.
 
 This design reuses the prior circular-buffer implementation while extending the naming model and stdio routing needed by the multi-task executive.
+
+**Mailbox ABI reference**
+
+| Call            | `R1`            | `R2`            | `R3`           | `R4`            | `R5`                         |
+|-----------------|-----------------|-----------------|----------------|-----------------|------------------------------|
+| `MAILBOX_OPEN`  | `target_ptr`    | `flags`         | —              | —               | —                            |
+| `MAILBOX_BIND`  | `target_ptr`    | `capacity`      | `mode`         | —               | —                            |
+| `MAILBOX_SEND`  | `handle`        | `payload_ptr`   | `length`       | `flags`         | `channel`                    |
+| `MAILBOX_RECV`  | `handle`        | `buffer_ptr`    | `max_length`   | `timeout`       | `info_ptr` (nullable)        |
+| `MAILBOX_PEEK`  | `handle`        | —               | —              | —               | —                            |
+| `MAILBOX_TAP`   | `handle`        | `enable` (0/1)  | —              | —               | —                            |
+| `MAILBOX_CLOSE` | `handle`        | —               | —              | —               | —                            |
+
+Timeout semantics (`MAILBOX_SEND`/`MAILBOX_RECV`):
+- `HSX_MBX_TIMEOUT_POLL` (`0x0000`): do not block; return `HSX_MBX_STATUS_NO_DATA` / `HSX_MBX_STATUS_WOULDBLOCK`.
+- `0x0001..0xFFFE`: relative timeout in milliseconds (host VM prototype).
+- `HSX_MBX_TIMEOUT_INFINITE` (`0xFFFF`): block until data is available.
+
+On successful `MAILBOX_RECV`, if `info_ptr` is non-null the executive writes a `hsx_mailbox_recv_info` structure containing `{status, length, flags, channel, src_pid}` before returning control to the task.
 
 ---
 ## 5. Syscall Modules
@@ -338,13 +372,6 @@ C source ? clang -emit-llvm ? hsx-llc.py ? .mvasm ? asm.py ? .hxe ? host_vm.py
 - [ ] Doxygen / docs automation.
 
 ---
-
-
-
-
-
-
-
 
 
 

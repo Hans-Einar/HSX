@@ -142,6 +142,7 @@
 - [x] Mirrored mailbox/stdio samples in C with reusable wrappers (`examples/tests/test_mailbox_*_c`, `examples/tests/test_stdio_mailbox_c`).
 
 ## TODO - Milestone 4 Follow-Up
+- [ ] first, check if this milestone still is valid. a lot has been done on this via bugs that surfaced during other milestones
 - [ ] Expand the stdio shim with blocking stdin helpers and finalize the canonical C wrappers.
 - [ ] Update consumer samples to exercise the blocking helpers once they land (replace current polling loops).
 - [ ] Broaden integration coverage for mailbox back-pressure and tap tracing scenarios.
@@ -153,21 +154,34 @@
 - [x] Exercise spill/reload flows via `python/tests/test_host_vm_cli.py` and `python/tests/test_mailbox_manager.py`, updating `examples/tests/` inputs as needed.
 - [x] After each capability lands, rerun `make -C python test` and targeted integration suites to confirm mailbox and half demos stay green.
 
-## TODO - hsx-llc IR Expansion (Active)
+## TODO - Mailbox update implementation (Active)
+ - see mailbox_update_implementation.md for details
+
+## TODO - hsx-llc IR Expansion (open)
 - [ ] Lower integer `trunc` from i32→i16/i8 (and related paths) without dropping sign bits.
 - [ ] Extend `sext`/`zext` handling for i8/i16 operands so results land in i32 registers.
 - [ ] Teach dynamic-index GEP lowering to scale offsets for 2- and 4-byte element types.
 - [ ] Restore pytest coverage for the new lowering (casts + GEP) once the implementation is stable.
 
 ## TODO - Calling Convention & ABI Enhancements (Open)
+- [ ] first, look through the code and see what has already been implemented, and what's missing. a lot has been done on this via bugs that surfaced during other milestones
 - [ ] Document the canonical HSX calling convention in `docs/hsx_spec-v2.md`, covering register roles (caller vs callee saved), argument/return placement, overflow stack layout for arguments ≥4, and the rules for aggregates/varargs.
 - [ ] Extend `python/hsx-llc.py` (and the native assembler/linker) so calls with more than three arguments automatically spill overflow parameters to the caller stack frame using 4-byte slots and generate callee-side loads/stores that honour the spec.
 - [ ] Update assembly shims (`examples/lib/hsx_stdio.mvasm`, `examples/lib/hsx_mailbox.mvasm`, etc.) and runtime helpers so they read overflow arguments from the stack, preserve callee-saved registers, and expose helper macros for hand-written MVASM.
 - [ ] Add regression samples/tests (C + MVASM) that exercise four-plus argument calls, mixed-width arguments, and varargs stubs to verify round-tripping through the VM and executive.
 
 ## TODO - Mailbox Fan-Out Follow-Up (Open)
+- [ ] first, look through the code and see what has already been implemented, and what's missing. a lot has been done on this via bugs that surfaced during other milestones
 - [x] Prototype fan-out sequence tracking and retention policies in the Python mailbox manager with pytest coverage.
 - [x] Extend shell listen/send tooling to expose fan-out policy selection for stdio channels.
 - [ ] Update docs/hsx_spec.md and HSX_SVC_API references once behavior is validated.
 
-<3
+
+
+## TODO - Clock step semantics & docs (Completed)
+
+- [x] Verified the scheduler now retires exactly one guest instruction per round-robin turn (`platforms/python/host_vm.py::MiniVM.step`, `VMController.step`, `python/tests/test_vm_pause.py::test_round_robin_single_instruction`).
+- [x] Confirmed RPC/shell plumbing accepts `clock step <N>` and `clock step <N> -p <pid>` with instruction counts only (no remaining `cycles` fields anywhere critical).
+- [x] Update operator help (`help/clock.txt`, `help/step.txt`) to describe the step-only model and document `-p/--pid`.
+- [x] Refresh protocol/docs (`docs/executive_protocol.md`) and client shims (`python/blinkenlights.py`, `python/exec_smoke.py`, `python/executive.py`, `python/vmclient.py`) to stop emitting `cycles` payloads and to mention per-instruction semantics.
+- [x] Smoke the GUI/CLI tooling once the docs/help updates land to ensure mixed PID/manual stepping behaves as expected (<3).

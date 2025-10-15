@@ -27,7 +27,7 @@ def _setup_controller(code: bytes, entry: int, rodata: bytes) -> tuple[VMControl
         "program": "<inline>",
         "state": "running",
         "priority": ctx.get("priority", 10),
-        "quantum": ctx.get("time_slice_cycles", 1000),
+        "quantum": ctx.get("time_slice_steps", 1),
         "pc": ctx.get("pc", entry),
         "sleep_pending": False,
         "vm_state": state,

@@ -5,7 +5,6 @@
 #define BUFFER_SIZE 192
 
 static char g_buffer[BUFFER_SIZE];
-static int g_stdin_info_raw[(sizeof(hsx_mailbox_recv_info) + sizeof(int) - 1) / sizeof(int)];
 
 static int trim_line(char* buffer, int length) {
     int trimmed = length;
@@ -50,16 +49,12 @@ int main(void) {
 
     hsx_stdio_puts("mailbox producer ready: send data via shell stdin");
 
-    hsx_mailbox_recv_info* stdin_info = (hsx_mailbox_recv_info*)g_stdin_info_raw;
-
     while (1) {
-        int status = hsx_mailbox_recv(stdin_handle, g_buffer, BUFFER_SIZE - 1,
-                                      HSX_MBX_TIMEOUT_INFINITE, stdin_info);
-        if (status < 0) {
+        int length = hsx_mailbox_recv_basic(stdin_handle, g_buffer, BUFFER_SIZE - 1);
+        if (length < 0) {
             hsx_stdio_puts_err("mailbox producer: stdin read error");
             continue;
         }
-        int length = stdin_info->length;
         if (length <= 0) {
             continue;
         }

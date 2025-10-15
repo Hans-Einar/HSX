@@ -35,9 +35,9 @@ Core Commands
 | `clock` | `{ "version": 1, "cmd": "clock" }` | `{ "version": 1, "status": "ok", "clock": { ... } }` | Reports clock status (state, rate, auto/manual step counters). |
 | `clock` | `{ "version": 1, "cmd": "clock", "op": "start" }` | `{ "version": 1, "status": "ok", "clock": { ... } }` | Starts the auto-step clock loop (alias `op: "run"`). |
 | `clock` | `{ "version": 1, "cmd": "clock", "op": "stop" }` | `{ "version": 1, "status": "ok", "clock": { ... } }` | Stops the auto-step clock loop (alias `op: "halt"`). |
-| `clock` | `{ "version": 1, "cmd": "clock", "op": "step", "cycles": 500 }` | `{ "version": 1, "status": "ok", "result": { "executed": n, ... }, "clock": { ... } }` | Runs a manual step; omit `cycles` to use the default budget. |
+| `clock` | `{ "version": 1, "cmd": "clock", "op": "step", "steps": 500 [, "pid": 2] }` | `{ "version": 1, "status": "ok", "result": { "executed": n, ... }, "clock": { ... } }` | Retires the requested number of guest instructions; add `pid` to restrict scheduling to a single task. |
 | `clock` | `{ "version": 1, "cmd": "clock", "op": "rate", "rate": 10 }` | `{ "version": 1, "status": "ok", "clock": { ... } }` | Sets auto-loop rate in Hz (`0` = unlimited). |
-| `step` | `{ "version": 1, "cmd": "step", "cycles": 500 }` | `{ "version": 1, "status": "ok", "result": { ... }, "clock": { ... } }` | Backwards-compatible alias for `clock` `op: "step"`. |
+| `step` | `{ "version": 1, "cmd": "step", "steps": 500 [, "pid": 2] }` | `{ "version": 1, "status": "ok", "result": { ... }, "clock": { ... } }` | Alias for `clock` `op: "step"`; honours the same `steps`/`pid` fields. |
 | `trace` | `{ "version": 1, "cmd": "trace", "pid": 1, "mode": "on" }` | `{ "version": 1, "status": "ok", "trace": { "pid": 1, "enabled": true } }` | Enable or disable instruction tracing for a task (`mode` optional to toggle). |
 | `pause` | `{ "version": 1, "cmd": "pause", "pid": 1 }` | `{ "version": 1, "status": "ok", "task": { ... } }` | Pauses the specified task (global pause if `pid` omitted). |
 | `resume` | `{ "version": 1, "cmd": "resume", "pid": 1 }` | `{ "version": 1, "status": "ok", "task": { ... } }` | Resumes the specified task (global resume if `pid` omitted). |

@@ -107,7 +107,7 @@ typedef struct {
   uint32_t r[16];
   void* code_base;
   void* data_base;
-  uint32_t time_slice_cycles;
+  uint32_t time_slice_steps;
   uint8_t state;   // READY/RUN/SLEEP/ZOMBIE
   int fd[8];       // 0=stdin,1=stdout,2=stderr, others
 } hsx_task_t;

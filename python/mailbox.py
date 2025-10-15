@@ -234,6 +234,11 @@ class MailboxManager:
         flags: int = 0,
         channel: int = 0,
     ) -> Tuple[bool, Optional[int]]:
+        try:
+            with open("/tmp/hsx_mailbox_trace.log", "a", encoding="utf-8") as trace_fp:
+                trace_fp.write(f"[MailboxManager] send pid={pid} handle={handle} len={len(payload)} flags=0x{flags:04X} channel={channel}\n")
+        except OSError:
+            pass
         state = self._handle_state(pid, handle)
         desc = self.descriptor_by_id(state.descriptor_id)
         state.is_sender = True
@@ -248,12 +253,22 @@ class MailboxManager:
             seq_no=desc.next_seq,
         )
         ok = self._enqueue_message(desc, message)
+        try:
+            with open("/tmp/hsx_mailbox_trace.log", "a", encoding="utf-8") as trace_fp:
+                trace_fp.write(f"[MailboxManager] send result ok={ok} descriptor={desc.descriptor_id} ns={desc.namespace} depth={len(desc.queue)}\n")
+        except OSError:
+            pass
         return ok, desc.descriptor_id
 
     def recv(self, *, pid: int, handle: int, record_waiter: bool = True) -> Optional[MailboxMessage]:
         state = self._handle_state(pid, handle)
         desc = self.descriptor_by_id(state.descriptor_id)
         fanout_enabled = bool(desc.mode_mask & HSX_MBX_MODE_FANOUT)
+        try:
+            with open("/tmp/hsx_mailbox_trace.log", "a", encoding="utf-8") as trace_fp:
+                trace_fp.write(f"[MailboxManager] recv pid={pid} handle={handle} descriptor={desc.descriptor_id} depth={len(desc.queue)}\n")
+        except OSError:
+            pass
         if fanout_enabled:
             self._reclaim_acked(desc)
             next_msg = self._next_message_for_handle(desc, state)
@@ -279,6 +294,11 @@ class MailboxManager:
             return result
 
         msg = self._pop_head(desc)
+        try:
+            with open("/tmp/hsx_mailbox_trace.log", "a", encoding="utf-8") as trace_fp:
+                trace_fp.write(f"[MailboxManager] recv pop pid={pid} handle={handle} msg={'none' if msg is None else msg.length} depth={len(desc.queue)}\n")
+        except OSError:
+            pass
         if msg is None:
             if record_waiter and pid not in desc.waiters:
                 desc.waiters.append(pid)
@@ -550,4 +570,3 @@ class MailboxManager:
 
 def _message_cost(message: MailboxMessage) -> int:
     return message.length + 8
-

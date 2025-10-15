@@ -176,6 +176,26 @@ def test_fanout_block_policy_prevents_overfill():
     assert ok is True
 
 
+def test_app_namespace_reused_across_pids():
+    mgr = MailboxManager()
+    consumer_handle = mgr.open(pid=1, target="app:demo")
+    producer_handle = mgr.open(pid=2, target="app:demo")
+
+    desc_consumer = mgr.descriptor_for_handle(1, consumer_handle)
+    desc_producer = mgr.descriptor_for_handle(2, producer_handle)
+    assert desc_consumer.descriptor_id == desc_producer.descriptor_id
+    assert desc_consumer.namespace == mbx_const.HSX_MBX_NAMESPACE_APP
+    assert desc_consumer.owner_pid is None
+
+    ok, descriptor_id = mgr.send(pid=2, handle=producer_handle, payload=b"ping")
+    assert ok is True
+    assert descriptor_id == desc_consumer.descriptor_id
+
+    msg = mgr.recv(pid=1, handle=consumer_handle)
+    assert msg is not None
+    assert msg.payload == b"ping"
+
+
 def test_set_default_stdio_mode_updates_existing():
     mgr = MailboxManager()
     mgr.register_task(5)

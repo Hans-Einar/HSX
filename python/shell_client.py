@@ -334,7 +334,7 @@ def _pretty_info(payload: dict) -> None:
     tasks = info.get('tasks', [])
     if tasks:
         print("  tasks:")
-        header = "      PID   State         Prio  Quantum  Cycles     Sleep     Exit  Trace  Program"
+        header = "      PID   State         Prio  Quantum  Steps     Sleep     Exit  Trace  Program"
         print(header)
         print("      " + "-" * (len(header) - 6))
         for task in tasks:
@@ -342,21 +342,21 @@ def _pretty_info(payload: dict) -> None:
             state = task.get("state")
             prio = task.get("priority", "-")
             quantum = task.get("quantum", "-")
-            cycles = task.get("accounted_cycles", "-")
+            steps_val = task.get("accounted_steps", task.get("accounted_cycles", "-"))
             sleep = task.get("sleep_pending", False)
             exit_status = task.get("exit_status")
             exit_text = "-" if exit_status is None else str(exit_status)
             trace_text = "on" if task.get("trace") else "off"
             program = task.get("program", "")
             marker = "*" if current is not None and pid == current else " "
-            print(f"    {marker} {pid:4}  {state:<12}  {prio:>4}  {quantum:>7}  {cycles:>8}  {str(sleep):<5}  {exit_text:>8}  {trace_text:>5}  {program}")
+            print(f"    {marker} {pid:4}  {state:<12}  {prio:>4}  {quantum:>7}  {steps_val:>8}  {str(sleep):<5}  {exit_text:>8}  {trace_text:>5}  {program}")
     clock = info.get('clock')
     if isinstance(clock, dict):
         print("  clock:")
         print(f"    state       : {clock.get('state')}  running: {clock.get('running')}")
-        print(f"    rate_hz     : {clock.get('rate_hz')}  step_cycles: {clock.get('step_cycles')}")
-        print(f"    auto        : steps={clock.get('auto_steps')}  cycles={clock.get('auto_cycles')}")
-        print(f"    manual      : steps={clock.get('manual_steps')}  cycles={clock.get('manual_cycles')}")
+        print(f"    rate_hz     : {clock.get('rate_hz')}  step_size: {clock.get('step_size')}")
+        print(f"    auto        : steps={clock.get('auto_steps')}  total={clock.get('auto_total_steps')}")
+        print(f"    manual      : steps={clock.get('manual_steps')}  total={clock.get('manual_total_steps')}")
     selected = info.get('selected_registers')
     if isinstance(selected, dict):
         print(f"  selected_pid: {info.get('selected_pid')}")
@@ -380,7 +380,7 @@ def _pretty_ps(payload: dict) -> None:
     if not tasks:
         print("  (no tasks)")
         return
-    header = "    PID   State         Prio  Quantum  Cycles     Sleep     Exit  Trace  Program"
+    header = "    PID   State         Prio  Quantum  Steps     Sleep     Exit  Trace  Program"
     print(header)
     print("    " + "-" * (len(header) - 4))
     for task in tasks:
@@ -388,15 +388,14 @@ def _pretty_ps(payload: dict) -> None:
         state = task.get("state")
         prio = task.get("priority", "-")
         quantum = task.get("quantum", "-")
-        cycles = task.get("accounted_cycles", task.get("context", {}).get("accounted_cycles") if isinstance(task.get("context"), dict) else "-")
+        steps_val = task.get("accounted_steps", task.get("context", {}).get("accounted_steps") if isinstance(task.get("context"), dict) else "-")
         sleep = task.get("sleep_pending", False)
         exit_status = task.get("exit_status")
         exit_text = "-" if exit_status is None else str(exit_status)
         trace_text = "on" if task.get("trace") else "off"
         program = task.get("program", "")
         marker = "*" if current_pid is not None and pid == current_pid else " "
-        print(f"  {marker} {pid:4}  {state:<12}  {prio:>4}  {quantum:>7}  {cycles:>8}  {str(sleep):<5}  {exit_text:>8}  {trace_text:>5}  {program}")
-
+        print(f"  {marker} {pid:4}  {state:<12}  {prio:>4}  {quantum:>7}  {steps_val:>8}  {str(sleep):<5}  {exit_text:>8}  {trace_text:>5}  {program}")
 
 def _pretty_clock(payload: dict) -> None:
     if payload.get("status") != "ok":
@@ -410,15 +409,15 @@ def _pretty_clock(payload: dict) -> None:
         state = clock.get("state")
         running = clock.get("running")
         rate_hz = clock.get("rate_hz")
-        step_cycles = clock.get("step_cycles")
+        step_size = clock.get("step_size")
         auto_steps = clock.get("auto_steps")
-        auto_cycles = clock.get("auto_cycles")
+        auto_total = clock.get("auto_total_steps")
         manual_steps = clock.get("manual_steps")
-        manual_cycles = clock.get("manual_cycles")
+        manual_total = clock.get("manual_total_steps")
         print(f"  state       : {state}  running: {running}")
-        print(f"  rate_hz     : {rate_hz}  step_cycles: {step_cycles}")
-        print(f"  auto        : steps={auto_steps}  cycles={auto_cycles}")
-        print(f"  manual      : steps={manual_steps}  cycles={manual_cycles}")
+        print(f"  rate_hz     : {rate_hz}  step_size: {step_size}")
+        print(f"  auto        : steps={auto_steps}  total={auto_total}")
+        print(f"  manual      : steps={manual_steps}  total={manual_total}")
     result = payload.get("result")
     if isinstance(result, dict):
         executed = result.get("executed")
@@ -427,6 +426,8 @@ def _pretty_clock(payload: dict) -> None:
         print("  last_step:")
         print(f"    executed : {executed}")
         print(f"    running  : {running}  paused: {paused}")
+        if "steps" in result:
+            print(f"    steps    : {result.get('steps')}")
         for key in ("current_pid", "sleep_pending"):
             if key in result:
                 print(f"    {key:<10}: {result.get(key)}")
@@ -632,7 +633,7 @@ def _pretty_dbg(payload: dict) -> None:
     result = block.get("result")
     if isinstance(result, dict) and result:
         print("  result:")
-        for key in ("executed", "running", "pc", "cycles", "paused", "current_pid", "next_pid"):
+        for key in ("executed", "running", "pc", "steps", "cycles", "paused", "current_pid", "next_pid"):
             if key in result:
                 print(f"    {key}: {result[key]}")
         debug_event = result.get("debug_event")
@@ -665,8 +666,8 @@ def _pretty_dmesg(payload: dict) -> None:
         level = (entry.get("level") or "").upper()
         message = entry.get("message", "")
         seq = entry.get("seq")
-        clock_cycles = entry.get("clock_cycles")
-        clock_text = "-" if clock_cycles is None else str(clock_cycles)
+        clock_steps = entry.get("clock_steps", entry.get("clock_cycles"))
+        clock_text = "-" if clock_steps is None else str(clock_steps)
         event = entry.get("event") if isinstance(entry.get("event"), dict) else None
         pid = entry.get("pid")
         if pid is None and isinstance(event, dict):
@@ -678,7 +679,7 @@ def _pretty_dmesg(payload: dict) -> None:
         if isinstance(event, dict):
             event_type = event.get("type", event_type)
         print(f"  [{seq}] {pid_text} ({clock_text}) {timestamp} \"{level}\" \"{event_type}\"")
-        extra = {k: v for k, v in entry.items() if k not in {"ts", "level", "message", "seq", "clock_cycles"}}
+        extra = {k: v for k, v in entry.items() if k not in {"ts", "level", "message", "seq", "clock_steps", "clock_cycles"}}
         if extra:
             print(f"        {json.dumps(extra, sort_keys=True)}")
 
@@ -690,9 +691,27 @@ _MAILBOX_NAMESPACE_NAMES = {
     3: "shared",
 }
 
+_MAILBOX_NAMESPACE_ALIASES = {
+    "pid": "pid",
+    "svc": "svc",
+    "service": "svc",
+    "app": "app",
+    "application": "app",
+    "shared": "shared",
+    "global": "shared",
+}
+
 
 def _mailbox_namespace_name(value: int) -> str:
     return _MAILBOX_NAMESPACE_NAMES.get(value, str(value))
+
+
+def _normalize_mailbox_namespace(token: str) -> str:
+    key = token.strip().lower()
+    normalized = _MAILBOX_NAMESPACE_ALIASES.get(key)
+    if normalized is None:
+        raise ValueError(f"unknown mailbox namespace '{token}'")
+    return normalized
 
 
 def _pretty_mbox(payload: dict) -> None:
@@ -701,18 +720,32 @@ def _pretty_mbox(payload: dict) -> None:
         return
     descriptors = payload.get("descriptors") or []
     filter_pid = payload.get("_filter_pid")
+    filter_namespace = payload.get("_filter_namespace")
     filtered: list[dict] = []
     for desc in descriptors:
+        namespace_value = _as_int(desc.get("namespace"), -1)
+        namespace_name = _mailbox_namespace_name(namespace_value)
+        if filter_namespace is not None and namespace_name != filter_namespace:
+            continue
         owner = desc.get("owner_pid")
         owner_pid = _as_int(owner, None) if owner is not None else None
         if filter_pid is not None and owner_pid != filter_pid:
             continue
         filtered.append(desc)
     print("mbox:")
+    if filter_namespace is not None:
+        print(f"  namespace : {filter_namespace}")
     if filter_pid is not None:
         print(f"  filter_pid: {filter_pid}")
     if not filtered:
-        print("  (no mailboxes)" if filter_pid is None else "  (no mailboxes for specified pid)")
+        if filter_pid is not None and filter_namespace is not None:
+            print("  (no mailboxes matching filters)")
+        elif filter_pid is not None:
+            print("  (no mailboxes for specified pid)")
+        elif filter_namespace is not None:
+            print("  (no mailboxes in selected namespace)")
+        else:
+            print("  (no mailboxes)")
         return
     header = "    ID  Namespace  Owner  Depth  Bytes  Mode   Name"
     print(header)
@@ -746,7 +779,7 @@ PRETTY_HANDLERS = {
 
 
 def _render_context(context: dict, indent: str = "  ") -> None:
-    for key in ("pid", "state", "priority", "time_slice_cycles", "accounted_cycles", "reg_base", "stack_base", "stack_limit", "exit_status", "trace"):
+    for key in ("pid", "state", "priority", "time_slice_steps", "accounted_steps", "reg_base", "stack_base", "stack_limit", "exit_status", "trace"):
         if key in context:
             value = context[key]
             if key.endswith('_base') or key.endswith('_limit'):
@@ -757,7 +790,8 @@ def _render_context(context: dict, indent: str = "  ") -> None:
 def _render_register_block(registers: dict, indent: str = "  ") -> None:
     print(f"{indent}pc     : 0x{registers.get('pc', 0):08X}  sp: 0x{registers.get('sp', 0):08X}")
     print(f"{indent}flags  : 0x{registers.get('flags', 0):X}    running: {registers.get('running')}")
-    print(f"{indent}cycles : {registers.get('cycles', 0)}")
+    step_count = registers.get('steps', registers.get('cycles', 0))
+    print(f"{indent}steps  : {step_count}")
     context = registers.get('context', {})
     if isinstance(context, dict) and context:
         print(f"{indent}context:")
@@ -887,13 +921,31 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
                 raise ValueError("clock usage: clock start|stop|status|run|halt [no extra arguments]")
             return payload
         if subcmd == "step":
-            if tokens:
-                try:
-                    payload["cycles"] = int(tokens[0], 0)
-                except ValueError as exc:
-                    raise ValueError("clock step cycles must be integer") from exc
-                if len(tokens) > 1:
-                    raise ValueError("clock step usage: clock step [cycles]")
+            steps_value: Optional[int] = None
+            target_pid: Optional[int] = None
+            i = 0
+            while i < len(tokens):
+                token = tokens[i]
+                if token in {"-p", "--pid"}:
+                    i += 1
+                    if i >= len(tokens):
+                        raise ValueError("clock step -p/--pid requires <pid>")
+                    try:
+                        target_pid = int(tokens[i], 0)
+                    except ValueError as exc:
+                        raise ValueError("clock step pid must be integer") from exc
+                elif steps_value is None:
+                    try:
+                        steps_value = int(token, 0)
+                    except ValueError as exc:
+                        raise ValueError("clock step steps must be integer") from exc
+                else:
+                    raise ValueError("clock step usage: clock step [steps] [-p <pid>]")
+                i += 1
+            if steps_value is not None:
+                payload["steps"] = steps_value
+            if target_pid is not None:
+                payload["pid"] = target_pid
             return payload
         if subcmd == "rate":
             if not tokens:
@@ -905,7 +957,7 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
             if len(tokens) > 1:
                 raise ValueError("clock rate usage: clock rate <hz>")
             return payload
-        raise ValueError("clock usage: clock [status|start|stop|step [cycles]|rate <hz>]")
+        raise ValueError("clock usage: clock [status|start|stop|step [steps] [-p <pid>]|rate <hz>]")
 
     if cmd == "load":
         if not args:
@@ -928,11 +980,32 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
         return payload
 
     if cmd == "step":
-        if args:
-            try:
-                payload["cycles"] = int(args[0])
-            except ValueError as exc:
-                raise ValueError("step cycles must be integer") from exc
+        tokens = list(args)
+        steps_value: Optional[int] = None
+        target_pid: Optional[int] = None
+        i = 0
+        while i < len(tokens):
+            token = tokens[i]
+            if token in {"-p", "--pid"}:
+                i += 1
+                if i >= len(tokens):
+                    raise ValueError("step -p/--pid requires <pid>")
+                try:
+                    target_pid = int(tokens[i], 0)
+                except ValueError as exc:
+                    raise ValueError("step pid must be integer") from exc
+            elif steps_value is None:
+                try:
+                    steps_value = int(token, 0)
+                except ValueError as exc:
+                    raise ValueError("step count must be integer") from exc
+            else:
+                raise ValueError("step usage: step [steps] [-p <pid>]")
+            i += 1
+        if steps_value is not None:
+            payload["steps"] = steps_value
+        if target_pid is not None:
+            payload["pid"] = target_pid
         return payload
 
     if cmd == "reload":
@@ -979,13 +1052,56 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
 
     if cmd == "mbox":
         payload["cmd"] = "mailbox_snapshot"
-        if args:
-            token = args[0].strip()
-            if token and token.lower() not in {"all", "*"}:
+        filter_pid: int | None = None
+        filter_namespace: str | None = None
+        tokens = list(args)
+        i = 0
+        while i < len(tokens):
+            raw_token = tokens[i].strip()
+            lower = raw_token.lower()
+            if not raw_token or lower in {"all", "*"}:
+                pass
+            elif lower in {"namespace", "ns"}:
+                i += 1
+                if i >= len(tokens):
+                    raise ValueError("mbox namespace requires a value")
+                filter_namespace = _normalize_mailbox_namespace(tokens[i])
+            elif lower.startswith("namespace=") or lower.startswith("ns="):
+                _, value = lower.split("=", 1)
+                filter_namespace = _normalize_mailbox_namespace(value)
+            elif lower.startswith("namespace:") or lower.startswith("ns:"):
+                _, value = lower.split(":", 1)
+                filter_namespace = _normalize_mailbox_namespace(value)
+            elif lower in {"owner", "pid"}:
+                i += 1
+                if i >= len(tokens):
+                    raise ValueError("mbox pid requires an integer value")
                 try:
-                    payload["_filter_pid"] = int(token, 0)
+                    filter_pid = int(tokens[i], 0)
                 except ValueError as exc:
                     raise ValueError("mbox pid must be an integer") from exc
+            elif lower.startswith("owner=") or lower.startswith("pid="):
+                try:
+                    filter_pid = int(raw_token.split("=", 1)[1], 0)
+                except ValueError as exc:
+                    raise ValueError("mbox pid must be an integer") from exc
+            elif lower.startswith("owner:") or lower.startswith("pid:"):
+                try:
+                    filter_pid = int(raw_token.split(":", 1)[1], 0)
+                except ValueError as exc:
+                    raise ValueError("mbox pid must be an integer") from exc
+            elif lower in {"app", "shared", "svc"}:
+                filter_namespace = _normalize_mailbox_namespace(lower)
+            else:
+                try:
+                    filter_pid = int(raw_token, 0)
+                except ValueError as exc:
+                    raise ValueError("mbox usage: mbox [all|app|shared|svc|ns <name>] [pid <n>|owner <n>]") from exc
+            i += 1
+        if filter_pid is not None:
+            payload["_filter_pid"] = filter_pid
+        if filter_namespace is not None:
+            payload["_filter_namespace"] = filter_namespace
         return payload
 
     if cmd == "dmesg":
@@ -1202,8 +1318,10 @@ def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: boo
             continue
 
         filter_pid = None
+        filter_namespace = None
         if cmd == 'mbox':
             filter_pid = payload.pop("_filter_pid", None)
+            filter_namespace = payload.pop("_filter_namespace", None)
 
         try:
             resp = send_request(host, port, payload)
@@ -1212,7 +1330,10 @@ def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: boo
             continue
         if cmd == 'mbox':
             resp = dict(resp)
-            resp["_filter_pid"] = filter_pid
+            if filter_pid is not None:
+                resp["_filter_pid"] = filter_pid
+            if filter_namespace is not None:
+                resp["_filter_namespace"] = filter_namespace
         handler = PRETTY_HANDLERS.get(cmd)
         if handler and not force_json:
             handler(resp)
@@ -1225,7 +1346,7 @@ def main() -> None:
     parser.add_argument("args", nargs="*", help="optional arguments for the command")
     parser.add_argument("--host", default="127.0.0.1", help="executive host")
     parser.add_argument("--port", type=int, default=9998, help="executive port")
-    parser.add_argument("--cycles", type=int, help="cycles for step command")
+    parser.add_argument("--steps", type=int, help="steps for step command")
     parser.add_argument("--path", help="path for load/exec commands")
     parser.add_argument("--verbose", action="store_true", help="verbose load")
     parser.add_argument("--json", action="store_true", help="print raw JSON responses")
@@ -1303,8 +1424,8 @@ def main() -> None:
             os.execv(sys.executable, [sys.executable] + sys.argv)
         return
 
-    if cmd == 'step' and args_ns.cycles is not None and not args:
-        args = [str(args_ns.cycles)]
+    if cmd == 'step' and args_ns.steps is not None and not args:
+        args = [str(args_ns.steps)]
 
     try:
         payload = _build_payload(cmd, args, Path.cwd())
@@ -1315,8 +1436,10 @@ def main() -> None:
         payload['verbose'] = True
 
     filter_pid = None
+    filter_namespace = None
     if cmd == 'mbox':
         filter_pid = payload.pop("_filter_pid", None)
+        filter_namespace = payload.pop("_filter_namespace", None)
 
     try:
         resp = send_request(args_ns.host, args_ns.port, payload)
@@ -1325,7 +1448,10 @@ def main() -> None:
 
     if cmd == 'mbox':
         resp = dict(resp)
-        resp["_filter_pid"] = filter_pid
+        if filter_pid is not None:
+            resp["_filter_pid"] = filter_pid
+        if filter_namespace is not None:
+            resp["_filter_namespace"] = filter_namespace
 
     handler = PRETTY_HANDLERS.get(cmd)
     if handler and not force_json:

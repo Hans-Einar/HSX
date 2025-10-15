@@ -36,7 +36,7 @@ def test_vmcontroller_step_respects_pause():
         "program": "<inline>",
         "state": "running",
         "priority": state["context"].get("priority", 10),
-        "quantum": state["context"].get("time_slice_cycles", 1000),
+        "quantum": state["context"].get("time_slice_steps", 1),
         "pc": state["context"].get("pc", entry),
         "sleep_pending": False,
         "vm_state": state,
@@ -45,13 +45,13 @@ def test_vmcontroller_step_respects_pause():
 
     first = controller.step(5)
     assert first["executed"] > 0
-    cycles_before = controller.vm.cycles
+    steps_before = controller.vm.steps
 
     controller.paused = True
     second = controller.step(10)
     assert second["executed"] == 0
     assert second["paused"] is True
-    assert controller.vm.cycles == cycles_before
+    assert controller.vm.steps == steps_before
 
 
 class _StubVM:
@@ -62,7 +62,7 @@ class _StubVM:
         self.reset_calls = 0
         self.kill_calls = 0
         self.step_calls = 0
-        self.cycles = 0
+        self.steps = 0
         self.tasks = {1: {"pid": 1, "state": "running", "pc": 0}}
         self.current_pid = 1
 
@@ -92,24 +92,26 @@ class _StubVM:
         self.tasks.pop(pid, None)
         return {"status": "ok"}
 
-    def step(self, cycles):
+    def step(self, steps, pid: int | None = None):
         self.step_calls += 1
         if self.paused:
             return {
                 "executed": 0,
                 "running": True,
                 "pc": 0x0010,
-                "cycles": self.cycles,
+                "steps": self.steps,
+                "cycles": self.steps,
                 "sleep_pending": False,
                 "paused": True,
                 "current_pid": self.current_pid,
             }
-        self.cycles += cycles
+        self.steps += steps
         return {
-            "executed": cycles,
+            "executed": steps,
             "running": True,
             "pc": 0x0020,
-            "cycles": self.cycles,
+            "steps": self.steps,
+            "cycles": self.steps,
             "sleep_pending": False,
             "paused": False,
             "current_pid": self.current_pid,
@@ -128,7 +130,8 @@ class _StubVM:
             "sp": 0x8000,
             "flags": 0,
             "running": True,
-            "cycles": self.cycles,
+            "steps": self.steps,
+            "cycles": self.steps,
             "context": {
                 "pc": 0x0020,
                 "regs": [0] * 16,
@@ -137,8 +140,10 @@ class _StubVM:
                 "reg_base": 0,
                 "stack_base": 0,
                 "stack_limit": 0,
-                "time_slice_cycles": 1000,
-                "accounted_cycles": self.cycles,
+                "time_slice_steps": 1,
+                "time_slice_cycles": 1,
+                "accounted_steps": self.steps,
+                "accounted_cycles": self.steps,
                 "state": "running",
                 "priority": 10,
                 "pid": pid,
@@ -193,3 +198,46 @@ def test_executive_pause_resume_kill():
     killed_task = state.kill_task(1)
     assert killed_task["state"] == "terminated"
     assert vm.kill_calls == 1
+
+
+def test_round_robin_single_instruction():
+    lines = [
+        ".text",
+        ".entry start",
+        "start:",
+        "LDI R1, 1",
+        "ADD R0, R0, R1",
+        "JMP start",
+    ]
+    code, entry, rodata = _assemble(lines)
+    controller = VMController()
+
+    def _add_task(pid: int) -> None:
+        vm = MiniVM(code, entry=entry, rodata=rodata)
+        state = vm.snapshot_state()
+        ctx = state["context"]
+        ctx["pid"] = pid
+        ctx["regs"][1] = 1
+        controller.task_states[pid] = state
+        controller.tasks[pid] = {
+            "pid": pid,
+            "program": f"<loop-{pid}>",
+            "state": "running",
+            "priority": ctx.get("priority", 10),
+            "quantum": ctx.get("time_slice_steps", 1),
+            "pc": ctx.get("pc", entry),
+            "sleep_pending": False,
+            "vm_state": state,
+            "trace": False,
+        }
+
+    _add_task(1)
+    _add_task(2)
+    controller.current_pid = 1
+    controller._activate_task(1)
+
+    controller.step(4)
+
+    for pid in (1, 2):
+        ctx = controller.task_states[pid]["context"]
+        assert ctx.get("accounted_steps") == 2

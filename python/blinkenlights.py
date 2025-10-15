@@ -119,10 +119,12 @@ class ShellRPC:
     def clock_stop(self) -> Dict[str, object]:
         return self.request({"cmd": "clock", "op": "stop"}).get("clock", {})
 
-    def clock_step(self, cycles: Optional[int] = None) -> Dict[str, object]:
+    def clock_step(self, steps: Optional[int] = None, pid: Optional[int] = None) -> Dict[str, object]:
         payload: Dict[str, object] = {"cmd": "clock", "op": "step"}
-        if cycles is not None:
-            payload["cycles"] = cycles
+        if steps is not None:
+            payload["steps"] = steps
+        if pid is not None:
+            payload["pid"] = pid
         return self.request(payload)
 
     def clock_rate(self, hz: float) -> Dict[str, object]:
@@ -211,7 +213,7 @@ class BlinkenlightsApp:
             ("Refresh", self.manual_refresh),
             ("Clock Start", self._clock_start_cmd),
             ("Clock Stop", self._clock_stop_cmd),
-            ("Clock Step 100", lambda: self._clock_step_cmd(100)),
+            ("Clock Step x100", lambda: self._clock_step_cmd(100)),
         ]
         top = 40
         for label, cb in btn_specs:
@@ -277,14 +279,14 @@ class BlinkenlightsApp:
         status = self.rpc.clock_stop()
         return self._format_clock_summary(status)
 
-    def _clock_step_cmd(self, cycles: int) -> str:
-        resp = self.rpc.clock_step(cycles)
+    def _clock_step_cmd(self, steps: int, pid: Optional[int] = None) -> str:
+        resp = self.rpc.clock_step(steps, pid=pid)
         result = resp.get("result", {}) if isinstance(resp, dict) else {}
         executed = result.get("executed")
         executed_text = f"{executed}" if executed is not None else "?"
         clock = resp.get("clock", {}) if isinstance(resp, dict) else {}
         summary = self._format_clock_summary(clock if isinstance(clock, dict) else {})
-        return f"{summary}; executed {executed_text} cycles"
+        return f"{summary}; executed {executed_text} instruction(s)"
 
     def manual_refresh(self) -> None:
         self.last_poll = 0

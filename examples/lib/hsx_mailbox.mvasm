@@ -102,10 +102,16 @@ hsx_mailbox_recv:
     MOV R2, R9
     MOV R3, R10
     MOV R4, R11
-    LDI R5, 0
+    LDI R6, -4
+    ADD R15, R15, R6
+    ST [R15+0], R12
+    MOV R5, R12
     SVC MOD=0x5, FN=0x3
     MOV R13, R0
     LDI R14, 0
+    LD R12, [R15+0]
+    LDI R6, 4
+    ADD R15, R15, R6
     CMP R13, R14
     JNZ hsx_mailbox_recv_error
     CMP R12, R14
@@ -177,7 +183,7 @@ hsx_mailbox_recv_basic:
     MOV R1, R8
     MOV R2, R9
     MOV R3, R10
-    LDI R4, 0
+    LDI R4, -1
     LDI R5, 0
     SVC MOD=0x5, FN=0x3
     MOV R8, R0

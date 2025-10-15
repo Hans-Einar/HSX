@@ -29,9 +29,9 @@ from typing import Any, Dict, Optional, List
 
 
 class ExecutiveState:
-    def __init__(self, vm: VMClient, step_cycles: int = 500) -> None:
+    def __init__(self, vm: VMClient, step_batch: int = 1) -> None:
         self.vm = vm
-        self.step_cycles = max(1, step_cycles)
+        self.step_batch = max(1, step_batch)
         self.auto_event = threading.Event()
         self.auto_thread: Optional[threading.Thread] = None
         self.lock = threading.Lock()
@@ -44,11 +44,11 @@ class ExecutiveState:
         self.log_buffer: deque[Dict[str, Any]] = deque(maxlen=512)
         self._next_log_seq = 1
         self.clock_rate_hz: float = 0.0
-        self.total_cycles: int = 0
+        self.total_steps: int = 0
         self.auto_step_count: int = 0
-        self.auto_cycle_count: int = 0
+        self.auto_step_total: int = 0
         self.manual_step_count: int = 0
-        self.manual_cycle_count: int = 0
+        self.manual_step_total: int = 0
         self._last_vm_running: bool = True
 
     def _refresh_tasks(self) -> None:
@@ -87,7 +87,7 @@ class ExecutiveState:
             "ts": time.time(),
             "level": level,
             "message": message,
-            "clock_cycles": self.total_cycles,
+            "clock_steps": self.total_steps,
         }
         if fields:
             entry.update(fields)
@@ -121,10 +121,10 @@ class ExecutiveState:
         self._refresh_tasks()
         return info
 
-    def step(self, cycles: Optional[int] = None, *, source: str = "manual") -> Dict[str, Any]:
-        budget = cycles if cycles is not None else self.step_cycles
+    def step(self, steps: Optional[int] = None, *, pid: Optional[int] = None, source: str = "manual") -> Dict[str, Any]:
+        budget = steps if steps is not None else self.step_batch
         with self.lock:
-            result = self.vm.step(budget)
+            result = self.vm.step(budget, pid=pid)
         events = result.get('events') or []
         self._process_vm_events(events)
         executed_raw = result.get("executed", 0)
@@ -133,13 +133,13 @@ class ExecutiveState:
         except (TypeError, ValueError):
             executed = 0
         if executed > 0:
-            self.total_cycles += executed
+            self.total_steps += executed
         if source == "auto":
             self.auto_step_count += 1
-            self.auto_cycle_count += executed
+            self.auto_step_total += executed
         else:
             self.manual_step_count += 1
-            self.manual_cycle_count += executed
+            self.manual_step_total += executed
         running_flag = bool(result.get("running", True))
         if (not running_flag) and (executed > 0 or self._last_vm_running):
             self.log(
@@ -173,11 +173,11 @@ class ExecutiveState:
             "state": "running" if running else "stopped",
             "running": running,
             "rate_hz": rate,
-            "step_cycles": self.step_cycles,
+            "step_size": self.step_batch,
             "auto_steps": self.auto_step_count,
-            "auto_cycles": self.auto_cycle_count,
+            "auto_total_steps": self.auto_step_total,
             "manual_steps": self.manual_step_count,
-            "manual_cycles": self.manual_cycle_count,
+            "manual_total_steps": self.manual_step_total,
         }
 
     def _has_runnable_tasks(self) -> bool:
@@ -189,8 +189,8 @@ class ExecutiveState:
         self.clock_rate_hz = float(hz)
         return self.get_clock_status()
 
-    def clock_step(self, cycles: Optional[int] = None) -> Dict[str, Any]:
-        return self.step(cycles, source="manual")
+    def clock_step(self, steps: Optional[int] = None, pid: Optional[int] = None) -> Dict[str, Any]:
+        return self.step(steps, pid=pid, source="manual")
 
     def get_task(self, pid: int) -> Dict[str, Any]:
         task = self.tasks.get(pid)
@@ -759,16 +759,18 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                     status = self.state.set_clock_rate(rate)
                     return {"version": 1, "status": "ok", "clock": status}
                 if op == "step":
-                    cycles_value = request.get("cycles")
-                    cycles = None
-                    if cycles_value is not None:
+                    steps_value = request.get("steps")
+                    steps = None
+                    if steps_value is not None:
                         try:
-                            cycles = int(cycles_value)
+                            steps = int(steps_value)
                         except (TypeError, ValueError):
-                            raise ValueError(f"clock step expects integer cycles, got {cycles_value!r}")
-                        if cycles <= 0:
-                            raise ValueError("clock step cycles must be positive")
-                    result = self.state.clock_step(cycles)
+                            raise ValueError(f"clock step expects integer steps, got {steps_value!r}")
+                        if steps <= 0:
+                            raise ValueError("clock step steps must be positive")
+                    pid_value = request.get("pid")
+                    pid_int = int(pid_value) if pid_value is not None else None
+                    result = self.state.clock_step(steps, pid=pid_int)
                     status = self.state.get_clock_status()
                     return {"version": 1, "status": "ok", "result": result, "clock": status}
                 raise ValueError(f"unknown clock op '{op}'")
@@ -779,9 +781,11 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 info = self.state.load(str(path_value), verbose=bool(request.get("verbose")))
                 return {"version": 1, "status": "ok", "image": info}
             if cmd == "step":
-                cycles = request.get("cycles")
-                cycles = int(cycles) if cycles is not None else None
-                result = self.state.step(cycles, source="manual")
+                steps_value = request.get("steps")
+                pid_value = request.get("pid")
+                steps_int = int(steps_value) if steps_value is not None else None
+                pid_int = int(pid_value) if pid_value is not None else None
+                result = self.state.step(steps_int, pid=pid_int, source="manual")
                 status = self.state.get_clock_status()
                 return {"version": 1, "status": "ok", "result": result, "clock": status}
             if cmd == "trace":
@@ -940,11 +944,11 @@ def main() -> None:
     parser.add_argument("--vm-port", type=int, default=9999, help="HSX VM port")
     parser.add_argument("--listen", type=int, default=9998, help="Shell listen port")
     parser.add_argument("--listen-host", default="127.0.0.1", help="Shell listen host")
-    parser.add_argument("--step", type=int, default=500, help="Cycles per step when auto stepping")
+    parser.add_argument("--step", type=int, default=1, help="Instructions per auto step batch")
     args = parser.parse_args()
 
     vm = VMClient(args.vm_host, args.vm_port)
-    state = ExecutiveState(vm, step_cycles=args.step)
+    state = ExecutiveState(vm, step_batch=args.step)
     try:
         info = state.attach()
         program = info.get("program")
@@ -976,9 +980,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-

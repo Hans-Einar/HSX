@@ -51,8 +51,11 @@ class VMClient:
             payload["verbose"] = True
         return _check_ok(self.request(payload)).get("image", {})
 
-    def step(self, cycles: int) -> Dict[str, Any]:
-        resp = _check_ok(self.request({"cmd": "step", "cycles": cycles}))
+    def step(self, steps: int, pid: Optional[int] = None) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {"cmd": "step", "steps": steps}
+        if pid is not None:
+            payload["pid"] = pid
+        resp = _check_ok(self.request(payload))
         return resp.get("result", {})
 
     def read_regs(self, pid: int | None = None) -> Dict[str, Any]:

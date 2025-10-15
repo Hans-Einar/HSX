@@ -5,7 +5,6 @@
 #define BUFFER_SIZE 192
 
 static char g_buffer[BUFFER_SIZE];
-static int g_recv_info_raw[(sizeof(hsx_mailbox_recv_info) + sizeof(int) - 1) / sizeof(int)];
 
 static int is_exit_command(const char* data, int length) {
     static const char kExit[] = "exit";
@@ -35,16 +34,12 @@ int main(void) {
 
     hsx_stdio_puts("mailbox consumer listening on " PROCON_MAILBOX_TARGET);
 
-    hsx_mailbox_recv_info* info = (hsx_mailbox_recv_info*)g_recv_info_raw;
-
     while (1) {
-        int status = hsx_mailbox_recv(handle, g_buffer, BUFFER_SIZE - 1,
-                                      HSX_MBX_TIMEOUT_INFINITE, info);
-        if (status < 0) {
+        int length = hsx_mailbox_recv_basic(handle, g_buffer, BUFFER_SIZE - 1);
+        if (length < 0) {
             hsx_stdio_puts_err("mailbox consumer: receive error");
             continue;
         }
-        int length = info->length;
         if (length == 0) {
             continue;
         }
