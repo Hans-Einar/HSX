@@ -84,11 +84,18 @@
 | ID | Title | Status |
 | -- | ----- | ------ |
 | I1 | Immediate stack overflow on task entry | resolved |
+| I2 | CALL immediate computes invalid target | new |
 
 ### I1 – Immediate stack overflow on task entry (resolved)
 - **Summary:** After introducing register-window backed contexts, every `clock step` crashed with `[PUSH] stack overflow` before user code executed.
 - **Review:** Stack allocator stored the guest SP as a *relative* offset (`stack_size`) while the VM expected an absolute address. With the default 4 KiB stack located at the top of memory, the initial `PUSH` saw `raw_sp < stack_limit` and triggered the guard.
 - **Remediation:** Update `_reserve_stack` / `_allocate_task_memory` to keep the stack at the top of RAM but track the absolute top-of-stack (`sp`) and a proper lower guard (`stack_limit`). Clamp the top to avoid wrapping past 0xFFFF.
 - **Implementation:** Commit f31fe6d4fbee4596b9f1aa4fede4e36f743b87bf (pending) adjusts stack allocation and updates `_ensure_task_memory`. Tests: `PYTHONPATH=. pytest python/tests/test_vm_pause.py python/tests/test_stack_guard.py`.
+
+### I2 – CALL immediate computes invalid target (new)
+- **Summary:** The mailbox producer crashes when a `CALL` at `0x081C` jumps to `0xFFFFF9AC`, which is outside the loaded code segment (length 3560 bytes). The disassembler shows `CALL rd=R0 rs1=R0 rs2=R0 imm=-1620`, so the VM should land inside the module but instead wraps far past the ROM window.
+- **Review:** Live trace captured via the Python VM (`[TRACE] pc=0x081C op=0x24 …`) confirms the decoder sign-extends the 16-bit immediate to `-1620` and the current implementation stores `target = imm & 0xFFFFFFFF` before assigning it to `pc`. Because `rs1` is ignored and the PC-relative adjustment is never applied, the VM treats the signed offset as an absolute address (`platforms/python/host_vm.py:902`). Per `docs/hsx_spec-v2.md` §3, `CALL` is defined as a PC-relative control transfer that pushes the return address; compiled code expects the offset to be added to `pc + 4` and masked to the architectural address width. The missing PC-relative addition (and lack of 16-bit masking) causes any backward call to underflow into the guard path.
+- **Remediation:** Restore the intended semantics in `MiniVM`: compute the call target as `(pc + imm)` when using the immediate form, fall back to `(regs[rs1] + imm)` when the register operand is used, and mask to the VM's address space (`0xFFFF`). Extend the range/limit checks to operate on the masked target so legal backward jumps survive. Add regression coverage that disassembles a short program containing backward calls and verifies the VM updates `pc` to `0x01C8` for this sample instruction. Update CLI/disassembler helpers if they assume absolute immediates.
+- **Implementation:** Plan to (1) add a focused unit test under `python/tests/` reproducing the failing instruction, (2) patch `MiniVM._step_call` (or the inline `CALL` case) to apply PC-relative math and masking, (3) refresh any documentation mentioning call semantics, and (4) capture before/after traces as evidence. Track the fix under T3/T4 once scheduled.
 
 Update this document after every working session—note partial progress, open questions, and where to pick up next.
