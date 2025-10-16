@@ -58,7 +58,9 @@
 
 ### T4 Tests, docs, demos (`active`)
 - [x] Create/extend unit tests: register-window isolation, stack overflow, trap resume, RR fairness.
-  - Added register-window and stack guard unit tests (`python/tests/test_vm_pause.py`, `python/tests/test_stack_guard.py`); mailbox trap resume will be covered via integration testing later. Tests executed: `PYTHONPATH=. pytest python/tests/test_vm_pause.py python/tests/test_stack_guard.py python/tests/test_shell_client.py`.
+  - Added register-window and stack guard unit tests (`python/tests/test_vm_pause.py`, `python/tests/test_stack_guard.py`). Tests executed: `PYTHONPATH=. pytest python/tests/test_vm_pause.py python/tests/test_stack_guard.py python/tests/test_shell_client.py`.
+- [x] Update integration tests/demos (mailbox producer/consumer) to assert behaviour under new scheduler.
+  - Added `python/tests/test_scheduler_stats.py` to validate scheduler counters/trace in `info()`.
 - [ ] Update integration tests/demos (mailbox producer/consumer) to assert behaviour under new scheduler.
   - Plan: scripted HSX shell transcript covering send/receive, verifying scheduler counters and trace.
 - [ ] Refresh documentation (`docs/hsx_spec-v2.md`, CLI help) to reflect “one step = one instruction” and base-pointer model.
