@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import sys, re, struct, zlib, argparse, json
+import sys, re, struct, zlib, argparse, json, subprocess
 from pathlib import Path
 from typing import Any, Dict
 
@@ -721,6 +721,7 @@ def main():
     ap.add_argument("-v", "--verbose", action="store_true", help="print assembly statistics")
     ap.add_argument("--dump-bytes", action="store_true", help="emit code words as hex for debugging")
     ap.add_argument("--emit-hxo", action="store_true", help="emit HSX object (.hxo) instead of final .hxe")
+    ap.add_argument("--dump-json", action="store_true", help="emit disassembly JSON alongside the .hxe")
     args = ap.parse_args()
     input_path = Path(args.input).resolve()
     with input_path.open("r", encoding="utf-8") as f:
@@ -745,6 +746,11 @@ def main():
         )
     else:
         write_hxe(code, entry or 0, args.output, rodata=rodata)
+        if args.dump_json:
+            json_path = Path(args.output).with_suffix(".json")
+            disassemble_py = Path(__file__).resolve().parents[1] / "python" / "disassemble.py"
+            cmd = [sys.executable, str(disassemble_py), args.output, "--mvasm", str(input_path), "-o", str(json_path)]
+            subprocess.run(cmd, check=True)
     if args.verbose:
         print(f"entry=0x{(entry or 0):08X} words={len(code)} bytes={len(code)*4} rodata={len(rodata)}")
         if imports_decl:

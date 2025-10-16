@@ -1397,7 +1397,7 @@ class VMController:
         self.traced_pids: Set[int] = set()
         self.debug_sessions: Dict[int, DebugState] = {}
         self._reg_alloc_next = REGISTER_REGION_START
-        self._stack_alloc_next = VM_ADDRESS_SPACE_SIZE
+        self._stack_alloc_next = VM_ADDRESS_SPACE_SIZE - STACK_ALIGNMENT
         self._reg_free_list: List[int] = []
         self._stack_free_list: List[Tuple[int, int]] = []  # (base, size)
         self._task_memory: Dict[int, Dict[str, int]] = {}
@@ -1551,29 +1551,32 @@ class VMController:
         size = max(stack_bytes, STACK_ALIGNMENT)
         if self._stack_free_list:
             stack_base, available = self._stack_free_list.pop()
-            if available < size:
-                size = available
-            stack_size = available
+            stack_size = min(available, size)
             stack_top = stack_base + stack_size
         else:
             stack_top = _align_down(self._stack_alloc_next, STACK_ALIGNMENT)
+            if stack_top < size:
+                raise RuntimeError("insufficient VM memory for stacks")
             stack_base = stack_top - size
             if stack_base <= self._reg_alloc_next:
                 raise RuntimeError("insufficient VM memory for stacks")
             self._stack_alloc_next = stack_base
             stack_size = size
-        sp_offset = stack_size  # offset from base to top-of-stack
-        return stack_base, stack_size, sp_offset
+        sp_absolute = stack_top
+        if sp_absolute >= VM_ADDRESS_SPACE_SIZE:
+            sp_absolute = VM_ADDRESS_SPACE_SIZE - STACK_ALIGNMENT
+        return stack_base, stack_size, sp_absolute
 
     def _allocate_task_memory(self, pid: int, stack_bytes: int = DEFAULT_STACK_BYTES) -> Dict[str, int]:
         reg_base = self._reserve_register_bank()
         stack_base, stack_size, sp_offset = self._reserve_stack(stack_bytes)
+        stack_limit = stack_base
         allocation = {
             "reg_base": reg_base,
             "stack_base": stack_base,
-            "stack_limit": stack_base,
+            "stack_limit": stack_limit,
             "stack_size": stack_size,
-            "sp_offset": sp_offset,
+            "sp": sp_offset,
         }
         self._task_memory[pid] = allocation
         return allocation
@@ -1591,6 +1594,7 @@ class VMController:
         stack_base = ctx.get("stack_base", 0)
         stack_limit = ctx.get("stack_limit", 0)
         stack_size = ctx.get("stack_size")
+        sp_value = ctx.get("sp")
         if reg_base and stack_base:
             allocation = self._task_memory.get(pid)
             if allocation is None:
@@ -1599,21 +1603,23 @@ class VMController:
                     "stack_base": stack_base,
                     "stack_limit": stack_limit or stack_base,
                     "stack_size": stack_size or DEFAULT_STACK_BYTES,
-                    "sp_offset": ctx.get("sp", DEFAULT_STACK_BYTES),
+                    "sp": sp_value if sp_value is not None else (stack_base + (stack_size or DEFAULT_STACK_BYTES)),
                 }
                 self._task_memory[pid] = allocation
             else:
                 allocation.setdefault("stack_size", stack_size or DEFAULT_STACK_BYTES)
+                if sp_value is not None:
+                    allocation["sp"] = sp_value
             ctx.setdefault("stack_limit", allocation["stack_limit"])
             ctx.setdefault("stack_size", allocation["stack_size"])
-            ctx.setdefault("sp", allocation["sp_offset"])
+            ctx.setdefault("sp", allocation.get("sp"))
             return ctx
         allocation = self._allocate_task_memory(pid, stack_bytes=stack_size or DEFAULT_STACK_BYTES)
         ctx["reg_base"] = allocation["reg_base"]
         ctx["stack_base"] = allocation["stack_base"]
         ctx["stack_limit"] = allocation["stack_limit"]
         ctx["stack_size"] = allocation["stack_size"]
-        ctx.setdefault("sp", allocation["sp_offset"])
+        ctx.setdefault("sp", allocation["sp"])
         state["context"] = ctx
         return ctx
 
@@ -2302,7 +2308,7 @@ class VMController:
         ctx["reg_base"] = allocation["reg_base"]
         ctx["stack_base"] = allocation["stack_base"]
         ctx["stack_limit"] = allocation["stack_limit"]
-        ctx["sp"] = allocation["sp_offset"]
+        ctx["sp"] = allocation["sp"]
         ctx["stack_size"] = allocation["stack_size"]
         state["context"] = ctx
         self.tasks[pid] = {
