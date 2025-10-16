@@ -77,4 +77,18 @@
 - Known blockers: None.
 - Next action when resuming: Review evidence, coordinate stakeholder sign-off, and close out DoD.
 
+## Implementation Issues Log
+
+> Track unexpected problems discovered during implementation. Each issue records a short description, the review findings, the remediation, and implementation notes (including code changes/tests).
+
+| ID | Title | Status |
+| -- | ----- | ------ |
+| I1 | Immediate stack overflow on task entry | resolved |
+
+### I1 – Immediate stack overflow on task entry (resolved)
+- **Summary:** After introducing register-window backed contexts, every `clock step` crashed with `[PUSH] stack overflow` before user code executed.
+- **Review:** Stack allocator stored the guest SP as a *relative* offset (`stack_size`) while the VM expected an absolute address. With the default 4 KiB stack located at the top of memory, the initial `PUSH` saw `raw_sp < stack_limit` and triggered the guard.
+- **Remediation:** Update `_reserve_stack` / `_allocate_task_memory` to keep the stack at the top of RAM but track the absolute top-of-stack (`sp`) and a proper lower guard (`stack_limit`). Clamp the top to avoid wrapping past 0xFFFF.
+- **Implementation:** Commit f31fe6d4fbee4596b9f1aa4fede4e36f743b87bf (pending) adjusts stack allocation and updates `_ensure_task_memory`. Tests: `PYTHONPATH=. pytest python/tests/test_vm_pause.py python/tests/test_stack_guard.py`.
+
 Update this document after every working session—note partial progress, open questions, and where to pick up next.
