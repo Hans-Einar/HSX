@@ -1,6 +1,0 @@
-### T4 Tests, docs, demos (`not started`)
-- [ ] Create/extend unit tests: register-window isolation, stack overflow, trap resume, RR fairness.
-- [ ] Update integration tests/demos (mailbox producer/consumer) to assert behaviour under new scheduler.
-- [ ] Refresh documentation (`docs/hsx_spec-v2.md`, CLI help) to reflect "one step = one instruction" and base-pointer model.
-- [ ] Capture evidence: `dumpregs`, `mbox`, scheduler stats before/after refactor.
-- [ ] Coordinate final review and stakeholder sign-off.

@@ -1215,13 +1215,13 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
             if len(args) > 1:
                 payload["limit"] = args[1]
             return payload
-        payload["pid"] = args[0]
+        payload["pid"] = int(args[0], 0)
         tokens = args[1:]
         i = 0
         while i < len(tokens):
             token = tokens[i].lower()
             if token in {"priority", "quantum"} and i + 1 < len(tokens):
-                payload[token] = tokens[i + 1]
+                payload[token] = int(tokens[i + 1], 0)
                 i += 2
             else:
                 raise ValueError("sched usage: sched [stats [limit]] | <pid> [priority <n>] [quantum <n>]")
