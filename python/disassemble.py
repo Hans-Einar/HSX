@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from disasm_util import OPCODE_NAMES, instruction_size
+from disasm_util import OPCODE_NAMES, format_operands, instruction_size
 from platforms.python.host_vm import HEADER, HEADER_FIELDS, HSX_MAGIC
 
 
@@ -38,10 +38,11 @@ def decode_instruction(word: int) -> Dict[str, int]:
     rd = (word >> 20) & 0x0F
     rs1 = (word >> 16) & 0x0F
     rs2 = (word >> 12) & 0x0F
-    imm = word & 0x0FFF
+    imm_raw = word & 0x0FFF
+    imm = imm_raw
     if imm & 0x800:
         imm -= 0x1000
-    return {'op': op, 'rd': rd, 'rs1': rs1, 'rs2': rs2, 'imm': imm}
+    return {'op': op, 'rd': rd, 'rs1': rs1, 'rs2': rs2, 'imm': imm, 'imm_raw': imm_raw}
 
 
 def disassemble(code: bytes) -> List[Dict[str, object]]:
@@ -51,6 +52,9 @@ def disassemble(code: bytes) -> List[Dict[str, object]]:
         word = be32(code, offset)
         info = decode_instruction(word)
         opcode_name = OPCODE_NAMES.get(info['op'], f"0x{info['op']:02X}")
+        next_word = None
+        if opcode_name == 'LDI32' and offset + 8 <= len(code):
+            next_word = be32(code, offset + 4)
         inst = {
             'pc': offset,
             'word': word,
@@ -59,7 +63,19 @@ def disassemble(code: bytes) -> List[Dict[str, object]]:
             'rs1': info['rs1'],
             'rs2': info['rs2'],
             'imm': info['imm'],
+            'imm_raw': info['imm_raw'],
+            'extended_imm': next_word,
         }
+        inst['operands'] = format_operands(
+            opcode_name,
+            info['rd'],
+            info['rs1'],
+            info['rs2'],
+            imm=info['imm'],
+            imm_raw=info['imm_raw'],
+            next_word=next_word,
+            pc=offset,
+        )
         listing.append(inst)
         offset += instruction_size(opcode_name)
     return listing
@@ -150,10 +166,9 @@ def print_listing(header, listing, symbols, rodata):
         for name in labels_text.get(inst['pc'], []):
             print(f"{name}:")
         target = f" -> {inst['target']}" if 'target' in inst else ''
-        print(
-            f"  0x{inst['pc']:04X}: 0x{inst['word']:08X} {inst['mnemonic']}"
-            f" rd=R{inst['rd']} rs1=R{inst['rs1']} rs2=R{inst['rs2']} imm={inst['imm']}{target}"
-        )
+        operands = inst.get('operands') or ''
+        spacing = f" {operands}" if operands else ''
+        print(f"  0x{inst['pc']:04X}: 0x{inst['word']:08X} {inst['mnemonic']}{spacing}{target}")
     if rodata:
         print()
         print('; rodata')

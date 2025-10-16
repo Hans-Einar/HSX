@@ -21,6 +21,7 @@ if str(REPO_ROOT) not in sys.path:
 try:
     from python.mailbox import MailboxManager, MailboxError, MailboxMessage
     from python import hsx_mailbox_constants as mbx_const
+    from python.disasm_util import OPCODE_NAMES, format_operands
 except ImportError as exc:  # pragma: no cover - require repo sources
     raise ImportError("HSX repo modules not found; ensure repository root on PYTHONPATH") from exc
 
@@ -737,16 +738,21 @@ class MiniVM:
 
         if self.pc + 4 > len(self.code):
             pid = self.context.pid if self.context else None
-            self.emit_event({
+            error_info = {
                 "type": "vm_error",
                 "pid": pid,
                 "error": "pc_out_of_range",
                 "pc": self.pc,
                 "code_len": len(self.code),
-            })
-            print(f"[VM] PC 0x{self.pc:04X} is outside code length {len(self.code)}")
-            self.running = False
-            self.save_context()
+            }
+            self.emit_event(error_info)
+            msg = f"[VM] PC 0x{self.pc:04X} is outside code length {len(self.code)}"
+            self._log(msg)
+            self._debug_halt(
+                "vm_error",
+                halt_pc=self.pc,
+                extra={"error": "pc_out_of_range", "code_len": len(self.code)},
+            )
             return
 
         ins = be32(self.code, self.pc)
@@ -814,7 +820,28 @@ class MiniVM:
             self.save_context()
 
         if self.trace or self.trace_out:
-            self._log(f"[TRACE] pc=0x{self.pc:04X} op=0x{op:02X} rd=R{rd} rs1=R{rs1} rs2=R{rs2} imm={imm}")
+            mnemonic = OPCODE_NAMES.get(op, f"0x{op:02X}")
+            reg_snapshot = [self.regs[i] for i in range(16)]
+            imm_raw = ins & 0x0FFF
+            next_word = None
+            if op == 0x60 and self.pc + 8 <= len(self.code):
+                next_word = be32(self.code, self.pc + 4)
+            operands = format_operands(
+                mnemonic,
+                rd,
+                rs1,
+                rs2,
+                imm=imm,
+                imm_raw=imm_raw,
+                reg_values=reg_snapshot,
+                flags=self.flags,
+                next_word=next_word,
+                pc=self.pc,
+            )
+            operand_text = f" {operands}" if operands else ""
+            self._log(
+                f"[TRACE] 0x{self.pc & 0xFFFF:04X}: 0x{ins:08X} {mnemonic}{operand_text}"
+            )
 
         adv = 4
         if op == 0x01:  # LDI
