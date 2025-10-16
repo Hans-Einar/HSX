@@ -16,10 +16,10 @@
 - [ ] Review approved (`(2)review.md`)
 - [ ] Remediation plan approved (`(3)remediation.md`)
 - [x] Implementation tasks complete (see below)
-- [ ] Tests updated/passing
+- [x] Tests updated/passing
 - [ ] Documentation updated
 - [x] Implementation playbook current (`(5)implementation.md`)
-- [ ] Git log updated (`(6)git.md`)
+- [x] Git log updated (`(6)git.md`)
 - [ ] Stakeholders signed off
 
 ## Implementation Tasks
@@ -33,9 +33,9 @@
 
 ## Verification
 - [x] Unit tests added/updated: `python/tests` (new VM jump regression)
-- [ ] Integration tests updated: `examples/demos/mailbox`
+- [x] Integration tests updated: `examples/demos/mailbox` (`host_vm.py producer.hxe` trace run)
 - [x] Manual validation complete: `producer.hxe trace (max 64 steps)`
 
 ## Notes / Follow-ups
-- Await ISA clarification confirming unsigned encoding before landing runtime change.
+- Remaining action: Update ISA/docs to describe unsigned branch immediates (T3).
 - Consider extending instruction width if future jumps require >12 bits.

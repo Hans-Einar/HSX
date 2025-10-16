@@ -30,12 +30,20 @@
   - Commits: Pending final PR aggregation (see workspace changes).
   - Tests: `python/tests/test_vm_jump_immediates.py`
 
+### I2 `Clock throttling fails to resume full speed` (`resolved`)
+- **Summary:** When all tasks are blocked the auto-loop deliberately slows down, but the clock kept idling even after a mailbox wake, leaving task execution in slow mode.
+- **Review:** The throttle logic in `ExecutiveState._auto_loop` prioritized the global `sleep_pending` flag before checking for runnable tasks. As long as any task was sleeping (common during mailbox waits), the loop stuck to a 10–50 ms delay even when other tasks were ready, so the clock never accelerated.
+- **Remediation:** Reorder the wait-time selection to favor runnable tasks, introduce explicit throttle state tracking (`mode`, `throttle_reason`), and surface the mode through `clock status` so operators can confirm when the loop returns to full speed.
+- **Implementation:**
+  - Commits: Pending (see working tree).
+  - Tests: `/mnt/c/Users/hanse/miniconda3/python.exe -m pytest python/tests/test_vm_pause.py python/tests/test_mailbox_wait.py python/tests/test_shell_client.py`
+
 ## Context & Artifacts
-- Source files / directories touched: `platforms/python/host_vm.py`, `python/disassemble.py`, `python/disasm_util.py`
+- Source files / directories touched: `platforms/python/host_vm.py`, `python/disassemble.py`, `python/disasm_util.py`, `python/execd.py`, `python/shell_client.py`, `python/blinkenlights.py`, `docs/executive_protocol.md`, `help/clock.txt`
 - Test suites to run: `python/tests`, mailbox demos under `examples/demos`
-- Commands / scripts used: `python platforms/python/host_vm.py <image> --trace`, targeted unit tests once added
+- Commands / scripts used: `python platforms/python/host_vm.py <image> --trace`, `/mnt/c/Users/hanse/miniconda3/python.exe -m pytest …`
 
 ## Handover Notes
-- Current status: Issue logged; remediation tasks queued but not started.
-- Pending questions / blockers: Await ISA guidance on immediate encoding width/semantics.
-- Suggested next action when resuming: Begin with T1 Step 1 audit once guidance received.
+- Current status: JMP immediate fix merged; clock throttle regression resolved with new status telemetry. ISA spec/doc refresh (T3) still pending.
+- Pending questions / blockers: Need decision on finalizing ISA documentation update for unsigned jumps.
+- Suggested next action when resuming: Draft the ISA/spec changes for T3 and confirm no additional throttle regressions via long-running mailbox demos.

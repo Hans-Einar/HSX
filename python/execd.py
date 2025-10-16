@@ -50,6 +50,9 @@ class ExecutiveState:
         self.manual_step_count: int = 0
         self.manual_step_total: int = 0
         self._last_vm_running: bool = True
+        self.clock_mode: str = "stopped"
+        self._clock_last_wait: float = 0.0
+        self._clock_throttle_reason: Optional[str] = None
 
     def _refresh_tasks(self) -> None:
         try:
@@ -157,6 +160,9 @@ class ExecutiveState:
         if self.auto_thread and self.auto_thread.is_alive():
             return
         self.auto_event.clear()
+        self.clock_mode = "rate" if self.clock_rate_hz > 0 else "active"
+        self._clock_throttle_reason = None
+        self._clock_last_wait = 0.0
         self.auto_thread = threading.Thread(target=self._auto_loop, daemon=True)
         self.auto_thread.start()
 
@@ -165,13 +171,22 @@ class ExecutiveState:
             self.auto_event.set()
             self.auto_thread.join(timeout=1.0)
         self.auto_thread = None
+        self.clock_mode = "stopped"
+        self._clock_throttle_reason = None
+        self._clock_last_wait = 0.0
 
     def get_clock_status(self) -> Dict[str, Any]:
         running = self.auto_thread is not None and self.auto_thread.is_alive()
         rate = self.clock_rate_hz if self.clock_rate_hz > 0 else 0.0
+        throttle_reason = self._clock_throttle_reason
+        throttled = throttle_reason in {"throttled", "sleep"}
         return {
             "state": "running" if running else "stopped",
             "running": running,
+            "mode": self.clock_mode,
+            "throttled": throttled,
+            "throttle_reason": throttle_reason,
+            "last_wait_s": self._clock_last_wait,
             "rate_hz": rate,
             "step_size": self.step_batch,
             "auto_steps": self.auto_step_count,
@@ -628,25 +643,57 @@ class ExecutiveState:
             result = self.step(source="auto")
             vm_running = bool(result.get("running", True))
             runnable = self._has_runnable_tasks()
+            any_tasks = bool(self.tasks)
             wait_time = 0.0
+            throttle_reason: Optional[str] = None
             if self.clock_rate_hz > 0:
                 period = 1.0 / self.clock_rate_hz
                 elapsed = time.perf_counter() - start
                 wait_time = max(0.0, period - elapsed)
                 if result.get("paused"):
+                    throttle_reason = "paused"
                     wait_time = max(wait_time, 0.05)
+                elif runnable:
+                    throttle_reason = None
                 elif result.get("sleep_pending"):
+                    throttle_reason = "sleep"
                     wait_time = max(wait_time, 0.01)
+                elif not vm_running or not any_tasks:
+                    throttle_reason = "idle" if not any_tasks else "throttled"
+                    wait_time = max(wait_time, 0.05)
             else:
-                if result.get("paused"):
+                if runnable:
+                    wait_time = 0.001
+                    throttle_reason = None
+                elif result.get("paused"):
+                    throttle_reason = "paused"
+                    wait_time = 0.05
+                elif not any_tasks:
+                    throttle_reason = "idle"
                     wait_time = 0.05
                 elif result.get("sleep_pending"):
+                    throttle_reason = "sleep"
                     wait_time = 0.01
-                elif not vm_running and not runnable:
+                elif not vm_running:
+                    throttle_reason = "throttled"
                     wait_time = 0.05
                 else:
                     wait_time = 0.001
+
+            if not any_tasks:
+                throttle_reason = throttle_reason or "idle"
+
+            if throttle_reason is None:
+                self.clock_mode = "rate" if self.clock_rate_hz > 0 else "active"
+            else:
+                self.clock_mode = throttle_reason
+            self._clock_throttle_reason = throttle_reason
+            self._clock_last_wait = wait_time
+
             if not vm_running and not runnable and not self.tasks:
+                self.clock_mode = "idle"
+                self._clock_throttle_reason = "idle"
+                self._clock_last_wait = 0.0
                 break
             if wait_time > 0:
                 self.auto_event.wait(timeout=wait_time)

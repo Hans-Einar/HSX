@@ -32,7 +32,7 @@ Core Commands
 | `load` | `{ "version": 1, "cmd": "load", "path": "/abs/app.hxe" }` | `{ "version": 1, "status": "ok", "image": { "pid": <int>, ... } }` | Loads `.hxe` into VM (works while attached). |
 | `exec` | Same as `load` | Same as `load` | Alias used by shell clients. |
 | `ps` | `{ "version": 1, "cmd": "ps" }` | `{ "version": 1, "status": "ok", "tasks": {"tasks": [...], "current_pid": n} }` | Returns scheduler snapshot (task list + active pid). |
-| `clock` | `{ "version": 1, "cmd": "clock" }` | `{ "version": 1, "status": "ok", "clock": { ... } }` | Reports clock status (state, rate, auto/manual step counters). |
+| `clock` | `{ "version": 1, "cmd": "clock" }` | `{ "version": 1, "status": "ok", "clock": { ... } }` | Reports clock status (state, mode, throttle metadata, rate, auto/manual counters). |
 | `clock` | `{ "version": 1, "cmd": "clock", "op": "start" }` | `{ "version": 1, "status": "ok", "clock": { ... } }` | Starts the auto-step clock loop (alias `op: "run"`). |
 | `clock` | `{ "version": 1, "cmd": "clock", "op": "stop" }` | `{ "version": 1, "status": "ok", "clock": { ... } }` | Stops the auto-step clock loop (alias `op: "halt"`). |
 | `clock` | `{ "version": 1, "cmd": "clock", "op": "step", "steps": 500 [, "pid": 2] }` | `{ "version": 1, "status": "ok", "result": { "executed": n, ... }, "clock": { ... } }` | Retires the requested number of guest instructions; add `pid` to restrict scheduling to a single task. |
@@ -48,6 +48,12 @@ Core Commands
 | `sched` | `{ "version": 1, "cmd": "sched", "pid": 1, "priority": 5, "quantum": 2000 }` | `{ "version": 1, "status": "ok", "task": { ... } }` | Updates per-task priority and/or quantum slice. |
 | `restart` | `{ "version": 1, "cmd": "restart", "targets": ["vm","exec"] }` | `{ "version": 1, "status": "ok", "restart": { ... } }` | Requests restart of VM and/or exec processes (defaults to both when omitted). |
 | `shutdown` | `{ "version": 1, "cmd": "shutdown" }` | `{ "version": 1, "status": "ok" }` | Asks executive server to exit. |
+
+Clock status payloads expose additional telemetry beyond the base running flag:
+
+- `mode`: qualitative state of the auto-loop (`active`, `rate`, `sleep`, `throttled`, `idle`, `paused`, `stopped`).
+- `throttled` / `throttle_reason`: whether the scheduler is intentionally slowed (e.g. all tasks blocked on mailboxes).
+- `last_wait_s`: most recent sleep duration scheduled by the auto loop.
 
 Task Model
 ----------
