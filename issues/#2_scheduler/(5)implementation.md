@@ -28,7 +28,7 @@
 - [x] Smoke-test by spawning two tasks; verify `dumpregs` shows distinct bases.
   - Consumer vs. producer bases observed at `0x1000/0xF000` and `0x1040/0xE000` respectively.
 
--### T2 MiniVM register access via base pointers (`active`)
+### T2 MiniVM register access via base pointers (`done`)
 - [x] Replace direct list usage (`self.regs`) with memory-backed getters/setters.
   - Implemented `RegisterFile` wrapper; instruction handlers now access register window via memory, keeping `ctx.regs` in sync.
 - [x] Update `set_context`, `save_context`, and `snapshot_registers` to avoid cloning arrays.
@@ -37,7 +37,8 @@
   - `VMController.read_regs()` now exposes `reg_base`/`stack_base`/`sp_effective`; CLI `dumpregs` prints the new fields.
 - [x] Add runtime assertions: active tasks must have non-zero `reg_base`, `stack_base`, `stack_limit`.
   - `_ensure_task_memory` verifies allocations and `_activate_task` raises if bases are missing.
-- [ ] Run unit tests covering register read/write to ensure behaviour unchanged.
+- [x] Run unit tests covering register read/write to ensure behaviour unchanged.
+  - `PYTHONPATH=. pytest python/tests/test_vm_pause.py python/tests/test_shell_client.py`.
 
 ### T3 Scheduler & mailbox contract enforcement (`not started`)
 - [ ] Simplify `_activate_task` / `_store_active_state` to use base pointers only.
@@ -60,8 +61,8 @@
 - Useful commands: `python python/disassemble.py ...`, HSX shell `clock step`, `dumpregs`, `mbox`, CI test runners.
 
 ## Handover Notes
-- Current status: T1 complete; T2 in progress (MiniVM now backed by register windows).
+- Current status: T1 and T2 complete; next up is T3 (scheduler contract enforcement).
 - Known blockers: None.
-- Next action when resuming: Update debugger/CLI helpers to consume the register window and plan coverage (assertions/tests).
+- Next action when resuming: Begin T3 by refactoring `_store_active_state` / `_activate_task` for pointer-based context swaps and auditing the round-robin stepping path.
 
 Update this document after every working session—note partial progress, open questions, and where to pick up next.
