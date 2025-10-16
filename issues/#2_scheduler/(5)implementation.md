@@ -40,8 +40,9 @@
 - [x] Run unit tests covering register read/write to ensure behaviour unchanged.
   - `PYTHONPATH=. pytest python/tests/test_vm_pause.py python/tests/test_shell_client.py`.
 
-### T3 Scheduler & mailbox contract enforcement (`not started`)
-- [ ] Simplify `_activate_task` / `_store_active_state` to use base pointers only.
+### T3 Scheduler & mailbox contract enforcement (`active`)
+- [x] Simplify `_activate_task` / `_store_active_state` to use base pointers only.
+  - `_ensure_task_memory` now runs during `_activate_task`/`_store_active_state`, reusing allocated register/stack windows and updating task metadata.
 - [ ] Guarantee `MiniVM.step()` retires exactly one instruction; remove implicit loops.
 - [ ] Update executive loop (`python/execd.py`) to honour one-instruction steps and rotate READY queue.
 - [ ] Rework mailbox wait/wake (`_prepare_mailbox_wait`, `_complete_mailbox_wait`) to stop copying registers, maintain wait queues, and enforce invariants.
@@ -61,8 +62,8 @@
 - Useful commands: `python python/disassemble.py ...`, HSX shell `clock step`, `dumpregs`, `mbox`, CI test runners.
 
 ## Handover Notes
-- Current status: T1 and T2 complete; next up is T3 (scheduler contract enforcement).
+- Current status: T1 and T2 complete; T3 is active (scheduler contract enforcement).
 - Known blockers: None.
-- Next action when resuming: Begin T3 by refactoring `_store_active_state` / `_activate_task` for pointer-based context swaps and auditing the round-robin stepping path.
+- Next action when resuming: Refactor `_store_active_state` / `_activate_task` to reuse allocated register/stack windows and then audit the round-robin single-instruction stepping path.
 
 Update this document after every working session—note partial progress, open questions, and where to pick up next.

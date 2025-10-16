@@ -15,6 +15,8 @@
 | 2025-10-15 | 9d5d596ff5e3e6bbe3417f29efe293b3846b32d9 | T1 checkboxes for register/stack allocation | Hans Einar | Filled in git log, adjusted playbook, and refined allocator scaffolding.
 | 2025-10-15 | f9dad8f2663307562f139bcaed27ced3dc9d9c01 | platforms/python/host_vm.py allocates per-task register banks and stack slices... | Hans Einar | Completed T1 work, verified snapshot/restore & two-task smoke test, moved playbook to T2.
 | 2025-10-16 | dc8592e6c516f4c00ce89bdb0c7a28e6707ca5c2 | Introduced RegisterFile wrapper for MiniVM | Hans Einar | MiniVM now accesses register windows via memory; context save/restore updated.
+| 2025-10-16 | 035f438bdae771de2b562f92c98ad449c432ba40 | MiniVM register window integration tests | Hans Einar | Ran targeted unit tests and marked T2 complete in the playbook.
+| 2025-10-16 | bef1cbe766bca171249243464d00baeafaed6fc6 | Completed T2 test coverage | Hans Einar | Recorded unit tests and updated playbook; ready to start scheduler contract work (T3).
 
 ## Pull Request
 - PR URL / ID: _TBD_

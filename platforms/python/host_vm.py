@@ -2347,6 +2347,7 @@ class VMController:
         state = self.vm.snapshot_state()
         ctx = state["context"]
         ctx["pid"] = self.current_pid
+        ctx = self._ensure_task_memory(self.current_pid, state)
         state["context"] = ctx
         state["running"] = self.vm.running
         state["steps"] = self.vm.steps
@@ -2362,6 +2363,10 @@ class VMController:
                 task["exit_status"] = exit_status
             else:
                 task.pop("exit_status", None)
+            task["reg_base"] = ctx.get("reg_base", task.get("reg_base"))
+            task["stack_base"] = ctx.get("stack_base", task.get("stack_base"))
+            task["stack_limit"] = ctx.get("stack_limit", task.get("stack_limit"))
+            task["stack_size"] = ctx.get("stack_size", task.get("stack_size"))
             waiting = ctx.get("state") == "waiting_mbx" or self.waiting_tasks.get(self.current_pid)
             if self.paused:
                 new_state = "paused"
