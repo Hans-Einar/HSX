@@ -901,7 +901,11 @@ class MiniVM:
                 adv = 0
         elif op == 0x24:  # CALL
             return_addr = (self.pc + 4) & 0xFFFFFFFF
-            target = imm & 0xFFFFFFFF
+            if rs1:
+                base = self.regs[rs1]
+            else:
+                base = self.pc
+            target = (int(base) + int(imm)) & 0xFFFF
             raw_sp = self.sp - 4
             if raw_sp < 0 or raw_sp < (self.context.stack_limit or 0) or raw_sp + 4 > len(self.mem):
                 self._log("[CALL] stack overflow")
@@ -917,7 +921,7 @@ class MiniVM:
             self.call_stack.append(return_addr)
             if self.trace:
                 self._log(
-                    f"[CALL] pc=0x{(self.pc & 0xFFFF):04X} -> 0x{target & 0xFFFFFFFF:04X} "
+                    f"[CALL] pc=0x{(self.pc & 0xFFFF):04X} -> 0x{target:04X} "
                     f"ret=0x{return_addr:04X} sp=0x{self.sp:04X}"
                 )
             self.pc = target

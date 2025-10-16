@@ -57,12 +57,15 @@ def test_local_relocations_resolved_in_image_mode():
     # LDI32 immediate is stored in the second word after the opcode
     assert code[1] == ASM.RODATA_BASE
 
-    # CALL foo should be patched with absolute text offset for foo
+    # CALL foo should be patched with the PC-relative offset to foo
     # start -> instructions: LDI32 (word 0 and 1), CALL foo (word 2), JMP start (word 3)
     # foo label is at offset 16 (4 instructions * 4 bytes)
     foo_addr = 16
-    call_word = code[2]
-    assert call_word & 0x0FFF == foo_addr & 0x0FFF
+    call_idx = 2
+    call_pc = call_idx * 4
+    call_word = code[call_idx]
+    expected_offset = foo_addr - call_pc
+    assert call_word & 0x0FFF == (expected_offset & 0x0FFF)
 
     # JMP start should loop back to address 0
     jmp_word = code[3]

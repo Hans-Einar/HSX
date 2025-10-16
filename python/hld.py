@@ -115,7 +115,11 @@ def link_objects(object_paths: List[Path], output: Path, *, verbose: bool = Fals
             if reloc.get("section") == "code":
                 idx = reloc["index"]
                 if reloc["type"] in {"imm12", "jump", "mem"}:
-                    mod["code"][idx] = set_imm12(mod["code"][idx], value)
+                    patch_value = value
+                    if reloc.get("pc_relative"):
+                        instr_pc = mod["code_base"] + idx * 4
+                        patch_value = value - instr_pc
+                    mod["code"][idx] = set_imm12(mod["code"][idx], patch_value)
                 elif reloc["type"] == "imm32":
                     mod["code"][idx] = value & 0xFFFFFFFF
                 else:
