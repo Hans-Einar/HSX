@@ -28,10 +28,11 @@
 - [x] Smoke-test by spawning two tasks; verify `dumpregs` shows distinct bases.
   - Consumer vs. producer bases observed at `0x1000/0xF000` and `0x1040/0xE000` respectively.
 
-### T2 MiniVM register access via base pointers (`active`)
-- [ ] Replace direct list usage (`self.regs`) with memory-backed getters/setters.
-  - Action: Inventory every `self.regs[...]` access (step logic, svc handlers, debugger helpers) and plan pointer-based replacements.
-- [ ] Update `set_context`, `save_context`, and `snapshot_registers` to avoid cloning arrays.
+-### T2 MiniVM register access via base pointers (`active`)
+- [x] Replace direct list usage (`self.regs`) with memory-backed getters/setters.
+  - Implemented `RegisterFile` wrapper; instruction handlers now access register window via memory, keeping `ctx.regs` in sync.
+- [x] Update `set_context`, `save_context`, and `snapshot_registers` to avoid cloning arrays.
+  - Context transitions now sync register banks via `RegisterFile`; `save_context` captures values from memory.
 - [ ] Adjust debugger helpers (`read_regs`, shell `dumpregs`) to read via base offset.
 - [ ] Add runtime assertions: active tasks must have non-zero `reg_base`, `stack_base`, `stack_limit`.
 - [ ] Run unit tests covering register read/write to ensure behaviour unchanged.
@@ -57,8 +58,8 @@
 - Useful commands: `python python/disassemble.py ...`, HSX shell `clock step`, `dumpregs`, `mbox`, CI test runners.
 
 ## Handover Notes
-- Current status: T1 complete; T2 active (MiniVM integration).
+- Current status: T1 complete; T2 in progress (MiniVM now backed by register windows).
 - Known blockers: None.
-- Next action when resuming: Map all `self.regs` touchpoints and prototype memory-backed accessors.
+- Next action when resuming: Review debugger helpers / assertions, add runtime checks for non-zero bases, and expand tests.
 
 Update this document after every working session—note partial progress, open questions, and where to pick up next.

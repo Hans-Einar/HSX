@@ -60,6 +60,8 @@ def _align_down(value: int, alignment: int) -> int:
     return value - (value % alignment)
 
 
+
+
 @dataclass
 class TaskContext:
     """Represents the architectural state for a single HSX task."""
@@ -113,6 +115,100 @@ def clone_context(ctx: TaskContext) -> TaskContext:
         fd_table=dict(ctx.fd_table),
         exit_status=ctx.exit_status,
     )
+
+
+def _ensure_reg_list(ctx: TaskContext) -> List[int]:
+    regs = getattr(ctx, "regs", None)
+    if regs is None:
+        regs = [0] * 16
+    else:
+        regs = list(regs)
+        if len(regs) < 16:
+            regs.extend([0] * (16 - len(regs)))
+        elif len(regs) > 16:
+            regs = regs[:16]
+    ctx.regs = regs
+    return regs
+
+
+class RegisterFile:
+    __slots__ = ("_vm",)
+
+    def __init__(self, vm: "MiniVM") -> None:
+        self._vm = vm
+
+    def __len__(self) -> int:
+        return 16
+
+    def _ctx(self) -> Optional[TaskContext]:
+        return self._vm.context
+
+    def _base(self) -> Optional[int]:
+        ctx = self._ctx()
+        if ctx is None:
+            return None
+        base = ctx.reg_base & 0xFFFF
+        return base if base else None
+
+    def __getitem__(self, key):
+        if isinstance(key, slice):
+            start, stop, step = key.indices(16)
+            return [self[idx] for idx in range(start, stop, step)]
+        idx = int(key)
+        if idx < 0 or idx >= 16:
+            raise IndexError("register index out of range")
+        ctx = self._ctx()
+        if ctx is None:
+            return 0
+        base = self._base()
+        if base is not None:
+            offset = base + (idx * 4)
+            if offset + 4 > len(self._vm.mem):
+                raise RuntimeError("register window outside VM memory")
+            mem = self._vm.mem
+            return (
+                mem[offset]
+                | (mem[offset + 1] << 8)
+                | (mem[offset + 2] << 16)
+                | (mem[offset + 3] << 24)
+            ) & 0xFFFFFFFF
+        regs = _ensure_reg_list(ctx)
+        return int(regs[idx]) & 0xFFFFFFFF
+
+    def __setitem__(self, key, value) -> None:
+        if isinstance(key, slice):
+            start, stop, step = key.indices(16)
+            values = list(value)
+            for offset, idx in enumerate(range(start, stop, step)):
+                self.__setitem__(idx, values[offset])
+            return
+        idx = int(key)
+        if idx < 0 or idx >= 16:
+            raise IndexError("register index out of range")
+        ctx = self._ctx()
+        if ctx is None:
+            return
+        val = int(value) & 0xFFFFFFFF
+        base = self._base()
+        if base is not None:
+            offset = base + (idx * 4)
+            if offset + 4 > len(self._vm.mem):
+                raise RuntimeError("register window outside VM memory")
+            self._vm.mem[offset:offset + 4] = val.to_bytes(4, "little")
+        regs = _ensure_reg_list(ctx)
+        regs[idx] = val
+
+    def __iter__(self):
+        for idx in range(16):
+            yield self[idx]
+
+    def to_list(self) -> List[int]:
+        return [self[idx] for idx in range(16)]
+
+    def copy_from(self, values: List[int]) -> None:
+        for idx in range(16):
+            val = values[idx] if idx < len(values) else 0
+            self[idx] = val
 
 
 def context_to_dict(ctx: TaskContext) -> Dict[str, Any]:
@@ -297,11 +393,6 @@ class MiniVM:
     ):
         self.code = bytearray(code)
         self.entry = entry
-        self.context: TaskContext = TaskContext(pc=entry)
-        self.running = True
-        self.steps = 0
-        self.cycles = 0  # legacy alias for compatibility
-        self.set_context(self.context)
         self.mem = bytearray(64 * 1024)
         self.fs = FSStub()
         self.trace = trace
@@ -327,6 +418,15 @@ class MiniVM:
         self.debug_async_break: bool = False
         self.debug_halted: bool = False
         self.debug_last_stop: Optional[Dict[str, Any]] = None
+        self.context: TaskContext = TaskContext(pc=entry)
+        self.running = True
+        self.steps = 0
+        self.cycles = 0  # legacy alias for compatibility
+        self.regs = RegisterFile(self)
+        self.pc = entry & 0xFFFFFFFF
+        self.sp = self.context.sp & 0xFFFFFFFF
+        self.flags = self.context.psw & 0xFF
+        self.set_context(self.context)
         if rodata:
             self._load_rodata(rodata)
 
@@ -431,15 +531,33 @@ class MiniVM:
 
     def set_context(self, ctx: TaskContext) -> None:
         self.context = ctx
-        self.regs = ctx.regs
-        self.pc = ctx.pc
-        self.sp = ctx.sp
-        self.flags = ctx.psw
+        _ensure_reg_list(ctx)
+        self.pc = ctx.pc & 0xFFFFFFFF
+        self.sp = ctx.sp & 0xFFFFFFFF
+        self.flags = ctx.psw & 0xFF
         self.pid = ctx.pid
         ctx.state = "running" if self.running else ctx.state
+        self._store_regs_to_memory()
 
     def set_mailbox_handler(self, handler: Optional[Callable[[int], None]]) -> None:
         self._mailbox_handler = handler
+
+    def _load_regs_from_memory(self) -> None:
+        ctx = self.context
+        if ctx is None:
+            return
+        base = ctx.reg_base
+        regs = _ensure_reg_list(ctx)
+        if base:
+            for idx in range(16):
+                regs[idx] = self.regs[idx]
+
+    def _store_regs_to_memory(self) -> None:
+        ctx = self.context
+        if ctx is None:
+            return
+        if ctx.reg_base:
+            self.regs.copy_from(_ensure_reg_list(ctx))
 
     def save_context(self) -> None:
         ctx = self.context
@@ -448,6 +566,7 @@ class MiniVM:
         ctx.pc = self.pc
         ctx.sp = self.sp
         ctx.psw = self.flags
+        self._load_regs_from_memory()
     def snapshot_registers(self):
         ctx = self.context
         context_meta = None
@@ -481,25 +600,35 @@ class MiniVM:
         }
 
     def restore_registers(self, snapshot):
-        self.pc = snapshot.get("pc", self.pc) & 0xFFFFFFFF
-        regs = snapshot.get("regs")
-        if regs is not None:
-            if len(regs) != len(self.regs):
-                raise ValueError("regs length mismatch")
-            self.regs = [int(x) & 0xFFFFFFFF for x in regs]
-            self.context.regs = self.regs
-        self.sp = snapshot.get("sp", self.sp) & 0xFFFFFFFF
-        self.flags = snapshot.get("flags", self.flags) & 0xFF
-        self.running = bool(snapshot.get("running", self.running))
-        self.context.pc = self.pc
-        self.context.sp = self.sp
-        self.context.psw = self.flags
-        self.context.state = "running" if self.running else "stopped"
         ctx_snapshot = snapshot.get("context")
         if ctx_snapshot:
             new_ctx = dict_to_context(ctx_snapshot)
-            new_ctx.regs = self.regs
+            _ensure_reg_list(new_ctx)
             self.context = new_ctx
+        ctx = self.context
+        if ctx is None:
+            ctx = TaskContext()
+            self.context = ctx
+        _ensure_reg_list(ctx)
+        regs_values = snapshot.get("regs")
+        if regs_values is not None:
+            values = [int(x) & 0xFFFFFFFF for x in regs_values]
+            if len(values) < 16:
+                values.extend([0] * (16 - len(values)))
+            elif len(values) > 16:
+                values = values[:16]
+            self.regs.copy_from(values)
+        else:
+            self._load_regs_from_memory()
+        self.pc = snapshot.get("pc", self.pc) & 0xFFFFFFFF
+        self.sp = snapshot.get("sp", self.sp) & 0xFFFFFFFF
+        self.flags = snapshot.get("flags", self.flags) & 0xFF
+        self.running = bool(snapshot.get("running", self.running))
+        ctx.pc = self.pc
+        ctx.sp = self.sp
+        ctx.psw = self.flags
+        ctx.state = "running" if self.running else "stopped"
+        self._load_regs_from_memory()
         return self.snapshot_registers()
 
     def snapshot_state(self) -> Dict[str, Any]:

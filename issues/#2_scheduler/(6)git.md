@@ -13,6 +13,7 @@
 | --- | --- | --- | --- | --- |
 | 2025-10-15 | 11cba7276a357c9090d875cfcc8c9044d84bb80b | scheduler: scaffold task memory allocators and log progress. | Hans Einar | Introduced allocator scaffolding and updated issue docs (T1 design).
 | 2025-10-15 | 9d5d596ff5e3e6bbe3417f29efe293b3846b32d9 | T1 checkboxes for register/stack allocation | Hans Einar | Filled in git log, adjusted playbook, and refined allocator scaffolding.
+| 2025-10-15 | f9dad8f2663307562f139bcaed27ced3dc9d9c01 | platforms/python/host_vm.py allocates per-task register banks and stack slices... | Hans Einar | Completed T1 work, verified snapshot/restore & two-task smoke test, moved playbook to T2.
 
 ## Pull Request
 - PR URL / ID: _TBD_
