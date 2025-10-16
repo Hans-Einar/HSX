@@ -562,6 +562,25 @@ class ExecutiveState:
             ctx['wait_handle'] = None
             state['running'] = True
 
+    def scheduler_stats(self) -> Dict[int, Dict[str, int]]:
+        info = self.vm.info()
+        return info.get("scheduler", {}).get("counters", {})
+
+    def scheduler_trace_snapshot(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        info = self.vm.info()
+        trace = info.get("scheduler", {}).get("trace", [])
+        if limit is not None:
+            try:
+                limit_int = int(limit)
+            except (TypeError, ValueError):
+                limit_int = None
+            if limit_int is not None:
+                if limit_int <= 0:
+                    trace = []
+                else:
+                    trace = trace[-limit_int:]
+        return trace
+
     def listen_stdout(self, pid: Optional[int], *, limit: int = 1, max_len: int = 512) -> Dict[str, Any]:
         descriptors = self.mailbox_snapshot()
         if pid is not None:

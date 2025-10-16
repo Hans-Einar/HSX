@@ -23,6 +23,7 @@
 | 2025-10-16 | 959499f2a853c4ef56fc5ddd2fec024362725453 | Added register isolation & stack guard tests | Hans Einar | New unit tests cover register window isolation and stack overflow handling.
 | 2025-10-16 | 358ba171a38100e5dbca1a2a6fad626d4862587f | Extended sched CLI tests and playbook | Hans Einar | Added sched payload/pretty-print coverage; documented test runs in T4 plan.
 | 2025-10-16 | b062b8007f34808a039f03a90559de40c00b5e85 | Added scheduler stats integration test | Hans Einar | `python/tests/test_scheduler_stats.py` verifies counters/trace exposure.
+| 2025-10-16 | f31fe6d4fbee4596b9f1aa4fede4e36f743b87bf | Documentation/help updates | Hans Einar | Spec now documents scheduler instrumentation; CLI help covers `sched stats`; captured evidence logged.
 
 ## Pull Request
 - PR URL / ID: _TBD_
