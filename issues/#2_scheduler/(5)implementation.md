@@ -40,7 +40,7 @@
 - [x] Run unit tests covering register read/write to ensure behaviour unchanged.
   - `PYTHONPATH=. pytest python/tests/test_vm_pause.py python/tests/test_shell_client.py`.
 
-### T3 Scheduler & mailbox contract enforcement (`active`)
+### T3 Scheduler & mailbox contract enforcement (`done`)
 - [x] Simplify `_activate_task` / `_store_active_state` to use base pointers only.
   - `_ensure_task_memory` now runs during `_activate_task`/`_store_active_state`, reusing allocated register/stack windows and updating task metadata.
 - [x] Guarantee `MiniVM.step()` retires exactly one instruction; remove implicit loops.
@@ -53,7 +53,8 @@
   - `_complete_mailbox_wait` now syncs register windows and writes results back to VM memory; tests rerun (`pytest python/tests/test_vm_pause.py python/tests/test_shell_client.py`).
 - [x] Add scheduler instrumentation: trace ring + per-task counters.
   - Added `scheduler_trace`/`scheduler_counters` in `VMController`; `info` now exposes recent events and per-task counts.
-- [ ] Implement CLI hooks (`clock step`, `clock step -p`, `sched stats`) reflecting new metrics.
+- [x] Implement CLI hooks (`clock step`, `clock step -p`, `sched stats`) reflecting new metrics.
+  - `sched` without pid now returns counters/trace; shell pretty-printer renders stats and traces.
 
 ### T4 Tests, docs, demos (`not started`)
 - [ ] Create/extend unit tests: register-window isolation, stack overflow, trap resume, RR fairness.
@@ -68,8 +69,8 @@
 - Useful commands: `python python/disassemble.py ...`, HSX shell `clock step`, `dumpregs`, `mbox`, CI test runners.
 
 ## Handover Notes
-- Current status: T1/T2 complete; T3 awaiting CLI exposure for scheduler stats.
+- Current status: T1–T3 complete; T4 (tests/docs/demos) ready to start.
 - Known blockers: None.
-- Next action when resuming: Add CLI surface (`sched stats`, etc.) to report the new scheduler counters/trace and finish remaining T3 checklist items.
+- Next action when resuming: Begin T4 by drafting test plan (register isolation, stack overflow, trap resume, RR fairness) and scheduling doc/help updates.
 
 Update this document after every working session—note partial progress, open questions, and where to pick up next.

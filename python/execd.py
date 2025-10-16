@@ -906,10 +906,14 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 return {"version": 1, "status": "ok", **result}
             if cmd == "sched":
                 pid_value = request.get("pid")
-                if pid_value is None:
-                    raise ValueError("sched requires 'pid'")
-                task = self.state.set_task_attrs(int(pid_value), priority=request.get("priority"), quantum=request.get("quantum"))
-                return {"version": 1, "status": "ok", "task": task}
+                if pid_value is not None:
+                    task = self.state.set_task_attrs(int(pid_value), priority=request.get("priority"), quantum=request.get("quantum"))
+                    return {"version": 1, "status": "ok", "task": task}
+                stats = self.state.scheduler_stats()
+                trace_limit = request.get("limit")
+                limit_int = int(trace_limit) if trace_limit is not None else None
+                trace = self.state.scheduler_trace_snapshot(limit=limit_int)
+                return {"version": 1, "status": "ok", "scheduler": {"counters": stats, "trace": trace}}
             if cmd == "restart":
                 targets = request.get("targets")
                 if isinstance(targets, str):

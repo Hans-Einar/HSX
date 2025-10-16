@@ -27,18 +27,18 @@
 - [ ] Stakeholders signed off (runtime/executive leads)
 
 ## Implementation Tasks
-- [ ] T1: Provision per-task register/stack arenas
-  - [ ] Allocate memory slices during task load/spawn
-  - [ ] Populate `reg_base`, `stack_base`, `stack_limit`, `sp16`
-  - [ ] Persist bases in snapshots/resume
-- [ ] T2: MiniVM register access via base pointers
-  - [ ] Replace Python list register storage
-  - [ ] Update context save/restore & debugger views
-  - [ ] Add runtime assertions for non-zero bases
-- [ ] T3: Scheduler & mailbox contract enforcement
-  - [ ] Remove register cloning in `_store_active_state` / `_activate_task`
-  - [ ] Ensure one-instruction stepping & wait queues
-  - [ ] Implement scheduler instrumentation + CLI hooks
+- [x] T1: Provision per-task register/stack arenas
+  - [x] Allocate memory slices during task load/spawn (register/stack allocators in `VMController`)
+  - [x] Populate `reg_base`, `stack_base`, `stack_limit`, `sp16` (load path assigns non-zero bases)
+  - [x] Persist bases in snapshots/resume (`_store_active_state` / `_activate_task` reuse allocations)
+- [x] T2: MiniVM register access via base pointers
+  - [x] Replace Python list register storage (`RegisterFile` wrapper)
+  - [x] Update context save/restore & debugger views (register window sync; CLI `dumpregs` updated)
+  - [x] Add runtime assertions for non-zero bases (`_ensure_task_memory`, activation checks)
+- [x] T3: Scheduler & mailbox contract enforcement
+  - [x] Remove register cloning in `_store_active_state` / `_activate_task` (pointer reuse)
+  - [x] Ensure one-instruction stepping & wait queues (unit test + instrumentation)
+  - [x] Implement scheduler instrumentation + CLI hooks (`sched` command reports counters/trace)
 - [ ] T4: Tests, docs, demos
   - [ ] Add unit/integration tests from verification plan
   - [ ] Update documentation/help text
