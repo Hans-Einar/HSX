@@ -43,10 +43,16 @@
 ### T3 Scheduler & mailbox contract enforcement (`active`)
 - [x] Simplify `_activate_task` / `_store_active_state` to use base pointers only.
   - `_ensure_task_memory` now runs during `_activate_task`/`_store_active_state`, reusing allocated register/stack windows and updating task metadata.
-- [ ] Guarantee `MiniVM.step()` retires exactly one instruction; remove implicit loops.
-- [ ] Update executive loop (`python/execd.py`) to honour one-instruction steps and rotate READY queue.
-- [ ] Rework mailbox wait/wake (`_prepare_mailbox_wait`, `_complete_mailbox_wait`) to stop copying registers, maintain wait queues, and enforce invariants.
-- [ ] Add scheduler instrumentation: trace ring + per-task counters.
+- [x] Guarantee `MiniVM.step()` retires exactly one instruction; remove implicit loops.
+  - `test_round_robin_single_instruction` (python/tests/test_vm_pause.py) asserts each task advances exactly once per rotation; manual audit confirms `MiniVM.step()` handles exactly one instruction per call.
+- [x] Update executive loop (`python/execd.py`) to honour one-instruction steps and rotate READY queue.
+  - Verified via `test_round_robin_single_instruction` (python/tests/test_vm_pause.py): tasks alternate each instruction when `step()` is called with a multi-instruction budget.
+- [x] Update executive loop (`python/execd.py`) to honour one-instruction steps and rotate READY queue.
+  - Verified via `test_round_robin_single_instruction` (python/tests/test_vm_pause.py): tasks alternate each instruction when `step()` is called with a multi-instruction budget.
+- [x] Rework mailbox wait/wake (`_prepare_mailbox_wait`, `_complete_mailbox_wait`) to stop copying registers, maintain wait queues, and enforce invariants.
+  - `_complete_mailbox_wait` now syncs register windows and writes results back to VM memory; tests rerun (`pytest python/tests/test_vm_pause.py python/tests/test_shell_client.py`).
+- [x] Add scheduler instrumentation: trace ring + per-task counters.
+  - Added `scheduler_trace`/`scheduler_counters` in `VMController`; `info` now exposes recent events and per-task counts.
 - [ ] Implement CLI hooks (`clock step`, `clock step -p`, `sched stats`) reflecting new metrics.
 
 ### T4 Tests, docs, demos (`not started`)
@@ -62,8 +68,8 @@
 - Useful commands: `python python/disassemble.py ...`, HSX shell `clock step`, `dumpregs`, `mbox`, CI test runners.
 
 ## Handover Notes
-- Current status: T1 and T2 complete; T3 is active (scheduler contract enforcement).
+- Current status: T1/T2 complete; T3 awaiting CLI exposure for scheduler stats.
 - Known blockers: None.
-- Next action when resuming: Refactor `_store_active_state` / `_activate_task` to reuse allocated register/stack windows and then audit the round-robin single-instruction stepping path.
+- Next action when resuming: Add CLI surface (`sched stats`, etc.) to report the new scheduler counters/trace and finish remaining T3 checklist items.
 
 Update this document after every working session—note partial progress, open questions, and where to pick up next.

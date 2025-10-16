@@ -17,6 +17,7 @@
 | 2025-10-16 | dc8592e6c516f4c00ce89bdb0c7a28e6707ca5c2 | Introduced RegisterFile wrapper for MiniVM | Hans Einar | MiniVM now accesses register windows via memory; context save/restore updated.
 | 2025-10-16 | 035f438bdae771de2b562f92c98ad449c432ba40 | MiniVM register window integration tests | Hans Einar | Ran targeted unit tests and marked T2 complete in the playbook.
 | 2025-10-16 | bef1cbe766bca171249243464d00baeafaed6fc6 | Completed T2 test coverage | Hans Einar | Recorded unit tests and updated playbook; ready to start scheduler contract work (T3).
+| 2025-10-16 | 3dace2120038eb9b2aff6de48932982faac90157 | Progressed T3 allocator reuse | Hans Einar | `_store_active_state` now reuses task memory allocations; task metadata stays in sync.
 
 ## Pull Request
 - PR URL / ID: _TBD_

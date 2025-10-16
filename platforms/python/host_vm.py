@@ -12,6 +12,7 @@ import sys
 import zlib
 from pathlib import PurePosixPath
 from typing import Any, Callable, Dict, Optional, List, Set, Tuple
+from collections import defaultdict, deque
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
@@ -1400,6 +1401,8 @@ class VMController:
         self._reg_free_list: List[int] = []
         self._stack_free_list: List[Tuple[int, int]] = []  # (base, size)
         self._task_memory: Dict[int, Dict[str, int]] = {}
+        self.scheduler_trace: deque[Dict[str, Any]] = deque(maxlen=256)
+        self.scheduler_counters: Dict[int, Dict[str, int]] = defaultdict(dict)
 
     def _trace_mailbox_regs(self, label: str, vm: MiniVM, fn: int, *, extra: Optional[Dict[str, Any]] = None) -> None:
         """Append a compact register/PC snapshot to the mailbox trace log."""
@@ -1433,6 +1436,8 @@ class VMController:
         self._reg_free_list.clear()
         self._stack_free_list.clear()
         self._task_memory.clear()
+        self.scheduler_trace.clear()
+        self.scheduler_counters.clear()
         return {"status": "ok"}
 
     def mailbox_snapshot(self) -> List[Dict[str, Any]]:
@@ -1611,6 +1616,27 @@ class VMController:
         ctx.setdefault("sp", allocation["sp_offset"])
         state["context"] = ctx
         return ctx
+
+    def _record_scheduler_event(self, event: str, pid: Optional[int], **fields: Any) -> None:
+        entry: Dict[str, Any] = {"event": event, "ts": time.monotonic()}
+        if pid is not None:
+            entry["pid"] = pid
+        for key, value in fields.items():
+            if value is not None:
+                entry[key] = value
+        self.scheduler_trace.append(entry)
+        if pid is not None:
+            counters = self.scheduler_counters.setdefault(pid, {})
+            counters[event] = counters.get(event, 0) + 1
+
+    def scheduler_trace_snapshot(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        trace = list(self.scheduler_trace)
+        if limit is not None:
+            return trace[-int(limit):]
+        return trace
+
+    def scheduler_stats(self) -> Dict[int, Dict[str, int]]:
+        return {pid: dict(counts) for pid, counts in self.scheduler_counters.items()}
 
     def mailbox_send(
         self,
@@ -1946,6 +1972,7 @@ class VMController:
         ctx.wait_handle = handle
         ctx.wait_deadline = deadline
         vm.running = False
+        self._record_scheduler_event("block", pid, descriptor=descriptor_id, handle=handle)
         state = self.task_states.get(pid)
         if state:
             state["context"] = context_to_dict(ctx)
@@ -2007,7 +2034,7 @@ class VMController:
                 state["mem"] = mem
             if payload:
                 mem[buffer_ptr : buffer_ptr + length] = payload
-            ctx_dict = state.get("context") or {}
+            ctx_dict = self._ensure_task_memory(pid, state)
             regs = list(ctx_dict.get("regs", [0] * 16))
             while len(regs) < 16:
                 regs.append(0)
@@ -2017,6 +2044,12 @@ class VMController:
             regs[3] = channel & 0xFFFF
             regs[4] = src_pid & 0xFFFF
             ctx_dict["regs"] = regs
+            reg_base = ctx_dict.get("reg_base", 0) & 0xFFFF
+            if reg_base:
+                for idx, value in enumerate(regs):
+                    offset = reg_base + idx * 4
+                    if offset + 4 <= len(mem):
+                        mem[offset:offset + 4] = (int(value) & 0xFFFFFFFF).to_bytes(4, "little")
             ctx_dict["state"] = "ready"
             ctx_dict["wait_kind"] = None
             ctx_dict["wait_mailbox"] = None
@@ -2048,6 +2081,7 @@ class VMController:
             self.vm.context.wait_handle = None
             self.vm.context.wait_deadline = None
             self.vm.running = True
+        self._record_scheduler_event("wake", pid, descriptor=descriptor_id, length=length)
         if info_ptr:
             self._write_mailbox_recv_info(
                 pid,
@@ -2219,6 +2253,10 @@ class VMController:
                 info["selected_registers"] = self.read_regs(pid)
             except ValueError as exc:
                 info["selected_error"] = str(exc)
+        info["scheduler"] = {
+            "trace": self.scheduler_trace_snapshot(limit=32),
+            "counters": self.scheduler_stats(),
+        }
         return info
 
     def schedule_restart(self, targets: Optional[List[str]] = None) -> None:
@@ -2543,6 +2581,11 @@ class VMController:
                     debug_event = event
             last_snapshot = vm.snapshot_registers()
             last_pid = target_pid
+            self._record_scheduler_event(
+                "step",
+                target_pid,
+                pc=last_snapshot.get("pc") if last_snapshot else None,
+            )
             self._store_active_state()
             self._check_mailbox_timeouts()
             if debug_event is not None:
@@ -2552,7 +2595,10 @@ class VMController:
                 dbg.halted = True
                 break
             if requested_pid is None:
+                prev_pid = self.current_pid
                 self._rotate_active()
+                if self.current_pid is not None and self.current_pid != prev_pid:
+                    self._record_scheduler_event("rotate", self.current_pid)
             else:
                 self.current_pid = requested_pid
             if self.paused:
