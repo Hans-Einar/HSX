@@ -198,6 +198,9 @@ class ExecutiveState:
     def _has_runnable_tasks(self) -> bool:
         return any(task.get("state") in {"running", "ready"} for task in self.tasks.values())
 
+    def _has_waiting_tasks(self) -> bool:
+        return any(task.get("state") in {"waiting", "waiting_mbx", "waiting_io"} for task in self.tasks.values())
+
     def set_clock_rate(self, hz: float) -> Dict[str, Any]:
         if hz < 0:
             raise ValueError("clock rate must be non-negative")
@@ -663,7 +666,7 @@ class ExecutiveState:
                     wait_time = max(wait_time, 0.05)
             else:
                 if runnable:
-                    wait_time = 0.001
+                    wait_time = 0.0
                     throttle_reason = None
                 elif result.get("paused"):
                     throttle_reason = "paused"
@@ -671,7 +674,7 @@ class ExecutiveState:
                 elif not any_tasks:
                     throttle_reason = "idle"
                     wait_time = 0.05
-                elif result.get("sleep_pending"):
+                elif result.get("sleep_pending") or self._has_waiting_tasks():
                     throttle_reason = "sleep"
                     wait_time = 0.01
                 elif not vm_running:
