@@ -73,6 +73,7 @@ class TaskContext:
     reg_base: int = 0
     stack_base: int = 0
     stack_limit: int = 0
+    stack_size: int = DEFAULT_STACK_BYTES
     time_slice_steps: int = 1
     accounted_steps: int = 0
     state: str = "ready"
@@ -103,6 +104,7 @@ def clone_context(ctx: TaskContext) -> TaskContext:
         reg_base=ctx.reg_base,
         stack_base=ctx.stack_base,
         stack_limit=ctx.stack_limit,
+        stack_size=ctx.stack_size,
         time_slice_steps=ctx.time_slice_steps,
         accounted_steps=ctx.accounted_steps,
         state=ctx.state,
@@ -220,6 +222,7 @@ def context_to_dict(ctx: TaskContext) -> Dict[str, Any]:
         "reg_base": ctx.reg_base,
         "stack_base": ctx.stack_base,
         "stack_limit": ctx.stack_limit,
+        "stack_size": ctx.stack_size,
         "time_slice_steps": ctx.time_slice_steps,
         "accounted_steps": ctx.accounted_steps,
         "time_slice_cycles": ctx.time_slice_steps,  # legacy alias
@@ -245,6 +248,7 @@ def dict_to_context(data: Dict[str, Any]) -> TaskContext:
         reg_base=int(data.get("reg_base", 0)) & 0xFFFFFFFF,
         stack_base=int(data.get("stack_base", 0)) & 0xFFFFFFFF,
         stack_limit=int(data.get("stack_limit", 0)) & 0xFFFFFFFF,
+        stack_size=int(data.get("stack_size", DEFAULT_STACK_BYTES)) & 0xFFFFFFFF,
         time_slice_steps=int(data.get("time_slice_steps", data.get("time_slice_cycles", 1))),
         accounted_steps=int(data.get("accounted_steps", data.get("accounted_cycles", 0))),
         state=str(data.get("state", "ready")),
@@ -2582,20 +2586,38 @@ class VMController:
         if pid is None:
             return {}
         if pid == self.current_pid and self.vm is not None:
-            return self.vm.snapshot_registers()
+            snapshot = self.vm.snapshot_registers()
+            context = snapshot.get("context", {})
+            if isinstance(context, dict):
+                snapshot.setdefault("reg_base", context.get("reg_base", 0))
+                snapshot.setdefault("stack_base", context.get("stack_base", 0))
+                snapshot.setdefault("stack_limit", context.get("stack_limit", 0))
+                snapshot.setdefault("stack_size", context.get("stack_size", DEFAULT_STACK_BYTES))
+                sp16 = snapshot.get("sp", 0) & 0xFFFF
+                snapshot.setdefault("sp_effective", (snapshot["stack_base"] + sp16) & 0xFFFFFFFF)
+            return snapshot
         state = self.task_states.get(pid)
         if not state:
             raise ValueError(f"unknown pid {pid}")
         ctx = dict_to_context(state["context"])
+        regs_list = _ensure_reg_list(ctx)
+        sp16 = ctx.sp & 0xFFFF
+        context_dict = context_to_dict(ctx)
+        context_dict.update(dict(state.get("context", {})))
         return {
             "pc": ctx.pc,
-            "regs": list(ctx.regs),
+            "regs": list(regs_list),
             "sp": ctx.sp,
             "flags": ctx.psw,
             "running": state.get("running", ctx.state == "running"),
             "steps": state.get("steps", ctx.accounted_steps),
             "cycles": state.get("cycles", ctx.accounted_steps),
-            "context": state["context"],
+            "reg_base": ctx.reg_base,
+            "stack_base": ctx.stack_base,
+            "stack_limit": ctx.stack_limit,
+            "stack_size": ctx.stack_size,
+            "sp_effective": (ctx.stack_base + sp16) & 0xFFFFFFFF,
+            "context": context_dict,
         }
 
     def write_regs(self, payload: Dict[str, Any], pid: Optional[int] = None) -> Dict[str, Any]:

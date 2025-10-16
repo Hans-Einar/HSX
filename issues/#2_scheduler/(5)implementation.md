@@ -5,7 +5,7 @@
 ## Overview
 - Issue: Scheduler ignores register-window contract (`issues/#2_scheduler`).
 - Current status: In progress (T1 active; next step migrate MiniVM to new reg_base/stack_base).
-- Last updated: 2025-10-15.
+- Last updated: 2025-10-16.
 
 ## Task Tracker
 
@@ -33,7 +33,8 @@
   - Implemented `RegisterFile` wrapper; instruction handlers now access register window via memory, keeping `ctx.regs` in sync.
 - [x] Update `set_context`, `save_context`, and `snapshot_registers` to avoid cloning arrays.
   - Context transitions now sync register banks via `RegisterFile`; `save_context` captures values from memory.
-- [ ] Adjust debugger helpers (`read_regs`, shell `dumpregs`) to read via base offset.
+- [x] Adjust debugger helpers (`read_regs`, shell `dumpregs`) to read via base offset.
+  - `VMController.read_regs()` now exposes `reg_base`/`stack_base`/`sp_effective`; CLI `dumpregs` prints the new fields.
 - [x] Add runtime assertions: active tasks must have non-zero `reg_base`, `stack_base`, `stack_limit`.
   - `_ensure_task_memory` verifies allocations and `_activate_task` raises if bases are missing.
 - [ ] Run unit tests covering register read/write to ensure behaviour unchanged.

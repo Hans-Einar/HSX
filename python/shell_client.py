@@ -790,6 +790,19 @@ def _render_context(context: dict, indent: str = "  ") -> None:
 def _render_register_block(registers: dict, indent: str = "  ") -> None:
     print(f"{indent}pc     : 0x{registers.get('pc', 0):08X}  sp: 0x{registers.get('sp', 0):08X}")
     print(f"{indent}flags  : 0x{registers.get('flags', 0):X}    running: {registers.get('running')}")
+    if 'reg_base' in registers or 'stack_base' in registers:
+        reg_base = registers.get('reg_base', 0)
+        stack_base = registers.get('stack_base', 0)
+        stack_limit = registers.get('stack_limit', 0)
+        stack_size = registers.get('stack_size')
+        eff_sp = registers.get('sp_effective')
+        line = f"{indent}reg_base: 0x{reg_base & 0xFFFFFFFF:08X}  stack_base: 0x{stack_base & 0xFFFFFFFF:08X}"
+        line += f"  stack_limit: 0x{stack_limit & 0xFFFFFFFF:08X}"
+        if stack_size is not None:
+            line += f"  stack_size: 0x{int(stack_size) & 0xFFFFFFFF:08X}"
+        if eff_sp is not None:
+            line += f"  sp_effective: 0x{int(eff_sp) & 0xFFFFFFFF:08X}"
+        print(line)
     step_count = registers.get('steps', registers.get('cycles', 0))
     print(f"{indent}steps  : {step_count}")
     context = registers.get('context', {})
