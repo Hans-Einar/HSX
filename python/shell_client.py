@@ -8,6 +8,7 @@ import socket
 import sys
 from datetime import datetime
 from pathlib import Path
+import shlex
 
 try:
     import readline  # type: ignore
@@ -1311,7 +1312,11 @@ def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: boo
         if line.lower() == 'help':
             _print_general_help()
             continue
-        parts = line.split()
+        try:
+            parts = shlex.split(line)
+        except ValueError as exc:
+            print(f"parse error: {exc}")
+            continue
         cmd = parts[0].lower()
         raw_args = parts[1:]
         if cmd == 'stdiofanout':

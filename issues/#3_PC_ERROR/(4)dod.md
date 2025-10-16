@@ -13,8 +13,8 @@
 - Git log: `./(6)git.md`
 
 ## Completion Checklist
-- [ ] Review approved (`(2)review.md`)
-- [ ] Remediation plan approved (`(3)remediation.md`)
+- [x] Review approved (`(2)review.md`)
+- [x] Remediation plan approved (`(3)remediation.md`)
 - [x] Implementation tasks complete (see below)
 - [x] Tests updated/passing
 - [x] Documentation updated
