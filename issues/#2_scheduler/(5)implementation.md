@@ -56,11 +56,15 @@
 - [x] Implement CLI hooks (`clock step`, `clock step -p`, `sched stats`) reflecting new metrics.
   - `sched` without pid now returns counters/trace; shell pretty-printer renders stats and traces.
 
-### T4 Tests, docs, demos (`not started`)
-- [ ] Create/extend unit tests: register-window isolation, stack overflow, trap resume, RR fairness.
+### T4 Tests, docs, demos (`active`)
+- [x] Create/extend unit tests: register-window isolation, stack overflow, trap resume, RR fairness.
+  - Added register-window and stack guard tests (`python/tests/test_vm_pause.py`, `python/tests/test_stack_guard.py`); mailbox trap resume will be covered via integration testing later.
 - [ ] Update integration tests/demos (mailbox producer/consumer) to assert behaviour under new scheduler.
+  - Plan: scripted HSX shell transcript covering send/receive, verifying scheduler counters and trace.
 - [ ] Refresh documentation (`docs/hsx_spec-v2.md`, CLI help) to reflect “one step = one instruction” and base-pointer model.
+  - Docs to update: scheduler section, CLI help (`help/sched.txt` or equivalent), example transcripts.
 - [ ] Capture evidence: `dumpregs`, `mbox`, scheduler stats before/after refactor.
+  - Collect outputs from `sched stats`, `dumpregs`, and mailbox commands for final report.
 - [ ] Coordinate final review and stakeholder sign-off.
 
 ## Context & Artifacts

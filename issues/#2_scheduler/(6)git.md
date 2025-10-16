@@ -19,6 +19,7 @@
 | 2025-10-16 | bef1cbe766bca171249243464d00baeafaed6fc6 | Completed T2 test coverage | Hans Einar | Recorded unit tests and updated playbook; ready to start scheduler contract work (T3).
 | 2025-10-16 | 3dace2120038eb9b2aff6de48932982faac90157 | Progressed T3 allocator reuse | Hans Einar | `_store_active_state` now reuses task memory allocations; task metadata stays in sync.
 | 2025-10-16 | c15e2c1567bd6a61ba9b99dc87a235282f5b0880 | Added scheduler instrumentation | Hans Einar | Controller now tracks step/rotate/block/wake events and exposes stats/trace (CLI exposure pending).
+| 2025-10-16 | a5c978be2b5d2752efdfedd440948cc12223ba6a | Finished T3 scheduler work | Hans Einar | CLI `sched` command reports scheduler counters/trace; tests rerun successfully.
 
 ## Pull Request
 - PR URL / ID: _TBD_
