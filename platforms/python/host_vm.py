@@ -760,7 +760,8 @@ class MiniVM:
         rd = (ins >> 20) & 0x0F
         rs1 = (ins >> 16) & 0x0F
         rs2 = (ins >> 12) & 0x0F
-        imm = ins & 0x0FFF
+        imm_raw = ins & 0x0FFF
+        imm = imm_raw
         if imm & 0x800:
             imm -= 0x1000
 
@@ -822,7 +823,10 @@ class MiniVM:
         if self.trace or self.trace_out:
             mnemonic = OPCODE_NAMES.get(op, f"0x{op:02X}")
             reg_snapshot = [self.regs[i] for i in range(16)]
-            imm_raw = ins & 0x0FFF
+            if op in (0x21, 0x22, 0x23, 0x30, 0x7F):
+                imm_display = imm_raw
+            else:
+                imm_display = imm
             next_word = None
             if op == 0x60 and self.pc + 8 <= len(self.code):
                 next_word = be32(self.code, self.pc + 4)
@@ -831,7 +835,7 @@ class MiniVM:
                 rd,
                 rs1,
                 rs2,
-                imm=imm,
+                imm=imm_display,
                 imm_raw=imm_raw,
                 reg_values=reg_snapshot,
                 flags=self.flags,
@@ -916,15 +920,15 @@ class MiniVM:
             v = (self.regs[rs1] - self.regs[rs2]) & 0xFFFFFFFF
             set_flags(v)
         elif op == 0x21:  # JMP
-            self.pc = imm & 0xFFFFFFFF
+            self.pc = imm_raw & 0xFFFFFFFF
             adv = 0
         elif op == 0x22:  # JZ
             if self.flags & 0x1:
-                self.pc = imm & 0xFFFFFFFF
+                self.pc = imm_raw & 0xFFFFFFFF
                 adv = 0
         elif op == 0x23:  # JNZ
             if not (self.flags & 0x1):
-                self.pc = imm & 0xFFFFFFFF
+                self.pc = imm_raw & 0xFFFFFFFF
                 adv = 0
         elif op == 0x24:  # CALL
             return_addr = (self.pc + 4) & 0xFFFFFFFF
@@ -980,8 +984,8 @@ class MiniVM:
                     self.pc = return_addr & 0xFFFFFFFF
                     adv = 0
         elif op == 0x30:  # SVC
-            mod = (imm >> 8) & 0x0F
-            fn = imm & 0xFF
+            mod = (imm_raw >> 8) & 0x0F
+            fn = imm_raw & 0xFF
             if self.svc_trace:
                 self._log(f"[SVC] mod=0x{mod:X} fn=0x{fn:X} R0..R3={self.regs[:4]}")
             self.handle_svc(mod, fn)
@@ -1061,7 +1065,7 @@ class MiniVM:
                 "reason": "brk",
                 "halt_pc": prev_pc,
                 "opcode": ins,
-                "extra": {"code": imm & 0xFF},
+                "extra": {"code": imm_raw & 0xFF},
             }
         else:
             print(f"[VM] Illegal opcode 0x{op:02X} at PC=0x{self.pc:04X}")

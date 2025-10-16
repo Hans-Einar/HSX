@@ -13,8 +13,8 @@
 ## Work Breakdown
 | Task ID | Description | Owner | Status | Notes |
 | --- | --- | --- | --- | --- |
-| T1 | Split immediate handling for control-flow opcodes and adjust VM execution | Runtime team | Not started | Requires ISA confirmation |
-| T2 | Update assembler/disassembler formatting and add regression tests for high-address jumps | Toolchain team | Not started | Tests should include VM execution harness |
+| T1 | Split immediate handling for control-flow opcodes and adjust VM execution | Runtime team | Completed | Zero-extend control-flow immediates; regression in `test_vm_jump_immediates.py` |
+| T2 | Update assembler/disassembler formatting and add regression tests for high-address jumps | Toolchain team | Completed | Disassembler uses `imm_effective`; new runtime/disasm tests landed |
 | T3 | Refresh docs/help text to explain unsigned branch immediates | Docs | Not started | Coordinate with spec maintainers |
 
 ### Detailed Steps

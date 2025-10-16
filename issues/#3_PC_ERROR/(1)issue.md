@@ -25,6 +25,7 @@
   [VM] PC 0xFFFFFA10 is outside code length 4
   ```
 - The mailbox producer build exhibits the same failure once it reaches its mailbox-handling trampoline.
+- Latest debugger capture (producer.hxe @ `examples/demos/build/mailbox`) shows the triple-stack prologue followed by `JMP 0xFFFFFA10 imm=-1520 (0xA10)` and immediate fault, despite the disassembly revealing the target is the next sequential instruction at `0x0A10`.
 
 ## Impact
 - Severity: **High** — absolute jumps above 0x07FF are unusable, blocking large programs and demos that place code beyond the first 2 KiB.

@@ -10,6 +10,9 @@ from typing import Dict, List, Optional, Tuple
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+MODULE_DIR = Path(__file__).resolve().parent
+if str(MODULE_DIR) not in sys.path:
+    sys.path.insert(0, str(MODULE_DIR))
 
 from disasm_util import OPCODE_NAMES, format_operands, instruction_size
 from platforms.python.host_vm import HEADER, HEADER_FIELDS, HSX_MAGIC
@@ -55,6 +58,8 @@ def disassemble(code: bytes) -> List[Dict[str, object]]:
         next_word = None
         if opcode_name == 'LDI32' and offset + 8 <= len(code):
             next_word = be32(code, offset + 4)
+        unsigned_ops = {0x21, 0x22, 0x23, 0x30, 0x7F}
+        imm_effective = info['imm_raw'] if info['op'] in unsigned_ops else info['imm']
         inst = {
             'pc': offset,
             'word': word,
@@ -64,6 +69,7 @@ def disassemble(code: bytes) -> List[Dict[str, object]]:
             'rs2': info['rs2'],
             'imm': info['imm'],
             'imm_raw': info['imm_raw'],
+            'imm_effective': imm_effective,
             'extended_imm': next_word,
         }
         inst['operands'] = format_operands(
@@ -71,7 +77,7 @@ def disassemble(code: bytes) -> List[Dict[str, object]]:
             info['rd'],
             info['rs1'],
             info['rs2'],
-            imm=info['imm'],
+            imm=imm_effective,
             imm_raw=info['imm_raw'],
             next_word=next_word,
             pc=offset,
