@@ -38,3 +38,27 @@ def test_global_int_lowering_loads_with_ld():
     assert '.text' in lines
     assert any(line.startswith('LDI32') and 'idx' in line for line in lines)
     assert any(line.startswith('LD ') for line in lines)
+
+
+def test_quoted_globals_do_not_collide_with_existing_names():
+    ll = (
+        '@__hsx_quoted_global_1 = dso_local global i32 7, align 4\n'
+        '@"??_C@_03@AB@HI@\\00" = private unnamed_addr constant [3 x i8] c"HI\\00", align 1\n\n'
+        'define dso_local i32 @main() {\n'
+        'entry:\n'
+        '  %ptr = getelementptr inbounds [3 x i8], ptr @"??_C@_03@AB@HI@\\00", i32 0, i32 0\n'
+        '  %val = load i8, ptr %ptr, align 1\n'
+        '  %ext = sext i8 %val to i32\n'
+        '  ret i32 %ext\n'
+        '}\n'
+    )
+    asm = HSX_LLC.compile_ll_to_mvasm(ll, trace=False)
+    lines = [line for line in asm.splitlines() if line]
+    labels = [line[:-1] for line in lines if line.endswith(':') and not line.startswith(' ')]
+    assert '__hsx_quoted_global_1' in labels
+    quoted_labels = [name for name in labels if name.startswith('__hsx_quoted_global_')]
+    assert len(quoted_labels) >= 2
+    assert len(set(quoted_labels)) == len(quoted_labels)
+    new_labels = [name for name in quoted_labels if name != '__hsx_quoted_global_1']
+    assert new_labels
+    assert any(line.startswith('LDI32') and new_labels[0] in line for line in lines)

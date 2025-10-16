@@ -10,7 +10,7 @@ Usage:
 import argparse, re, sys
 import struct
 from collections import defaultdict
-from typing import List, Dict, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 R_RET = "R0"
 ATTR_TOKENS = {"nsw", "nuw", "noundef", "dso_local", "local_unnamed_addr", "volatile"}
@@ -21,6 +21,65 @@ LDI_RE = re.compile(rf"LDI\s+(R\d{{1,2}}),\s*({IMM_TOKEN})$", re.IGNORECASE)
 LDI32_RE = re.compile(rf"LDI32\s+(R\d{{1,2}}),\s*({IMM_TOKEN})$", re.IGNORECASE)
 
 ARG_REGS = ["R1","R2","R3"]  # more via stack later
+
+
+# ---------------------------------------------------------------------------
+# Global symbol sanitization helpers
+
+_GLOBAL_NAME_CACHE: Dict[str, str] = {}
+_GLOBAL_RESERVED_NAMES: Set[str] = set()
+_GLOBAL_NAME_COUNTER = 0
+_QUOTED_GLOBAL_RE = re.compile(r'@"([^"\\]*(?:\\.[^"\\]*)*)"')
+_BARE_GLOBAL_RE = re.compile(r'@([A-Za-z0-9_.]+)')
+
+
+def _reset_global_name_cache() -> None:
+    global _GLOBAL_NAME_CACHE, _GLOBAL_NAME_COUNTER, _GLOBAL_RESERVED_NAMES
+    _GLOBAL_NAME_CACHE = {}
+    _GLOBAL_NAME_COUNTER = 0
+    _GLOBAL_RESERVED_NAMES = set()
+
+
+def _reserve_global_name(name: str) -> None:
+    _GLOBAL_RESERVED_NAMES.add(name)
+
+
+def _sanitize_global_name(raw: str) -> str:
+    """Return a backend-safe symbol name for an arbitrary LLVM global."""
+
+    global _GLOBAL_NAME_COUNTER
+    cached = _GLOBAL_NAME_CACHE.get(raw)
+    if cached:
+        return cached
+
+    if re.fullmatch(r"[A-Za-z0-9_.]+", raw):
+        name = raw
+    else:
+        while True:
+            _GLOBAL_NAME_COUNTER += 1
+            candidate = f"__hsx_quoted_global_{_GLOBAL_NAME_COUNTER}"
+            if candidate not in _GLOBAL_RESERVED_NAMES:
+                name = candidate
+                break
+    _reserve_global_name(name)
+    _GLOBAL_NAME_CACHE[raw] = name
+    return name
+
+
+def _preprocess_ir_text(ir_text: str) -> str:
+    """Replace quoted global references with sanitized backend names."""
+
+    for match in _BARE_GLOBAL_RE.finditer(ir_text):
+        _reserve_global_name(match.group(1))
+
+    def repl(match: re.Match) -> str:
+        raw = match.group(1)
+        # Unescape simple sequences like \01 that Clang may emit for globals.
+        raw_unescaped = bytes(raw, "utf-8").decode("unicode_escape")
+        name = _sanitize_global_name(raw_unescaped)
+        return f"@{name}"
+
+    return _QUOTED_GLOBAL_RE.sub(repl, ir_text)
 
 class ISelError(Exception):
     pass
@@ -1409,6 +1468,8 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
     return asm, spill_data_lines
 
 def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
+    _reset_global_name_cache()
+    ir_text = _preprocess_ir_text(ir_text)
     ir = parse_ir(ir_text.splitlines())
     entry_label = next((fn['name'] for fn in ir['functions'] if fn['name'] == 'main'), None)
     defined_names = {fn['name'] for fn in ir['functions']}
