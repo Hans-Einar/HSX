@@ -225,7 +225,12 @@ def _resolve_unit_local_relocs(code_words: list[int], rodata_buf: bytearray, rel
         value = _compute_local_reloc_value(reloc, sym_info)
         if reloc.get("pc_relative"):
             instr_pc = reloc["index"] * 4
-            value -= instr_pc
+            delta = value - instr_pc
+            if delta % 4 != 0:
+                raise ValueError(
+                    f"PC-relative relocation requires word-aligned target: value=0x{value:X} pc=0x{instr_pc:X}"
+                )
+            value = delta // 4
         section = reloc.get("section")
         rtype = reloc.get("type")
         if section == "code":
@@ -626,7 +631,12 @@ def assemble(lines, *, include_base: Path | None = None, for_object: bool = Fals
                 continue
             if pc_relative:
                 instr_pc = fx['index'] * 4
-                value = value - instr_pc
+                delta = value - instr_pc
+                if delta % 4 != 0:
+                    raise ValueError(
+                        f"PC-relative relocation requires word-aligned target: value=0x{value:X} pc=0x{instr_pc:X}"
+                    )
+                value = delta // 4
             code[fx['index']] = set_imm12(code[fx['index']], value)
         elif ftype == 'entry':
             value = resolve_symbol(fx['symbol'])

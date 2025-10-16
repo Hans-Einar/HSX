@@ -64,8 +64,10 @@ def test_local_relocations_resolved_in_image_mode():
     call_idx = 2
     call_pc = call_idx * 4
     call_word = code[call_idx]
-    expected_offset = foo_addr - call_pc
-    assert call_word & 0x0FFF == (expected_offset & 0x0FFF)
+    expected_offset_bytes = foo_addr - call_pc
+    assert expected_offset_bytes % 4 == 0
+    expected_offset_words = expected_offset_bytes // 4
+    assert call_word & 0x0FFF == (expected_offset_words & 0x0FFF)
 
     # JMP start should loop back to address 0
     jmp_word = code[3]

@@ -905,7 +905,8 @@ class MiniVM:
                 base = self.regs[rs1]
             else:
                 base = self.pc
-            target = (int(base) + int(imm)) & 0xFFFF
+            target_offset = int(imm) << 2
+            target = (int(base) + target_offset) & 0xFFFF
             raw_sp = self.sp - 4
             if raw_sp < 0 or raw_sp < (self.context.stack_limit or 0) or raw_sp + 4 > len(self.mem):
                 self._log("[CALL] stack overflow")
