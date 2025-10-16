@@ -17,7 +17,7 @@
 - [ ] Remediation plan approved (`(3)remediation.md`)
 - [x] Implementation tasks complete (see below)
 - [x] Tests updated/passing
-- [ ] Documentation updated
+- [x] Documentation updated
 - [x] Implementation playbook current (`(5)implementation.md`)
 - [x] Git log updated (`(6)git.md`)
 - [ ] Stakeholders signed off
@@ -28,8 +28,8 @@
   - [x] Validate mailbox producer demo end-to-end
 - [x] T2: Toolchain/test updates for jump formatting
   - [x] Extend assembler/disassembler output and add regression tests
-- [ ] T3: Documentation refresh
-  - [ ] Update ISA spec and trace/disasm help text
+- [x] T3: Documentation refresh
+  - [x] Update ISA spec and trace/disasm help text
 
 ## Verification
 - [x] Unit tests added/updated: `python/tests` (new VM jump regression)
@@ -37,5 +37,4 @@
 - [x] Manual validation complete: `producer.hxe trace (max 64 steps)`
 
 ## Notes / Follow-ups
-- Remaining action: Update ISA/docs to describe unsigned branch immediates (T3).
-- Consider extending instruction width if future jumps require >12 bits.
+- Documentation now captures unsigned branch immediates and clock telemetry; monitor for future ISA width extensions if >12-bit jumps become necessary.

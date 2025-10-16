@@ -65,6 +65,8 @@
 ### Immediate & Memory Model
 - Harvard: code in NOR/FRAM, data in RAM/FRAM.
 - Load/store are word‑addressed (32‑bit) plus `LDB/LDH/STB/STH`.
+- Absolute control-flow instructions (`JMP`, `JZ`, `JNZ`) zero-extend their 12-bit immediate and jump within the 0x0000–0x0FFF code window.
+- Relative control flow (`CALL`) treats the 12-bit immediate as a signed word offset (`<<2`) from the selected base register/PC, preserving backwards jumps.
 
 ### Instruction Groups
 | Group | Mnemonics |
