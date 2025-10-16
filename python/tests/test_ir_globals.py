@@ -62,3 +62,50 @@ def test_quoted_globals_do_not_collide_with_existing_names():
     new_labels = [name for name in quoted_labels if name != '__hsx_quoted_global_1']
     assert new_labels
     assert any(line.startswith('LDI32') and new_labels[0] in line for line in lines)
+
+
+def test_quoted_globals_with_section_attributes_are_parsed():
+    ll = (
+        '@"??_C@_0CP@IBHPODGP@mailbox?5producer?3?5failed?5to?5open@" = '
+        'linkonce_odr dso_local unnamed_addr constant [36 x i8] '
+        'c"mailbox producer: failed to open\\0A\\00", section ".rdata", align 2\n\n'
+        'define dso_local i32 @main() {\n'
+        'entry:\n'
+        '  %ptr = getelementptr inbounds [36 x i8], '
+        'ptr @"??_C@_0CP@IBHPODGP@mailbox?5producer?3?5failed?5to?5open@", i64 0, i64 0\n'
+        '  %val = load i8, ptr %ptr, align 1\n'
+        '  %ext = sext i8 %val to i32\n'
+        '  ret i32 %ext\n'
+        '}\n'
+    )
+    asm = HSX_LLC.compile_ll_to_mvasm(ll, trace=False)
+    lines = [line for line in asm.splitlines() if line]
+    labels = [line[:-1] for line in lines if line.endswith(':') and not line.startswith(' ')]
+    quoted_labels = [name for name in labels if name.startswith('__hsx_quoted_global_')]
+    assert quoted_labels, 'expected sanitized quoted global label in data section'
+    assert any(line.strip().startswith('.byte') for line in lines), 'expected emitted byte data for string'
+    assert any(label in line for label in quoted_labels for line in lines if line.startswith('LDI32'))
+
+
+def test_comdat_alias_lines_are_ignored_during_sanitization():
+    ll = (
+        '$"??_C@_0M@ABCD@foo?$AA@" = comdat any\n'
+        '@"??_C@_0M@ABCD@foo?$AA@" = linkonce_odr dso_local unnamed_addr constant [4 x i8] '
+        'c"foo\\00", comdat, align 1\n\n'
+        'define dso_local i32 @main() {\n'
+        'entry:\n'
+        '  %ptr = getelementptr inbounds [4 x i8], '
+        'ptr @"??_C@_0M@ABCD@foo?$AA@", i32 0, i32 0\n'
+        '  %val = load i8, ptr %ptr, align 1\n'
+        '  %ext = sext i8 %val to i32\n'
+        '  ret i32 %ext\n'
+        '}\n'
+    )
+    asm = HSX_LLC.compile_ll_to_mvasm(ll, trace=False)
+    lines = [line for line in asm.splitlines() if line]
+    labels = [line[:-1] for line in lines if line.endswith(':') and not line.startswith(' ')]
+    quoted_labels = [name for name in labels if name.startswith('__hsx_quoted_global_')]
+    assert quoted_labels, 'expected sanitized quoted global label in data section'
+    comdat_lines = [line for line in lines if line.startswith('$"')]
+    assert not comdat_lines, 'COMDAT alias lines should not appear in the sanitized output'
+    assert any(label in line for label in quoted_labels for line in lines if line.startswith('LDI32'))

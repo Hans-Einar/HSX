@@ -29,7 +29,12 @@ ARG_REGS = ["R1","R2","R3"]  # more via stack later
 _GLOBAL_NAME_CACHE: Dict[str, str] = {}
 _GLOBAL_RESERVED_NAMES: Set[str] = set()
 _GLOBAL_NAME_COUNTER = 0
-_QUOTED_GLOBAL_RE = re.compile(r'@"([^"\\]*(?:\\.[^"\\]*)*)"')
+# Windows COFF IR places duplicate COMDAT names in lines that begin with
+# `$"..." = comdat any`. Those names use the same quoting syntax as globals,
+# but we must leave them intact so the surrounding syntax stays valid.  Use a
+# negative look-behind to ensure we only touch real globals that are written as
+# `@"..."` and ignore the `$"..."` COMDAT aliases.
+_QUOTED_GLOBAL_RE = re.compile(r'(?<!\$)@"([^"\\]*(?:\\.[^"\\]*)*)"')
 _BARE_GLOBAL_RE = re.compile(r'@([A-Za-z0-9_.]+)')
 
 
@@ -79,7 +84,14 @@ def _preprocess_ir_text(ir_text: str) -> str:
         name = _sanitize_global_name(raw_unescaped)
         return f"@{name}"
 
-    return _QUOTED_GLOBAL_RE.sub(repl, ir_text)
+    processed_lines = []
+    for line in ir_text.splitlines():
+        if line.lstrip().startswith('$"'):
+            processed_lines.append(line)
+            continue
+        processed_lines.append(_QUOTED_GLOBAL_RE.sub(repl, line))
+    suffix = "\n" if ir_text.endswith("\n") else ""
+    return "\n".join(processed_lines) + suffix
 
 class ISelError(Exception):
     pass
@@ -103,30 +115,85 @@ def parse_llvm_string_literal(body: str) -> bytes:
 
 def parse_global_definition(line: str):
     line = line.strip()
-    string_match = re.match(r'@([A-Za-z0-9_.]+)\s*=\s*(?:[\w.]+\s+)*constant\s+\[(\d+)\s+x\s+i8\]\s+c"(.*)"(?:,\s*align\s*(\d+))?', line)
+
+    def parse_align_from_tail(tail: str) -> Optional[int]:
+        if not tail:
+            return None
+        match = re.search(r'align\s+(\d+)', tail)
+        if match:
+            return int(match.group(1))
+        return None
+
+    def split_value_and_attrs(text: str) -> Tuple[str, str]:
+        depth = 0
+        in_string = False
+        escape = False
+        for idx, ch in enumerate(text):
+            if in_string:
+                if escape:
+                    escape = False
+                    continue
+                if ch == '\\':
+                    escape = True
+                    continue
+                if ch == '"':
+                    in_string = False
+                continue
+            if ch == '"':
+                in_string = True
+                continue
+            if ch == '(':
+                depth += 1
+                continue
+            if ch == ')':
+                depth = max(depth - 1, 0)
+                continue
+            if ch == ',' and depth == 0:
+                return text[:idx].strip(), text[idx + 1 :].strip()
+        return text.strip(), ''
+
+    string_match = re.match(
+        r'@([A-Za-z0-9_.]+)\s*=\s*(?:[\w.]+\s+)*constant\s+\[(\d+)\s+x\s+i8\]\s+c"((?:[^"\\]|\\.)*)"(.*)',
+        line,
+    )
     if string_match:
-        name, _, body, align = string_match.groups()
+        name, _, body, tail = string_match.groups()
         data = parse_llvm_string_literal(body)
-        return {"name": name, "kind": "bytes", "data": data, "align": int(align) if align else None}
+        align = parse_align_from_tail(tail)
+        return {"name": name, "kind": "bytes", "data": data, "align": align}
+
     zero_array_match = re.match(
-        r'@([A-Za-z0-9_.]+)\s*=\s*(?:[\w.]+\s+)*global\s+\[(\d+)\s+x\s+i(8|16|32)\]\s+zeroinitializer(?:,\s*align\s*(\d+))?',
+        r'@([A-Za-z0-9_.]+)\s*=\s*(?:[\w.]+\s+)*global\s+\[(\d+)\s+x\s+i(8|16|32)\]\s+zeroinitializer(.*)',
         line,
     )
     if zero_array_match:
-        name, count, bits, align = zero_array_match.groups()
+        name, count, bits, tail = zero_array_match.groups()
         count = int(count)
         elem_size = int(bits) // 8
         data = bytes([0] * (count * elem_size))
-        return {"name": name, "kind": "bytes", "data": data, "align": int(align) if align else None}
-    int_match = re.match(r'@([A-Za-z0-9_.]+)\s*=\s*(?:[\w.]+\s+)*global\s+i(8|16|32)\s+([^,]+)(?:,\s*align\s*(\d+))?', line)
+        align = parse_align_from_tail(tail)
+        return {"name": name, "kind": "bytes", "data": data, "align": align}
+
+    int_match = re.match(
+        r'@([A-Za-z0-9_.]+)\s*=\s*(?:[\w.]+\s+)*global\s+i(8|16|32)\s+(.+)',
+        line,
+    )
     if int_match:
-        name, bits, value_str, align = int_match.groups()
+        name, bits, rest = int_match.groups()
+        value_str, tail = split_value_and_attrs(rest)
+        align = parse_align_from_tail(tail)
         value_str = value_str.strip()
-        value = 0 if value_str == 'zeroinitializer' else int(value_str)
-        return {"name": name, "kind": "int", "bits": int(bits), "value": value, "align": int(align) if align else None}
-    float_match = re.match(r'@([A-Za-z0-9_.]+)\s*=\s*(?:[\w.]+\s+)*global\s+float\s+([^,]+)(?:,\s*align\s*(\d+))?', line)
+        value = 0 if value_str == 'zeroinitializer' else int(value_str, 0)
+        return {"name": name, "kind": "int", "bits": int(bits), "value": value, "align": align}
+
+    float_match = re.match(
+        r'@([A-Za-z0-9_.]+)\s*=\s*(?:[\w.]+\s+)*global\s+float\s+(.+)',
+        line,
+    )
     if float_match:
-        name, value_str, align = float_match.groups()
+        name, rest = float_match.groups()
+        value_str, tail = split_value_and_attrs(rest)
+        align = parse_align_from_tail(tail)
         value_str = value_str.strip()
         if value_str == 'zeroinitializer':
             bits = 0
@@ -134,7 +201,7 @@ def parse_global_definition(line: str):
             bits = int(value_str, 16) & 0xFFFFFFFF
         else:
             bits = struct.unpack('<I', struct.pack('<f', float(value_str)))[0]
-        return {"name": name, "kind": "float", "bits": 32, "value": bits, "align": int(align) if align else None}
+        return {"name": name, "kind": "float", "bits": 32, "value": bits, "align": align}
     return None
 
 
