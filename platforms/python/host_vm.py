@@ -1576,6 +1576,38 @@ class VMController:
         self._reg_free_list.append(allocation["reg_base"])
         self._stack_free_list.append((allocation["stack_base"], allocation.get("stack_size", DEFAULT_STACK_BYTES)))
 
+    def _ensure_task_memory(self, pid: int, state: Dict[str, Any]) -> Dict[str, Any]:
+        ctx = state.setdefault("context", {})
+        reg_base = ctx.get("reg_base", 0)
+        stack_base = ctx.get("stack_base", 0)
+        stack_limit = ctx.get("stack_limit", 0)
+        stack_size = ctx.get("stack_size")
+        if reg_base and stack_base:
+            allocation = self._task_memory.get(pid)
+            if allocation is None:
+                allocation = {
+                    "reg_base": reg_base,
+                    "stack_base": stack_base,
+                    "stack_limit": stack_limit or stack_base,
+                    "stack_size": stack_size or DEFAULT_STACK_BYTES,
+                    "sp_offset": ctx.get("sp", DEFAULT_STACK_BYTES),
+                }
+                self._task_memory[pid] = allocation
+            else:
+                allocation.setdefault("stack_size", stack_size or DEFAULT_STACK_BYTES)
+            ctx.setdefault("stack_limit", allocation["stack_limit"])
+            ctx.setdefault("stack_size", allocation["stack_size"])
+            ctx.setdefault("sp", allocation["sp_offset"])
+            return ctx
+        allocation = self._allocate_task_memory(pid, stack_bytes=stack_size or DEFAULT_STACK_BYTES)
+        ctx["reg_base"] = allocation["reg_base"]
+        ctx["stack_base"] = allocation["stack_base"]
+        ctx["stack_limit"] = allocation["stack_limit"]
+        ctx["stack_size"] = allocation["stack_size"]
+        ctx.setdefault("sp", allocation["sp_offset"])
+        state["context"] = ctx
+        return ctx
+
     def mailbox_send(
         self,
         pid: int,
@@ -2229,6 +2261,7 @@ class VMController:
         ctx["stack_base"] = allocation["stack_base"]
         ctx["stack_limit"] = allocation["stack_limit"]
         ctx["sp"] = allocation["sp_offset"]
+        ctx["stack_size"] = allocation["stack_size"]
         state["context"] = ctx
         self.tasks[pid] = {
             "pid": pid,
@@ -2363,6 +2396,9 @@ class VMController:
             raise ValueError(f"no state for pid {pid}")
         trace_enabled = self.default_trace or (pid in self.traced_pids)
         self.trace = trace_enabled
+        ctx_dict = self._ensure_task_memory(pid, state)
+        if not ctx_dict.get("reg_base") or not ctx_dict.get("stack_base"):
+            raise RuntimeError(f"task {pid} missing register/stack base allocation")
         if self.vm is None:
             initial_code = bytes(state.get("code", bytearray()))
             entry = state.get("context", {}).get("pc", task.get("pc", 0))

@@ -34,7 +34,8 @@
 - [x] Update `set_context`, `save_context`, and `snapshot_registers` to avoid cloning arrays.
   - Context transitions now sync register banks via `RegisterFile`; `save_context` captures values from memory.
 - [ ] Adjust debugger helpers (`read_regs`, shell `dumpregs`) to read via base offset.
-- [ ] Add runtime assertions: active tasks must have non-zero `reg_base`, `stack_base`, `stack_limit`.
+- [x] Add runtime assertions: active tasks must have non-zero `reg_base`, `stack_base`, `stack_limit`.
+  - `_ensure_task_memory` verifies allocations and `_activate_task` raises if bases are missing.
 - [ ] Run unit tests covering register read/write to ensure behaviour unchanged.
 
 ### T3 Scheduler & mailbox contract enforcement (`not started`)
@@ -60,6 +61,6 @@
 ## Handover Notes
 - Current status: T1 complete; T2 in progress (MiniVM now backed by register windows).
 - Known blockers: None.
-- Next action when resuming: Review debugger helpers / assertions, add runtime checks for non-zero bases, and expand tests.
+- Next action when resuming: Update debugger/CLI helpers to consume the register window and plan coverage (assertions/tests).
 
 Update this document after every working session—note partial progress, open questions, and where to pick up next.
