@@ -22,6 +22,7 @@
 | 2025-10-16 | a5c978be2b5d2752efdfedd440948cc12223ba6a | Finished T3 scheduler work | Hans Einar | CLI `sched` command reports scheduler counters/trace; tests rerun successfully.
 | 2025-10-16 | 959499f2a853c4ef56fc5ddd2fec024362725453 | Added register isolation & stack guard tests | Hans Einar | New unit tests cover register window isolation and stack overflow handling.
 | 2025-10-16 | 358ba171a38100e5dbca1a2a6fad626d4862587f | Extended sched CLI tests and playbook | Hans Einar | Added sched payload/pretty-print coverage; documented test runs in T4 plan.
+| 2025-10-16 | b062b8007f34808a039f03a90559de40c00b5e85 | Added scheduler stats integration test | Hans Einar | `python/tests/test_scheduler_stats.py` verifies counters/trace exposure.
 
 ## Pull Request
 - PR URL / ID: _TBD_

@@ -1,2 +1,6 @@
 sched <pid> [priority <n>] [quantum <n>]
-Update the scheduler priority and/or quantum for a task. Values are decimal.
+    Update the scheduler priority and/or quantum for a task. Values are decimal.
+
+sched stats [limit]
+    Show scheduler counters and the recent event trace. Optional limit
+    trims the number of events returned.

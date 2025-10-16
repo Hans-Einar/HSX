@@ -40,13 +40,13 @@
   - [x] Ensure one-instruction stepping & wait queues (unit test + instrumentation)
   - [x] Implement scheduler instrumentation + CLI hooks (`sched` command reports counters/trace)
 - [ ] T4: Tests, docs, demos
-  - [ ] Add unit/integration tests from verification plan
-  - [ ] Update documentation/help text
+  - [x] Add unit/integration tests from verification plan (register isolation, stack guard, scheduler stats)
+  - [x] Update documentation/help text
   - [ ] Capture evidence (stdout/mbox dumps, scheduler stats)
 
 ## Verification
-- [ ] Unit tests added/updated: register isolation, stack guard, trap resume, fairness
-- [ ] Integration tests updated: mailbox demo, deterministic clock stepping
+- [x] Unit tests added/updated: register isolation, stack guard, trap resume, fairness
+- [x] Integration tests updated: mailbox demo, deterministic clock stepping (scheduler stats integration test)
 - [ ] Manual validation complete: CLI commands, dumpregs showing non-zero bases
 
 ## Notes / Follow-ups

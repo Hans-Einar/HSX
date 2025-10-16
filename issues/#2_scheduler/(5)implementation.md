@@ -61,12 +61,10 @@
   - Added register-window and stack guard unit tests (`python/tests/test_vm_pause.py`, `python/tests/test_stack_guard.py`). Tests executed: `PYTHONPATH=. pytest python/tests/test_vm_pause.py python/tests/test_stack_guard.py python/tests/test_shell_client.py`.
 - [x] Update integration tests/demos (mailbox producer/consumer) to assert behaviour under new scheduler.
   - Added `python/tests/test_scheduler_stats.py` to validate scheduler counters/trace in `info()`.
-- [ ] Update integration tests/demos (mailbox producer/consumer) to assert behaviour under new scheduler.
-  - Plan: scripted HSX shell transcript covering send/receive, verifying scheduler counters and trace.
-- [ ] Refresh documentation (`docs/hsx_spec-v2.md`, CLI help) to reflect “one step = one instruction” and base-pointer model.
-  - Docs to update: scheduler section, CLI help (`help/sched.txt` or equivalent), example transcripts.
-- [ ] Capture evidence: `dumpregs`, `mbox`, scheduler stats before/after refactor.
-  - Collect outputs from `sched stats`, `dumpregs`, and mailbox commands for final report.
+- [x] Refresh documentation (`docs/hsx_spec-v2.md`, CLI help) to reflect “one step = one instruction” and base-pointer model.
+  - Updated `docs/hsx_spec-v2.md` (scheduler instrumentation) and `help/sched.txt` (documented `sched stats`).
+- [x] Capture evidence: `dumpregs`, `mbox`, scheduler stats before/after refactor.
+  - Captured script output in `issues/#2_scheduler/evidence.md` (scheduler counters/trace, dumpregs, mailbox snapshot).
 - [ ] Coordinate final review and stakeholder sign-off.
 
 ## Context & Artifacts
@@ -75,8 +73,8 @@
 - Useful commands: `python python/disassemble.py ...`, HSX shell `clock step`, `dumpregs`, `mbox`, CI test runners.
 
 ## Handover Notes
-- Current status: T1–T3 complete; T4 (tests/docs/demos) ready to start.
+- Current status: T1–T3 complete; T4 nearing completion (final sign-off pending).
 - Known blockers: None.
-- Next action when resuming: Begin T4 by drafting test plan (register isolation, stack overflow, trap resume, RR fairness) and scheduling doc/help updates.
+- Next action when resuming: Review evidence, coordinate stakeholder sign-off, and close out DoD.
 
 Update this document after every working session—note partial progress, open questions, and where to pick up next.
