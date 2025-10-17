@@ -8,6 +8,7 @@ import socket
 import sys
 from datetime import datetime
 from pathlib import Path
+import shlex
 
 try:
     import readline  # type: ignore
@@ -353,8 +354,9 @@ def _pretty_info(payload: dict) -> None:
     clock = info.get('clock')
     if isinstance(clock, dict):
         print("  clock:")
-        print(f"    state       : {clock.get('state')}  running: {clock.get('running')}")
+        print(f"    state       : {clock.get('state')}  mode: {clock.get('mode')}  running: {clock.get('running')}")
         print(f"    rate_hz     : {clock.get('rate_hz')}  step_size: {clock.get('step_size')}")
+        print(f"    throttle    : {clock.get('throttled')} ({clock.get('throttle_reason')})  last_wait_s: {clock.get('last_wait_s')}")
         print(f"    auto        : steps={clock.get('auto_steps')}  total={clock.get('auto_total_steps')}")
         print(f"    manual      : steps={clock.get('manual_steps')}  total={clock.get('manual_total_steps')}")
     selected = info.get('selected_registers')
@@ -425,14 +427,19 @@ def _pretty_clock(payload: dict) -> None:
     else:
         state = clock.get("state")
         running = clock.get("running")
+        mode = clock.get("mode")
+        throttled = clock.get("throttled")
+        throttle_reason = clock.get("throttle_reason")
+        last_wait = clock.get("last_wait_s")
         rate_hz = clock.get("rate_hz")
         step_size = clock.get("step_size")
         auto_steps = clock.get("auto_steps")
         auto_total = clock.get("auto_total_steps")
         manual_steps = clock.get("manual_steps")
         manual_total = clock.get("manual_total_steps")
-        print(f"  state       : {state}  running: {running}")
+        print(f"  state       : {state}  mode: {mode}  running: {running}")
         print(f"  rate_hz     : {rate_hz}  step_size: {step_size}")
+        print(f"  throttle    : {throttled} ({throttle_reason})  last_wait_s: {last_wait}")
         print(f"  auto        : steps={auto_steps}  total={auto_total}")
         print(f"  manual      : steps={manual_steps}  total={manual_total}")
     result = payload.get("result")
@@ -464,38 +471,66 @@ def _pretty_listen(payload: dict) -> None:
     if payload.get("status") != "ok":
         print(json.dumps(payload, indent=2, sort_keys=True))
         return
-    messages = payload.get("messages", [])
-    print("listen:")
+    messages = payload.get("messages", []) or []
     if not messages:
-        print("  (no messages)")
+        print("(no messages)")
         return
-    for idx, msg in enumerate(messages, start=1):
-        target = msg.get("target")
-        channel = msg.get("channel")
-        length = msg.get("length")
-        src_pid = msg.get("src_pid")
-        flags = msg.get("flags")
-        header_parts = []
-        if target is not None:
-            header_parts.append(f"target={target}")
-        if src_pid is not None:
-            header_parts.append(f"src={src_pid}")
-        if channel is not None:
-            header_parts.append(f"channel={channel}")
-        if length is not None:
-            header_parts.append(f"len={length}")
-        if flags:
-            header_parts.append(f"flags=0x{int(flags):X}")
-        header = " ".join(header_parts) if header_parts else "(no metadata)"
-        print(f"  [{idx}] {header}")
-        text = msg.get("text", "")
-        data_hex = msg.get("data_hex", "")
-        if isinstance(text, str) and text:
-            print(f"    text : {repr(text)}")
-        if isinstance(data_hex, str) and data_hex:
-            text_hex = text.encode("utf-8").hex() if isinstance(text, str) else None
-            if text_hex is None or text_hex.lower() != data_hex.lower():
-                print(f"    hex  : {data_hex}")
+    wrote_any = False
+    for msg in messages:
+        text = msg.get("text")
+        data_hex = msg.get("data_hex")
+        if isinstance(text, str):
+            sys.stdout.write(text)
+            wrote_any = True
+        elif isinstance(data_hex, str) and data_hex:
+            try:
+                data_bytes = bytes.fromhex(data_hex)
+            except ValueError:
+                sys.stdout.write(f"<invalid data_hex:{data_hex}>")
+            else:
+                sys.stdout.buffer.write(data_bytes)
+                wrote_any = True
+        else:
+            # No textual payload; fall back to printing structured entry.
+            sys.stdout.write(json.dumps(msg, sort_keys=True) + "\n")
+            wrote_any = True
+    if wrote_any:
+        sys.stdout.flush()
+    else:
+        print("(no message payload)")
+
+
+def _pretty_send(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    target = payload.get("target")
+    length = payload.get("length")
+    if length is None:
+        data_hex = payload.get("data_hex")
+        if isinstance(data_hex, str):
+            length = len(data_hex) // 2
+        else:
+            data = payload.get("data")
+            if isinstance(data, str):
+                length = len(data.encode("utf-8"))
+    length_text = str(length) if length is not None else "?"
+    pid_text = None
+    stdin_label = None
+    if isinstance(target, str):
+        parts = target.rsplit("@", 1)
+        if len(parts) == 2 and parts[0].endswith("svc:stdio.in"):
+            try:
+                pid_text = str(int(parts[1], 0))
+            except ValueError:
+                pid_text = parts[1]
+            stdin_label = True
+    if stdin_label and pid_text is not None:
+        print(f"{length_text} bytes sent to stdin on pid {pid_text}")
+    elif isinstance(target, str):
+        print(f"{length_text} bytes sent to {target}")
+    else:
+        print(f"{length_text} bytes sent")
 
 
 def _pretty_list(payload: dict) -> None:
@@ -824,6 +859,8 @@ PRETTY_HANDLERS = {
     'clock': _pretty_clock,
     'step': _pretty_clock,
     'trace': _pretty_trace,
+    'listen': _pretty_listen,
+    'send': _pretty_send,
     'dbg': _pretty_dbg,
     'sched': _pretty_sched,
 }
@@ -1275,7 +1312,11 @@ def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: boo
         if line.lower() == 'help':
             _print_general_help()
             continue
-        parts = line.split()
+        try:
+            parts = shlex.split(line)
+        except ValueError as exc:
+            print(f"parse error: {exc}")
+            continue
         cmd = parts[0].lower()
         raw_args = parts[1:]
         if cmd == 'stdiofanout':

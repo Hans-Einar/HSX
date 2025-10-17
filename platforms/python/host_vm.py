@@ -21,6 +21,7 @@ if str(REPO_ROOT) not in sys.path:
 try:
     from python.mailbox import MailboxManager, MailboxError, MailboxMessage
     from python import hsx_mailbox_constants as mbx_const
+    from python.disasm_util import OPCODE_NAMES, format_operands
 except ImportError as exc:  # pragma: no cover - require repo sources
     raise ImportError("HSX repo modules not found; ensure repository root on PYTHONPATH") from exc
 
@@ -737,16 +738,21 @@ class MiniVM:
 
         if self.pc + 4 > len(self.code):
             pid = self.context.pid if self.context else None
-            self.emit_event({
+            error_info = {
                 "type": "vm_error",
                 "pid": pid,
                 "error": "pc_out_of_range",
                 "pc": self.pc,
                 "code_len": len(self.code),
-            })
-            print(f"[VM] PC 0x{self.pc:04X} is outside code length {len(self.code)}")
-            self.running = False
-            self.save_context()
+            }
+            self.emit_event(error_info)
+            msg = f"[VM] PC 0x{self.pc:04X} is outside code length {len(self.code)}"
+            self._log(msg)
+            self._debug_halt(
+                "vm_error",
+                halt_pc=self.pc,
+                extra={"error": "pc_out_of_range", "code_len": len(self.code)},
+            )
             return
 
         ins = be32(self.code, self.pc)
@@ -754,7 +760,8 @@ class MiniVM:
         rd = (ins >> 20) & 0x0F
         rs1 = (ins >> 16) & 0x0F
         rs2 = (ins >> 12) & 0x0F
-        imm = ins & 0x0FFF
+        imm_raw = ins & 0x0FFF
+        imm = imm_raw
         if imm & 0x800:
             imm -= 0x1000
 
@@ -814,7 +821,31 @@ class MiniVM:
             self.save_context()
 
         if self.trace or self.trace_out:
-            self._log(f"[TRACE] pc=0x{self.pc:04X} op=0x{op:02X} rd=R{rd} rs1=R{rs1} rs2=R{rs2} imm={imm}")
+            mnemonic = OPCODE_NAMES.get(op, f"0x{op:02X}")
+            reg_snapshot = [self.regs[i] for i in range(16)]
+            if op in (0x21, 0x22, 0x23, 0x30, 0x7F):
+                imm_display = imm_raw
+            else:
+                imm_display = imm
+            next_word = None
+            if op == 0x60 and self.pc + 8 <= len(self.code):
+                next_word = be32(self.code, self.pc + 4)
+            operands = format_operands(
+                mnemonic,
+                rd,
+                rs1,
+                rs2,
+                imm=imm_display,
+                imm_raw=imm_raw,
+                reg_values=reg_snapshot,
+                flags=self.flags,
+                next_word=next_word,
+                pc=self.pc,
+            )
+            operand_text = f" {operands}" if operands else ""
+            self._log(
+                f"[TRACE] 0x{self.pc & 0xFFFF:04X}: 0x{ins:08X} {mnemonic}{operand_text}"
+            )
 
         adv = 4
         if op == 0x01:  # LDI
@@ -889,15 +920,15 @@ class MiniVM:
             v = (self.regs[rs1] - self.regs[rs2]) & 0xFFFFFFFF
             set_flags(v)
         elif op == 0x21:  # JMP
-            self.pc = imm & 0xFFFFFFFF
+            self.pc = imm_raw & 0xFFFFFFFF
             adv = 0
         elif op == 0x22:  # JZ
             if self.flags & 0x1:
-                self.pc = imm & 0xFFFFFFFF
+                self.pc = imm_raw & 0xFFFFFFFF
                 adv = 0
         elif op == 0x23:  # JNZ
             if not (self.flags & 0x1):
-                self.pc = imm & 0xFFFFFFFF
+                self.pc = imm_raw & 0xFFFFFFFF
                 adv = 0
         elif op == 0x24:  # CALL
             return_addr = (self.pc + 4) & 0xFFFFFFFF
@@ -953,8 +984,8 @@ class MiniVM:
                     self.pc = return_addr & 0xFFFFFFFF
                     adv = 0
         elif op == 0x30:  # SVC
-            mod = (imm >> 8) & 0x0F
-            fn = imm & 0xFF
+            mod = (imm_raw >> 8) & 0x0F
+            fn = imm_raw & 0xFF
             if self.svc_trace:
                 self._log(f"[SVC] mod=0x{mod:X} fn=0x{fn:X} R0..R3={self.regs[:4]}")
             self.handle_svc(mod, fn)
@@ -1034,7 +1065,7 @@ class MiniVM:
                 "reason": "brk",
                 "halt_pc": prev_pc,
                 "opcode": ins,
-                "extra": {"code": imm & 0xFF},
+                "extra": {"code": imm_raw & 0xFF},
             }
         else:
             print(f"[VM] Illegal opcode 0x{op:02X} at PC=0x{self.pc:04X}")

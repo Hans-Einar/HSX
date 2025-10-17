@@ -264,12 +264,15 @@ class BlinkenlightsApp:
         if not status:
             return "Clock status unavailable"
         state = status.get("state", "unknown")
+        mode = status.get("mode", "active")
+        throttled = status.get("throttled")
         rate = status.get("rate_hz")
         if isinstance(rate, (int, float)) and rate and rate > 0:
             rate_text = f"{rate:g} Hz"
         else:
             rate_text = "unlimited"
-        return f"Clock {state} ({rate_text})"
+        throttle_note = " throttled" if throttled else ""
+        return f"Clock {state}/{mode}{throttle_note} ({rate_text})"
 
     def _clock_start_cmd(self) -> str:
         status = self.rpc.clock_start()
