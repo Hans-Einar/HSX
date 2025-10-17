@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import sys, re, struct, zlib, argparse, json
+import sys, re, struct, zlib, argparse, json, subprocess
 from pathlib import Path
 from typing import Any, Dict
 
@@ -223,6 +223,14 @@ def _resolve_unit_local_relocs(code_words: list[int], rodata_buf: bytearray, rel
             remaining.append(reloc)
             continue
         value = _compute_local_reloc_value(reloc, sym_info)
+        if reloc.get("pc_relative"):
+            instr_pc = reloc["index"] * 4
+            delta = value - instr_pc
+            if delta % 4 != 0:
+                raise ValueError(
+                    f"PC-relative relocation requires word-aligned target: value=0x{value:X} pc=0x{instr_pc:X}"
+                )
+            value = delta // 4
         section = reloc.get("section")
         rtype = reloc.get("type")
         if section == "code":
@@ -546,6 +554,7 @@ def assemble(lines, *, include_base: Path | None = None, for_object: bool = Fals
             add_code_word(emit_word(op, 0, rs1, rs2, 0))
         elif mnem in ('JMP', 'JZ', 'JNZ', 'CALL'):
             target = args[0]
+            pc_relative = mnem == 'CALL'
             try:
                 imm_val = parse_int(target)
                 add_code_word(emit_word(op, 0, 0, 0, sign12(imm_val)))
@@ -554,7 +563,7 @@ def assemble(lines, *, include_base: Path | None = None, for_object: bool = Fals
                 if not ref:
                     raise
                 add_code_word(emit_word(op, 0, 0, 0, 0))
-                fixups.append({'type': 'jump', 'index': len(code) - 1, 'ref': ref})
+                fixups.append({'type': 'jump', 'index': len(code) - 1, 'ref': ref, 'pc_relative': pc_relative})
         elif mnem == 'SVC':
             if len(args) == 1:
                 imm_val = parse_int(args[0])
@@ -613,9 +622,21 @@ def assemble(lines, *, include_base: Path | None = None, for_object: bool = Fals
             kind, name = fx['ref']
             value = eval_symbol_ref(fx['ref'])
             is_local = name in labels
+            pc_relative = fx.get('pc_relative', False)
             if value is None or (for_object and is_local):
-                relocs.append({'type': 'jump', 'index': fx['index'], 'symbol': name, 'kind': kind, 'section': 'code'})
+                reloc_entry = {'type': 'jump', 'index': fx['index'], 'symbol': name, 'kind': kind, 'section': 'code'}
+                if pc_relative:
+                    reloc_entry['pc_relative'] = True
+                relocs.append(reloc_entry)
                 continue
+            if pc_relative:
+                instr_pc = fx['index'] * 4
+                delta = value - instr_pc
+                if delta % 4 != 0:
+                    raise ValueError(
+                        f"PC-relative relocation requires word-aligned target: value=0x{value:X} pc=0x{instr_pc:X}"
+                    )
+                value = delta // 4
             code[fx['index']] = set_imm12(code[fx['index']], value)
         elif ftype == 'entry':
             value = resolve_symbol(fx['symbol'])
@@ -721,6 +742,7 @@ def main():
     ap.add_argument("-v", "--verbose", action="store_true", help="print assembly statistics")
     ap.add_argument("--dump-bytes", action="store_true", help="emit code words as hex for debugging")
     ap.add_argument("--emit-hxo", action="store_true", help="emit HSX object (.hxo) instead of final .hxe")
+    ap.add_argument("--dump-json", action="store_true", help="emit disassembly JSON alongside the .hxe")
     args = ap.parse_args()
     input_path = Path(args.input).resolve()
     with input_path.open("r", encoding="utf-8") as f:
@@ -745,6 +767,11 @@ def main():
         )
     else:
         write_hxe(code, entry or 0, args.output, rodata=rodata)
+        if args.dump_json:
+            json_path = Path(args.output).with_suffix(".json")
+            disassemble_py = Path(__file__).resolve().parents[1] / "python" / "disassemble.py"
+            cmd = [sys.executable, str(disassemble_py), args.output, "--mvasm", str(input_path), "-o", str(json_path)]
+            subprocess.run(cmd, check=True)
     if args.verbose:
         print(f"entry=0x{(entry or 0):08X} words={len(code)} bytes={len(code)*4} rodata={len(rodata)}")
         if imports_decl:

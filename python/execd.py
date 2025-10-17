@@ -562,6 +562,25 @@ class ExecutiveState:
             ctx['wait_handle'] = None
             state['running'] = True
 
+    def scheduler_stats(self) -> Dict[int, Dict[str, int]]:
+        info = self.vm.info()
+        return info.get("scheduler", {}).get("counters", {})
+
+    def scheduler_trace_snapshot(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        info = self.vm.info()
+        trace = info.get("scheduler", {}).get("trace", [])
+        if limit is not None:
+            try:
+                limit_int = int(limit)
+            except (TypeError, ValueError):
+                limit_int = None
+            if limit_int is not None:
+                if limit_int <= 0:
+                    trace = []
+                else:
+                    trace = trace[-limit_int:]
+        return trace
+
     def listen_stdout(self, pid: Optional[int], *, limit: int = 1, max_len: int = 512) -> Dict[str, Any]:
         descriptors = self.mailbox_snapshot()
         if pid is not None:
@@ -906,10 +925,14 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 return {"version": 1, "status": "ok", **result}
             if cmd == "sched":
                 pid_value = request.get("pid")
-                if pid_value is None:
-                    raise ValueError("sched requires 'pid'")
-                task = self.state.set_task_attrs(int(pid_value), priority=request.get("priority"), quantum=request.get("quantum"))
-                return {"version": 1, "status": "ok", "task": task}
+                if pid_value is not None:
+                    task = self.state.set_task_attrs(int(pid_value), priority=request.get("priority"), quantum=request.get("quantum"))
+                    return {"version": 1, "status": "ok", "task": task}
+                stats = self.state.scheduler_stats()
+                trace_limit = request.get("limit")
+                limit_int = int(trace_limit) if trace_limit is not None else None
+                trace = self.state.scheduler_trace_snapshot(limit=limit_int)
+                return {"version": 1, "status": "ok", "scheduler": {"counters": stats, "trace": trace}}
             if cmd == "restart":
                 targets = request.get("targets")
                 if isinstance(targets, str):

@@ -361,6 +361,23 @@ def _pretty_info(payload: dict) -> None:
     if isinstance(selected, dict):
         print(f"  selected_pid: {info.get('selected_pid')}")
         _render_register_block(selected, indent="  ")
+    scheduler = info.get('scheduler')
+    if isinstance(scheduler, dict):
+        counters = scheduler.get('counters')
+        trace = scheduler.get('trace')
+        if counters:
+            print("  scheduler counters:")
+            for pid, counts in counters.items():
+                print(f"    pid {pid}:")
+                for event, value in sorted(counts.items()):
+                    print(f"      {event:<8} : {value}")
+        if trace:
+            print("  scheduler trace (most recent first):")
+            for entry in reversed(trace):
+                pid_text = f" pid={entry['pid']}" if 'pid' in entry else ""
+                extra = {k: v for k, v in entry.items() if k not in {'event', 'ts', 'pid'}}
+                extra_text = f" {extra}" if extra else ""
+                print(f"    [{entry['event']}] ts={entry['ts']:.6f}{pid_text}{extra_text}")
 
 
 def _pretty_ps(payload: dict) -> None:
@@ -648,6 +665,39 @@ def _pretty_dbg(payload: dict) -> None:
                 print(f"      {event}")
 
 
+def _pretty_sched(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    if payload.get("task"):
+        task = payload["task"]
+        print("sched task update:")
+        for key, value in sorted(task.items()):
+            print(f"  {key:<12}: {value}")
+        return
+    sched = payload.get("scheduler", {})
+    counters = sched.get("counters", {})
+    trace = sched.get("trace", [])
+    print("sched stats:")
+    if counters:
+        print("  counters:")
+        for pid, entries in sorted(counters.items()):
+            print(f"    pid {pid}:")
+            for event, value in sorted(entries.items()):
+                print(f"      {event:<8} : {value}")
+    else:
+        print("  counters: (none)")
+    if trace:
+        print("  trace (most recent first):")
+        for entry in reversed(trace):
+            pid_text = f" pid={entry['pid']}" if 'pid' in entry else ""
+            extra = {k: v for k, v in entry.items() if k not in {'event', 'ts', 'pid'}}
+            extra_text = f" {extra}" if extra else ""
+            print(f"    [{entry['event']}] ts={entry['ts']:.6f}{pid_text}{extra_text}")
+    else:
+        print("  trace: (empty)")
+
+
 def _pretty_dmesg(payload: dict) -> None:
     if payload.get("status") != "ok":
         print(json.dumps(payload, indent=2, sort_keys=True))
@@ -775,6 +825,7 @@ PRETTY_HANDLERS = {
     'step': _pretty_clock,
     'trace': _pretty_trace,
     'dbg': _pretty_dbg,
+    'sched': _pretty_sched,
 }
 
 
@@ -790,6 +841,19 @@ def _render_context(context: dict, indent: str = "  ") -> None:
 def _render_register_block(registers: dict, indent: str = "  ") -> None:
     print(f"{indent}pc     : 0x{registers.get('pc', 0):08X}  sp: 0x{registers.get('sp', 0):08X}")
     print(f"{indent}flags  : 0x{registers.get('flags', 0):X}    running: {registers.get('running')}")
+    if 'reg_base' in registers or 'stack_base' in registers:
+        reg_base = registers.get('reg_base', 0)
+        stack_base = registers.get('stack_base', 0)
+        stack_limit = registers.get('stack_limit', 0)
+        stack_size = registers.get('stack_size')
+        eff_sp = registers.get('sp_effective')
+        line = f"{indent}reg_base: 0x{reg_base & 0xFFFFFFFF:08X}  stack_base: 0x{stack_base & 0xFFFFFFFF:08X}"
+        line += f"  stack_limit: 0x{stack_limit & 0xFFFFFFFF:08X}"
+        if stack_size is not None:
+            line += f"  stack_size: 0x{int(stack_size) & 0xFFFFFFFF:08X}"
+        if eff_sp is not None:
+            line += f"  sp_effective: 0x{int(eff_sp) & 0xFFFFFFFF:08X}"
+        print(line)
     step_count = registers.get('steps', registers.get('cycles', 0))
     print(f"{indent}steps  : {step_count}")
     context = registers.get('context', {})
@@ -1145,17 +1209,22 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
 
     if cmd == "sched":
         if not args:
-            raise ValueError("sched requires <pid> [priority <n>] [quantum <n>]")
-        payload["pid"] = args[0]
+            return payload
+        first = args[0].lower()
+        if first in {"stats", "trace"}:
+            if len(args) > 1:
+                payload["limit"] = args[1]
+            return payload
+        payload["pid"] = int(args[0], 0)
         tokens = args[1:]
         i = 0
         while i < len(tokens):
             token = tokens[i].lower()
             if token in {"priority", "quantum"} and i + 1 < len(tokens):
-                payload[token] = tokens[i + 1]
+                payload[token] = int(tokens[i + 1], 0)
                 i += 2
             else:
-                raise ValueError("sched usage: sched <pid> [priority <n>] [quantum <n>]")
+                raise ValueError("sched usage: sched [stats [limit]] | <pid> [priority <n>] [quantum <n>]")
         return payload
 
     if cmd == "peek":

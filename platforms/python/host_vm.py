@@ -11,7 +11,8 @@ import struct
 import sys
 import zlib
 from pathlib import PurePosixPath
-from typing import Any, Callable, Dict, Optional, List, Set
+from typing import Any, Callable, Dict, Optional, List, Set, Tuple
+from collections import defaultdict, deque
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
@@ -47,6 +48,20 @@ HEADER_FIELDS = (
 
 RECV_INFO_STRUCT = struct.Struct("<iiIII")
 
+REGISTER_BANK_BYTES = 16 * 4  # 16 GPRs × 32-bit
+DEFAULT_STACK_BYTES = 0x1000  # 4 KiB per task (tunable)
+REGISTER_REGION_START = 0x1000  # leave lower memory for code/data
+VM_ADDRESS_SPACE_SIZE = 0x10000  # 64 KiB
+STACK_ALIGNMENT = 4
+
+
+def _align_down(value: int, alignment: int) -> int:
+    if alignment <= 0:
+        return value
+    return value - (value % alignment)
+
+
+
 
 @dataclass
 class TaskContext:
@@ -59,6 +74,7 @@ class TaskContext:
     reg_base: int = 0
     stack_base: int = 0
     stack_limit: int = 0
+    stack_size: int = DEFAULT_STACK_BYTES
     time_slice_steps: int = 1
     accounted_steps: int = 0
     state: str = "ready"
@@ -89,6 +105,7 @@ def clone_context(ctx: TaskContext) -> TaskContext:
         reg_base=ctx.reg_base,
         stack_base=ctx.stack_base,
         stack_limit=ctx.stack_limit,
+        stack_size=ctx.stack_size,
         time_slice_steps=ctx.time_slice_steps,
         accounted_steps=ctx.accounted_steps,
         state=ctx.state,
@@ -103,6 +120,100 @@ def clone_context(ctx: TaskContext) -> TaskContext:
     )
 
 
+def _ensure_reg_list(ctx: TaskContext) -> List[int]:
+    regs = getattr(ctx, "regs", None)
+    if regs is None:
+        regs = [0] * 16
+    else:
+        regs = list(regs)
+        if len(regs) < 16:
+            regs.extend([0] * (16 - len(regs)))
+        elif len(regs) > 16:
+            regs = regs[:16]
+    ctx.regs = regs
+    return regs
+
+
+class RegisterFile:
+    __slots__ = ("_vm",)
+
+    def __init__(self, vm: "MiniVM") -> None:
+        self._vm = vm
+
+    def __len__(self) -> int:
+        return 16
+
+    def _ctx(self) -> Optional[TaskContext]:
+        return self._vm.context
+
+    def _base(self) -> Optional[int]:
+        ctx = self._ctx()
+        if ctx is None:
+            return None
+        base = ctx.reg_base & 0xFFFF
+        return base if base else None
+
+    def __getitem__(self, key):
+        if isinstance(key, slice):
+            start, stop, step = key.indices(16)
+            return [self[idx] for idx in range(start, stop, step)]
+        idx = int(key)
+        if idx < 0 or idx >= 16:
+            raise IndexError("register index out of range")
+        ctx = self._ctx()
+        if ctx is None:
+            return 0
+        base = self._base()
+        if base is not None:
+            offset = base + (idx * 4)
+            if offset + 4 > len(self._vm.mem):
+                raise RuntimeError("register window outside VM memory")
+            mem = self._vm.mem
+            return (
+                mem[offset]
+                | (mem[offset + 1] << 8)
+                | (mem[offset + 2] << 16)
+                | (mem[offset + 3] << 24)
+            ) & 0xFFFFFFFF
+        regs = _ensure_reg_list(ctx)
+        return int(regs[idx]) & 0xFFFFFFFF
+
+    def __setitem__(self, key, value) -> None:
+        if isinstance(key, slice):
+            start, stop, step = key.indices(16)
+            values = list(value)
+            for offset, idx in enumerate(range(start, stop, step)):
+                self.__setitem__(idx, values[offset])
+            return
+        idx = int(key)
+        if idx < 0 or idx >= 16:
+            raise IndexError("register index out of range")
+        ctx = self._ctx()
+        if ctx is None:
+            return
+        val = int(value) & 0xFFFFFFFF
+        base = self._base()
+        if base is not None:
+            offset = base + (idx * 4)
+            if offset + 4 > len(self._vm.mem):
+                raise RuntimeError("register window outside VM memory")
+            self._vm.mem[offset:offset + 4] = val.to_bytes(4, "little")
+        regs = _ensure_reg_list(ctx)
+        regs[idx] = val
+
+    def __iter__(self):
+        for idx in range(16):
+            yield self[idx]
+
+    def to_list(self) -> List[int]:
+        return [self[idx] for idx in range(16)]
+
+    def copy_from(self, values: List[int]) -> None:
+        for idx in range(16):
+            val = values[idx] if idx < len(values) else 0
+            self[idx] = val
+
+
 def context_to_dict(ctx: TaskContext) -> Dict[str, Any]:
     return {
         "regs": list(ctx.regs),
@@ -112,6 +223,7 @@ def context_to_dict(ctx: TaskContext) -> Dict[str, Any]:
         "reg_base": ctx.reg_base,
         "stack_base": ctx.stack_base,
         "stack_limit": ctx.stack_limit,
+        "stack_size": ctx.stack_size,
         "time_slice_steps": ctx.time_slice_steps,
         "accounted_steps": ctx.accounted_steps,
         "time_slice_cycles": ctx.time_slice_steps,  # legacy alias
@@ -137,6 +249,7 @@ def dict_to_context(data: Dict[str, Any]) -> TaskContext:
         reg_base=int(data.get("reg_base", 0)) & 0xFFFFFFFF,
         stack_base=int(data.get("stack_base", 0)) & 0xFFFFFFFF,
         stack_limit=int(data.get("stack_limit", 0)) & 0xFFFFFFFF,
+        stack_size=int(data.get("stack_size", DEFAULT_STACK_BYTES)) & 0xFFFFFFFF,
         time_slice_steps=int(data.get("time_slice_steps", data.get("time_slice_cycles", 1))),
         accounted_steps=int(data.get("accounted_steps", data.get("accounted_cycles", 0))),
         state=str(data.get("state", "ready")),
@@ -285,11 +398,6 @@ class MiniVM:
     ):
         self.code = bytearray(code)
         self.entry = entry
-        self.context: TaskContext = TaskContext(pc=entry)
-        self.running = True
-        self.steps = 0
-        self.cycles = 0  # legacy alias for compatibility
-        self.set_context(self.context)
         self.mem = bytearray(64 * 1024)
         self.fs = FSStub()
         self.trace = trace
@@ -315,6 +423,15 @@ class MiniVM:
         self.debug_async_break: bool = False
         self.debug_halted: bool = False
         self.debug_last_stop: Optional[Dict[str, Any]] = None
+        self.context: TaskContext = TaskContext(pc=entry)
+        self.running = True
+        self.steps = 0
+        self.cycles = 0  # legacy alias for compatibility
+        self.regs = RegisterFile(self)
+        self.pc = entry & 0xFFFFFFFF
+        self.sp = self.context.sp & 0xFFFFFFFF
+        self.flags = self.context.psw & 0xFF
+        self.set_context(self.context)
         if rodata:
             self._load_rodata(rodata)
 
@@ -419,15 +536,33 @@ class MiniVM:
 
     def set_context(self, ctx: TaskContext) -> None:
         self.context = ctx
-        self.regs = ctx.regs
-        self.pc = ctx.pc
-        self.sp = ctx.sp
-        self.flags = ctx.psw
+        _ensure_reg_list(ctx)
+        self.pc = ctx.pc & 0xFFFFFFFF
+        self.sp = ctx.sp & 0xFFFFFFFF
+        self.flags = ctx.psw & 0xFF
         self.pid = ctx.pid
         ctx.state = "running" if self.running else ctx.state
+        self._store_regs_to_memory()
 
     def set_mailbox_handler(self, handler: Optional[Callable[[int], None]]) -> None:
         self._mailbox_handler = handler
+
+    def _load_regs_from_memory(self) -> None:
+        ctx = self.context
+        if ctx is None:
+            return
+        base = ctx.reg_base
+        regs = _ensure_reg_list(ctx)
+        if base:
+            for idx in range(16):
+                regs[idx] = self.regs[idx]
+
+    def _store_regs_to_memory(self) -> None:
+        ctx = self.context
+        if ctx is None:
+            return
+        if ctx.reg_base:
+            self.regs.copy_from(_ensure_reg_list(ctx))
 
     def save_context(self) -> None:
         ctx = self.context
@@ -436,6 +571,7 @@ class MiniVM:
         ctx.pc = self.pc
         ctx.sp = self.sp
         ctx.psw = self.flags
+        self._load_regs_from_memory()
     def snapshot_registers(self):
         ctx = self.context
         context_meta = None
@@ -469,25 +605,35 @@ class MiniVM:
         }
 
     def restore_registers(self, snapshot):
-        self.pc = snapshot.get("pc", self.pc) & 0xFFFFFFFF
-        regs = snapshot.get("regs")
-        if regs is not None:
-            if len(regs) != len(self.regs):
-                raise ValueError("regs length mismatch")
-            self.regs = [int(x) & 0xFFFFFFFF for x in regs]
-            self.context.regs = self.regs
-        self.sp = snapshot.get("sp", self.sp) & 0xFFFFFFFF
-        self.flags = snapshot.get("flags", self.flags) & 0xFF
-        self.running = bool(snapshot.get("running", self.running))
-        self.context.pc = self.pc
-        self.context.sp = self.sp
-        self.context.psw = self.flags
-        self.context.state = "running" if self.running else "stopped"
         ctx_snapshot = snapshot.get("context")
         if ctx_snapshot:
             new_ctx = dict_to_context(ctx_snapshot)
-            new_ctx.regs = self.regs
+            _ensure_reg_list(new_ctx)
             self.context = new_ctx
+        ctx = self.context
+        if ctx is None:
+            ctx = TaskContext()
+            self.context = ctx
+        _ensure_reg_list(ctx)
+        regs_values = snapshot.get("regs")
+        if regs_values is not None:
+            values = [int(x) & 0xFFFFFFFF for x in regs_values]
+            if len(values) < 16:
+                values.extend([0] * (16 - len(values)))
+            elif len(values) > 16:
+                values = values[:16]
+            self.regs.copy_from(values)
+        else:
+            self._load_regs_from_memory()
+        self.pc = snapshot.get("pc", self.pc) & 0xFFFFFFFF
+        self.sp = snapshot.get("sp", self.sp) & 0xFFFFFFFF
+        self.flags = snapshot.get("flags", self.flags) & 0xFF
+        self.running = bool(snapshot.get("running", self.running))
+        ctx.pc = self.pc
+        ctx.sp = self.sp
+        ctx.psw = self.flags
+        ctx.state = "running" if self.running else "stopped"
+        self._load_regs_from_memory()
         return self.snapshot_registers()
 
     def snapshot_state(self) -> Dict[str, Any]:
@@ -755,7 +901,12 @@ class MiniVM:
                 adv = 0
         elif op == 0x24:  # CALL
             return_addr = (self.pc + 4) & 0xFFFFFFFF
-            target = imm & 0xFFFFFFFF
+            if rs1:
+                base = self.regs[rs1]
+            else:
+                base = self.pc
+            target_offset = int(imm) << 2
+            target = (int(base) + target_offset) & 0xFFFF
             raw_sp = self.sp - 4
             if raw_sp < 0 or raw_sp < (self.context.stack_limit or 0) or raw_sp + 4 > len(self.mem):
                 self._log("[CALL] stack overflow")
@@ -771,7 +922,7 @@ class MiniVM:
             self.call_stack.append(return_addr)
             if self.trace:
                 self._log(
-                    f"[CALL] pc=0x{(self.pc & 0xFFFF):04X} -> 0x{target & 0xFFFFFFFF:04X} "
+                    f"[CALL] pc=0x{(self.pc & 0xFFFF):04X} -> 0x{target:04X} "
                     f"ret=0x{return_addr:04X} sp=0x{self.sp:04X}"
                 )
             self.pc = target
@@ -1250,6 +1401,13 @@ class VMController:
         self.default_trace = trace
         self.traced_pids: Set[int] = set()
         self.debug_sessions: Dict[int, DebugState] = {}
+        self._reg_alloc_next = REGISTER_REGION_START
+        self._stack_alloc_next = VM_ADDRESS_SPACE_SIZE - STACK_ALIGNMENT
+        self._reg_free_list: List[int] = []
+        self._stack_free_list: List[Tuple[int, int]] = []  # (base, size)
+        self._task_memory: Dict[int, Dict[str, int]] = {}
+        self.scheduler_trace: deque[Dict[str, Any]] = deque(maxlen=256)
+        self.scheduler_counters: Dict[int, Dict[str, int]] = defaultdict(dict)
 
     def _trace_mailbox_regs(self, label: str, vm: MiniVM, fn: int, *, extra: Optional[Dict[str, Any]] = None) -> None:
         """Append a compact register/PC snapshot to the mailbox trace log."""
@@ -1278,6 +1436,13 @@ class VMController:
         self.current_pid = None
         self.next_pid = 1
         self.debug_sessions.clear()
+        self._reg_alloc_next = REGISTER_REGION_START
+        self._stack_alloc_next = VM_ADDRESS_SPACE_SIZE
+        self._reg_free_list.clear()
+        self._stack_free_list.clear()
+        self._task_memory.clear()
+        self.scheduler_trace.clear()
+        self.scheduler_counters.clear()
         return {"status": "ok"}
 
     def mailbox_snapshot(self) -> List[Dict[str, Any]]:
@@ -1376,6 +1541,113 @@ class VMController:
         if normalized in {"in", "stdin"}:
             return ["in"]
         raise ValueError(f"unknown stdio stream '{stream}'")
+
+    def _reserve_register_bank(self) -> int:
+        if self._reg_free_list:
+            return self._reg_free_list.pop()
+        base = self._reg_alloc_next
+        next_base = base + REGISTER_BANK_BYTES
+        if next_base >= self._stack_alloc_next:
+            raise RuntimeError("insufficient VM memory for register banks")
+        self._reg_alloc_next = next_base
+        return base
+
+    def _reserve_stack(self, stack_bytes: int = DEFAULT_STACK_BYTES) -> Tuple[int, int, int]:
+        size = max(stack_bytes, STACK_ALIGNMENT)
+        if self._stack_free_list:
+            stack_base, available = self._stack_free_list.pop()
+            stack_size = min(available, size)
+            stack_top = stack_base + stack_size
+        else:
+            stack_top = _align_down(self._stack_alloc_next, STACK_ALIGNMENT)
+            if stack_top < size:
+                raise RuntimeError("insufficient VM memory for stacks")
+            stack_base = stack_top - size
+            if stack_base <= self._reg_alloc_next:
+                raise RuntimeError("insufficient VM memory for stacks")
+            self._stack_alloc_next = stack_base
+            stack_size = size
+        sp_absolute = stack_top
+        if sp_absolute >= VM_ADDRESS_SPACE_SIZE:
+            sp_absolute = VM_ADDRESS_SPACE_SIZE - STACK_ALIGNMENT
+        return stack_base, stack_size, sp_absolute
+
+    def _allocate_task_memory(self, pid: int, stack_bytes: int = DEFAULT_STACK_BYTES) -> Dict[str, int]:
+        reg_base = self._reserve_register_bank()
+        stack_base, stack_size, sp_offset = self._reserve_stack(stack_bytes)
+        stack_limit = stack_base
+        allocation = {
+            "reg_base": reg_base,
+            "stack_base": stack_base,
+            "stack_limit": stack_limit,
+            "stack_size": stack_size,
+            "sp": sp_offset,
+        }
+        self._task_memory[pid] = allocation
+        return allocation
+
+    def _release_task_memory(self, pid: int) -> None:
+        allocation = self._task_memory.pop(pid, None)
+        if allocation is None:
+            return
+        self._reg_free_list.append(allocation["reg_base"])
+        self._stack_free_list.append((allocation["stack_base"], allocation.get("stack_size", DEFAULT_STACK_BYTES)))
+
+    def _ensure_task_memory(self, pid: int, state: Dict[str, Any]) -> Dict[str, Any]:
+        ctx = state.setdefault("context", {})
+        reg_base = ctx.get("reg_base", 0)
+        stack_base = ctx.get("stack_base", 0)
+        stack_limit = ctx.get("stack_limit", 0)
+        stack_size = ctx.get("stack_size")
+        sp_value = ctx.get("sp")
+        if reg_base and stack_base:
+            allocation = self._task_memory.get(pid)
+            if allocation is None:
+                allocation = {
+                    "reg_base": reg_base,
+                    "stack_base": stack_base,
+                    "stack_limit": stack_limit or stack_base,
+                    "stack_size": stack_size or DEFAULT_STACK_BYTES,
+                    "sp": sp_value if sp_value is not None else (stack_base + (stack_size or DEFAULT_STACK_BYTES)),
+                }
+                self._task_memory[pid] = allocation
+            else:
+                allocation.setdefault("stack_size", stack_size or DEFAULT_STACK_BYTES)
+                if sp_value is not None:
+                    allocation["sp"] = sp_value
+            ctx.setdefault("stack_limit", allocation["stack_limit"])
+            ctx.setdefault("stack_size", allocation["stack_size"])
+            ctx.setdefault("sp", allocation.get("sp"))
+            return ctx
+        allocation = self._allocate_task_memory(pid, stack_bytes=stack_size or DEFAULT_STACK_BYTES)
+        ctx["reg_base"] = allocation["reg_base"]
+        ctx["stack_base"] = allocation["stack_base"]
+        ctx["stack_limit"] = allocation["stack_limit"]
+        ctx["stack_size"] = allocation["stack_size"]
+        ctx.setdefault("sp", allocation["sp"])
+        state["context"] = ctx
+        return ctx
+
+    def _record_scheduler_event(self, event: str, pid: Optional[int], **fields: Any) -> None:
+        entry: Dict[str, Any] = {"event": event, "ts": time.monotonic()}
+        if pid is not None:
+            entry["pid"] = pid
+        for key, value in fields.items():
+            if value is not None:
+                entry[key] = value
+        self.scheduler_trace.append(entry)
+        if pid is not None:
+            counters = self.scheduler_counters.setdefault(pid, {})
+            counters[event] = counters.get(event, 0) + 1
+
+    def scheduler_trace_snapshot(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        trace = list(self.scheduler_trace)
+        if limit is not None:
+            return trace[-int(limit):]
+        return trace
+
+    def scheduler_stats(self) -> Dict[int, Dict[str, int]]:
+        return {pid: dict(counts) for pid, counts in self.scheduler_counters.items()}
 
     def mailbox_send(
         self,
@@ -1711,6 +1983,7 @@ class VMController:
         ctx.wait_handle = handle
         ctx.wait_deadline = deadline
         vm.running = False
+        self._record_scheduler_event("block", pid, descriptor=descriptor_id, handle=handle)
         state = self.task_states.get(pid)
         if state:
             state["context"] = context_to_dict(ctx)
@@ -1772,7 +2045,7 @@ class VMController:
                 state["mem"] = mem
             if payload:
                 mem[buffer_ptr : buffer_ptr + length] = payload
-            ctx_dict = state.get("context") or {}
+            ctx_dict = self._ensure_task_memory(pid, state)
             regs = list(ctx_dict.get("regs", [0] * 16))
             while len(regs) < 16:
                 regs.append(0)
@@ -1782,6 +2055,12 @@ class VMController:
             regs[3] = channel & 0xFFFF
             regs[4] = src_pid & 0xFFFF
             ctx_dict["regs"] = regs
+            reg_base = ctx_dict.get("reg_base", 0) & 0xFFFF
+            if reg_base:
+                for idx, value in enumerate(regs):
+                    offset = reg_base + idx * 4
+                    if offset + 4 <= len(mem):
+                        mem[offset:offset + 4] = (int(value) & 0xFFFFFFFF).to_bytes(4, "little")
             ctx_dict["state"] = "ready"
             ctx_dict["wait_kind"] = None
             ctx_dict["wait_mailbox"] = None
@@ -1813,6 +2092,7 @@ class VMController:
             self.vm.context.wait_handle = None
             self.vm.context.wait_deadline = None
             self.vm.running = True
+        self._record_scheduler_event("wake", pid, descriptor=descriptor_id, length=length)
         if info_ptr:
             self._write_mailbox_recv_info(
                 pid,
@@ -1984,6 +2264,10 @@ class VMController:
                 info["selected_registers"] = self.read_regs(pid)
             except ValueError as exc:
                 info["selected_error"] = str(exc)
+        info["scheduler"] = {
+            "trace": self.scheduler_trace_snapshot(limit=32),
+            "counters": self.scheduler_stats(),
+        }
         return info
 
     def schedule_restart(self, targets: Optional[List[str]] = None) -> None:
@@ -2004,9 +2288,33 @@ class VMController:
         pid = self.next_pid
         self.next_pid += 1
         ctx = state["context"]
+        allocation = self._allocate_task_memory(pid)
+        mem = state.get("mem")
+        if mem is None:
+            mem = bytearray(VM_ADDRESS_SPACE_SIZE)
+            state["mem"] = mem
+        regs = list(ctx.get("regs", [0] * 16))
+        for idx, value in enumerate(regs):
+            base = allocation["reg_base"] + idx * 4
+            end = base + 4
+            if end > len(mem):
+                raise RuntimeError("register bank exceeds VM memory")
+            mem[base:end] = (int(value) & 0xFFFFFFFF).to_bytes(4, "little")
+        stack_base = allocation["stack_base"]
+        stack_size = allocation["stack_size"]
+        stack_top = stack_base + stack_size
+        if stack_top > len(mem):
+            raise RuntimeError("stack allocation exceeds VM memory")
+        for i in range(stack_base, stack_top):
+            mem[i] = 0
         ctx["pid"] = pid
         ctx["exit_status"] = None
         ctx["trace"] = self.default_trace
+        ctx["reg_base"] = allocation["reg_base"]
+        ctx["stack_base"] = allocation["stack_base"]
+        ctx["stack_limit"] = allocation["stack_limit"]
+        ctx["sp"] = allocation["sp"]
+        ctx["stack_size"] = allocation["stack_size"]
         state["context"] = ctx
         self.tasks[pid] = {
             "pid": pid,
@@ -2020,6 +2328,10 @@ class VMController:
             "vm_state": state,
             "exit_status": None,
             "trace": self.default_trace,
+            "reg_base": allocation["reg_base"],
+            "stack_base": allocation["stack_base"],
+            "stack_limit": allocation["stack_limit"],
+            "stack_size": allocation["stack_size"],
         }
         self.task_states[pid] = state
         self.mailboxes.register_task(pid)
@@ -2084,6 +2396,7 @@ class VMController:
         state = self.vm.snapshot_state()
         ctx = state["context"]
         ctx["pid"] = self.current_pid
+        ctx = self._ensure_task_memory(self.current_pid, state)
         state["context"] = ctx
         state["running"] = self.vm.running
         state["steps"] = self.vm.steps
@@ -2099,6 +2412,10 @@ class VMController:
                 task["exit_status"] = exit_status
             else:
                 task.pop("exit_status", None)
+            task["reg_base"] = ctx.get("reg_base", task.get("reg_base"))
+            task["stack_base"] = ctx.get("stack_base", task.get("stack_base"))
+            task["stack_limit"] = ctx.get("stack_limit", task.get("stack_limit"))
+            task["stack_size"] = ctx.get("stack_size", task.get("stack_size"))
             waiting = ctx.get("state") == "waiting_mbx" or self.waiting_tasks.get(self.current_pid)
             if self.paused:
                 new_state = "paused"
@@ -2137,6 +2454,9 @@ class VMController:
             raise ValueError(f"no state for pid {pid}")
         trace_enabled = self.default_trace or (pid in self.traced_pids)
         self.trace = trace_enabled
+        ctx_dict = self._ensure_task_memory(pid, state)
+        if not ctx_dict.get("reg_base") or not ctx_dict.get("stack_base"):
+            raise RuntimeError(f"task {pid} missing register/stack base allocation")
         if self.vm is None:
             initial_code = bytes(state.get("code", bytearray()))
             entry = state.get("context", {}).get("pc", task.get("pc", 0))
@@ -2272,6 +2592,11 @@ class VMController:
                     debug_event = event
             last_snapshot = vm.snapshot_registers()
             last_pid = target_pid
+            self._record_scheduler_event(
+                "step",
+                target_pid,
+                pc=last_snapshot.get("pc") if last_snapshot else None,
+            )
             self._store_active_state()
             self._check_mailbox_timeouts()
             if debug_event is not None:
@@ -2281,7 +2606,10 @@ class VMController:
                 dbg.halted = True
                 break
             if requested_pid is None:
+                prev_pid = self.current_pid
                 self._rotate_active()
+                if self.current_pid is not None and self.current_pid != prev_pid:
+                    self._record_scheduler_event("rotate", self.current_pid)
             else:
                 self.current_pid = requested_pid
             if self.paused:
@@ -2320,20 +2648,38 @@ class VMController:
         if pid is None:
             return {}
         if pid == self.current_pid and self.vm is not None:
-            return self.vm.snapshot_registers()
+            snapshot = self.vm.snapshot_registers()
+            context = snapshot.get("context", {})
+            if isinstance(context, dict):
+                snapshot.setdefault("reg_base", context.get("reg_base", 0))
+                snapshot.setdefault("stack_base", context.get("stack_base", 0))
+                snapshot.setdefault("stack_limit", context.get("stack_limit", 0))
+                snapshot.setdefault("stack_size", context.get("stack_size", DEFAULT_STACK_BYTES))
+                sp16 = snapshot.get("sp", 0) & 0xFFFF
+                snapshot.setdefault("sp_effective", (snapshot["stack_base"] + sp16) & 0xFFFFFFFF)
+            return snapshot
         state = self.task_states.get(pid)
         if not state:
             raise ValueError(f"unknown pid {pid}")
         ctx = dict_to_context(state["context"])
+        regs_list = _ensure_reg_list(ctx)
+        sp16 = ctx.sp & 0xFFFF
+        context_dict = context_to_dict(ctx)
+        context_dict.update(dict(state.get("context", {})))
         return {
             "pc": ctx.pc,
-            "regs": list(ctx.regs),
+            "regs": list(regs_list),
             "sp": ctx.sp,
             "flags": ctx.psw,
             "running": state.get("running", ctx.state == "running"),
             "steps": state.get("steps", ctx.accounted_steps),
             "cycles": state.get("cycles", ctx.accounted_steps),
-            "context": state["context"],
+            "reg_base": ctx.reg_base,
+            "stack_base": ctx.stack_base,
+            "stack_limit": ctx.stack_limit,
+            "stack_size": ctx.stack_size,
+            "sp_effective": (ctx.stack_base + sp16) & 0xFFFFFFFF,
+            "context": context_dict,
         }
 
     def write_regs(self, payload: Dict[str, Any], pid: Optional[int] = None) -> Dict[str, Any]:
@@ -2387,6 +2733,7 @@ class VMController:
             self._store_active_state()
             self.vm = None
             self.current_pid = None
+        self._release_task_memory(pid)
         self.tasks.pop(pid, None)
         self.task_states.pop(pid, None)
         self.debug_sessions.pop(pid, None)

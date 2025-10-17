@@ -5,7 +5,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from python.shell_client import _build_payload
+from python.shell_client import _build_payload, _pretty_sched
 
 
 def test_stdio_payload_includes_pid_stream_mode(tmp_path: Path) -> None:
@@ -60,6 +60,19 @@ def test_mbox_invalid_namespace(tmp_path: Path) -> None:
         _build_payload("mbox", ["ns", "invalid"], tmp_path)
 
 
+def test_sched_payload_pid(tmp_path: Path) -> None:
+    payload = _build_payload("sched", ["7", "priority", "2"], tmp_path)
+    assert payload["pid"] == 7
+    assert payload["priority"] == 2
+
+
+def test_sched_payload_stats(tmp_path: Path) -> None:
+    payload = _build_payload("sched", ["stats", "10"], tmp_path)
+    assert payload["cmd"] == "sched"
+    assert payload.get("limit") == "10"
+    assert "pid" not in payload
+
+
 def test_load_payload_resolves_relative_path(tmp_path: Path) -> None:
     payload = _build_payload("load", ["prog.hxe"], tmp_path)
     assert Path(payload["path"]).parent == tmp_path.resolve()
@@ -79,3 +92,32 @@ def test_dbg_bp_add_payload(tmp_path: Path) -> None:
     assert payload["action"] == "add"
     assert payload["pid"] == 3
     assert payload["addr"] == 0x120
+
+
+def test_pretty_sched_stats(capsys: pytest.CaptureFixture[str]) -> None:
+    payload = {
+        "status": "ok",
+        "scheduler": {
+            "counters": {1: {"step": 2, "rotate": 1}},
+            "trace": [
+                {"event": "step", "ts": 123.0, "pid": 1},
+                {"event": "rotate", "ts": 123.1, "pid": 2},
+            ],
+        },
+    }
+    _pretty_sched(payload)
+    output = capsys.readouterr().out
+    assert "pid 1" in output
+    assert "step" in output
+    assert "[rotate]" in output
+
+
+def test_pretty_sched_task_update(capsys: pytest.CaptureFixture[str]) -> None:
+    payload = {
+        "status": "ok",
+        "task": {"pid": 7, "priority": 5, "quantum": 3},
+    }
+    _pretty_sched(payload)
+    output = capsys.readouterr().out
+    assert "sched task update" in output
+    assert "pid" in output

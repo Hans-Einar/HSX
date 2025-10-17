@@ -7,6 +7,7 @@ from python import asm as hsx_asm
 from platforms.python.host_vm import MiniVM, VMController
 
 from python.execd import ExecutiveState
+import unittest
 
 
 def _assemble(lines):
@@ -241,3 +242,24 @@ def test_round_robin_single_instruction():
     for pid in (1, 2):
         ctx = controller.task_states[pid]["context"]
         assert ctx.get("accounted_steps") == 2
+
+
+class TestRegisterWindowIsolation(unittest.TestCase):
+    def test_register_windows_isolated_between_tasks(self):
+        controller = VMController()
+        consumer = controller.load_from_path("examples/demos/build/mailbox/consumer.hxe")
+        producer = controller.load_from_path("examples/demos/build/mailbox/producer.hxe")
+
+        controller._activate_task(consumer["pid"])
+        controller.vm.regs[1] = 0xAAAAAAAA
+        controller._store_active_state()
+
+        controller._activate_task(producer["pid"])
+        controller.vm.regs[1] = 0xBBBBBBBB
+        controller._store_active_state()
+
+        consumer_ctx = controller.task_states[consumer["pid"]]["context"]
+        producer_ctx = controller.task_states[producer["pid"]]["context"]
+
+        self.assertEqual(consumer_ctx["regs"][1], 0xAAAAAAAA & 0xFFFFFFFF)
+        self.assertEqual(producer_ctx["regs"][1], 0xBBBBBBBB & 0xFFFFFFFF)

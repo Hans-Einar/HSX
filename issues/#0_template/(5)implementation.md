@@ -7,16 +7,32 @@
 ## Task Tracker
 Link each section to the corresponding task ID in `(3)remediation.md` and checklist entries in `(4)dod.md`.
 
-### T1 `<Title>`
+### T1 `<Title>` (`<status>`)
 - [ ] Step 1 — `<description>`
   - Notes:
   - Artifacts:
 - [ ] Step 2 — `<description>`
 
-### T2 `<Title>`
+### T2 `<Title>` (`<status>`)
 - [ ] Step 1 — `<description>`
 
 _(add more sections as needed)_
+
+> Recommended status labels: `not started`, `active`, `blocked`, `open`, `done`. Update the status in parentheses whenever the task progresses.
+
+## Implementation Issues Log
+
+> Track unexpected problems discovered while implementing the remediation plan. Duplicate the structure below for each issue (I1, I2, ...).
+
+### I<id> `<short title>` (`<status>`)
+- **Summary:** `<short description>`
+- **Review:** `<findings / root cause>`
+- **Remediation:** `<planned fix>`
+- **Implementation:**
+  - Commits: `<hash or TBD>`
+  - Tests: `<commands>`
+
+_(add more issues as needed)_
 
 ## Context & Artifacts
 - Source files / directories touched:

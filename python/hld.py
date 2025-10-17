@@ -115,7 +115,16 @@ def link_objects(object_paths: List[Path], output: Path, *, verbose: bool = Fals
             if reloc.get("section") == "code":
                 idx = reloc["index"]
                 if reloc["type"] in {"imm12", "jump", "mem"}:
-                    mod["code"][idx] = set_imm12(mod["code"][idx], value)
+                    patch_value = value
+                    if reloc.get("pc_relative"):
+                        instr_pc = mod["code_base"] + idx * 4
+                        delta = value - instr_pc
+                        if delta % 4 != 0:
+                            raise ValueError(
+                                f"PC-relative relocation requires word alignment: value=0x{value:X} pc=0x{instr_pc:X}"
+                            )
+                        patch_value = delta // 4
+                    mod["code"][idx] = set_imm12(mod["code"][idx], patch_value)
                 elif reloc["type"] == "imm32":
                     mod["code"][idx] = value & 0xFFFFFFFF
                 else:
