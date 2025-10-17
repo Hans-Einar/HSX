@@ -17,13 +17,13 @@
 - Git log: `./(6)git.md`
 
 ## Completion Checklist
-+ [x] Review approved (`(2)review.md`)
-+ [x] Remediation plan approved (`(3)remediation.md`)
-- [ ] Implementation tasks complete (see below)
-- [ ] Tests updated/passing (unit + integration)
-- [ ] Documentation updated (`docs/hsx_spec-v2.md`, CLI help)
-- [ ] Implementation playbook current (`(5)implementation.md`)
-- [ ] Git log updated (`(6)git.md`)
+- [x] Review approved (`(2)review.md`)
+- [x] Remediation plan approved (`(3)remediation.md`)
+- [x] Implementation tasks complete (see below)
+- [x] Tests updated/passing (unit + integration)
+- [x] Documentation updated (`docs/hsx_spec-v2.md`, CLI help)
+- [x] Implementation playbook current (`(5)implementation.md`)
+- [x] Git log updated (`(6)git.md`)
 - [ ] Stakeholders signed off (runtime/executive leads)
 
 ## Implementation Tasks
@@ -39,15 +39,15 @@
   - [x] Remove register cloning in `_store_active_state` / `_activate_task` (pointer reuse)
   - [x] Ensure one-instruction stepping & wait queues (unit test + instrumentation)
   - [x] Implement scheduler instrumentation + CLI hooks (`sched` command reports counters/trace)
-- [ ] T4: Tests, docs, demos
+- [x] T4: Tests, docs, demos
   - [x] Add unit/integration tests from verification plan (register isolation, stack guard, scheduler stats)
   - [x] Update documentation/help text
-  - [ ] Capture evidence (stdout/mbox dumps, scheduler stats)
+  - [x] Capture evidence (stdout/mbox dumps, scheduler stats) — see `issues/#2_scheduler/evidence.md`
 
 ## Verification
 - [x] Unit tests added/updated: register isolation, stack guard, trap resume, fairness
 - [x] Integration tests updated: mailbox demo, deterministic clock stepping (scheduler stats integration test)
-- [ ] Manual validation complete: CLI commands, dumpregs showing non-zero bases
+- [x] Manual validation complete: CLI commands, dumpregs showing non-zero bases (`issues/#2_scheduler/evidence.md`)
 
 ## Notes / Follow-ups
 - Track potential performance regressions post-refactor; create new issue if profiling reveals hotspots.

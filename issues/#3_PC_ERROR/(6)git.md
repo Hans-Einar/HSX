@@ -13,6 +13,7 @@
 | 2025-10-16 | da40e8e | Track clock throttle state and expose it via shell telemetry | Hans Einar | `/mnt/c/Users/hanse/miniconda3/python.exe -m pytest python/tests/test_vm_pause.py python/tests/test_mailbox_wait.py python/tests/test_shell_client.py` |
 | 2025-10-16 | 26a1e34 | Shell pretty-print updates & ISA doc refresh | Hans Einar | `/mnt/c/Users/hanse/miniconda3/python.exe -m pytest python/tests/test_shell_client.py` |
 | 2025-10-16 | 692a3e2 | Restore free-run clock behavior when tasks are runnable | Hans Einar | `/mnt/c/Users/hanse/miniconda3/python.exe -m pytest python/tests/test_vm_pause.py python/tests/test_mailbox_wait.py` |
+| 2025-10-16 | d252ffb | Parse shell commands with shlex for robust quoting | Hans Einar | `/mnt/c/Users/hanse/miniconda3/python.exe -m pytest python/tests/test_shell_client.py` |
 
 ## Pull Request
 - PR URL / ID: `<pending>`
