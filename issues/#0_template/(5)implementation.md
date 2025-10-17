@@ -26,7 +26,7 @@ _(add more sections as needed)_
 
 ### I<id> `<short title>` (`<status>`)
 - **Summary:** `<short description>`
-- **Review:** `<findings / root cause>`
+- **Study findings:** `<root cause insights>`
 - **Remediation:** `<planned fix>`
 - **Implementation:**
   - Commits: `<hash or TBD>`

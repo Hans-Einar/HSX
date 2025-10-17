@@ -1,10 +1,10 @@
-# REVIEW TEMPLATE
+# STUDY TEMPLATE
 
-> File name: `(2)review.md` (retain the numeric prefix when copying).
+> File name: `(2)study.md` (retain the numeric prefix when copying).
 
 > Summarise the technical assessment that diagnoses the issue. Use this as the canonical gap analysis.
 
-## Reviewer
+## Study Lead
 - Name / role:
 - Date:
 - Artifacts reviewed (code paths, commits, specs):

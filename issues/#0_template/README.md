@@ -9,7 +9,7 @@ Each Markdown file keeps a numeric prefix `(1)`, `(2)`, … to preserve ordering
 | File | Purpose |
 | --- | --- |
 | `(1)issue.md` | Canonical description of the problem. Captures context, evidence, impact, and acceptance signals. |
-| `(2)review.md` | Technical assessment of how implementation diverges from expectations/spec. May suggest remediation directions. |
+| `(2)study.md` | Technical assessment of how implementation diverges from expectations/spec. May suggest remediation directions. |
 | `(3)remediation.md` | Detailed implementation plan based on the review. Breaks work into actionable tasks, dependencies, and verification steps. |
 | `(4)dod.md` | “Definition of Done” summary: TL;DR, links to the other docs, and concrete task checklists that mark completion. |
 | `(5)implementation.md` | Detailed, living playbook for executing remediation tasks; fine-grained checklist for agents. |

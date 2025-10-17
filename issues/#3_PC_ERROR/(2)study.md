@@ -1,6 +1,8 @@
-# Review — JMP immediate sign-extension corrupts PC
+# Study — JMP immediate sign-extension corrupts PC
 
-## Reviewer
+> File name: `(2)study.md` (retain the numeric prefix when copying).
+
+## Study Lead
 - Name / role: gpt-5-codex (runtime analysis)
 - Date: 2025-10-16
 - Artifacts reviewed (code paths, commits, specs):

@@ -1,10 +1,10 @@
-# REVIEW TEMPLATE
+# STUDY REPORT
 
-> File name: `(2)review.md` (retain the numeric prefix when copying).
+> File name: `(2)study.md` (retain the numeric prefix when copying).
 
 > Summarise the technical assessment that diagnoses the issue. Use this as the canonical gap analysis.
 
-## Reviewer
+## Study Lead
 - Name / role: Codex (assistant)
 - Date: 2025-02-14
 - Artifacts reviewed: `docs/hsx_spec-v2.md`, `platforms/python/host_vm.py`, `python/execd.py`, mailbox demo traces

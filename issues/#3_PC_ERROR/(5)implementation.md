@@ -25,7 +25,7 @@
 
 ### I1 `Unsigned jump semantics pending ISA confirmation` (`resolved`)
 - **Summary:** Need authoritative answer on whether absolute jumps should be unsigned or expanded beyond 12 bits.
-- **Review:** Resolved via confirmation from mailbox demo trace: unsigned decode matches ISA docs and exercises high addresses without faults.
+- **Study findings:** Resolved via confirmation from mailbox demo trace: unsigned decode matches ISA docs and exercises high addresses without faults.
 - **Remediation:** Applied runtime/tooling fixes in this iteration; further ISA expansion not required.
 - **Implementation:**
   - Commits: Pending final PR aggregation (see workspace changes).
@@ -33,7 +33,7 @@
 
 ### I2 `Clock throttling fails to resume full speed` (`resolved`)
 - **Summary:** When all tasks are blocked the auto-loop deliberately slows down, but the clock kept idling even after a mailbox wake, leaving task execution in slow mode.
-- **Review:** The throttle logic in `ExecutiveState._auto_loop` prioritized the global `sleep_pending` flag before checking for runnable tasks. As long as any task was sleeping (common during mailbox waits), the loop stuck to a 10–50 ms delay even when other tasks were ready, so the clock never accelerated.
+- **Study findings:** The throttle logic in `ExecutiveState._auto_loop` prioritized the global `sleep_pending` flag before checking for runnable tasks. As long as any task was sleeping (common during mailbox waits), the loop stuck to a 10–50 ms delay even when other tasks were ready, so the clock never accelerated.
 - **Remediation:** Reorder the wait-time selection to favor runnable tasks, introduce explicit throttle state tracking (`mode`, `throttle_reason`), and surface the mode through `clock status` so operators can confirm when the loop returns to full speed.
 - **Implementation:**
   - Commits: Pending (see working tree).

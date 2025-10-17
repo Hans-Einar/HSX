@@ -6,18 +6,18 @@
 
 ## TL;DR
 - Issue summary: `[link to issue.md section]`
-- Review summary: `[link to review.md section]`
+- Study summary: `[link to study.md section]`
 - Remediation summary: `[link to remediation.md section]`
 
 ## Quick Links
 - Issue description: `./(1)issue.md`
-- Review: `./(2)review.md`
+- Study: `./(2)study.md`
 - Remediation plan: `./(3)remediation.md`
 - Implementation playbook: `./(5)implementation.md`
 - Git log: `./(6)git.md`
 
 ## Completion Checklist
-- [ ] Review approved (`(2)review.md`)
+- [ ] Study approved (`(2)study.md`)
 - [ ] Remediation plan approved (`(3)remediation.md`)
 - [ ] Implementation tasks complete (see below)
 - [ ] Tests updated/passing

@@ -16,7 +16,7 @@ When in doubt, consult `issues/#0_template/README.md` for template details.
 
 ## 1. Picking Up an Existing Issue (fresh context window)
 1. Read the quick links in `(4)dod.md` to orient yourself.
-2. Skim `(1)issue.md`, `(2)review.md`, `(3)remediation.md`, `(5)implementation.md`, and `(6)git.md` to understand current status.
+2. Skim `(1)issue.md`, `(2)study.md`, `(3)remediation.md`, `(5)implementation.md`, and `(6)git.md` to understand current status.
 3. Check `issues/INDEX.md` if you need a TL;DR before diving in.
 4. Note the active task in `(5)implementation.md` and pending subtasks.
 

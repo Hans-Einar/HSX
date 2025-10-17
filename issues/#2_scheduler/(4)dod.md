@@ -6,18 +6,18 @@
 
 ## TL;DR
 - Issue summary: Scheduler ignores register-window contract; context switches copy registers and disable stack guards.
-- Review summary: See `(2)review.md` for spec references and divergence table.
+- Study summary: See `(2)study.md` for spec references and divergence table.
 - Remediation summary: `(3)remediation.md` outlines tasks T1–T4 to implement base-pointer switching, enforce the scheduler contract, and refresh tooling/tests.
 
 ## Quick Links
 - Issue description: `./(1)issue.md`
-- Review: `./(2)review.md`
+- Study: `./(2)study.md`
 - Remediation plan: `./(3)remediation.md`
 - Implementation playbook: `./(5)implementation.md`
 - Git log: `./(6)git.md`
 
 ## Completion Checklist
-- [x] Review approved (`(2)review.md`)
+- [x] Study approved (`(2)study.md`)
 - [x] Remediation plan approved (`(3)remediation.md`)
 - [x] Implementation tasks complete (see below)
 - [x] Tests updated/passing (unit + integration)
