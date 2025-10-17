@@ -1,48 +1,51 @@
 # Feature Design — HSX Debugger Toolkit & TUI
 
-> Detailed specification for the agreed solution. Update if implementation deviates.
+> Detailed specification for the agreed solution. Update as the design playbook (D1–D6) progresses.
 
 ## Overview
-- Draft design pending completion of the feature study. This document will capture the agreed debugger architecture, interfaces, and rollout plan.
-- Link back to `(2)study.md` for discovery notes and option analysis.
+- Feature ID: `#1_TUI_DEBUGGER`
+- Design status: `not started`
+- Last updated: `2025-10-16`
+- Related docs: `(1)functionality.md`, `(2)study.md`
 
 ## Architecture & Components
-- **Affected areas:** `python/execd.py` (RPC), new debugger package (CLI/REPL/TUI), potential MiniVM direct interface (`platforms/python/host_vm.py`), documentation/help assets.
-- **Data flow:** _TBD._
-- **Interfaces / APIs:** _TBD._
+- **Debugger core:** shared session/transport/event layer consumed by CLI (`dbg`), scripting API, and TUI.
+- **CLI (`dbg`):** command-line entry point building atop the core; supports scripted and interactive usage.
+- **TUI frontend:** implemented using the selected framework (textual/prompt_toolkit/etc.), composing modular panels (registers/stack/memory/watch/trace).
+- **Executive/VM updates:** mailbox/event channel, trace instrumentation, stack/memory hooks, BRK/virtual breakpoint support.
 
-## Detailed Design
-### 1. Core debugger engine (_TBD_)
-- Describe session management, transport abstraction, state synchronisation.
-- Pseudocode / diagrams to be added once approach is chosen.
+## Detailed Design Tasks
 
-### 2. CLI / scripting interface (_TBD_)
-- Command structure, argument parsing, exit codes.
+### D1 Evaluate TUI frameworks (`not started`)
+- <!-- populate once D1 tasks complete -->
 
-### 3. Interactive shell (_TBD_)
-- Command set, history, auto-completion, context awareness.
+### D2 Draft debugger-core architecture (`not started`)
+- <!-- populate once D2 tasks complete -->
 
-### 4. TUI front-end (_TBD_)
-- Layout (register panel, trace, disassembly, auxiliary widgets), update cadence, keyboard controls.
+### D3 Prototype executive signalling channel (`not started`)
+- <!-- populate once D3 tasks complete -->
 
-## Compatibility & Migration
-- Backward compatibility considerations with existing HSX shell clients.
-- Packaging/distribution implications for Windows/macOS/Linux.
-- Feature flagging or phased rollout plan once design is finalised.
+### D4 Audit VM/executive for stack/memory support (`not started`)
+- <!-- populate once D4 tasks complete -->
+
+### D5 Define MCU `dbg.hsx` relay (`not started`)
+- <!-- populate once D5 tasks complete -->
+
+### D6 Prepare design documentation (`not started`)
+- <!-- populate once D6 tasks complete -->
+
+## Compatibility & Migration Considerations
+- To be detailed once architecture decisions are final.
 
 ## Testing Strategy
-- Unit tests: core session logic, command parsing, data transforms.
-- Integration tests: attach to `execd` and MiniVM, exercise CLI and TUI flows.
-- Manual validation checklist for cross-platform terminals.
+- To be specified during the design phase (unit, integration, manual validation).
 
 ## Documentation Updates
-- User guides for CLI, shell, and TUI usage.
-- Developer docs outlining API extension points.
-- Help text for new commands.
+- Identify required documentation changes (CLI/TUI help, architecture notes) during design.
 
 ## Risks & Mitigations
-- _To be enumerated once design decisions are final._
+- Record risks and proposed mitigations as design decisions are made.
 
 ## Sign-off
-- Design approved by: `<pending>`
+- Approved by: `<pending>`
 - Date: `<pending>`

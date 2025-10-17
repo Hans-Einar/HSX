@@ -36,19 +36,54 @@
 ## Solution Options
 | Option | Description | Pros | Cons / Risks |
 |--------|-------------|------|--------------|
-| A | Layered “debugger core” package: transport/session layer + adapters for CLI shell, scripted API, and TUI (e.g., built on `textual`). | Single source of truth for state, clean separation of concerns, easier to extend with future UIs. | Requires significant refactor of current shell; must design event bus and state cache carefully. |
-| B | Standalone TUI app with minimal shared core; CLI remains mostly as-is. | Allows rapid UI iteration without large shell changes. | Duplicated logic between shell and TUI; harder to maintain consistent behaviour; automation needs may lag. |
-| C | Incrementally extend HSX shell to embed debugger session and pseudo-TUI (e.g., curses). | Lower initial effort, leverages existing command parsing. | Shell code already complex; mixing TUI and CLI might reduce maintainability and portability. |
+| A | Build a layered debugger core (Python package) that exposes transport/session/event APIs with adapters for a dedicated `dbg` CLI, scripting commands, and TUI (e.g., `textual`). HSX shell remains thin but can delegate via `hsx dbg …`. | Clean separation, reusable across interfaces, keeps HSX shell lightweight for MCU porting. | Requires new core architecture (session cache, event bus) and refactors shell to delegate. |
+| B | Standalone TUI frontend with minimal shared core; CLI continues largely untouched. | Fastest path to a TUI prototype. | Logic duplication between shell and debugger; inconsistent automation story; harder maintenance. |
+| C | Expand HSX shell with debugger features/TUI. | Single entry point, minimal new binaries. | Bloats shell, conflicts with goal of portability, increases coupling. |
 
 ## Decision
-- **Chosen approach:** `<Option pending detailed evaluation>`
-- **Rationale:** To be finalised after assessing TUI library feasibility, debugger-core abstraction, and executive event channel design.
-- **Open questions:** Choice of TUI framework (`textual`, `prompt_toolkit`, etc.), event streaming mechanism (`svc:debug.events` mailbox vs. custom channel), strategy for instruction trace capture (VM instrumentation vs. executive logging), approach for call-stack reconstruction, and packaging/distribution on Windows.
-- **Dependencies:** Executive RPC stability, MiniVM trace instrumentation, mailbox subsystem updates, symbol metadata availability (LLC JSON), performance impact of single-step mode.
+- **Chosen approach:** Option A — layered debugger core with dedicated `dbg` CLI/TUI while keeping HSX shell minimal and delegating when needed.
+- **Rationale:** Preserves separation of concerns, keeps the microcontroller-friendly shell lightweight, and enables richer tooling without entangling existing CLI code.
+- **Open questions:** Choice of TUI framework (`textual`, `prompt_toolkit`, etc.), event streaming mechanism (`svc:debug.events` mailbox vs. custom channel), strategy for instruction trace capture (VM instrumentation vs. executive logging), approach for call-stack reconstruction, packaging/distribution on Windows, and expectations for an on-target `dbg.hsx` relay.
+- **Dependencies:** Executive RPC stability, MiniVM trace instrumentation, mailbox subsystem updates, symbol metadata availability (LLC JSON), performance impact of single-step mode, availability of BRK-instrumented builds for optional hardware breakpoints.
 
-## Next Steps
-- Evaluate candidate TUI frameworks (textual, prompt_toolkit, textualize) for Windows compatibility and layout capabilities.
-- Draft debugger-core architecture: session manager, event bus, data cache, breakpoint/watch services.
-- Prototype executive signalling channel (mailbox or push socket) and minimal client subscriber.
-- Audit VM/executive code to confirm feasibility of call-stack reconstruction and memory inspector APIs.
-- Update `(3)design.md` with selected architecture, sequencing, and required executive/VM changes once decisions are made.
+## Design Playbook
+
+### D1 Evaluate TUI frameworks (`not started`)
+- [ ] Survey `textual` capabilities (layout, async, Windows support).
+- [ ] Verify `prompt_toolkit` features (panels, resize handling).
+- [ ] Investigate `urwid`/`npyscreen` as fallbacks (note limitations).
+- [ ] Document pros/cons and recommend primary framework in `(3)design.md`.
+
+### D2 Draft debugger-core architecture (`not started`)
+- [ ] Define core components: session manager, transport client, event bus, state cache.
+- [ ] Sketch breakpoint/watch service interfaces.
+- [ ] Outline APIs exposed to CLI, scripting, and TUI layers.
+- [ ] Capture architecture diagram/description for `(3)design.md`.
+
+### D3 Prototype executive signalling channel (`not started`)
+- [ ] Specify debug-event mailbox schema (message fields, routing).
+- [ ] Implement minimal publisher in `execd` (stub).
+- [ ] Build client subscriber that drains events and updates local cache.
+- [ ] Measure performance/latency impact (document findings).
+
+### D4 Audit VM/executive for stack/memory support (`not started`)
+- [ ] Review current stack frame layout & available metadata.
+- [ ] Identify hooks needed for stack reconstruction in `execd`.
+- [ ] Assess feasibility of memory inspector APIs (read/write granularity, safety).
+- [ ] Log required remediation tasks for `(3)design.md`.
+
+### D5 Define MCU `dbg.hsx` relay (`not started`)
+- [ ] Describe minimal functionality (subscribe to event mailbox, forward via serial).
+- [ ] Outline message format/commands for host->target interactions.
+- [ ] Note resource constraints & implementation considerations.
+- [ ] Decide whether to include in initial design or backlog it.
+
+### D6 Prepare design documentation (`not started`)
+- [ ] Synthesize outcomes from D1–D5.
+- [ ] Update `(3)design.md` with selected architecture, sequencing, and required changes.
+- [ ] Review design with stakeholders; capture sign-off.
+
+## Design Definition of Done
+- [ ] Design playbook items D1–D6 completed and documented.
+- [ ] `(3)design.md` reflects chosen architecture, UI plans, and required executive/VM updates.
+- [ ] Stakeholders review/approve the design before implementation begins.
