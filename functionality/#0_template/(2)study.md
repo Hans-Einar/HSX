@@ -11,6 +11,7 @@
 - Describe how the system behaves today.
 - Include relevant code paths, data flows, or user interactions.
 - Note any known limitations, bugs, or tech debt that motivated this feature.
+- Highlight how the requested functionality maps onto current behaviour and identify gaps.
 
 ### Supporting Evidence
 - Logs / traces: `<path or summary>`

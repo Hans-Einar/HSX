@@ -8,9 +8,10 @@ Each feature request lives under `functionality/#<id>_<slug>/`.
 ## 0. Creating a New Feature Folder
 1. Copy `functionality/#0_template/` → `functionality/#<id>_<slug>/`.
 2. Keep numeric prefixes on all template files.
-3. Fill out `(1)functionality.md` with the problem statement, use cases, and triggers.
-4. Draft an initial study `(2)study.md` capturing the baseline behaviour and candidate approaches.
-5. Summarise the agreed solution in `(3)design.md` before implementation begins.
+3. Capture stakeholder conversation in `(0)interview.md`; end with a clear requirements snapshot.
+4. Fill out `(1)functionality.md` with the refined problem statement, use cases, and triggers.
+5. Draft an initial study `(2)study.md` capturing the baseline behaviour and candidate approaches.
+6. Summarise the agreed solution in `(3)design.md` before implementation begins.
 
 ---
 
