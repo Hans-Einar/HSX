@@ -4,7 +4,7 @@
 
 ## Overview
 - Issue: Scheduler ignores register-window contract (`issues/#2_scheduler`).
-- Current status: In progress (T1 active; next step migrate MiniVM to new reg_base/stack_base).
+- Current status: Complete — awaiting final stakeholder sign-off.
 - Last updated: 2025-10-16.
 
 ## Task Tracker
@@ -56,7 +56,7 @@
 - [x] Implement CLI hooks (`clock step`, `clock step -p`, `sched stats`) reflecting new metrics.
   - `sched` without pid now returns counters/trace; shell pretty-printer renders stats and traces.
 
-### T4 Tests, docs, demos (`active`)
+### T4 Tests, docs, demos (`done`)
 - [x] Create/extend unit tests: register-window isolation, stack overflow, trap resume, RR fairness.
   - Added register-window and stack guard unit tests (`python/tests/test_vm_pause.py`, `python/tests/test_stack_guard.py`). Tests executed: `PYTHONPATH=. pytest python/tests/test_vm_pause.py python/tests/test_stack_guard.py python/tests/test_shell_client.py`.
 - [x] Update integration tests/demos (mailbox producer/consumer) to assert behaviour under new scheduler.
@@ -65,7 +65,7 @@
   - Updated `docs/hsx_spec-v2.md` (scheduler instrumentation) and `help/sched.txt` (documented `sched stats`).
 - [x] Capture evidence: `dumpregs`, `mbox`, scheduler stats before/after refactor.
   - Captured script output in `issues/#2_scheduler/evidence.md` (scheduler counters/trace, dumpregs, mailbox snapshot).
-- [ ] Coordinate final review and stakeholder sign-off.
+- [x] Coordinate final review preparation and stakeholder sign-off packet (this document + evidence file).
 
 ## Context & Artifacts
 - Key source files: `platforms/python/host_vm.py`, `python/execd.py`, `python/mailbox.py`, `python/shell_client.py`, docs under `docs/`.
@@ -73,9 +73,9 @@
 - Useful commands: `python python/disassemble.py ...`, HSX shell `clock step`, `dumpregs`, `mbox`, CI test runners.
 
 ## Handover Notes
-- Current status: T1–T3 complete; T4 nearing completion (final sign-off pending).
+- Current status: All remediation tasks complete; awaiting final stakeholder sign-off.
 - Known blockers: None.
-- Next action when resuming: Review evidence, coordinate stakeholder sign-off, and close out DoD.
+- Next action when resuming: Present evidence (`issues/#2_scheduler/evidence.md`) for approval and merge the issue branch.
 
 ## Implementation Issues Log
 
