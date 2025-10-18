@@ -3,23 +3,26 @@
 ## TL;DR
 - Feature summary: `./(1)functionality.md`
 - Study summary: `./(2)study.md`
-- Design summary: `./(3)design.md`
+- Requirements summary: `./(3)requirements.md`
+- Design summary: `./(4)design.md`
 
 ## Quick Links
 - Feature brief: `./(1)functionality.md`
 - Study: `./(2)study.md`
-- Design: `./(3)design.md`
-- Implementation playbook: `./(5)implementation.md`
-- Git log: `./(6)git.md`
+- Requirements: `./(3)requirements.md`
+- Design: `./(4)design.md`
+- Implementation playbook: `./(6)implementation.md`
+- Git log: `./(7)git.md`
 
 ## Completion Checklist
 - [ ] Study approved (`(2)study.md`)
-- [ ] Design approved (`(3)design.md`)
+- [ ] Requirements approved (`(3)requirements.md`)
+- [ ] Design approved (`(4)design.md`)
 - [ ] Implementation tasks complete (see below)
 - [ ] Tests updated/passing
 - [ ] Documentation updated
-- [ ] Implementation playbook current (`(5)implementation.md`)
-- [ ] Git log updated (`(6)git.md`)
+- [ ] Implementation playbook current (`(6)implementation.md`)
+- [ ] Git log updated (`(7)git.md`)
 - [ ] Stakeholders signed off
 
 ## Feature Tasks

@@ -52,13 +52,13 @@
 - [ ] Survey `textual` capabilities (layout, async, Windows support).
 - [ ] Verify `prompt_toolkit` features (panels, resize handling).
 - [ ] Investigate `urwid`/`npyscreen` as fallbacks (note limitations).
-- [ ] Document pros/cons and recommend primary framework in `(3)design.md`.
+- [ ] Document pros/cons and recommend primary framework in `(4)design.md`.
 
 ### D2 Draft debugger-core architecture (`not started`)
 - [ ] Define core components: session manager, transport client, event bus, state cache.
 - [ ] Sketch breakpoint/watch service interfaces.
 - [ ] Outline APIs exposed to CLI, scripting, and TUI layers.
-- [ ] Capture architecture diagram/description for `(3)design.md`.
+- [ ] Capture architecture diagram/description for `(4)design.md`.
 
 ### D3 Prototype executive signalling channel (`not started`)
 - [ ] Specify debug-event mailbox schema (message fields, routing).
@@ -70,7 +70,7 @@
 - [ ] Review current stack frame layout & available metadata.
 - [ ] Identify hooks needed for stack reconstruction in `execd`.
 - [ ] Assess feasibility of memory inspector APIs (read/write granularity, safety).
-- [ ] Log required remediation tasks for `(3)design.md`.
+- [ ] Log required remediation tasks for `(4)design.md`.
 
 ### D5 Define MCU `dbg.hsx` relay (`not started`)
 - [ ] Describe minimal functionality (subscribe to event mailbox, forward via serial).
@@ -80,10 +80,10 @@
 
 ### D6 Prepare design documentation (`not started`)
 - [ ] Synthesize outcomes from D1–D5.
-- [ ] Update `(3)design.md` with selected architecture, sequencing, and required changes.
+- [ ] Update `(4)design.md` with selected architecture, sequencing, and required changes.
 - [ ] Review design with stakeholders; capture sign-off.
 
 ## Design Definition of Done
 - [ ] Design playbook items D1–D6 completed and documented.
-- [ ] `(3)design.md` reflects chosen architecture, UI plans, and required executive/VM updates.
+- [ ] `(4)design.md` reflects chosen architecture, UI plans, and required executive/VM updates.
 - [ ] Stakeholders review/approve the design before implementation begins.

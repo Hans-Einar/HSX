@@ -16,17 +16,18 @@ Each feature request lives under `functionality/#<id>_<slug>/`.
 ---
 
 ## 1. Picking Up an Existing Feature (fresh context window)
-1. Review `(4)dod.md` for the current status.
-2. Skim `(1)functionality.md`, `(2)study.md`, `(3)design.md`, `(5)implementation.md`, and `(6)git.md` to understand scope and progress.
+1. Review `(5)dod.md` for the current status.
+2. Skim `(1)functionality.md`, `(2)study.md`, `(3)requirements.md`, `(4)design.md`, `(6)implementation.md`, and `(7)git.md` in that order so you understand the requirements and study context before reading design/implementation notes.
 3. Check `functionality/INDEX.md` for a quick summary if needed.
 4. Note the active subtask in `(5)implementation.md` before making changes.
 
 ---
 
 ## 2. Start of Each Work Session
-1. Run `git status` from the repo root. Sync `(6)git.md` if commits are missing.
-2. Confirm you are on the correct branch; record the branch name in `(6)git.md`.
+1. Run `git status` from the repo root. Sync `(7)git.md` if commits are missing.
+2. Confirm you are on the correct branch; record the branch name in `(7)git.md`.
 3. Re-read the active items in `(5)implementation.md` and ensure their status reflects reality.
+4. Before editing code or docs, reconfirm where the feature sits in the playbooks: re-read `(1)functionality.md` → `(2)study.md` → `(3)requirements.md` → `(4)design.md` so your next steps match the current phase.
 
 ---
 
