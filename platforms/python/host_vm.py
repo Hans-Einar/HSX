@@ -416,6 +416,7 @@ class MiniVM:
         self.call_stack: List[int] = []
         self._last_pc: Optional[int] = None
         self._repeat_pc_count: int = 0
+        self._legacy_exec_module_warned: bool = False
         self.debug_enabled: bool = False
         self.debug_breakpoints: Set[int] = set()
         self.debug_temp_breakpoints: Set[int] = set()
@@ -1145,8 +1146,18 @@ class MiniVM:
                 self.regs[0] = 0
         elif mod == mbx_const.HSX_MBX_MODULE_ID:
             self._svc_mailbox(fn)
-        elif mod == 0x7:
+        elif mod == 0x6:
             self._svc_exec(fn)
+        elif mod == 0x7:
+            if fn in (0, 1):
+                if not self._legacy_exec_module_warned:
+                    self._log("[SVC] mod=0x07 exec traps are deprecated; use module 0x06")
+                    self._legacy_exec_module_warned = True
+                self._svc_exec(fn)
+            else:
+                self._log(f"[SVC] mod=0x{mod:X} fn=0x{fn:X} (stub)")
+                self.regs[0] = HSX_ERR_ENOSYS
+            return
         elif mod == 0x3:
             self._svc_shell(fn)
         elif mod == 0x4:

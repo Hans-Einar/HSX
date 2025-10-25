@@ -1,4 +1,4 @@
-# Requirements — HSX Debugger Toolkit & TUI
+﻿# Requirements â€” HSX Debugger Toolkit & TUI
 
 > Consolidate the behavioural and system requirements that implementation must satisfy. Derived from `(1)functionality.md` and `(2)study.md`.
 
@@ -55,7 +55,9 @@
 
 - **F-6: Event-driven updates**
   - Executive exposes subscription endpoint delivering `debug_stop`, `trace_step`, `mailbox_*`, `clock_tick`, `log` events.
-  - Debugger maintains subscription heartbeat; reconnects automatically on transient failures.
+  - Executive exposes `events.subscribe`/`events.ack` with bounded queues (defaults per `docs/executive_protocol.md`).
+  - Event payloads include `seq`, `ts`, `pid`, `type`, and structured `data` for categories (trace_step, debug_break, scheduler, mailbox, watch, stdout/stderr).
+  - Tooling must handle back-pressure (acknowledge processed events, resynchronise with `since_seq` after drops).
   - Clients can filter event categories to reduce noise.
 
 - **F-7: Watch list**
@@ -98,12 +100,12 @@
 - AC-4: Event subscription endpoint handles at least 500 events/sec without backlog growth beyond configured cap.
 - AC-5: Breakpoint insertion/removal reflected in both CLI and TUI, with hits logged and exposed via event stream.
 - AC-6: Stack view resolves symbol names when metadata present; falls back to hex addresses otherwise, with warning.
-- AC-7: Requirements dependencies (S-1–S-4) implemented or tracked with explicit backlog items before implementation moves forward.
+- AC-7: Requirements dependencies (S-1â€“S-4) implemented or tracked with explicit backlog items before implementation moves forward.
 
 ## Traceability Notes
-- Requirements F-1…F-7 originate from functionality use cases and study gaps; they map directly to design tasks D1–D6 in `(4)design.md`.
+- Requirements F-1â€¦F-7 originate from functionality use cases and study gaps; they map directly to design tasks D1â€“D6 in `(4)design.md`.
 - Acceptance criteria align with success metrics listed in `(1)functionality.md`.
-- Each system dependency (S-1…S-4) should link to corresponding implementation tasks in `(6)implementation.md` and DoD checklist entries in `(5)dod.md`.
+- Each system dependency (S-1â€¦S-4) should link to corresponding implementation tasks in `(6)implementation.md` and DoD checklist entries in `(5)dod.md`.
 
 ## Open Questions
 - Confirm format and delivery mechanism for symbol metadata (embedded vs. sidecar file).

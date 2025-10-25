@@ -85,13 +85,15 @@ hsx_svc(0x01, 0x02, *(uint16_t*)&f16_val, 0);
 
 ---
 
-## ⚙️ Module 0x07 – System / Exec Control
+## ⚙️ Module 0x06 – System / Exec Control
 
 | Fn | Name | Params | Return | Description |
 |----|------|---------|---------|--------------|
 | 0x00 | `EXEC_EXIT` | R1: code | none | Terminate task. |
 | 0x01 | `EXEC_YIELD` | none | none | Cooperative yield. |
 | 0x02 | `EXEC_TASKLIST` | R1: ptr | R0 = count | List running tasks. |
+
+> Legacy payloads may still issue these calls via module `0x07`. The executive forwards them to `0x06` while logging a deprecation warning so tooling can migrate safely.
 
 ---
 
