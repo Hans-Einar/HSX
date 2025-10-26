@@ -7,3 +7,4 @@
 - Include regression tests and protocol samples (event payloads, session flows) with each feature per the design specifications.
 - Document deviations or discoveries directly in the design docs, appending implementation notes so future iterations remain aligned.
 
+- Maintain module docs under system/toolchain/toolkit with matching shared specs (see shared/ folder for ABI/event/budget references).

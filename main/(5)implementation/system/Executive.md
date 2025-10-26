@@ -20,3 +20,17 @@
 
 ## Commit Log
 - _Pending_: append commit entries (hash, summary, DR/DG references) as work lands.
+
+## Public Interfaces
+| Command | Notes |
+|---------|-------|
+| session.open/close/keepalive | Capability negotiation, PID locks (DR-8.1). |
+| events.subscribe/ack/unsubscribe | Event stream (DR-8.1, DG-5.2). |
+| clock/step RPCs | Enforce single-instruction contract (DR-5.1). |
+| EXEC_GET_VERSION | ABI version handshake (DR-2.5). |
+
+## Traceability
+- **DR:** DR-1.1, DR-1.2, DR-1.3, DR-2.5, DR-3.1, DR-5.1–5.3, DR-6.1, DR-7.1, DR-8.1.
+- **DG:** DG-1.2–1.4, DG-3.4–3.5, DG-5.1–5.4, DG-6.1, DG-7.1, DG-8.2.
+- **DO:** DO-5.a, DO-relay.
+

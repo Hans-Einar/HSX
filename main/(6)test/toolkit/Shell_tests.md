@@ -7,10 +7,11 @@
 ## Test Matrix
 | Area | Test | Notes |
 |------|------|-------|
-| Session attach | CLI ttach/detach exercises PID locks | Ensure older servers gracefully fallback. |
+| Session attach | CLI ttach/detach exercises PID locks | Ensure older servers gracefully fallback. |
 | Event feed | dbg listen equivalent streaming events | Validate filters + drop warnings. |
-| Value/command | al/cmd commands with auth flags | Mirror DR-7.1 policy. |
+| Value/command | al/cmd commands with auth flags | Mirror DR-7.1 policy. |
 
 ## Tooling
 - CLI integration tests (e.g., pexpect).
+
 
