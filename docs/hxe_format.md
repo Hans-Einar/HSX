@@ -61,7 +61,7 @@ If `flags` indicates manifest presence, append a length-prefixed structure after
 Manifest guidelines:
 - Provide `pid`, `image_name`, `version`, `required_caps`, `fram_keys` array.
 - Each FRAM entry: `{ "key": 0x1234, "mode": "load"|"save"|"loadsave", "length": 16, "crc": <optional> }`.
-- Provisioning doc `(4.7)` references this schema.
+- Provisioning doc [04.07--Provisioning.md](../main/04--Design/04.07--Provisioning.md) references this schema.
 
 ## Toolchain Responsibilities
 - `hsx-llc` / `asm.py` produce `.hxo` objects consumed by linker.
@@ -75,8 +75,8 @@ Manifest guidelines:
 - Expose manifest data to provisioning and persistence modules.
 
 ## References
-- `main/(4)design/(4.5)toolchain.md`
+- [main/04--Design/04.05--Toolchain.md](../main/04--Design/04.05--Toolchain.md)
 - `docs/asm.md` (assembler CLI + metadata output)
-- `main/(4)design/(4.7)provisioning.md`
-- `main/(5)implementation/toolchain/formats/hxe.md`
-- `main/(5)implementation/system/Provisioning.md`
+- [main/04--Design/04.07--Provisioning.md](../main/04--Design/04.07--Provisioning.md)
+- [main/05--Implementation/toolchain/formats/hxe.md](../main/05--Implementation/toolchain/formats/hxe.md)
+- [main/05--Implementation/system/Provisioning.md](../main/05--Implementation/system/Provisioning.md)

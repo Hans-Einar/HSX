@@ -1,12 +1,12 @@
 # HSX ABI Syscall Table (Draft)
 
 Sources:
-- `main/(0)context.md`
-- `main/(1)mandate.md`
-- `main/(2)study.md`
-- `main/(3)architecture/(3.2)executive.md`
-- `main/(3)architecture/(3.4)val_cmd.md`
-- `docs/hsx_value_interface.md`
+- [main/00--Context/00--Context.md](../main/00--Context/00--Context.md)
+- [main/01--Mandate/01--Mandate.md](../main/01--Mandate/01--Mandate.md)
+- [main/02--Study/02--Study.md](../main/02--Study/02--Study.md)
+- [main/03--Architecture/03.02--Executive.md](../main/03--Architecture/03.02--Executive.md)
+- [main/03--Architecture/03.04--ValCmd.md](../main/03--Architecture/03.04--ValCmd.md)
+- [docs/hsx_value_interface.md](hsx_value_interface.md)
 - `platforms/python/host_vm.py`
 
 ## Calling convention
@@ -29,8 +29,8 @@ Sources:
 | 0x04 | Virtual filesystem | Implemented (Python) | Backed by `FSStub`; routes stdout and stderr to mailboxes when configured. |
 | 0x05 | Mailbox subsystem | Implemented (Python + shared header) | Contract shared with C via `include/hsx_mailbox.h`. |
 | 0x06 | Executive control | Implemented (Python) | Yield/sleep traps used by the scheduler. Module reassigned from 0x07 (legacy alias kept). |
-| 0x07 | Value service | Planned | Specified in `docs/hsx_value_interface.md`; not yet exposed by the Python VM. |
-| 0x08 | Command service | Planned | Specified in `docs/hsx_value_interface.md`. |
+| 0x07 | Value service | Planned | Specified in [docs/hsx_value_interface.md](hsx_value_interface.md); not yet exposed by the Python VM. |
+| 0x08 | Command service | Planned | Specified in [docs/hsx_value_interface.md](hsx_value_interface.md). |
 | 0x0E | Developer libm | Optional | Enabled with `--dev-libm`; supplies sin, cos, exp helpers for testing. |
 
 ## Module 0x00 - Core instrumentation
@@ -95,7 +95,7 @@ Legacy compatibility: module 0x07 still accepts `EXEC_YIELD` and `EXEC_SLEEP_MS`
 
 ## Module 0x07 - Value service (planned)
 
-Planned per `docs/hsx_value_interface.md`. Calls currently receive `HSX_ERR_ENOSYS` in the Python VM.
+Planned per [docs/hsx_value_interface.md](hsx_value_interface.md). Calls currently receive `HSX_ERR_ENOSYS` in the Python VM.
 
 | Fn | Mnemonic | R1 | R2 | R3 | R4 | R5 | Expected R0 | Notes |
 |----|----------|----|----|----|----|----|-------------|-------|
@@ -110,7 +110,7 @@ Planned per `docs/hsx_value_interface.md`. Calls currently receive `HSX_ERR_ENOS
 
 ## Module 0x08 - Command service (planned)
 
-Planned per `docs/hsx_value_interface.md`. Calls currently receive `HSX_ERR_ENOSYS` in the Python VM.
+Planned per [docs/hsx_value_interface.md](hsx_value_interface.md). Calls currently receive `HSX_ERR_ENOSYS` in the Python VM.
 
 | Fn | Mnemonic | R1 | R2 | R3 | R4 | R5 | Expected R0 | Notes |
 |----|----------|----|----|----|----|----|-------------|-------|
@@ -130,7 +130,7 @@ Planned per `docs/hsx_value_interface.md`. Calls currently receive `HSX_ERR_ENOS
 
 ## Open issues
 
-- Complete the rollout by updating all payloads/tooling to issue executive control traps through module 0x06, then remove the legacy module 0x07 alias once the value and command services are available (`main/(3)architecture/(3.4)val_cmd.md`).
+- Complete the rollout by updating all payloads/tooling to issue executive control traps through module 0x06, then remove the legacy module 0x07 alias once the value and command services are available ([main/03--Architecture/03.04--ValCmd.md](../main/03--Architecture/03.04--ValCmd.md)).
 - Define a canonical "module version" query (candidate: `EXEC_GET_VERSION`, module 0x06) so payloads can negotiate required capabilities with the host executive. The call should accept a module ID in `R1` and return a structured version/feature bitmap in `R0`/`R1`.
-- Implement the value and command services as specified in `docs/hsx_value_interface.md`, wiring persistence and mailbox bindings through the executive.
-- Extend the mailbox handler to honour the timeout and info pointer parameters for `MAILBOX_RECV` so blocking semantics match `main/(3)architecture/(3.3)mailbox.md`.
+- Implement the value and command services as specified in [docs/hsx_value_interface.md](hsx_value_interface.md), wiring persistence and mailbox bindings through the executive.
+- Extend the mailbox handler to honour the timeout and info pointer parameters for `MAILBOX_RECV` so blocking semantics match [main/03--Architecture/03.03--Mailbox.md](../main/03--Architecture/03.03--Mailbox.md).

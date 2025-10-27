@@ -25,5 +25,5 @@
 
 ## Next Steps (When Reactivated)
 - Confirm security requirements with stakeholders (product, field, security).
-- Update `main/(4)design/(4.2)executive.md` and related specs with normative requirements, replacing the “design option” qualifier.
+- Update [main/04--Design/04.02--Executive.md](../main/04--Design/04.02--Executive.md) and related specs with normative requirements, replacing the “design option” qualifier.
 - Prototype host-side enforcement in Python executive and shell tooling before porting to embedded targets.

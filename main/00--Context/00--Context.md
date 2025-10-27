@@ -26,3 +26,4 @@
 - Establish governance process for updating specs vs. implementation.
 - Track how C porting efforts will interface with Python prototypes and embedded host builds.
 - Define provisioning strategy for distributing HSX apps (CAN master vs. on-node storage) across product lines.
+

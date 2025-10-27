@@ -1,4 +1,4 @@
-# Standard Operating Procedure — Documentation & Iteration
+# Standard Operating Procedure - Documentation & Iteration
 
 ## Purpose
 - Ensure architecture/design documents stay aligned with implementation.
@@ -6,10 +6,10 @@
 - Provide iteration checklist so updates are applied consistently.
 
 ## Artefact Overview
-- `main/(1)mandate.md`: project mandate; update when scope/goals change.
-- `main/(2)study.md`: foundational research; revise when new investigations shift decisions.
-- `main/(3)architecture/`: subsystem responsibilities and interfaces.
-- `main/(4)design/`: implementation planning per subsystem.
+- [01--Mandate](01--Mandate/01--Mandate.md): project mandate; update when scope/goals change.
+- [02--Study](02--Study/02--Study.md): foundational research; revise when new investigations shift decisions.
+- [03--Architecture](03--Architecture/): subsystem responsibilities and interfaces.
+- [04--Design](04--Design/): implementation planning per subsystem.
 - `functionality/#*/`: feature-specific docs (requirements, design, implementation playbook).
 - `refactor/#*/`: refactor packages mirroring the same lifecycle.
 - `docs/*.md`: canonical specs (hsx_spec-v2, executive_protocol, hsx_value_interface, etc.).
@@ -17,9 +17,9 @@
 ## Iteration Workflow
 1. **Kickoff**
    - Confirm mandate/study remain valid; record any new assumptions or constraints.
-   - Create/update feature or refactor package with requirements `(3)` before touching design.
+   - Create/update feature or refactor package with requirements (`03.xx`) before touching design.
 2. **Architecture Review**
-   - Identify affected subsystem views (for example `(3.2)executive.md`, `(3.4)val_cmd.md`).
+   - Identify affected subsystem views (for example [03--Architecture/03.02--Executive.md](03--Architecture/03.02--Executive.md), [03--Architecture/03.04--ValCmd.md](03--Architecture/03.04--ValCmd.md)).
    - Update responsibilities/interfaces if the change alters behaviour or boundaries.
    - Check off items in the architecture playbook once each view reflects the latest plan.
 3. **Design Detailing**
