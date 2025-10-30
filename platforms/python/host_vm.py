@@ -1158,8 +1158,6 @@ class MiniVM:
                 self._log(f"[SVC] mod=0x{mod:X} fn=0x{fn:X} (stub)")
                 self.regs[0] = HSX_ERR_ENOSYS
             return
-        elif mod == 0x3:
-            self._svc_shell(fn)
         elif mod == 0x4:
             self._svc_fs(fn)
         else:
@@ -1265,78 +1263,6 @@ class MiniVM:
         else:
             print(f"[FS] fn={fn} not implemented")
             self.regs[0] = -1
-
-
-    def _svc_shell(self, fn):
-        if self.exec_root is None:
-            self.regs[0] = 0
-            return
-        root = self.exec_root
-        if fn == 1:
-            out_ptr = self.regs[1] & 0xFFFF
-            max_len = self.regs[2] & 0xFFFF
-            if max_len <= 0 or out_ptr >= len(self.mem):
-                self.regs[0] = 0
-                return
-            names = []
-            for p in root.rglob("*.hxe"):
-                try:
-                    rel = p.relative_to(root)
-                except ValueError:
-                    rel = p
-                names.append(rel.as_posix())
-            names.sort()
-            if names:
-                payload = ("\n".join(names) + "\n").encode("utf-8")
-            else:
-                payload = b"(none)\n"
-            limit = min(max_len, len(self.mem) - out_ptr)
-            self.mem[out_ptr:out_ptr + limit] = b"\x00" * limit
-            chunk = payload[:limit]
-            self.mem[out_ptr:out_ptr + len(chunk)] = chunk
-            self.regs[0] = len(chunk)
-            return
-        if fn == 0:
-            name = self._read_c_string(self.regs[1])
-            if not name:
-                self.regs[0] = 0
-                return
-            target = root / name
-            if target.is_dir():
-                target = target / "main.hxe"
-            if target.suffix.lower() != ".hxe":
-                target = target.with_suffix(".hxe")
-            if not target.exists():
-                self._log(f"[exec] missing payload {target}")
-                self.regs[0] = 0
-                return
-            try:
-                header, code, rodata = load_hxe(target)
-            except Exception as exc:
-                self._log(f"[exec] failed to load {target}: {exc}")
-                self.regs[0] = 0
-                return
-            child = MiniVM(
-                code,
-                entry=header["entry"],
-                rodata=rodata,
-                trace=self.trace,
-                svc_trace=self.svc_trace,
-                dev_libm=self.dev_libm,
-                trace_file=self.trace_out,
-                exec_root=self.exec_root,
-            )
-            steps = 0
-            max_steps = 20000
-            while child.running and steps < max_steps:
-                child.step()
-                steps += 1
-            if child.running:
-                self._log(f"[exec] max steps reached for {target.name}")
-                child.running = False
-            self.regs[0] = child.regs[0] & 0xFFFFFFFF
-            return
-        self.regs[0] = 0
 
 
     def _svc_mailbox(self, fn: int) -> None:
