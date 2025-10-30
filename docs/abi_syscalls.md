@@ -25,10 +25,9 @@ Sources:
 | 0x00 | Core instrumentation | Implemented (Python) | Exposes the MiniVM step counter for coarse timing. |
 | 0x01 | Task control and stdio | Implemented (Python) | Exit trap plus raw UART write. |
 | 0x02 | CAN transport | Implemented (Python) | Transmit stub used by tests and logging. |
-| 0x03 | Exec payload loader | Implemented (Python) | Launches helper `.hxe` payloads from `exec_root`. |
 | 0x04 | Virtual filesystem | Implemented (Python) | Backed by `FSStub`; routes stdout and stderr to mailboxes when configured. |
 | 0x05 | Mailbox subsystem | Implemented (Python + shared header) | Contract shared with C via `include/hsx_mailbox.h`. |
-| 0x06 | Executive control | Implemented (Python) | Yield/sleep traps used by the scheduler. Module reassigned from 0x07 (legacy alias kept). |
+| 0x06 | Executive control | Implemented (Python) | Executive-level services (e.g., sleep). Apps don't explicitly yield—context switching happens automatically on blocking operations. |
 | 0x07 | Value service | Planned | Specified in [docs/hsx_value_interface.md](hsx_value_interface.md); not yet exposed by the Python VM. |
 | 0x08 | Command service | Planned | Specified in [docs/hsx_value_interface.md](hsx_value_interface.md). |
 | 0x0E | Developer libm | Optional | Enabled with `--dev-libm`; supplies sin, cos, exp helpers for testing. |
@@ -51,13 +50,6 @@ Sources:
 | Fn | Mnemonic | R1 | R2 | R3 | R4 | R5 | R0 on return | Status | Notes |
 |----|----------|----|----|----|----|----|--------------|--------|-------|
 | 0x00 | CAN_TX | can_id (11 bit) | payload_ptr | length (0..8) | - | - | 0 on success | Implemented | Logs the frame and returns zero (`platforms/python/host_vm.py:1129`). |
-
-## Module 0x03 - Exec payload loader
-
-| Fn | Mnemonic | R1 | R2 | R3 | R4 | R5 | R0 on return | Status | Notes |
-|----|----------|----|----|----|----|----|--------------|--------|-------|
-| 0x00 | EXEC_RUN | name_ptr | - | - | - | - | Child exit code | Implemented | Loads a `.hxe` from `exec_root`, runs up to 20000 steps, returns the child R0 (`platforms/python/host_vm.py:1299`). |
-| 0x01 | EXEC_LIST | out_ptr | max_len | - | - | - | Bytes written | Implemented | Writes newline separated payload names, zero fills before copying (`platforms/python/host_vm.py:1265`). |
 
 ## Module 0x04 - Virtual filesystem
 
@@ -88,10 +80,9 @@ Sources:
 
 | Fn | Mnemonic | R1 | R2 | R3 | R4 | R5 | R0 on return | Status | Notes |
 |----|----------|----|----|----|----|----|--------------|--------|-------|
-| 0x00 | EXEC_YIELD | - | - | - | - | - | 0 | Implemented | Emits a `yield` event so the scheduler can switch tasks (`platforms/python/host_vm.py:1168`). |
-| 0x01 | EXEC_SLEEP_MS | - | - | - | - | - | 0 | Implemented | Caller supplies the sleep duration in R0 on entry; handler schedules wake-up (`platforms/python/host_vm.py:1171`). |
+| 0x00 | EXEC_SLEEP_MS | - | - | - | - | - | 0 | Implemented | Caller supplies the sleep duration in R0 on entry; handler schedules wake-up (`platforms/python/host_vm.py:1177`). |
 
-Legacy compatibility: module 0x07 still accepts `EXEC_YIELD` and `EXEC_SLEEP_MS` and forwards them to module 0x06 while logging a deprecation warning. This keeps existing `.hxe` payloads running while tooling migrates to the new module ID.
+This module provides executive-level services that don't fit naturally in other modules. Applications should not need to be aware of scheduling details—context switching happens automatically when tasks block on mailbox operations or sleep.
 
 ## Module 0x07 - Value service (planned)
 

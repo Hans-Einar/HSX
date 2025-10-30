@@ -393,7 +393,6 @@ class MiniVM:
         svc_trace: bool = False,
         dev_libm: bool = False,
         trace_file=None,
-        exec_root=None,
         mailboxes: Optional[MailboxManager] = None,
         mailbox_handler: Optional[Callable[[int], None]] = None,
     ):
@@ -409,7 +408,6 @@ class MiniVM:
         self.pending_events: List[Dict[str, Any]] = []
         self.attached = False
         self.trace_out = trace_file
-        self.exec_root = Path(exec_root).resolve() if exec_root else None
         self.mailboxes = mailboxes or MailboxManager()
         self._mailbox_handler: Optional[Callable[[int], None]] = mailbox_handler
         self.pid: Optional[int] = None
@@ -1149,17 +1147,17 @@ class MiniVM:
         elif mod == 0x6:
             self._svc_exec(fn)
         elif mod == 0x7:
-            if fn in (0, 1):
+            if fn == 1:  # Legacy SLEEP_MS on module 0x07
                 if not self._legacy_exec_module_warned:
                     self._log("[SVC] mod=0x07 exec traps are deprecated; use module 0x06")
                     self._legacy_exec_module_warned = True
-                self._svc_exec(fn)
+                # Map legacy fn=1 to new fn=0 (SLEEP_MS)
+                self.regs[0] = self.regs[0]  # preserve sleep duration in R0
+                self._svc_exec(0)
             else:
                 self._log(f"[SVC] mod=0x{mod:X} fn=0x{fn:X} (stub)")
                 self.regs[0] = HSX_ERR_ENOSYS
             return
-        elif mod == 0x3:
-            self._svc_shell(fn)
         elif mod == 0x4:
             self._svc_fs(fn)
         else:
@@ -1175,16 +1173,13 @@ class MiniVM:
         return out.decode("utf-8", errors="ignore")
 
     def _svc_exec(self, fn):
-        if fn == 0:  # yield
-            self.emit_event({"type": "yield"})
-            self.regs[0] = 0
-        elif fn == 1:  # sleep_ms
+        if fn == 0:  # sleep_ms
             ms = self.regs[0] & 0xFFFFFFFF
             self.request_sleep(ms)
             self.regs[0] = 0
         else:
             self._log(f"[EXEC] fn={fn} not implemented")
-            self.regs[0] = 0
+            self.regs[0] = HSX_ERR_ENOSYS
 
 
     def _svc_fs(self, fn):
@@ -1265,78 +1260,6 @@ class MiniVM:
         else:
             print(f"[FS] fn={fn} not implemented")
             self.regs[0] = -1
-
-
-    def _svc_shell(self, fn):
-        if self.exec_root is None:
-            self.regs[0] = 0
-            return
-        root = self.exec_root
-        if fn == 1:
-            out_ptr = self.regs[1] & 0xFFFF
-            max_len = self.regs[2] & 0xFFFF
-            if max_len <= 0 or out_ptr >= len(self.mem):
-                self.regs[0] = 0
-                return
-            names = []
-            for p in root.rglob("*.hxe"):
-                try:
-                    rel = p.relative_to(root)
-                except ValueError:
-                    rel = p
-                names.append(rel.as_posix())
-            names.sort()
-            if names:
-                payload = ("\n".join(names) + "\n").encode("utf-8")
-            else:
-                payload = b"(none)\n"
-            limit = min(max_len, len(self.mem) - out_ptr)
-            self.mem[out_ptr:out_ptr + limit] = b"\x00" * limit
-            chunk = payload[:limit]
-            self.mem[out_ptr:out_ptr + len(chunk)] = chunk
-            self.regs[0] = len(chunk)
-            return
-        if fn == 0:
-            name = self._read_c_string(self.regs[1])
-            if not name:
-                self.regs[0] = 0
-                return
-            target = root / name
-            if target.is_dir():
-                target = target / "main.hxe"
-            if target.suffix.lower() != ".hxe":
-                target = target.with_suffix(".hxe")
-            if not target.exists():
-                self._log(f"[exec] missing payload {target}")
-                self.regs[0] = 0
-                return
-            try:
-                header, code, rodata = load_hxe(target)
-            except Exception as exc:
-                self._log(f"[exec] failed to load {target}: {exc}")
-                self.regs[0] = 0
-                return
-            child = MiniVM(
-                code,
-                entry=header["entry"],
-                rodata=rodata,
-                trace=self.trace,
-                svc_trace=self.svc_trace,
-                dev_libm=self.dev_libm,
-                trace_file=self.trace_out,
-                exec_root=self.exec_root,
-            )
-            steps = 0
-            max_steps = 20000
-            while child.running and steps < max_steps:
-                child.step()
-                steps += 1
-            if child.running:
-                self._log(f"[exec] max steps reached for {target.name}")
-                child.running = False
-            self.regs[0] = child.regs[0] & 0xFFFFFFFF
-            return
-        self.regs[0] = 0
 
 
     def _svc_mailbox(self, fn: int) -> None:
@@ -3354,7 +3277,6 @@ def main():
     ap.add_argument("program", nargs="?", help=".hxe image produced by asm.py")
     ap.add_argument("--trace", action="store_true", help="print executed instructions")
     ap.add_argument("--trace-file", help="append trace output to a file")
-    ap.add_argument("--exec-root", help="directory containing .hxe payloads for exec SVC")
     ap.add_argument("--svc-trace", action="store_true", help="log SVC invocations")
     ap.add_argument("--max-steps", type=int, default=None, help="safety cap on executed steps")
     ap.add_argument("--max-cycles", type=int, default=None, help="deprecated alias for --max-steps")
@@ -3400,14 +3322,6 @@ def main():
 
     header, code, rodata = load_hxe(args.program, verbose=args.verbose)
 
-    exec_root = None
-    if args.exec_root:
-        exec_root = Path(args.exec_root).resolve()
-    else:
-        default_root = Path(args.program).resolve().parent / "payloads"
-        if default_root.exists():
-            exec_root = default_root
-
     vm = MiniVM(
         code,
         entry=header["entry"],
@@ -3416,7 +3330,6 @@ def main():
         svc_trace=args.svc_trace,
         dev_libm=args.dev_libm,
         trace_file=trace_fp,
-        exec_root=exec_root,
     )
 
     if args.entry_symbol:
