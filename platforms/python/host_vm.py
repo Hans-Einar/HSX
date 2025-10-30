@@ -393,7 +393,6 @@ class MiniVM:
         svc_trace: bool = False,
         dev_libm: bool = False,
         trace_file=None,
-        exec_root=None,
         mailboxes: Optional[MailboxManager] = None,
         mailbox_handler: Optional[Callable[[int], None]] = None,
     ):
@@ -409,7 +408,6 @@ class MiniVM:
         self.pending_events: List[Dict[str, Any]] = []
         self.attached = False
         self.trace_out = trace_file
-        self.exec_root = Path(exec_root).resolve() if exec_root else None
         self.mailboxes = mailboxes or MailboxManager()
         self._mailbox_handler: Optional[Callable[[int], None]] = mailbox_handler
         self.pid: Optional[int] = None
@@ -3280,7 +3278,6 @@ def main():
     ap.add_argument("program", nargs="?", help=".hxe image produced by asm.py")
     ap.add_argument("--trace", action="store_true", help="print executed instructions")
     ap.add_argument("--trace-file", help="append trace output to a file")
-    ap.add_argument("--exec-root", help="directory containing .hxe payloads for exec SVC")
     ap.add_argument("--svc-trace", action="store_true", help="log SVC invocations")
     ap.add_argument("--max-steps", type=int, default=None, help="safety cap on executed steps")
     ap.add_argument("--max-cycles", type=int, default=None, help="deprecated alias for --max-steps")
@@ -3326,14 +3323,6 @@ def main():
 
     header, code, rodata = load_hxe(args.program, verbose=args.verbose)
 
-    exec_root = None
-    if args.exec_root:
-        exec_root = Path(args.exec_root).resolve()
-    else:
-        default_root = Path(args.program).resolve().parent / "payloads"
-        if default_root.exists():
-            exec_root = default_root
-
     vm = MiniVM(
         code,
         entry=header["entry"],
@@ -3342,7 +3331,6 @@ def main():
         svc_trace=args.svc_trace,
         dev_libm=args.dev_libm,
         trace_file=trace_fp,
-        exec_root=exec_root,
     )
 
     if args.entry_symbol:
