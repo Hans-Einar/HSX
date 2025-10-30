@@ -12,28 +12,41 @@ All multi-byte fields use big-endian unless stated otherwise.
 |--------|------|-------|-------------|
 | 0x00   | 4    | `magic` | ASCII `HSXE` (0x48 0x53 0x58 0x45). |
 | 0x04   | 2    | `version` | Format version (initially 0x0001). |
-| 0x06   | 2    | `flags` | Bitfield (e.g., compression, manifest presence). |
+| 0x06   | 2    | `flags` | Bitfield (bit 0: manifest presence, bit 1: allow_multiple_instances). |
 | 0x08   | 4    | `entry` | Entry point offset (relative to code). |
 | 0x0C   | 4    | `code_len` | Bytes in code section (aligned to 4). |
 | 0x10   | 4    | `ro_len` | Bytes in read-only data section (aligned to 4). |
 | 0x14   | 4    | `bss_size` | Bytes of zeroed data at runtime. |
 | 0x18   | 4    | `req_caps` | Capability bitmask (HAL requirements, features). |
-| 0x1C   | 4    | `crc32` | CRC over header (0x00–0x17) + code + rodata. |
+| 0x1C   | 4    | `crc32` | CRC over header (0x00–0x1F) + code + rodata. |
+| 0x20   | 32   | `app_name` | Null-terminated ASCII app name (max 31 chars + null). |
 
-Immediately following the header:
+Immediately following the header (now 64 bytes):
 1. `code` section (`code_len` bytes) – executable text.
 2. `rodata` section (`ro_len` bytes) – read-only data.
-3. Optional embedded manifest (see below) if `flags` indicates presence.
+3. Optional embedded manifest (see below) if `flags & 0x01` is set.
 
 ## Alignment & Compatibility
-- Header size fixed at 32 bytes.
+- Header size fixed at 64 bytes (expanded from 32 to accommodate app_name).
 - `code_len` and `ro_len` must be multiples of 4. Loader should reject unaligned lengths.
 - `entry` must fall within `[0, code_len)`.
 - Increment `version` whenever incompatible changes occur. Older loaders must verify `version` and fail gracefully with `unsupported_version:<n>`.
 
+## Header Flags (`flags` at offset 0x06)
+| Bit | Meaning |
+|-----|---------|
+| 0   | Manifest presence: If set, embedded manifest follows rodata section. |
+| 1   | Allow multiple instances: If set, multiple instances of this app can be loaded simultaneously. |
+| 2-15| Reserved for future use. |
+
+**Multiple Instance Naming Convention:**
+- When `allow_multiple_instances` flag (bit 1) is **not set** and an app with the same `app_name` is already loaded, the loader returns `EEXIST` error.
+- When `allow_multiple_instances` flag (bit 1) is **set** and an app with the same `app_name` is already loaded, the executive appends `_#0`, `_#1`, `_#2`, etc. to create unique instance names.
+- Example: If `motor_controller` is loaded twice with allow_multiple_instances=true, the instances become `motor_controller_#0` and `motor_controller_#1`.
+
 ## CRC Procedure
 - Compute CRC32 (polynomial 0x04C11DB7) over:
-  - Header bytes 0x00–0x17.
+  - Header bytes 0x00–0x1F (excluding app_name at 0x20-0x3F).
   - Code section.
   - Rodata section.
 - Store result at header offset 0x1C. Loader validates CRC before executing.
