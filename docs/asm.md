@@ -18,7 +18,7 @@ This document captures the behaviour and artefacts emitted by the HSX MVASM asse
 
 For backward compatibility or convenience, use `--emit-hxe` to generate executables directly (legacy mode).
 
-## `.hxo` Object Schema (`--emit-hxo`)
+## `.hxo` Object Schema (Default Output)
 
 The intermediate object is a UTF-8 JSON document written by `write_hxo_object`. Field definitions:
 
