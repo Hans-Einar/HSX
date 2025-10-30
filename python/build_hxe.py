@@ -19,19 +19,30 @@ def run(cmd: List[str]) -> None:
 
 
 def build(main_mvasm: Path, output: Path, asm_tool: Path, linker_tool: Path, extras: List[Path]) -> None:
+    """Build HXE by assembling to objects and linking.
+    
+    Following standard toolchain practice:
+    1. Assembler always emits .hxo object files
+    2. Linker always creates .hxe executables from object files
+    
+    This ensures a single, consistent path for HXE creation.
+    """
     python_exe = Path(sys.executable)
-    if extras:
-        main_obj = output.with_suffix('.hxo')
-        run([str(python_exe), str(asm_tool), str(main_mvasm), '--emit-hxo', '-o', str(main_obj)])
-        extra_objs = []
-        build_dir = output.parent
-        for lib in extras:
-            obj = build_dir / (lib.stem + '.hxo')
-            run([str(python_exe), str(asm_tool), str(lib), '--emit-hxo', '-o', str(obj)])
-            extra_objs.append(str(obj))
-        run([str(python_exe), str(linker_tool), '-o', str(output), *extra_objs, str(main_obj)])
-    else:
-        run([str(python_exe), str(asm_tool), str(main_mvasm), '-o', str(output)])
+    build_dir = output.parent
+    
+    # Assemble main file to object
+    main_obj = build_dir / (main_mvasm.stem + '.hxo')
+    run([str(python_exe), str(asm_tool), str(main_mvasm), '-o', str(main_obj)])
+    
+    # Assemble extra libraries to objects
+    extra_objs = []
+    for lib in extras:
+        obj = build_dir / (lib.stem + '.hxo')
+        run([str(python_exe), str(asm_tool), str(lib), '-o', str(obj)])
+        extra_objs.append(str(obj))
+    
+    # Link all objects into final executable
+    run([str(python_exe), str(linker_tool), '-o', str(output), *extra_objs, str(main_obj)])
 
 
 def main() -> None:

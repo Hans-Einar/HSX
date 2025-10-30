@@ -41,7 +41,7 @@ runlongrun: longrun
 
 $(BUILD_DIR)/longrun/main.hxe: $(BUILD_DIR)/longrun/main.mvasm
 	$(MKDIR_CMD)
-	$(PYTHON) "$(REPO_ROOT)/python/asm.py" $< -o $@
+	$(PYTHON) "$(REPO_ROOT)/python/build_hxe.py" --asm "$(REPO_ROOT)/python/asm.py" --linker "$(REPO_ROOT)/python/hld.py" --main "$<" --out "$@"
 
 $(BUILD_DIR)/longrun/main.mvasm: $(BUILD_DIR)/longrun/main.ll
 	$(MKDIR_CMD)
