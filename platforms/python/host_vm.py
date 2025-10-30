@@ -1147,11 +1147,13 @@ class MiniVM:
         elif mod == 0x6:
             self._svc_exec(fn)
         elif mod == 0x7:
-            if fn in (0, 1):
+            if fn == 1:  # Legacy SLEEP_MS on module 0x07
                 if not self._legacy_exec_module_warned:
                     self._log("[SVC] mod=0x07 exec traps are deprecated; use module 0x06")
                     self._legacy_exec_module_warned = True
-                self._svc_exec(fn)
+                # Map legacy fn=1 to new fn=0 (SLEEP_MS)
+                self.regs[0] = self.regs[0]  # preserve sleep duration in R0
+                self._svc_exec(0)
             else:
                 self._log(f"[SVC] mod=0x{mod:X} fn=0x{fn:X} (stub)")
                 self.regs[0] = HSX_ERR_ENOSYS
@@ -1171,16 +1173,13 @@ class MiniVM:
         return out.decode("utf-8", errors="ignore")
 
     def _svc_exec(self, fn):
-        if fn == 0:  # yield
-            self.emit_event({"type": "yield"})
-            self.regs[0] = 0
-        elif fn == 1:  # sleep_ms
+        if fn == 0:  # sleep_ms
             ms = self.regs[0] & 0xFFFFFFFF
             self.request_sleep(ms)
             self.regs[0] = 0
         else:
             self._log(f"[EXEC] fn={fn} not implemented")
-            self.regs[0] = 0
+            self.regs[0] = HSX_ERR_ENOSYS
 
 
     def _svc_fs(self, fn):
