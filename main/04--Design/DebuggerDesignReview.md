@@ -128,10 +128,274 @@ app.sym         # Full debug info (optional)
 }
 ```
 
-### 1.4 Toolchain Changes Required
-1. **Linker (`hld.py`)**: Add `--emit-sym` option to generate .sym JSON
-2. **Assembler (`asm.py`)**: Preserve source line annotations through to linker
-3. **Disassemble (`disassemble.py`)**: Extend JSON schema to match above
+### 1.4 Line Number Preservation Through Toolchain
+
+**Overview:** LLVM IR already contains comprehensive debug metadata when compiled with `-g` flag. The challenge is preserving this through our custom toolchain (hsx-llc.py → asm.py → hld.py) to the final .sym file.
+
+#### 1.4.1 LLVM Debug Metadata Format
+
+When Clang compiles C/C++ with `-g`, it embeds DWARF debug information in LLVM IR:
+
+```llvm
+; Function definition with debug info
+define dso_local i32 @add(i32 noundef %0, i32 noundef %1) #0 !dbg !10 {
+  ; Variable declarations
+  call void @llvm.dbg.declare(metadata ptr %3, metadata !15, metadata !DIExpression()), !dbg !16
+  
+  ; Instructions with line annotations
+  %6 = load i32, ptr %3, align 4, !dbg !21
+  %8 = add nsw i32 %6, %7, !dbg !23
+  ret i32 %9, !dbg !25
+}
+
+; Debug metadata nodes
+!10 = distinct !DISubprogram(name: "add", scope: !1, file: !1, line: 1, type: !11, ...)
+!15 = !DILocalVariable(name: "a", arg: 1, scope: !10, file: !1, line: 1, type: !13)
+!16 = !DILocation(line: 1, column: 13, scope: !10)
+!21 = !DILocation(line: 2, column: 18, scope: !10)
+```
+
+**Key LLVM Debug Metadata Nodes:**
+- `!DICompileUnit`: Top-level compile unit (language, file, producer)
+- `!DIFile`: Source file (filename, directory, checksum)
+- `!DISubprogram`: Function/subprogram (name, scope, line, type)
+- `!DILocalVariable`: Local variable (name, arg position, scope, line, type)
+- `!DILocation`: Source location (line, column, scope)
+- `!DIBasicType`: Type information (name, size, encoding)
+
+**Instruction Annotations:**
+- Each LLVM instruction can have `!dbg !N` suffix pointing to a `!DILocation` node
+- `llvm.dbg.declare` intrinsic associates variables with memory locations
+- Function definitions reference `!DISubprogram` nodes
+
+#### 1.4.2 hsx-llc.py Debug Metadata Extraction
+
+**Current State:** `hsx-llc.py` does NOT parse or preserve debug metadata.
+
+**Proposed Implementation:**
+
+```python
+class DebugInfo:
+    def __init__(self):
+        self.files = {}          # !N -> {filename, directory}
+        self.subprograms = {}    # !N -> {name, file, line, scope}
+        self.locations = {}      # !N -> {line, column, scope, file}
+        self.variables = {}      # !N -> {name, type, scope, line}
+    
+    def parse_metadata_node(self, line: str):
+        """Parse debug metadata nodes from LLVM IR"""
+        # !10 = distinct !DISubprogram(name: "add", file: !1, line: 1, ...)
+        if '!DISubprogram' in line:
+            node_id, attrs = self._parse_di_node(line)
+            self.subprograms[node_id] = {
+                'name': attrs.get('name'),
+                'file': attrs.get('file'),
+                'line': int(attrs.get('line', 0)),
+                'scope': attrs.get('scope')
+            }
+        
+        # !16 = !DILocation(line: 1, column: 13, scope: !10)
+        elif '!DILocation' in line:
+            node_id, attrs = self._parse_di_node(line)
+            self.locations[node_id] = {
+                'line': int(attrs.get('line', 0)),
+                'column': int(attrs.get('column', 0)),
+                'scope': attrs.get('scope')
+            }
+        
+        # !1 = !DIFile(filename: "test.c", directory: "/path")
+        elif '!DIFile' in line:
+            node_id, attrs = self._parse_di_node(line)
+            self.files[node_id] = {
+                'filename': attrs.get('filename'),
+                'directory': attrs.get('directory')
+            }
+
+class HSXLowering:
+    def __init__(self):
+        self.debug_info = DebugInfo()
+        self.instruction_locations = {}  # mvasm_line -> source_location
+    
+    def lower_instruction(self, llvm_inst: str, mvasm_output_line: int):
+        """Lower LLVM instruction and track debug location"""
+        # Extract !dbg !N annotation
+        dbg_ref = self._extract_debug_ref(llvm_inst)
+        if dbg_ref and dbg_ref in self.debug_info.locations:
+            loc = self.debug_info.locations[dbg_ref]
+            # Map this MVASM line to source location
+            self.instruction_locations[mvasm_output_line] = {
+                'line': loc['line'],
+                'column': loc['column'],
+                'scope': loc['scope']
+            }
+        
+        # ... rest of lowering logic
+    
+    def emit_debug_comments(self, output_file):
+        """Emit debug metadata as MVASM comments"""
+        for mvasm_line, loc in self.instruction_locations.items():
+            # Add comment: ; source line 42, column 18
+            output_file.write(f"; @line {loc['line']} @col {loc['column']}\n")
+```
+
+**Output Format in MVASM:**
+```asm
+; Function: add (test.c:1)
+add:
+    ; @line 2 @col 18
+    LD R1, [R7 + -4]
+    ; @line 2 @col 22
+    LD R2, [R7 + -8]
+    ; @line 2 @col 20
+    ADD R3, R1, R2
+    ; @line 3 @col 12
+    MOV R0, R3
+    ; @line 3 @col 5
+    RET
+```
+
+#### 1.4.3 Assembler Line Number Preservation
+
+**asm.py Changes:**
+
+1. Parse debug comment directives:
+```python
+# In parse_line():
+if line.startswith('; @line'):
+    match = re.match(r'; @line (\d+) @col (\d+)', line)
+    if match:
+        current_source_line = int(match.group(1))
+        current_source_column = int(match.group(2))
+```
+
+2. Associate source locations with encoded instructions:
+```python
+# In HXO output:
+{
+    "symbols": {...},
+    "debug_lines": [
+        {"pc": 0x0100, "line": 2, "column": 18, "file": "test.c"},
+        {"pc": 0x0104, "line": 2, "column": 22, "file": "test.c"},
+        {"pc": 0x0108, "line": 2, "column": 20, "file": "test.c"}
+    ]
+}
+```
+
+#### 1.4.4 Linker Debug Information Merge
+
+**hld.py Changes:**
+
+1. Collect debug_lines from all HXO inputs
+2. Adjust PC addresses after relocation
+3. Merge with symbol table
+4. Output to .sym file
+
+```python
+def merge_debug_info(modules: List[HXO]) -> Dict:
+    debug_info = {
+        'files': {},
+        'functions': [],
+        'line_map': []  # Sorted by PC
+    }
+    
+    for mod in modules:
+        base_addr = mod['base_address']
+        
+        # Merge line mappings with adjusted addresses
+        for line_entry in mod.get('debug_lines', []):
+            debug_info['line_map'].append({
+                'pc': base_addr + line_entry['pc'],
+                'file': line_entry['file'],
+                'line': line_entry['line'],
+                'column': line_entry['column']
+            })
+    
+    # Sort by PC for binary search
+    debug_info['line_map'].sort(key=lambda x: x['pc'])
+    
+    return debug_info
+```
+
+#### 1.4.5 Alternative: Intermediate Debug File
+
+Instead of passing debug info through MVASM comments, create intermediate `.dbg` file:
+
+**Workflow:**
+1. `clang -g -S -emit-llvm` → `app.ll` (LLVM IR with debug metadata)
+2. `hsx-llc.py app.ll -o app.asm --emit-debug app.dbg`
+   - Outputs MVASM without debug comments
+   - Separate `app.dbg` JSON maps LLVM IR lines to source locations
+3. `asm.py app.asm -o app.hxo`
+   - No debug processing needed
+4. `hld.py app.hxo -o app.hxe --debug-info app.dbg --emit-sym app.sym`
+   - Reads .dbg to map HXO/HXE addresses to source lines
+   - Outputs combined .sym
+
+**app.dbg Format:**
+```json
+{
+  "version": 1,
+  "source_file": "test.c",
+  "llvm_to_source": {
+    "basic_blocks": {
+      "entry": {"file": "test.c", "line": 1, "function": "add"},
+      "%6": {"file": "test.c", "line": 2, "column": 18}
+    }
+  },
+  "llvm_to_mvasm": {
+    "%6 = load": ["LD R1, [R7 + -4]"],
+    "%8 = add": ["ADD R3, R1, R2"]
+  }
+}
+```
+
+**Pros:**
+- Clean separation of concerns
+- No MVASM comment pollution
+- Can correlate LLVM IR, MVASM, and source
+- Easier to debug toolchain itself
+
+**Cons:**
+- Additional file to track
+- More complex implementation
+
+#### 1.4.6 Recommendation
+
+**Approach:** Use intermediate `.dbg` file for clean separation.
+
+**Implementation Phases:**
+1. **Phase 1 (MVP):** hsx-llc.py emits function-level debug info only
+   - Extract `!DISubprogram` nodes for function names and start lines
+   - Emit to .dbg with function name → PC mapping
+   - Sufficient for basic disassembly with function labels
+
+2. **Phase 2 (Line-level):** Add instruction-level line tracking
+   - Parse `!DILocation` for each instruction
+   - Track LLVM instruction → MVASM instruction mapping
+   - Emit full line mapping to .dbg
+
+3. **Phase 3 (Variable tracking):** Add local variable debug info
+   - Parse `!DILocalVariable` and `llvm.dbg.declare`
+   - Track variable locations (registers/stack offsets)
+   - Enable watch expressions and stack frame locals
+
+**Toolchain Integration:**
+- `hsx-llc.py --emit-debug`: Required for debug builds
+- `asm.py`: No changes needed (ignores .dbg)
+- `hld.py --debug-info *.dbg --emit-sym`: Merges debug info into .sym
+- `.sym` file contains final PC → source line mapping for debugger
+
+### 1.5 Toolchain Changes Required
+1. **hsx-llc.py**: Add `--emit-debug <file>` option to extract LLVM debug metadata
+   - Parse `!DIFile`, `!DISubprogram`, `!DILocation` nodes
+   - Track LLVM IR instruction → MVASM instruction mapping
+   - Output intermediate .dbg JSON file
+2. **Linker (`hld.py`)**: Add `--debug-info <file>` and `--emit-sym` options
+   - Read .dbg file(s) from compilation units
+   - Map MVASM addresses to final HXE addresses after relocation
+   - Merge with symbol table and output .sym JSON
+3. **Assembler (`asm.py`)**: No changes required (debug info bypasses assembler)
+4. **Disassemble (`disassemble.py`)**: Extend to consume .sym for annotated output
 
 ## 2. Protocol Extensions for TUI Support
 
@@ -523,8 +787,11 @@ Once decisions finalized, distribute changes to:
 2. **Disassembly caching:** Should executive cache full disassembly or compute on-demand?
 3. **Watch performance:** Acceptable to check all watches on every step, or need optimization?
 4. **Trace buffer:** Negotiate size per-session or fixed per executive variant?
-5. **Line number info:** Include in every instruction or only at statement boundaries?
-6. **ABI/calling convention:** Document frame layout assumptions for stack walking?
+5. **Debug info approach:** Use intermediate .dbg files (Section 1.4.5) or MVASM comments (Section 1.4.2)?
+6. **Line number granularity:** Track every LLVM instruction or only statement boundaries?
+7. **Debug implementation phases:** Start with function-level (Phase 1) or go straight to line-level (Phase 2)?
+8. **ABI/calling convention:** Document frame layout assumptions for stack walking?
+9. **LLVM debug metadata:** Parse all DI* nodes or subset (DISubprogram, DILocation only)?
 
 ## 10. Next Steps
 
@@ -538,3 +805,9 @@ Once decisions finalized, distribute changes to:
 
 **Change Log:**
 - 2025-10-30: Initial draft based on review comments
+- 2025-10-30: Added Section 1.4 on line number preservation through Clang/LLVM toolchain
+  - Documented LLVM debug metadata format (!DILocation, !DISubprogram, etc.)
+  - Proposed hsx-llc.py debug metadata extraction mechanism
+  - Designed intermediate .dbg file approach for clean separation
+  - Outlined 3-phase implementation (function-level → line-level → variable tracking)
+  - Updated open questions to include debug info decisions
