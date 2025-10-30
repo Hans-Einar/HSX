@@ -50,7 +50,7 @@ $(BUILD_DIR)/$(LINKER_TEST)/main.hxe: $(LINKER_HXO)
 
 $(BUILD_DIR)/$(LINKER_TEST)/%.hxo: $(BUILD_DIR)/$(LINKER_TEST)/%.mvasm
 	$(MKDIR_CMD)
-	$(PYTHON) "$(REPO_ROOT)/python/asm.py" $< -o $@ --emit-hxo
+	$(PYTHON) "$(REPO_ROOT)/python/asm.py" $< -o $@
 
 $(BUILD_DIR)/$(LINKER_TEST)/%.mvasm: $(BUILD_DIR)/$(LINKER_TEST)/%.ll
 	$(MKDIR_CMD)

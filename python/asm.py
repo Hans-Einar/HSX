@@ -741,18 +741,23 @@ def main():
     ap.add_argument("-o", "--output", required=True)
     ap.add_argument("-v", "--verbose", action="store_true", help="print assembly statistics")
     ap.add_argument("--dump-bytes", action="store_true", help="emit code words as hex for debugging")
-    ap.add_argument("--emit-hxo", action="store_true", help="emit HSX object (.hxo) instead of final .hxe")
+    ap.add_argument("--emit-hxe", action="store_true", help="emit HSX executable (.hxe) directly (default is .hxo object)")
     ap.add_argument("--dump-json", action="store_true", help="emit disassembly JSON alongside the .hxe")
     args = ap.parse_args()
     input_path = Path(args.input).resolve()
     with input_path.open("r", encoding="utf-8") as f:
         lines = f.readlines()
+    
+    # Default behavior: emit .hxo object file (standard toolchain practice)
+    # Use --emit-hxe for direct executable generation (legacy/convenience mode)
+    emit_object = not args.emit_hxe
+    
     code, entry, externs, imports_decl, rodata, relocs, exports, entry_symbol, local_symbols = assemble(
         lines,
         include_base=input_path.parent,
-        for_object=args.emit_hxo,
+        for_object=emit_object,
     )
-    if args.emit_hxo:
+    if emit_object:
         write_hxo_object(
             args.output,
             code_words=code,
