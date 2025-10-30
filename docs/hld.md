@@ -3,7 +3,9 @@
 > SDP Reference: 2025-10 Main Run (Design Playbook #11)
 
 ## Purpose
-`python/hld.py` links one or more `.hxo` objects into a final `.hxe` executable. It also acts as a pass-through packer when given a single `.hxe`. This document defines the CLI surface, object expectations, and linking algorithm so build scripts and tooling can rely on consistent behaviour.
+`python/hld.py` is the **single point for creating `.hxe` executables** in the HSX toolchain (as of v0.2.0). It links one or more `.hxo` objects into a final `.hxe` executable. It also acts as a pass-through packer when given a single `.hxe`. This document defines the CLI surface, object expectations, and linking algorithm so build scripts and tooling can rely on consistent behaviour.
+
+Following standard toolchain practice (GCC, LLVM), the assembler (`asm.py`) now defaults to emitting object files (`.hxo`), and the linker is responsible for all executable creation. This ensures a consistent, single path for `.hxe` generation.
 
 ## CLI Summary
 
