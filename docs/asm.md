@@ -9,14 +9,14 @@ This document captures the behaviour and artefacts emitted by the HSX MVASM asse
 | Flag | Description |
 |------|-------------|
 | `-o/--output <path>` | Required. Destination path for output file. |
-| `--emit-hxe` | Emit a final executable (`.hxe`) directly. Default is to emit `.hxo` object files. |
+| `--emit-hxe` | Convenience mode: Create `.hxe` executable by internally invoking the linker. Assembler creates a temporary `.hxo`, calls `hld.py`, then cleans up. |
 | `--dump-json` | When producing `.hxe`, also invoke `python/disassemble.py` to create a JSON listing (`<output>.json`). |
 | `--dump-bytes` | Print encoded instruction words to stdout (debug only). |
 | `--verbose` | Print entry point, code/rodata sizes, and import/export summaries. |
 
-**Default Behavior (v0.2):** The assembler now emits `.hxo` object files by default, following standard toolchain practice. The linker (`hld.py`) is responsible for creating final `.hxe` executables from one or more object files. This ensures a single, consistent path for executable creation and simplifies the assembler.
+**Default Behavior (v0.2):** The assembler **always** emits `.hxo` object files, following standard toolchain practice. The linker (`hld.py`) is the **sole point** for creating final `.hxe` executables from one or more object files. This ensures a single, consistent code path for executable creation.
 
-For backward compatibility or convenience, use `--emit-hxe` to generate executables directly (legacy mode).
+**Convenience Mode (`--emit-hxe`):** For single-file programs, `--emit-hxe` provides a shortcut by internally creating a temporary `.hxo` and invoking the linker. The assembler itself contains no `.hxe` creation logic—all executable generation goes through the linker.
 
 ## `.hxo` Object Schema (Default Output)
 

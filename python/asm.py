@@ -741,23 +741,64 @@ def main():
     ap.add_argument("-o", "--output", required=True)
     ap.add_argument("-v", "--verbose", action="store_true", help="print assembly statistics")
     ap.add_argument("--dump-bytes", action="store_true", help="emit code words as hex for debugging")
-    ap.add_argument("--emit-hxe", action="store_true", help="emit HSX executable (.hxe) directly (default is .hxo object)")
+    ap.add_argument("--emit-hxe", action="store_true", help="emit HSX executable (.hxe) directly via linker (convenience mode)")
     ap.add_argument("--dump-json", action="store_true", help="emit disassembly JSON alongside the .hxe")
     args = ap.parse_args()
     input_path = Path(args.input).resolve()
     with input_path.open("r", encoding="utf-8") as f:
         lines = f.readlines()
     
-    # Default behavior: emit .hxo object file (standard toolchain practice)
-    # Use --emit-hxe for direct executable generation (legacy/convenience mode)
-    emit_object = not args.emit_hxe
-    
+    # Assembler always creates .hxo object files (for_object=True)
+    # This ensures single source of truth: only linker creates .hxe files
     code, entry, externs, imports_decl, rodata, relocs, exports, entry_symbol, local_symbols = assemble(
         lines,
         include_base=input_path.parent,
-        for_object=emit_object,
+        for_object=True,
     )
-    if emit_object:
+    
+    if args.emit_hxe:
+        # Convenience mode: create temporary .hxo and invoke linker
+        import tempfile
+        import os
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.hxo', delete=False, encoding='utf-8') as tmp:
+            tmp_hxo_path = tmp.name
+        
+        try:
+            # Write temporary .hxo object file
+            write_hxo_object(
+                tmp_hxo_path,
+                code_words=code,
+                rodata=rodata,
+                entry=entry or 0,
+                entry_symbol=entry_symbol,
+                externs=externs,
+                imports_decl=imports_decl,
+                relocs=relocs,
+                exports=exports,
+                local_symbols=local_symbols,
+            )
+            
+            # Invoke linker to create .hxe from the temporary .hxo
+            linker_path = Path(__file__).parent / "hld.py"
+            cmd = [sys.executable, str(linker_path), tmp_hxo_path, "-o", args.output]
+            if args.verbose:
+                cmd.append("-v")
+            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            if args.verbose and result.stdout:
+                print(result.stdout, end='')
+            
+            # Handle --dump-json for .hxe files
+            if args.dump_json:
+                json_path = Path(args.output).with_suffix(".json")
+                disassemble_py = Path(__file__).resolve().parents[1] / "python" / "disassemble.py"
+                cmd = [sys.executable, str(disassemble_py), args.output, "--mvasm", str(input_path), "-o", str(json_path)]
+                subprocess.run(cmd, check=True)
+        finally:
+            # Clean up temporary .hxo file
+            if os.path.exists(tmp_hxo_path):
+                os.unlink(tmp_hxo_path)
+    else:
+        # Default: emit .hxo object file
         write_hxo_object(
             args.output,
             code_words=code,
@@ -770,13 +811,6 @@ def main():
             exports=exports,
             local_symbols=local_symbols,
         )
-    else:
-        write_hxe(code, entry or 0, args.output, rodata=rodata)
-        if args.dump_json:
-            json_path = Path(args.output).with_suffix(".json")
-            disassemble_py = Path(__file__).resolve().parents[1] / "python" / "disassemble.py"
-            cmd = [sys.executable, str(disassemble_py), args.output, "--mvasm", str(input_path), "-o", str(json_path)]
-            subprocess.run(cmd, check=True)
     if args.verbose:
         print(f"entry=0x{(entry or 0):08X} words={len(code)} bytes={len(code)*4} rodata={len(rodata)}")
         if imports_decl:
