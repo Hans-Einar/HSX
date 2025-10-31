@@ -618,14 +618,22 @@ pytest tests/toolchain/test_hsx_cc_build.py -v
 - [x] Create comprehensive CLI with argparse
 - [x] Add verbose logging
 - [x] Implement error handling and propagation
-- [ ] Add unit tests for HSXBuilder methods
-- [ ] Add integration tests for build modes
-- [ ] Create example projects in examples/
-- [ ] Add build caching support (future)
-- [ ] Add configuration file support (future)
+- [x] Add unit tests for HSXBuilder methods (python/tests/test_hsx_cc_build.py)
+- [x] Add integration tests for build modes (python/tests/test_hsx_cc_build_integration.py)
+- [x] Create example projects in examples/ (examples/hsx-cc-build/)
+- [ ] Add build caching support (future enhancement)
+- [ ] Add configuration file support (future enhancement)
 
 ## Commit Log
 
 - 2025-10-31: Initial implementation with Makefile and direct modes
 - 2025-10-31: Added debug metadata generation (sources.json, .sym, .dbg)
 - 2025-10-31: Documentation created in 04.05--Toolchain.md and this file
+- 2025-10-31: Added comprehensive test suite:
+  - Unit tests (23 tests covering HSXBuilder methods)
+  - Integration tests (8 end-to-end build scenarios)
+- 2025-10-31: Created example projects:
+  - simple-direct-build: Single-file demo
+  - multi-file-project: Multiple compilation units
+  - makefile-project: Makefile integration
+  - custom-build-dirs: Build directory organization
