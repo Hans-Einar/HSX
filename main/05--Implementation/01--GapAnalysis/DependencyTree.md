@@ -201,25 +201,28 @@ Executive must provide scheduler primitives for blocking/unblocking PIDs and eve
 
 **Status:** 🟡 In Progress  
 **Priority:** P1 (High - required for development)  
-**Implementation Plan:** [05--Toolchain/02--ImplementationPlan.md](./05--Toolchain/02--ImplementationPlan.md) *(To be created)*
+**Implementation Plan:** [05--Toolchain/02--ImplementationPlan.md](./05--Toolchain/02--ImplementationPlan.md)
 
 **Dependencies:**
-- **Requires:** VM Phase 1.1 (shift operations - for ISA completeness)
-- **Requires:** VM Phase 1.2 (ADC/SBC - for ISA completeness)
-- **Requires:** VM Phase 1.4 (DIV - for ISA completeness)
+- **Requires:** VM Phase 1.1/1.2/1.4 (shift operations, ADC/SBC, DIV - for ISA completeness)
+- **Requires:** Executive Phase 3.1 (HXE v2 preprocessing)
 
 **Provides To:**
-- All components: Assembly, compilation, build tools
-- Developers: HXE binary generation
+- All components: Assembly, compilation, build tools, HXE binary generation
+- Developers: Complete build pipeline (C → HXE)
+- ValCmd/Mailbox: Metadata section generation (.value, .cmd, .mailbox)
+- Debugger: Symbol files (.sym) and debug metadata (.dbg)
 
-**Current Phase:** TBD
+**Current Phase:** Core pipeline functional (Phase 1-2 focus: HXE v2 + metadata)
 
 **Completion Criteria:**
-- [ ] MVASM supports full ISA (including new opcodes)
-- [ ] Disassembler supports full ISA
-- [ ] HXE builder functional
-- [ ] LLVM backend complete
-- [ ] Build pipeline automated
+- [ ] HXE v2 format support with metadata sections
+- [ ] Metadata pipeline (pragmas → MVASM directives → HXE sections)
+- [ ] Debug metadata infrastructure (.dbg, .sym files)
+- [ ] Source path handling for portable builds
+- [ ] ISA completion (shift opcodes, ADC/SBC, DIV synchronized with VM)
+- [ ] Deterministic builds validated
+- [ ] Expanded test coverage and performance profiling
 
 ---
 
@@ -455,6 +458,7 @@ Executive must provide scheduler primitives for blocking/unblocking PIDs and eve
 | 2025-10-31 | Executive | 🟡 In Progress | Implementation Plan created with 7 phases and detailed task breakdown |
 | 2025-10-31 | Mailbox | 🟡 In Progress | Implementation Plan created with 6 phases covering IPC, events, and C port |
 | 2025-10-31 | ValCmd | 🔴 Not Started | Implementation Plan created with 9 phases for complete telemetry/control subsystem |
+| 2025-10-31 | Toolchain | 🟡 In Progress | Implementation Plan created with 7 phases for HXE v2, debug metadata, and ISA completion |
 | 2025-10-31 | DependencyTree | 🟢 Complete | Initial dependency tree created |
 
 ---
