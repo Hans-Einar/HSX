@@ -170,24 +170,30 @@ Executive must provide scheduler primitives for blocking/unblocking PIDs and eve
 
 **Status:** 🔴 Not Started  
 **Priority:** P2 (Medium - value command interface)  
-**Implementation Plan:** [04--ValCmd/02--ImplementationPlan.md](./04--ValCmd/02--ImplementationPlan.md) *(To be created)*
+**Implementation Plan:** [04--ValCmd/02--ImplementationPlan.md](./04--ValCmd/02--ImplementationPlan.md)
 
 **Dependencies:**
-- **Requires:** VM Phase 3.3 (Value/Command services)
-- **Requires:** Executive (event stream)
-- **Requires:** Shared ABI Header
+- **Requires:** Shared ABI Header (module 0x07/0x08 definitions)
+- **Requires:** Executive (event stream, HXE v2 preprocessing)
+- **Requires:** Mailbox (subscriptions and notifications)
 
 **Provides To:**
-- Tools: Value inspection and command interface
-- Debugger: Value queries
+- Tools: Value inspection and command interface via RPC
+- Debugger: Value watch panels and queries
+- Applications: Telemetry and control interface
 
-**Current Phase:** Not Started
+**Current Phase:** Not Started (Complete subsystem missing)
 
 **Completion Criteria:**
-- [ ] Value service API implemented
-- [ ] Command service API implemented
-- [ ] Integration with executive protocol
-- [ ] Documentation complete
+- [ ] Core data structures and registry (value/command entries, descriptors, string table)
+- [ ] VALUE SVC module 0x07 (REGISTER, GET, SET, SUB, PERSIST)
+- [ ] COMMAND SVC module 0x08 (REGISTER, CALL, CALL_ASYNC, HELP)
+- [ ] Executive integration (events, RPC commands, resource tracking)
+- [ ] HXE v2 declarative support (.value/.cmd sections)
+- [ ] Persistence and notifications (FRAM, mailbox)
+- [ ] Transport bindings (CAN, shell/CLI, UART)
+- [ ] C application interface (Value wrapper with operator overloads)
+- [ ] Advanced features (debugger, auth, PID cleanup, C port)
 
 ---
 
@@ -448,6 +454,7 @@ Executive must provide scheduler primitives for blocking/unblocking PIDs and eve
 | 2025-10-31 | VM | 🟡 In Progress | Phase 1 implementation begun, Study and Implementation Plan complete |
 | 2025-10-31 | Executive | 🟡 In Progress | Implementation Plan created with 7 phases and detailed task breakdown |
 | 2025-10-31 | Mailbox | 🟡 In Progress | Implementation Plan created with 6 phases covering IPC, events, and C port |
+| 2025-10-31 | ValCmd | 🔴 Not Started | Implementation Plan created with 9 phases for complete telemetry/control subsystem |
 | 2025-10-31 | DependencyTree | 🟢 Complete | Initial dependency tree created |
 
 ---
