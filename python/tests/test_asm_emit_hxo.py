@@ -27,7 +27,6 @@ start:
         str(asm_path),
         "-o",
         str(hxo_path),
-        "--emit-hxo",
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr or result.stdout

@@ -1,11 +1,12 @@
 # HSX Toolchain
 
 ## Version
-v0.1.1 (2025-10-10)
+v0.2.0 (2025-10-30)
 
-## Capabilities in v0.1
-- Python-based assembler (`python/asm.py`) with support for `.extern`, `.import`, `.text`, `.data`, stable 16-bit addressing, and `.hxo` emission.
-- High-level linker (`python/hld.py`) producing HSXE binaries with `_start` entry resolution and preserved header format (magic `HSXE`, version `0x0001`, 8-byte CRC).
+## Capabilities in v0.2
+- Python-based assembler (`python/asm.py`) with support for `.extern`, `.import`, `.text`, `.data`, stable 16-bit addressing. **Now defaults to emitting `.hxo` object files**, following standard toolchain practice.
+- High-level linker (`python/hld.py`) producing HSXE binaries with `_start` entry resolution and preserved header format (magic `HSXE`, version `0x0001`, 8-byte CRC). **Now the single point for creating `.hxe` executables**.
+- Build helper (`python/build_hxe.py`) that **always uses the assembler→linker flow** for consistent executable creation, whether building single files or multi-module programs.
 - LLVM IR lowering pipeline (`python/hsx-llc.py`) covering control flow (br/call/phi), integer and half-precision arithmetic, loads/stores, comparisons, and external symbol imports.
 - MiniVM host runtime (`platforms/python/host_vm.py`) with CLI flags for entry selection, step limiting, instruction tracing, stdio mailboxes, and SVC EXIT handling.
 - Python executive and TCP shell orchestration supporting task lifecycle management, JSON protocol, ps/exec/kill commands, and `.hxe` payload loading.
@@ -25,6 +26,15 @@ v0.1.1 (2025-10-10)
 - After each capability lands, rerun `make -C python test` plus targeted integration tests to ensure mailbox and half-precision demos remain healthy.
 
 ## Version Log
+
+### v0.2.0 (2025-10-30)
+**Toolchain Standardization: Assembler→Linker Flow**
+- **Breaking Change**: Assembler (`asm.py`) now defaults to emitting `.hxo` object files. Use `--emit-hxe` for direct executable generation (legacy mode).
+- Linker (`hld.py`) is now the single point for creating `.hxe` executables, following standard toolchain practice (similar to GCC, LLVM).
+- `build_hxe.py` simplified to always use the assembler→linker flow, even for single-file programs.
+- Updated Makefiles (`examples/tests/Makefile`, `examples/demos/Makefile`) to follow new flow.
+- **Benefits**: Single source of truth for executable creation, simpler assembler, more flexible linking, consistent build process.
+- All tests updated and passing (122 tests).
 
 ### v0.1.2 (2025-10-10)
 - Adjusted call lowering so return values land in `R4`, keeping `R7` free for long-lived counters in the MiniVM integration tests.

@@ -7,9 +7,10 @@ from platforms.python.host_vm import VMController
 
 
 def test_info_exposes_scheduler_counters_and_trace():
+    repo_root = Path(__file__).resolve().parents[2]
     controller = VMController()
-    consumer = controller.load_from_path("examples/demos/build/mailbox/consumer.hxe")
-    producer = controller.load_from_path("examples/demos/build/mailbox/producer.hxe")
+    consumer = controller.load_from_path(str(repo_root / "examples/demos/build/mailbox/consumer.hxe"))
+    producer = controller.load_from_path(str(repo_root / "examples/demos/build/mailbox/producer.hxe"))
 
     controller.step(6)
 
