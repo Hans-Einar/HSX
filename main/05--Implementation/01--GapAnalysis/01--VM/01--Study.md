@@ -77,6 +77,9 @@ _Gaps that block full compliance with the design._
 
 **Open Items:**
 - **C embedded port (DR-1.3, DG-1.4):** Design specifies Python reference **and** C port for embedded targets. No C implementation exists yet in `platforms/`. This is critical for deployment on MCU targets (STM32, etc.)
+- **Shift operations (LSL, LSR, ASR):** Study document (`main/02--Study/02--Study.md`) identifies shift operations as part of "minimal instruction set" needed for LLVM lowering and C compilation. Essential for bit manipulation, efficient multiply/divide by powers of 2, and C bitfield operations. Currently missing from ISA.
+- **Carry-aware arithmetic (ADC, SBC):** Study document identifies add-with-carry and subtract-with-borrow as part of minimal instruction set. Required for multi-precision arithmetic (e.g., 64-bit operations on 32-bit architecture). Current ISA has ADD/SUB but no carry variants.
+- **PSW flag implementation (C, N, V):** Design spec (section 4.3) defines processor status word with Z (zero), C (carry), N (negative), and V (overflow) flags. Current implementation only sets Z flag (line 770 in `host_vm.py`). C, N, V flags are not computed or maintained by any arithmetic/logic operations.
 - **DIV opcode (0x13):** Design spec includes DIV in opcode table, but implementation in `host_vm.py` currently skips from MUL (0x12) to AND (0x14). Integer division is missing.
 - **Streaming HXE loader (6.1.2):** Design specifies `vm_load_{begin,write,end,abort}` for byte-granularity ingestion. Current implementation only supports monolithic loading via full HXE buffer. Streaming is essential for CAN/UART provisioning on low-RAM targets.
 - **Optional code/data paging (4.4, 6.1.4):** Design includes code cache lines (256-512B) and data TLB (2-4 entries) for memory-constrained targets. Not implemented; all code/data must fit in RAM.
@@ -107,30 +110,33 @@ _Ordered steps to close the gaps._
 **Priority Actions:**
 
 **Phase 1: Complete Python Reference Implementation**
-1. **Add DIV opcode (0x13)** - Implement integer division in `host_vm.py` step function to match design spec opcode table
-2. **Formalize trace APIs** - Expose `vm_get_last_pc()`, `vm_get_last_opcode()`, `vm_get_last_regs()` as specified in sections 6.1 and 7.1
-3. **Implement streaming loader** - Add `vm_load_{begin,write,end,abort}` methods per section 6.1.2 for byte-wise HXE ingestion
-4. **Add optional register access APIs** - Implement `vm_reg_get_for(pid, reg_id)` and `vm_reg_set_for(pid, reg_id, value)` per section 6.1.1
+1. **Add shift operations (LSL, LSR, ASR)** - Implement logical shift left, logical shift right, and arithmetic shift right opcodes. Required by study document for LLVM lowering and C compilation needs.
+2. **Add carry-aware arithmetic (ADC, SBC)** - Implement add-with-carry and subtract-with-borrow opcodes for multi-precision arithmetic support.
+3. **Complete PSW flag implementation** - Implement C (carry), N (negative), and V (overflow) flag computation in arithmetic and logic operations. Currently only Z (zero) flag is set.
+4. **Add DIV opcode (0x13)** - Implement integer division in `host_vm.py` step function to match design spec opcode table
+5. **Formalize trace APIs** - Expose `vm_get_last_pc()`, `vm_get_last_opcode()`, `vm_get_last_regs()` as specified in sections 6.1 and 7.1
+6. **Implement streaming loader** - Add `vm_load_{begin,write,end,abort}` methods per section 6.1.2 for byte-wise HXE ingestion
+7. **Add optional register access APIs** - Implement `vm_reg_get_for(pid, reg_id)` and `vm_reg_set_for(pid, reg_id, value)` per section 6.1.1
 
 **Phase 2: C Embedded Port (Critical for DR-1.3, DG-1.4)**
-5. **Create C port structure** - Set up `platforms/c/` with build system (Makefile, CMake)
-6. **Port core VM** - Translate MiniVM class to C with opcode dispatch (prefer jump table or computed goto per section 4.1)
-7. **Port context management** - Implement TaskContext and workspace pointer swapping in C
-8. **Port HXE loader** - Implement monolithic and streaming loaders in C
-9. **Port syscall handlers** - Implement module 0x00, 0x01, 0x02, 0x04, 0x05, 0x06 in C
-10. **Cross-platform test suite** - Create shared test vectors that run on both Python and C implementations (per DG-1.4)
+8. **Create C port structure** - Set up `platforms/c/` with build system (Makefile, CMake)
+9. **Port core VM** - Translate MiniVM class to C with opcode dispatch (prefer jump table or computed goto per section 4.1)
+10. **Port context management** - Implement TaskContext and workspace pointer swapping in C
+11. **Port HXE loader** - Implement monolithic and streaming loaders in C
+12. **Port syscall handlers** - Implement module 0x00, 0x01, 0x02, 0x04, 0x05, 0x06 in C
+13. **Cross-platform test suite** - Create shared test vectors that run on both Python and C implementations (per DG-1.4)
 
 **Phase 3: Advanced Features**
-11. **Heap support** - Implement heap region allocation and management per HXE `heap_size_bytes` field
-12. **Memory paging** - Implement optional code cache and data TLB per sections 4.4 and 6.1.4 (deferred until C port deployed on constrained MCU)
-13. **Value/Command services** - Complete module 0x07 and 0x08 implementations per `docs/hsx_value_interface.md`
-14. **Policy framework** - Add policy flags to `mem_cfg` for fine-grained access control
+14. **Heap support** - Implement heap region allocation and management per HXE `heap_size_bytes` field
+15. **Memory paging** - Implement optional code cache and data TLB per sections 4.4 and 6.1.4 (deferred until C port deployed on constrained MCU)
+16. **Value/Command services** - Complete module 0x07 and 0x08 implementations per `docs/hsx_value_interface.md`
+17. **Policy framework** - Add policy flags to `mem_cfg` for fine-grained access control
 
 **Phase 4: Documentation & Validation**
-15. **API documentation** - Document all public VM APIs with signatures, return types, error codes
-16. **Performance benchmarking** - Establish methodology and measure C port against 2-4M instr/s target on M4@48MHz
-17. **Migration guide** - Document behavioral equivalence and any platform-specific considerations
-18. **Expand test coverage** - Add tests for workspace swap timing, ABI compliance (DR-2.3), paging edge cases
+18. **API documentation** - Document all public VM APIs with signatures, return types, error codes
+19. **Performance benchmarking** - Establish methodology and measure C port against 2-4M instr/s target on M4@48MHz
+20. **Migration guide** - Document behavioral equivalence and any platform-specific considerations
+21. **Expand test coverage** - Add tests for workspace swap timing, ABI compliance (DR-2.3), paging edge cases, shift operations, and carry flag behavior
 
 **Cross-References:**
 - Design Requirements: DR-1.3, DR-2.1, DR-2.1a, DR-2.3, DR-3.1, DR-5.1, DR-6.1, DR-8.1
