@@ -300,27 +300,26 @@ Executive must provide scheduler primitives for blocking/unblocking PIDs and eve
 
 **Status:** 🔴 Not Started  
 **Priority:** P1 (High - critical for development)  
-**Implementation Plan:** [09--Debugger/02--ImplementationPlan.md](./09--Debugger/02--ImplementationPlan.md) *(To be created)*
+**Implementation Plan:** [09--Debugger/02--ImplementationPlan.md](./09--Debugger/02--ImplementationPlan.md)
 
 **Dependencies:**
-- **Requires:** VM Phase 1.5 (trace APIs)
-- **Requires:** VM Phase 1.7 (register access APIs)
-- **Requires:** Executive (event stream)
+- **Requires:** Toolkit Phase 1-3 (hsxdbg core package)
+- **Requires:** Executive Phase 1-2 (Session management, event streaming, breakpoints, stack, watch, disassembly)
+- **Requires:** Toolchain Phase 3 (Symbol files .sym)
 
 **Provides To:**
-- Developers: Debugging capabilities
-- TUI Debugger: Core debugging functionality
-- VSCode Debugger: Core debugging functionality
+- Developers: CLI debugging interface with REPL
+- Automation: JSON output for CI/CD
 
-**Current Phase:** Not Started
+**Current Phase:** Phase 1 (CLI Framework)
 
 **Completion Criteria:**
-- [ ] Breakpoint support
-- [ ] Single-step execution
-- [ ] Register inspection
-- [ ] Memory inspection
-- [ ] Stack trace generation
-- [ ] Integration with debugger UIs
+- [ ] CLI framework with command parser and JSON output
+- [ ] Session management commands (attach, detach, observer)
+- [ ] Breakpoint management (set, clear, list, enable/disable)
+- [ ] Inspection commands (stack, watch, memory, disassembly)
+- [ ] Advanced features (context-aware completion, persistent history, scripting)
+- [ ] Comprehensive user guide and automation examples
 
 ---
 
@@ -328,23 +327,27 @@ Executive must provide scheduler primitives for blocking/unblocking PIDs and eve
 
 **Status:** 🔴 Not Started  
 **Priority:** P2 (Medium - TUI interface)  
-**Implementation Plan:** [10--TUI_Debugger/02--ImplementationPlan.md](./10--TUI_Debugger/02--ImplementationPlan.md) *(To be created)*
+**Implementation Plan:** [10--TUI_Debugger/02--ImplementationPlan.md](./10--TUI_Debugger/02--ImplementationPlan.md)
 
 **Dependencies:**
-- **Requires:** Debugger (core debugging functionality)
-- **Requires:** Executive (event stream)
+- **Requires:** Toolkit Phase 1-3 (hsxdbg core package)
+- **Requires:** Executive Phase 1-2 (Debugger APIs)
+- **Requires:** Toolchain Phase 3 (Symbol files)
+- **Requires:** Textual framework (>= 0.58.0)
 
 **Provides To:**
-- Developers: Terminal-based debugging UI
+- Developers: Full-screen terminal debugging interface
 
-**Current Phase:** Not Started
+**Current Phase:** Phase 1 (TUI Framework Setup)
 
 **Completion Criteria:**
-- [ ] TUI interface implemented
-- [ ] Integration with core debugger
-- [ ] Trace display
-- [ ] Register/memory views
-- [ ] Interactive commands
+- [ ] Textual framework integration and TUI application shell
+- [ ] Core panels (registers, disassembly, console, status bar)
+- [ ] Advanced panels (trace, stack, memory, watches, mailbox)
+- [ ] Event integration with real-time panel updates (<200ms latency)
+- [ ] Keyboard navigation (F5/F10/F11/F9 shortcuts, Tab navigation)
+- [ ] Layout and themes (default layout, responsive, dark/light themes)
+- [ ] User guide with screenshots
 
 ---
 
@@ -352,22 +355,28 @@ Executive must provide scheduler primitives for blocking/unblocking PIDs and eve
 
 **Status:** 🔴 Not Started  
 **Priority:** P2 (Medium - IDE integration)  
-**Implementation Plan:** [11--vscode_debugger/02--ImplementationPlan.md](./11--vscode_debugger/02--ImplementationPlan.md) *(To be created)*
+**Implementation Plan:** [11--vscode_debugger/02--ImplementationPlan.md](./11--vscode_debugger/02--ImplementationPlan.md)
 
 **Dependencies:**
-- **Requires:** Debugger (core debugging functionality)
-- **Requires:** Executive (event stream)
+- **Requires:** Toolkit Phase 1-3 (hsxdbg core package)
+- **Requires:** Executive Phase 1-2 (Debugger APIs)
+- **Requires:** Toolchain Phase 3 (.sym files with source line mapping)
+- **Requires:** Debug Adapter Protocol (DAP) specification
 
 **Provides To:**
-- Developers: VSCode debugging integration
+- Developers: VS Code IDE-native debugging experience
 
-**Current Phase:** Not Started
+**Current Phase:** Phase 1 (DAP Adapter Foundation)
 
 **Completion Criteria:**
-- [ ] VSCode extension implemented
-- [ ] Debug adapter protocol support
-- [ ] Integration with core debugger
-- [ ] Source-level debugging
+- [ ] DAP adapter module with protocol handling (stdio/TCP communication)
+- [ ] Executive client integration using hsxdbg core
+- [ ] Symbol loader reading .sym files for source mapping
+- [ ] Core DAP requests (initialize, launch, setBreakpoints, execution control, disconnect)
+- [ ] Inspection requests (stackTrace, scopes, variables, evaluate)
+- [ ] Event handling (DAP events from executive events, source mapping)
+- [ ] VS Code extension (TypeScript, package.json, launch config, adapter lifecycle)
+- [ ] Testing and documentation (DAP tests, E2E tests, user guide, VSIX packaging)
 
 ---
 
@@ -459,6 +468,9 @@ Executive must provide scheduler primitives for blocking/unblocking PIDs and eve
 | 2025-10-31 | Mailbox | 🟡 In Progress | Implementation Plan created with 6 phases covering IPC, events, and C port |
 | 2025-10-31 | ValCmd | 🔴 Not Started | Implementation Plan created with 9 phases for complete telemetry/control subsystem |
 | 2025-10-31 | Toolchain | 🟡 In Progress | Implementation Plan created with 7 phases for HXE v2, debug metadata, and ISA completion |
+| 2025-10-31 | Debugger (CLI) | 🔴 Not Started | Implementation Plan created with 6 phases for CLI debugger with REPL |
+| 2025-10-31 | TUI_Debugger | 🔴 Not Started | Implementation Plan created with 7 phases for Textual-based full-screen debugger |
+| 2025-10-31 | vscode_debugger | 🔴 Not Started | Implementation Plan created with 7 phases for DAP adapter and VS Code extension |
 | 2025-10-31 | DependencyTree | 🟢 Complete | Initial dependency tree created |
 
 ---
