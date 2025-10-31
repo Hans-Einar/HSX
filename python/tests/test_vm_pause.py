@@ -246,9 +246,10 @@ def test_round_robin_single_instruction():
 
 class TestRegisterWindowIsolation(unittest.TestCase):
     def test_register_windows_isolated_between_tasks(self):
+        repo_root = Path(__file__).resolve().parents[2]
         controller = VMController()
-        consumer = controller.load_from_path("examples/demos/build/mailbox/consumer.hxe")
-        producer = controller.load_from_path("examples/demos/build/mailbox/producer.hxe")
+        consumer = controller.load_from_path(str(repo_root / "examples/demos/build/mailbox/consumer.hxe"))
+        producer = controller.load_from_path(str(repo_root / "examples/demos/build/mailbox/producer.hxe"))
 
         controller._activate_task(consumer["pid"])
         controller.vm.regs[1] = 0xAAAAAAAA

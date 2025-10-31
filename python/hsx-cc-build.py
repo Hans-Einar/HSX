@@ -45,7 +45,7 @@ import subprocess
 import shutil
 from pathlib import Path
 from typing import List, Optional, Dict
-from datetime import datetime
+from datetime import datetime, timezone
 
 class HSXBuildError(Exception):
     """Build error exception"""
@@ -247,7 +247,7 @@ class HSXBuilder:
         sources_data = {
             'version': 1,
             'project_root': str(self.project_root.resolve()),
-            'build_time': datetime.utcnow().isoformat() + 'Z',
+            'build_time': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
             'sources': [],
             'include_paths': []
         }

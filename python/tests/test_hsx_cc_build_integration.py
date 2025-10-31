@@ -194,18 +194,18 @@ def test_makefile_build_mode(tmp_path):
     """Test Makefile integration mode"""
     repo_root = Path(__file__).resolve().parents[2]
     
-    # Create a simple Makefile
+    # Create a simple Makefile with cross-platform Python commands
     makefile = tmp_path / "Makefile"
-    makefile.write_text("""
+    makefile.write_text(f"""
 .PHONY: all clean
 
 all:
 \t@echo "Building..."
-\t@mkdir -p build
-\t@touch build/output.hxe
+\t@{sys.executable} -c "import os; os.makedirs('build', exist_ok=True)"
+\t@{sys.executable} -c "open('build/output.hxe', 'a').close()"
 
 clean:
-\t@rm -rf build
+\t@{sys.executable} -c "import shutil; shutil.rmtree('build', ignore_errors=True)"
 """)
     
     # Build using hsx-cc-build.py with Makefile mode
