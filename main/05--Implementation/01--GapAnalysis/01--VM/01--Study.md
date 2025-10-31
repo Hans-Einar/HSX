@@ -6,8 +6,16 @@ _Brief synopsis of the design document and links back to the design specificatio
 
 **Design Reference:** [04.01--VM.md](../../../04--Design/04.01--VM.md)
 
-**Summary:** 
-<!-- Summarize the key objectives and scope of the VM design here -->
+**Summary:**  
+The MiniVM design specifies a "dumb machine" that implements the HSX instruction-set architecture (ISA) for single-task execution on both Python reference and embedded C targets. The VM is always executive-driven in production—it performs no autonomous scheduling, context switching, or HAL work. Key design tenets include:
+
+- **Deterministic execution** with workspace-pointer-based O(1) context switching
+- **Complete ISA implementation** covering data movement, integer ALU, control flow, floating-point helpers (f16), and system services (SVC)
+- **Executive-driven control plane** with narrow API for orchestration (load, step, clock, register/memory access)
+- **Trap interface** for syscalls (SVC), breakpoints (BRK), and faults
+- **HXE format support** with both monolithic and streaming loaders
+- **Debug infrastructure** including trace records and register inspection
+- **ABI compliance** with standard calling conventions and stack management
 
 ---
 
@@ -16,16 +24,50 @@ _Brief synopsis of the design document and links back to the design specificatio
 _What already exists today that satisfies the design intent._
 
 **Code Paths:**
-- <!-- List relevant source files, modules, or packages -->
+- **Python reference VM:** `platforms/python/host_vm.py` (3,363 lines, fully functional)
+  - `MiniVM` class with complete ISA implementation
+  - `TaskContext` dataclass for per-task state management
+  - `RegisterFile` class implementing workspace-pointer-based register windows
+  - Full opcode dispatch covering all specified instructions (LDI, LD, ST, MOV, LDB, LDH, STB, STH, ADD, SUB, MUL, AND, OR, XOR, NOT, CMP, JMP, JZ, JNZ, CALL, RET, SVC, PUSH, POP, FADD, FSUB, FMUL, FDIV, I2F, F2I, LDI32, BRK)
+  - HXE loader with header validation and CRC checking
+  - Syscall dispatch for modules 0x00-0x08, 0x0E
+  - Debug support with breakpoints, single-step, and trace records
+  - Mailbox integration via `MailboxManager`
+- **Executive implementation:** `python/executive.py`, `python/execd.py` (45,100 lines)
+  - JSON-RPC protocol over TCP for remote control
+  - Multi-task scheduling with priority and quantum support
+  - Clock control (start, stop, step, rate adjustment)
+  - Task lifecycle management (load, pause, resume, kill)
+  - Memory inspection (peek/poke)
+- **Supporting modules:**
+  - `python/vmclient.py` - Client library for executive protocol
+  - `python/mailbox.py` - Mailbox subsystem implementation
+  - `python/hsx_manager.py` - High-level VM management
 
 **Tests:**
-- <!-- List test files or test suites that validate this component -->
+- `python/tests/test_vm_callret.py` - CALL/RET instruction validation
+- `python/tests/test_vm_callret_edges.py` - Edge cases for call/return sequences
+- `python/tests/test_vm_exit.py` - TASK_EXIT syscall behavior
+- `python/tests/test_vm_jump_immediates.py` - Jump instruction operand handling
+- `python/tests/test_vm_mem_oob.py` - Out-of-bounds memory access detection
+- `python/tests/test_vm_pause.py` - Task pause/resume and state management
+- Test plan documented in `main/06--Test/system/MiniVM_tests.md`
 
 **Tools:**
-- <!-- List any tooling that supports this component -->
+- `python/asm.py` - HSX assembler (MVASM)
+- `python/disassemble.py` - Disassembler for HSX bytecode
+- `python/build_hxe.py` - HXE binary builder
+- `python/hsx-llc.py` - LLVM backend compiler
+- `python/shell_client.py` - Interactive executive shell
+- `python/blinkenlights.py` - Visual debugger/monitor
 
 **Documentation:**
-- <!-- List relevant documentation files -->
+- `docs/abi_syscalls.md` - Syscall table and calling conventions
+- `docs/MVASM_SPEC.md` - Assembly language specification
+- `docs/hxe_format.md` - Executable format specification
+- `docs/executive_protocol.md` - Executive JSON-RPC protocol
+- `docs/resource_budgets.md` - Memory and performance targets
+- `docs/hsx_spec-v2.md` - Overall HSX specification
 
 ---
 
@@ -34,13 +76,27 @@ _What already exists today that satisfies the design intent._
 _Gaps that block full compliance with the design._
 
 **Open Items:**
-- <!-- List missing features, partial implementations, or known bugs -->
+- **C embedded port (DR-1.3, DG-1.4):** Design specifies Python reference **and** C port for embedded targets. No C implementation exists yet in `platforms/`. This is critical for deployment on MCU targets (STM32, etc.)
+- **DIV opcode (0x13):** Design spec includes DIV in opcode table, but implementation in `host_vm.py` currently skips from MUL (0x12) to AND (0x14). Integer division is missing.
+- **Streaming HXE loader (6.1.2):** Design specifies `vm_load_{begin,write,end,abort}` for byte-granularity ingestion. Current implementation only supports monolithic loading via full HXE buffer. Streaming is essential for CAN/UART provisioning on low-RAM targets.
+- **Optional code/data paging (4.4, 6.1.4):** Design includes code cache lines (256-512B) and data TLB (2-4 entries) for memory-constrained targets. Not implemented; all code/data must fit in RAM.
+- **SETPSW/GETPSW opcodes:** Design section 4.1 mentions "future SETPSW/GETPSW" for system helpers but these are not defined in opcode table or implemented
+- **Heap support (6.1.5):** HXE header includes optional `heap_size_bytes` field, but VM does not allocate or manage heap regions. Dynamic allocation support is incomplete.
+- **Performance targets (4.9):** Design goal of 2-4M instructions/second on M4 @ 48MHz cannot be validated without C port
+- **Trace APIs (6.1, 7.1):** Design specifies `vm_get_last_pc()`, `vm_get_last_opcode()`, and `vm_get_last_regs()` for executive-side trace capture. Python VM stores some trace state but APIs are not formally exposed per design spec.
+- **`vm_reg_get_for` and `vm_reg_set_for` (6.1.1):** Optional APIs for reading/writing registers of non-active PIDs are not implemented
 
 **Deferred Features:**
-- <!-- List features that are explicitly postponed -->
+- **Value service (module 0x07):** Specified in `docs/hsx_value_interface.md` but marked "Planned" in `docs/abi_syscalls.md`. Not exposed by Python VM yet.
+- **Command service (module 0x08):** Also marked "Planned" in syscall table. Design references but not implemented.
+- **Advanced paging modes:** Code prefetch, double-buffering, and data paging with TLB management are optional design features deferred until C port and embedded deployment
+- **Policy flags in mem_cfg (6.1.4):** Design includes policy bitset for controlling `mem_write` in RUN state, `reg_set(PC)` in STOPPED state, etc. Current implementation has no policy enforcement framework.
 
 **Documentation Gaps:**
-- <!-- List missing or incomplete documentation -->
+- Missing formal API documentation for Python VM's public interface (method signatures, return types, error codes)
+- No migration guide for applications moving between Python and future C implementations
+- Performance benchmarking methodology not documented (how to validate 2-4M instr/s target)
+- Missing examples of `mem_cfg` usage with different resource budgets
 
 ---
 
@@ -49,14 +105,40 @@ _Gaps that block full compliance with the design._
 _Ordered steps to close the gaps._
 
 **Priority Actions:**
-1. <!-- Action item 1 -->
-2. <!-- Action item 2 -->
-3. <!-- Action item 3 -->
+
+**Phase 1: Complete Python Reference Implementation**
+1. **Add DIV opcode (0x13)** - Implement integer division in `host_vm.py` step function to match design spec opcode table
+2. **Formalize trace APIs** - Expose `vm_get_last_pc()`, `vm_get_last_opcode()`, `vm_get_last_regs()` as specified in sections 6.1 and 7.1
+3. **Implement streaming loader** - Add `vm_load_{begin,write,end,abort}` methods per section 6.1.2 for byte-wise HXE ingestion
+4. **Add optional register access APIs** - Implement `vm_reg_get_for(pid, reg_id)` and `vm_reg_set_for(pid, reg_id, value)` per section 6.1.1
+
+**Phase 2: C Embedded Port (Critical for DR-1.3, DG-1.4)**
+5. **Create C port structure** - Set up `platforms/c/` with build system (Makefile, CMake)
+6. **Port core VM** - Translate MiniVM class to C with opcode dispatch (prefer jump table or computed goto per section 4.1)
+7. **Port context management** - Implement TaskContext and workspace pointer swapping in C
+8. **Port HXE loader** - Implement monolithic and streaming loaders in C
+9. **Port syscall handlers** - Implement module 0x00, 0x01, 0x02, 0x04, 0x05, 0x06 in C
+10. **Cross-platform test suite** - Create shared test vectors that run on both Python and C implementations (per DG-1.4)
+
+**Phase 3: Advanced Features**
+11. **Heap support** - Implement heap region allocation and management per HXE `heap_size_bytes` field
+12. **Memory paging** - Implement optional code cache and data TLB per sections 4.4 and 6.1.4 (deferred until C port deployed on constrained MCU)
+13. **Value/Command services** - Complete module 0x07 and 0x08 implementations per `docs/hsx_value_interface.md`
+14. **Policy framework** - Add policy flags to `mem_cfg` for fine-grained access control
+
+**Phase 4: Documentation & Validation**
+15. **API documentation** - Document all public VM APIs with signatures, return types, error codes
+16. **Performance benchmarking** - Establish methodology and measure C port against 2-4M instr/s target on M4@48MHz
+17. **Migration guide** - Document behavioral equivalence and any platform-specific considerations
+18. **Expand test coverage** - Add tests for workspace swap timing, ABI compliance (DR-2.3), paging edge cases
 
 **Cross-References:**
-- <!-- Link to issues, milestones, or TODO items -->
+- Design Requirements: DR-1.3, DR-2.1, DR-2.1a, DR-2.3, DR-3.1, DR-5.1, DR-6.1, DR-8.1
+- Design Goals: DG-1.3, DG-1.4, DG-2.1-2.4, DG-3.1-3.3, DG-4.1-4.3, DG-5.1-5.4, DG-6.1, DG-7.2
+- Related milestones: Check `MILESTONES.md` for C port target dates
+- Test specification: `main/06--Test/system/MiniVM_tests.md`
 
 ---
 
-**Last Updated:** _[Date not set]_  
-**Status:** _[Not Started | In Progress | Complete]_
+**Last Updated:** 2025-10-31  
+**Status:** In Progress (Python implementation substantial, C port not started)
