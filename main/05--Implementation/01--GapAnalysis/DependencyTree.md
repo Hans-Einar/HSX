@@ -228,23 +228,28 @@ Executive must provide scheduler primitives for blocking/unblocking PIDs and eve
 
 ### 06--Toolkit
 
-**Status:** 🔴 Not Started  
-**Priority:** P2 (Medium - development support tools)  
-**Implementation Plan:** [06--Toolkit/02--ImplementationPlan.md](./06--Toolkit/02--ImplementationPlan.md) *(To be created)*
+**Status:** 🟡 In Progress  
+**Priority:** P1 (High - critical for debugging infrastructure)  
+**Implementation Plan:** [06--Toolkit/02--ImplementationPlan.md](./06--Toolkit/02--ImplementationPlan.md)
 
 **Dependencies:**
-- **Requires:** Executive (JSON-RPC protocol)
-- **Requires:** VM (trace APIs)
+- **Requires:** Executive Phase 1-2 (Session management, event streaming, debugger APIs)
+- **Requires:** Toolchain Phase 3 (Symbol files)
 
 **Provides To:**
-- Developers: CLI tools, shell client, monitoring
+- Debugger (09): hsxdbg core package (transport, session, events, cache, commands)
+- TUI_Debugger (10): hsxdbg core package
+- vscode_debugger (11): hsxdbg core package
+- Developers: hsx-manager (process lifecycle), hsx-shell (CLI)
 
-**Current Phase:** Not Started
+**Current Phase:** Phase 1 (Debugger Core Infrastructure)
 
 **Completion Criteria:**
-- [ ] Shell client complete
-- [ ] Monitoring tools complete
-- [ ] CLI utilities complete
+- [ ] hsxdbg core package with 5 modules (transport, session, events, cache, commands)
+- [ ] Event streaming with back-pressure handling and filtering
+- [ ] State cache for efficient local queries
+- [ ] Manager enhancements (logging, configuration, health checks, automated restart)
+- [ ] Cross-platform packaging for Windows, macOS, Linux
 
 ---
 
@@ -468,6 +473,7 @@ Executive must provide scheduler primitives for blocking/unblocking PIDs and eve
 | 2025-10-31 | Mailbox | 🟡 In Progress | Implementation Plan created with 6 phases covering IPC, events, and C port |
 | 2025-10-31 | ValCmd | 🔴 Not Started | Implementation Plan created with 9 phases for complete telemetry/control subsystem |
 | 2025-10-31 | Toolchain | 🟡 In Progress | Implementation Plan created with 7 phases for HXE v2, debug metadata, and ISA completion |
+| 2025-10-31 | Toolkit | 🟡 In Progress | Implementation Plan created with 5 phases for hsxdbg core package and manager enhancements |
 | 2025-10-31 | Debugger (CLI) | 🔴 Not Started | Implementation Plan created with 6 phases for CLI debugger with REPL |
 | 2025-10-31 | TUI_Debugger | 🔴 Not Started | Implementation Plan created with 7 phases for Textual-based full-screen debugger |
 | 2025-10-31 | vscode_debugger | 🔴 Not Started | Implementation Plan created with 7 phases for DAP adapter and VS Code extension |
