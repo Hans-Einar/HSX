@@ -53,9 +53,9 @@ LINKER_HXO        := $(LINKER_LL:.ll=.hxo)
 .SECONDARY: $(LL_ARTIFACTS) $(MVA_ARTIFACTS) $(HXE_ARTIFACTS) $(LINKER_LL) $(LINKER_MVA) $(LINKER_HXO)
 
 # Ekstrabibliotek for spesifikke tester
-HSX_EXTRA_MVASM_test_stdio_mailbox_c    := $(REPO_ROOT)/examples/lib/hsx_mailbox.mvasm $(REPO_ROOT)/examples/lib/hsx_stdio.mvasm
-HSX_EXTRA_MVASM_test_mailbox_producer_c := $(REPO_ROOT)/examples/lib/hsx_mailbox.mvasm
-HSX_EXTRA_MVASM_test_mailbox_consumer_c := $(REPO_ROOT)/examples/lib/hsx_mailbox.mvasm $(REPO_ROOT)/examples/lib/hsx_stdio.mvasm
+HSX_EXTRA_MVASM_test_stdio_mailbox_c    := examples/lib/hsx_mailbox.mvasm examples/lib/hsx_stdio.mvasm
+HSX_EXTRA_MVASM_test_mailbox_producer_c := examples/lib/hsx_mailbox.mvasm
+HSX_EXTRA_MVASM_test_mailbox_consumer_c := examples/lib/hsx_mailbox.mvasm examples/lib/hsx_stdio.mvasm
 
 .PHONY: all tests run-% clean list print-root
 
@@ -100,7 +100,11 @@ $(BUILD_DIR)/$(LINKER_TEST)/%.ll: $(LINKER_TEST)/%.c
 # ---------- Generic test pipeline ----------
 $(BUILD_DIR)/%/main.hxe: $(BUILD_DIR)/%/main.mvasm
 	$(MKDIR_CMD)
-	$(PYTHON) -c "import subprocess, sys; subprocess.run([sys.executable, '$(HXE_BUILDER)', '--asm', '$(REPO_ROOT)/python/asm.py', '--linker', '$(REPO_ROOT)/python/hld.py', '--main', '$<', '--out', '$@'] + [item for pair in [['--extra', lib] for lib in [$(foreach lib,$(HSX_EXTRA_MVASM_$*),'$(lib)',)]] for item in pair], check=True)"
+	"$(PYTHON)" "$(HXE_BUILDER)" \
+		--asm "$(REPO_ROOT)/python/asm.py" \
+		--linker "$(REPO_ROOT)/python/hld.py" \
+		--main "$<" \
+		--out "$@" $(foreach lib,$(HSX_EXTRA_MVASM_$*), --extra "$(REPO_ROOT)/$(lib)")
 
 $(BUILD_DIR)/%/main.mvasm: $(BUILD_DIR)/%/main.ll
 	$(MKDIR_CMD)

@@ -237,13 +237,19 @@ def render_globals(globals_list):
     return lines
 
 def parse_ir(lines: List[str]) -> Dict:
-    ir = {"functions": [], "globals": []}
+    ir = {"functions": [], "globals": [], "types": {}}
     cur = None
     bb = None
     for raw in lines:
         line = raw.strip()
         if not line or line.startswith(";"):
             continue
+        if cur is None:
+            type_match = re.match(r'(%[A-Za-z0-9_.]+)\s*=\s*type\s+(.+)', line)
+            if type_match:
+                type_name, type_body = type_match.groups()
+                ir["types"][type_name] = type_body.strip()
+                continue
         if cur is None and line.startswith('@'):
             glob = parse_global_definition(line)
             if glob:
@@ -290,6 +296,152 @@ def parse_ir(lines: List[str]) -> Dict:
             cur["blocks"].append(bb)
         bb["ins"].append(line)
     return ir
+
+
+def _align_to(value: int, alignment: int) -> int:
+    if alignment <= 0:
+        alignment = 1
+    return ((value + alignment - 1) // alignment) * alignment
+
+
+def _split_top_level(expr: str, sep: str = ',') -> List[str]:
+    parts: List[str] = []
+    depth = 0
+    token: List[str] = []
+    idx = 0
+    while idx < len(expr):
+        ch = expr[idx]
+        if ch in '{[(':
+            depth += 1
+        elif ch in '}])':
+            depth = max(depth - 1, 0)
+        if ch == sep and depth == 0:
+            piece = ''.join(token).strip()
+            if piece:
+                parts.append(piece)
+            token = []
+        else:
+            token.append(ch)
+        idx += 1
+    tail = ''.join(token).strip()
+    if tail:
+        parts.append(tail)
+    return parts
+
+
+def compute_type_layout(
+    type_expr: str,
+    type_defs: Dict[str, str],
+    cache: Optional[Dict[str, Tuple[int, int]]] = None,
+) -> Tuple[int, int]:
+    key = type_expr.strip()
+    if cache is None:
+        cache = {}
+    cached = cache.get(key)
+    if cached:
+        return cached
+
+    # Named type indirection
+    if key.startswith('%'):
+        body = type_defs.get(key)
+        if body is None:
+            result = (1, 1)
+        else:
+            result = compute_type_layout(body, type_defs, cache)
+        cache[key] = result
+        return result
+
+    # Handle "type { ... }" bodies that may still include the keyword
+    if key.startswith('type '):
+        result = compute_type_layout(key[5:], type_defs, cache)
+        cache[key] = result
+        return result
+
+    # Struct/union-like aggregates
+    if key.startswith('{') and key.endswith('}'):
+        inner = key[1:-1].strip()
+        if not inner:
+            result = (0, 1)
+        else:
+            fields = _split_top_level(inner)
+            offset = 0
+            max_align = 1
+            for field in fields:
+                field_size, field_align = compute_type_layout(field, type_defs, cache)
+                offset = _align_to(offset, field_align)
+                offset += field_size
+                max_align = max(max_align, field_align)
+            size = _align_to(offset, max_align)
+            result = (size, max_align)
+        cache[key] = result
+        return result
+
+    # Arrays
+    if key.startswith('[') and key.endswith(']'):
+        m = re.match(r'\[(\d+)\s+x\s+(.+)\]', key)
+        if m:
+            count = int(m.group(1))
+            elem_expr = m.group(2).strip()
+            elem_size, elem_align = compute_type_layout(elem_expr, type_defs, cache)
+            stride = _align_to(elem_size, elem_align)
+            size = stride * count
+            result = (size, elem_align)
+            cache[key] = result
+            return result
+
+    # Vectors (treat like packed arrays)
+    if key.startswith('<') and key.endswith('>'):
+        m = re.match(r'<(\d+)\s+x\s+(.+)>', key)
+        if m:
+            count = int(m.group(1))
+            elem_expr = m.group(2).strip()
+            elem_size, elem_align = compute_type_layout(elem_expr, type_defs, cache)
+            size = elem_size * count
+            result = (size, elem_align)
+            cache[key] = result
+            return result
+
+    # Pointer types
+    if key == 'ptr' or key.startswith('ptr ') or key.endswith('*') or 'addrspace' in key and '*' in key:
+        result = (4, 4)
+        cache[key] = result
+        return result
+
+    scalar_map = {
+        'void': (0, 1),
+        'i1': (1, 1),
+        'i8': (1, 1),
+        'i16': (2, 2),
+        'i32': (4, 4),
+        'i64': (8, 8),
+        'half': (2, 2),
+        'float': (4, 4),
+        'double': (8, 8),
+    }
+    if key in scalar_map:
+        result = scalar_map[key]
+        cache[key] = result
+        return result
+
+    if key.startswith('i') and key[1:].isdigit():
+        bits = int(key[1:])
+        size = max(1, (bits + 7) // 8)
+        if bits <= 8:
+            align = 1
+        elif bits <= 16:
+            align = 2
+        elif bits <= 32:
+            align = 4
+        else:
+            align = 8
+        result = (size, align)
+        cache[key] = result
+        return result
+
+    # Fallback: treat as word-sized
+    result = (4, 4)
+    cache[key] = result
+    return result
 
 def normalize_ir_line(line: str) -> str:
     line = re.sub(r',\s*!dbg\S*', '', line)
@@ -508,13 +660,16 @@ def optimize_movs(lines: List[str]) -> List[str]:
     stage2 = eliminate_mov_chains(stage1)
     return stage2
 
-def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_symbols=None) -> List[str]:
+def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_symbols=None, type_info=None) -> List[str]:
     asm: List[str] = []
-    vmap: Dict[str,str] = {}
+    vmap: Dict[str, str] = {}
     if imports is None:
         imports = set()
     if defined is None:
         defined = set()
+
+    type_defs = type_info or {}
+    type_layout_cache: Dict[str, Tuple[int, int]] = {}
 
 
     asm.append(f"; -- function {fn['name']} --")
@@ -582,6 +737,9 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
             return 'i32'
         return type_name
 
+    def type_layout_info(type_name: Optional[str]) -> Tuple[int, int]:
+        return compute_type_layout(canonical_type(type_name), type_defs, type_layout_cache)
+
     def deduce_value_type(token: Optional[str]) -> str:
         if not token:
             return 'i32'
@@ -601,13 +759,11 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
         return 'i32'
 
     def type_category(type_name: Optional[str]) -> str:
-        tname = canonical_type(type_name)
-        if tname in {'i1', 'i8'}:
+        size, _ = type_layout_info(type_name)
+        if size <= 1:
             return 'byte'
-        if tname in {'i16', 'half'}:
+        if size == 2:
             return 'half'
-        if tname in {'i32', 'float', 'ptr'}:
-            return 'word'
         return 'word'
 
     def type_to_store_instr(type_name: Optional[str]) -> str:
@@ -623,16 +779,12 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
         return {'byte': '.byte', 'half': '.half', 'word': '.word'}[kind]
 
     def type_size(type_name: Optional[str]) -> int:
-        tname = canonical_type(type_name)
-        if tname in {'i1', 'i8'}:
-            return 1
-        if tname in {'i16', 'half'}:
-            return 2
-        if tname in {'i32', 'float', 'ptr'}:
-            return 4
-        if tname == 'i64':
-            return 8
-        return 1
+        size, _ = type_layout_info(type_name)
+        return size
+
+    def type_alignment(type_name: Optional[str]) -> int:
+        _, align = type_layout_info(type_name)
+        return max(align, 1)
 
     # Map arguments (if any) to R1..R3 (MVP ignores types)
     arg_regs = {}
@@ -986,13 +1138,16 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
             orig_line = line
             line = normalize_ir_line(line)
             if trace: asm.append(f"; IR: {orig_line}")
-            m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*alloca\s+([A-Za-z0-9_.]+)', line)
+            m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*alloca\s+([^,]+)', line)
             if m:
                 slot, elem_type = m.groups()
+                elem_type = elem_type.strip()
                 value_types[slot] = 'ptr'
                 align_match = re.search(r'align\s+(\d+)', line)
-                align_val = int(align_match.group(1)) if align_match else type_size(elem_type)
+                align_val = int(align_match.group(1)) if align_match else type_alignment(elem_type)
                 slot_size = type_size(elem_type)
+                if slot_size <= 0:
+                    slot_size = max(align_val, 1)
                 offset = allocate_frame_slot_bytes(slot_size, align_val)
                 frame_ptr_offsets[slot] = offset
                 rd = alloc_vreg(slot, 'ptr')
@@ -1546,7 +1701,14 @@ def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
     out: List[str] = []
     spill_data_all: List[str] = []
     for fn in ir['functions']:
-        fn_asm, fn_spill_data = lower_function(fn, trace=trace, imports=imports, defined=defined_names, global_symbols=global_names)
+        fn_asm, fn_spill_data = lower_function(
+            fn,
+            trace=trace,
+            imports=imports,
+            defined=defined_names,
+            global_symbols=global_names,
+            type_info=ir.get('types', {}),
+        )
         out += fn_asm
         if fn_spill_data:
             spill_data_all.extend(fn_spill_data)

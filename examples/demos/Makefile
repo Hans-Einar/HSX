@@ -36,17 +36,17 @@ CLANGFLAGS ?= -S -emit-llvm -O0 -fno-builtin
 RUN_ARGS ?=
 
 # mkdir som funker på begge OS (kjøres i recipe, derfor siteres "$@")
-MKDIR_CMD = $(PYTHON) -c "import os,sys; p=os.path.abspath(sys.argv[1]); os.makedirs(os.path.dirname(p),exist_ok=True)" "$@"
+MKDIR_CMD = "$(PYTHON)" -c "import os,sys; p=os.path.abspath(sys.argv[1]); os.makedirs(os.path.dirname(p),exist_ok=True)" "$@"
 
 LIB_DIR := $(REPO_ROOT)/examples/lib
 INCLUDE_DIR := $(REPO_ROOT)/include
 
 HSX_EXTRA_MVASM_mailbox_producer := \
-	$(REPO_ROOT)/examples/lib/hsx_mailbox.mvasm \
-	$(REPO_ROOT)/examples/lib/hsx_stdio.mvasm
+	examples/lib/hsx_mailbox.mvasm \
+	examples/lib/hsx_stdio.mvasm
 HSX_EXTRA_MVASM_mailbox_consumer := \
-	$(REPO_ROOT)/examples/lib/hsx_mailbox.mvasm \
-	$(REPO_ROOT)/examples/lib/hsx_stdio.mvasm
+	examples/lib/hsx_mailbox.mvasm \
+	examples/lib/hsx_stdio.mvasm
 
 .SECONDARY:
 .PHONY: all longrun runlongrun mailbox_producer mailbox_consumer run_mailbox_producer run_mailbox_consumer shell runshell clean print-root
@@ -64,7 +64,11 @@ runlongrun: longrun
 
 $(BUILD_DIR)/longrun/main.hxe: $(BUILD_DIR)/longrun/main.mvasm
 	$(MKDIR_CMD)
-	$(PYTHON) -c "import subprocess, sys; subprocess.run([sys.executable, '$(REPO_ROOT)/python/build_hxe.py', '--asm', '$(REPO_ROOT)/python/asm.py', '--linker', '$(REPO_ROOT)/python/hld.py', '--main', '$<', '--out', '$@'], check=True)"
+	"$(PYTHON)" "$(REPO_ROOT)/python/build_hxe.py" \
+		--asm "$(REPO_ROOT)/python/asm.py" \
+		--linker "$(REPO_ROOT)/python/hld.py" \
+		--main "$<" \
+		--out "$@"
 
 $(BUILD_DIR)/longrun/main.mvasm: $(BUILD_DIR)/longrun/main.ll
 	$(MKDIR_CMD)
@@ -85,7 +89,11 @@ run_mailbox_consumer: mailbox_consumer
 
 $(BUILD_DIR)/mailbox/producer.hxe: $(BUILD_DIR)/mailbox/producer.mvasm
 	$(MKDIR_CMD)
-	$(PYTHON) -c "import subprocess, sys; subprocess.run([sys.executable, '$(REPO_ROOT)/python/build_hxe.py', '--asm', '$(REPO_ROOT)/python/asm.py', '--linker', '$(REPO_ROOT)/python/hld.py', '--main', '$<', '--out', '$@'] + [item for pair in [['--extra', lib] for lib in [$(foreach lib,$(HSX_EXTRA_MVASM_mailbox_producer),'$(lib)',)]] for item in pair], check=True)"
+	"$(PYTHON)" "$(REPO_ROOT)/python/build_hxe.py" \
+		--asm "$(REPO_ROOT)/python/asm.py" \
+		--linker "$(REPO_ROOT)/python/hld.py" \
+		--main "$<" \
+		--out "$@" $(foreach lib,$(HSX_EXTRA_MVASM_mailbox_producer), --extra "$(REPO_ROOT)/$(lib)")
 
 $(BUILD_DIR)/mailbox/producer.mvasm: $(BUILD_DIR)/mailbox/producer.ll
 	$(MKDIR_CMD)
@@ -97,7 +105,11 @@ $(BUILD_DIR)/mailbox/producer.ll: mailbox/producer.c
 
 $(BUILD_DIR)/mailbox/consumer.hxe: $(BUILD_DIR)/mailbox/consumer.mvasm
 	$(MKDIR_CMD)
-	$(PYTHON) -c "import subprocess, sys; subprocess.run([sys.executable, '$(REPO_ROOT)/python/build_hxe.py', '--asm', '$(REPO_ROOT)/python/asm.py', '--linker', '$(REPO_ROOT)/python/hld.py', '--main', '$<', '--out', '$@'] + [item for pair in [['--extra', lib] for lib in [$(foreach lib,$(HSX_EXTRA_MVASM_mailbox_consumer),'$(lib)',)]] for item in pair], check=True)"
+	"$(PYTHON)" "$(REPO_ROOT)/python/build_hxe.py" \
+		--asm "$(REPO_ROOT)/python/asm.py" \
+		--linker "$(REPO_ROOT)/python/hld.py" \
+		--main "$<" \
+		--out "$@" $(foreach lib,$(HSX_EXTRA_MVASM_mailbox_consumer), --extra "$(REPO_ROOT)/$(lib)")
 
 $(BUILD_DIR)/mailbox/consumer.mvasm: $(BUILD_DIR)/mailbox/consumer.ll
 	$(MKDIR_CMD)

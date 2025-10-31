@@ -47,6 +47,24 @@ from pathlib import Path
 from typing import List, Optional, Dict
 from datetime import datetime, timezone
 
+
+def _select_symbol(preferred: str, fallback: str) -> str:
+    """Return preferred symbol when it can be encoded, otherwise fallback."""
+    streams = (sys.stdout, sys.stderr)
+    for stream in streams:
+        encoding = getattr(stream, "encoding", None)
+        if not encoding:
+            continue
+        try:
+            preferred.encode(encoding)
+        except UnicodeEncodeError:
+            return fallback
+    return preferred
+
+
+SUCCESS_MARK = _select_symbol("✓", "[OK]")
+FAIL_MARK = _select_symbol("✗", "[ERROR]")
+
 class HSXBuildError(Exception):
     """Build error exception"""
     pass
@@ -358,7 +376,7 @@ class HSXBuilder:
                     except HSXBuildError:
                         self.log("Warning: Could not generate sources.json")
             
-            print("\n✓ Build successful!")
+            print(f"\n{SUCCESS_MARK} Build successful!")
             print(f"  Output: {self.build_dir}")
             
             if self.args.debug:
@@ -368,13 +386,13 @@ class HSXBuilder:
                 print(f"    - {self.build_dir}/sources.json (path map)")
         
         except HSXBuildError as e:
-            print(f"\n✗ Build failed: {e}", file=sys.stderr)
+            print(f"\n{FAIL_MARK} Build failed: {e}", file=sys.stderr)
             return 1
         except KeyboardInterrupt:
-            print("\n✗ Build interrupted", file=sys.stderr)
+            print(f"\n{FAIL_MARK} Build interrupted", file=sys.stderr)
             return 130
         except Exception as e:
-            print(f"\n✗ Unexpected error: {e}", file=sys.stderr)
+            print(f"\n{FAIL_MARK} Unexpected error: {e}", file=sys.stderr)
             if self.verbose:
                 import traceback
                 traceback.print_exc()
