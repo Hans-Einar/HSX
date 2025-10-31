@@ -140,7 +140,7 @@ Executive must provide scheduler primitives for blocking/unblocking PIDs and eve
 
 **Status:** 🟡 In Progress  
 **Priority:** P1 (High - core IPC mechanism)  
-**Implementation Plan:** [03--Mailbox/02--ImplementationPlan.md](./03--Mailbox/02--ImplementationPlan.md) *(To be created)*
+**Implementation Plan:** [03--Mailbox/02--ImplementationPlan.md](./03--Mailbox/02--ImplementationPlan.md)
 
 **Dependencies:**
 - **Requires:** Executive scheduler/event system (block/unblock APIs)
@@ -152,15 +152,17 @@ Executive must provide scheduler primitives for blocking/unblocking PIDs and eve
 - Debugger: Mailbox event stream
 - Tools: Stdio integration
 
-**Current Phase:** TBD
+**Current Phase:** Phase 1 (Complete Python Implementation)
 
 **Completion Criteria:**
-- [ ] Delivery modes implemented (single-reader, fan-out, tap)
-- [ ] Wait/wake integration with executive
-- [ ] Namespace support (svc:, pid:, app:, shared:)
-- [ ] Back-pressure policies (block/drop)
-- [ ] Stdio mailbox integration
-- [ ] Event emission for mailbox operations
+- [ ] Status codes updated (TIMEOUT, NO_DESCRIPTOR)
+- [ ] Event emission integrated with executive (6 event types)
+- [ ] Resource monitoring APIs functional
+- [ ] Fan-out reclamation and tap isolation verified
+- [ ] HXE v2 .mailbox section support
+- [ ] Scheduler integration (WAIT_MBX state, timeout heap)
+- [ ] Resource management (quotas, budgets, exhaustion handling)
+- [ ] C port for embedded deployment
 
 ---
 
@@ -445,6 +447,7 @@ Executive must provide scheduler primitives for blocking/unblocking PIDs and eve
 |------|--------|---------------|-------|
 | 2025-10-31 | VM | 🟡 In Progress | Phase 1 implementation begun, Study and Implementation Plan complete |
 | 2025-10-31 | Executive | 🟡 In Progress | Implementation Plan created with 7 phases and detailed task breakdown |
+| 2025-10-31 | Mailbox | 🟡 In Progress | Implementation Plan created with 6 phases covering IPC, events, and C port |
 | 2025-10-31 | DependencyTree | 🟢 Complete | Initial dependency tree created |
 
 ---
