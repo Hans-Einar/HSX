@@ -1,7 +1,7 @@
 # Makefile for HSX project using hsx-cc-build.py
 # This demonstrates how to integrate hsx-cc-build.py with make
 
-PROJECT_ROOT := $(shell pwd)
+PROJECT_ROOT := $(CURDIR)
 PYTHON := python3
 HSX_CC_BUILD := $(PROJECT_ROOT)/../../../python/hsx-cc-build.py
 

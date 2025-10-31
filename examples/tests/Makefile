@@ -1,6 +1,6 @@
 # Auto-generated Makefile for HSX examples/tests
 
-REPO_ROOT := $(shell cd "$(CURDIR)/../.." && pwd)
+REPO_ROOT := $(abspath $(CURDIR)/../..)
 PYTHON ?= $(if $(HSX_PY),$(HSX_PY),python)
 CLANG ?= $(if $(HSX_CLANG),$(HSX_CLANG),clang)
 VM := $(REPO_ROOT)/platforms/python/host_vm.py

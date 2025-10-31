@@ -1,4 +1,4 @@
-REPO_ROOT := $(shell cd "$(CURDIR)/../.." && pwd)
+REPO_ROOT := $(abspath $(CURDIR)/../..)
 ifeq ($(origin PYTHON), undefined)
   ifneq ($(HSX_PY),)
     PYTHON := $(HSX_PY)
