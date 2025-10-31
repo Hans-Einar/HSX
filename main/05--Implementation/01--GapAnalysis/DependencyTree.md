@@ -110,7 +110,7 @@ Executive must provide scheduler primitives for blocking/unblocking PIDs and eve
 
 **Status:** 🟡 In Progress  
 **Priority:** P0 (Critical - orchestrates all VM and task operations)  
-**Implementation Plan:** [02--Executive/02--ImplementationPlan.md](./02--Executive/02--ImplementationPlan.md) *(To be created)*
+**Implementation Plan:** [02--Executive/02--ImplementationPlan.md](./02--Executive/02--ImplementationPlan.md)
 
 **Dependencies:**
 - **Requires:** VM Phase 1 (basic execution, trace APIs)
@@ -122,15 +122,17 @@ Executive must provide scheduler primitives for blocking/unblocking PIDs and eve
 - Debugger: Event stream for trace consumption
 - Tools: JSON-RPC protocol interface
 
-**Current Phase:** TBD
+**Current Phase:** Phase 1 (Core Debugger Infrastructure)
 
 **Completion Criteria:**
-- [ ] Multi-task scheduling with priority and quantum
-- [ ] Event stream with standardized schema
-- [ ] Block/unblock PID APIs
-- [ ] Clock control (start, stop, step, rate)
-- [ ] JSON-RPC protocol stable
-- [ ] Integration with VM trace APIs
+- [ ] Session management (open/close/keepalive, PID locks)
+- [ ] Event streaming foundation (subscribe/unsubscribe, bounded buffer, ACK protocol)
+- [ ] Breakpoint management (set/clear/list, hit detection)
+- [ ] Symbol loading and stack reconstruction
+- [ ] Disassembly API with symbol annotations
+- [ ] Formal state machine with wait/wake integration
+- [ ] HXE v2 metadata support
+- [ ] Trace infrastructure with configurable buffers
 
 ---
 
@@ -442,6 +444,7 @@ Executive must provide scheduler primitives for blocking/unblocking PIDs and eve
 | Date | Module | Status Change | Notes |
 |------|--------|---------------|-------|
 | 2025-10-31 | VM | 🟡 In Progress | Phase 1 implementation begun, Study and Implementation Plan complete |
+| 2025-10-31 | Executive | 🟡 In Progress | Implementation Plan created with 7 phases and detailed task breakdown |
 | 2025-10-31 | DependencyTree | 🟢 Complete | Initial dependency tree created |
 
 ---
