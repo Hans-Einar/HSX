@@ -1,12 +1,15 @@
 # Auto-generated Makefile for HSX examples/tests
 
-REPO_ROOT := $(abspath $(CURDIR)/../..)
+REPO_ROOT := $(shell cd "$(CURDIR)/../.." && pwd)
 PYTHON ?= $(if $(HSX_PY),$(HSX_PY),python)
 CLANG ?= $(if $(HSX_CLANG),$(HSX_CLANG),clang)
 VM := $(REPO_ROOT)/platforms/python/host_vm.py
 BUILD_DIR ?= build
 HXE_BUILDER := $(REPO_ROOT)/python/build_hxe.py
-CLANGFLAGS ?= -S -emit-llvm -O0 -fno-builtin -fno-ms-compatibility -fno-ms-extensions -target wasm32-unknown-unknown -I$(REPO_ROOT)/examples/lib -I$(REPO_ROOT)/include
+CLANGFLAGS_BASE := -S -emit-llvm -O0 -fno-builtin -fno-ms-compatibility -fno-ms-extensions -target wasm32-unknown-unknown
+# Note: Include paths must be quoted at point of use in recipes to handle spaces
+LIB_DIR := $(REPO_ROOT)/examples/lib
+INCLUDE_DIR := $(REPO_ROOT)/include
 RUN_ARGS ?=
 MKDIR_CMD = $(PYTHON) -c "import os, sys; os.makedirs(os.path.dirname(os.path.abspath(sys.argv[1])), exist_ok=True)" "$@"
 
@@ -58,7 +61,7 @@ $(BUILD_DIR)/$(LINKER_TEST)/%.mvasm: $(BUILD_DIR)/$(LINKER_TEST)/%.ll
 
 $(BUILD_DIR)/$(LINKER_TEST)/%.ll: $(LINKER_TEST)/%.c
 	$(MKDIR_CMD)
-	$(CLANG) $(CLANGFLAGS) $< -o $@
+	$(CLANG) $(CLANGFLAGS_BASE) -I"$(LIB_DIR)" -I"$(INCLUDE_DIR)" $< -o $@
 
 $(BUILD_DIR)/%/main.hxe: $(BUILD_DIR)/%/main.mvasm
 	$(MKDIR_CMD)
@@ -70,7 +73,7 @@ $(BUILD_DIR)/%/main.mvasm: $(BUILD_DIR)/%/main.ll
 
 $(BUILD_DIR)/%/main.ll: %/main.c
 	$(MKDIR_CMD)
-	$(CLANG) $(CLANGFLAGS) $< -o $@
+	$(CLANG) $(CLANGFLAGS_BASE) -I"$(LIB_DIR)" -I"$(INCLUDE_DIR)" $< -o $@
 
 clean:
 	$(PYTHON) -c "import shutil, sys; shutil.rmtree(sys.argv[1], ignore_errors=True)" $(BUILD_DIR)

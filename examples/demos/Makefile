@@ -1,4 +1,4 @@
-REPO_ROOT := $(abspath $(CURDIR)/../..)
+REPO_ROOT := $(shell cd "$(CURDIR)/../.." && pwd)
 ifeq ($(origin PYTHON), undefined)
   ifneq ($(HSX_PY),)
     PYTHON := $(HSX_PY)
@@ -18,7 +18,9 @@ BUILD_DIR ?= build
 CLANGFLAGS ?= -S -emit-llvm -O0 -fno-builtin
 RUN_ARGS ?=
 MKDIR_CMD = $(PYTHON) -c "import os, sys; os.makedirs(os.path.dirname(os.path.abspath(sys.argv[1])), exist_ok=True)" "$@"
-INCLUDE_FLAGS := -I$(REPO_ROOT)/examples/lib -I$(REPO_ROOT)/include
+# Note: Paths must be quoted at point of use in recipes to handle spaces
+LIB_DIR := $(REPO_ROOT)/examples/lib
+INCLUDE_DIR := $(REPO_ROOT)/include
 
 HSX_EXTRA_MVASM_mailbox_producer := \
 	$(REPO_ROOT)/examples/lib/hsx_mailbox.mvasm \
@@ -49,7 +51,7 @@ $(BUILD_DIR)/longrun/main.mvasm: $(BUILD_DIR)/longrun/main.ll
 
 $(BUILD_DIR)/longrun/main.ll: longrun/main.c
 	$(MKDIR_CMD)
-	$(CLANG) $(CLANGFLAGS) $(INCLUDE_FLAGS) $< -o $@
+	$(CLANG) $(CLANGFLAGS) -I"$(LIB_DIR)" -I"$(INCLUDE_DIR)" $< -o $@
 
 mailbox_producer: $(BUILD_DIR)/mailbox/producer.hxe
 
@@ -71,7 +73,7 @@ $(BUILD_DIR)/mailbox/producer.mvasm: $(BUILD_DIR)/mailbox/producer.ll
 
 $(BUILD_DIR)/mailbox/producer.ll: mailbox/producer.c
 	$(MKDIR_CMD)
-	$(CLANG) $(CLANGFLAGS) $(INCLUDE_FLAGS) $< -o $@
+	$(CLANG) $(CLANGFLAGS) -I"$(LIB_DIR)" -I"$(INCLUDE_DIR)" $< -o $@
 
 $(BUILD_DIR)/mailbox/consumer.hxe: $(BUILD_DIR)/mailbox/consumer.mvasm
 	$(MKDIR_CMD)
@@ -83,7 +85,7 @@ $(BUILD_DIR)/mailbox/consumer.mvasm: $(BUILD_DIR)/mailbox/consumer.ll
 
 $(BUILD_DIR)/mailbox/consumer.ll: mailbox/consumer.c
 	$(MKDIR_CMD)
-	$(CLANG) $(CLANGFLAGS) $(INCLUDE_FLAGS) $< -o $@
+	$(CLANG) $(CLANGFLAGS) -I"$(LIB_DIR)" -I"$(INCLUDE_DIR)" $< -o $@
 
 clean:
 	$(PYTHON) -c "import shutil, sys; shutil.rmtree(sys.argv[1], ignore_errors=True)" $(BUILD_DIR)
