@@ -98,35 +98,11 @@ _Gaps that block full compliance with the design._
   - **State cache (`hsxdbg.cache`):** Register/memory/stack/watch/mailbox caching to minimize RPC round-trips
   - **Command layer (`hsxdbg.commands`):** Typed command helpers (`step`, `resume`, `set_breakpoint`, `read_memory`)
 
-**CLI Debugger (4.2.2, 6):**
-- **Structured debugger protocol (5):** Design specifies complete session management, event streaming, and control protocol. Shell client has basic commands but no formal protocol implementation.
-- **Session management (5.1):** No `session.open`/`close` with capability negotiation, heartbeats, or PID locking
-- **Event streaming (5.2):** No event subscription, no async event delivery, no back-pressure handling
-- **Breakpoint management (5.3):** No `set_breakpoint`, `clear_breakpoint`, `list_breakpoints` commands
-- **Stack reconstruction (5.4):** No `stack.backtrace` with frame unwinding and symbol resolution
-- **Watch expressions (5.5):** No watch variable management or update notifications
-- **Memory inspection (5.6):** No formatted memory dumps or region queries
-- **Disassembly (5.7):** No instruction disassembly with symbol annotations
-- **JSON output mode (4.2.2):** Design specifies machine-readable output for CI/CD. Shell has basic JSON but not comprehensive.
-- **Tab completion (4.2.2):** Design specifies context-aware completion for commands, symbols, addresses. Shell has basic completion but not debugger-aware.
-- **Persistent history (4.2.2):** Design specifies history across sessions. Shell has session history but not persistent.
+**CLI Debugger:** See dedicated study [09--Debugger](../09--Debugger/01--Study.md)
 
-**TUI Debugger (4.2.2, [04.10]):**
-- **Complete TUI missing:** Design specifies Textual-based visual debugger with multiple panels. Not implemented.
-  - No source code viewer with line highlighting
-  - No register/stack/watch panels
-  - No breakpoint management UI
-  - No memory viewer
-  - No mailbox/event viewer
-  - No keyboard shortcuts and navigation
+**TUI Debugger:** See dedicated study [10--TUI_Debugger](../10--TUI_Debugger/01--Study.md)
 
-**VS Code Integration (4.2.2, [04.11]):**
-- **Complete DAP adapter missing:** Design specifies Debug Adapter Protocol implementation. Not implemented.
-  - No `debugAdapter` protocol messages
-  - No launch configuration support
-  - No source-level stepping with breakpoints
-  - No variable inspection in IDE
-  - No debug console integration
+**VS Code Integration:** See dedicated study [11--vscode_debugger](../11--vscode_debugger/01--Study.md)
 
 **Executive Integration:**
 - **Debugger RPC APIs missing:** Design assumes executive implements session/event/debugger RPCs. Executive gap analysis shows these are not implemented (see 02--Executive study).
@@ -134,17 +110,14 @@ _Gaps that block full compliance with the design._
 - **Event emission:** Design requires executive to emit structured events. Event streaming infrastructure missing in executive.
 
 **Deferred Features:**
-- **Advanced TUI features (DO-8.a):** Enhanced visualizations, custom layouts, scripting in TUI
 - **Remote debugging relay (DO-relay):** TCP relay for debugging remote/embedded targets
 - **Multi-session support:** Concurrent debugging of multiple PIDs
-- **Reverse debugging:** Recording and replay of execution
-- **Watchpoints:** Data breakpoints on memory/register changes
+- **Manager clustering:** Coordinating multiple manager instances
 
 **Documentation Gaps:**
 - Executive protocol specification incomplete - debugger RPCs not fully documented in `executive_protocol.md`
-- No user guide for debugger commands and workflows
-- No examples of JSON automation scripts
 - No packaging/distribution instructions for cross-platform installers
+- No examples of manager configuration files
 
 ---
 
@@ -172,45 +145,17 @@ _Ordered steps to close the gaps._
 11. **Cache invalidation** - Update cache on events, invalidate on control operations
 12. **Cache query API** - Efficient local queries without RPC round-trips
 
-**Phase 4: CLI Debugger Enhancement**
-13. **Refactor shell_client** - Separate shell commands from debugger commands
-14. **Session management commands** - `attach <pid>`, `detach`, `observer <pid>` per section 5.1
-15. **Breakpoint commands** - `break <addr/symbol>`, `delete <bp>`, `list breakpoints` per section 5.3
-16. **Stack commands** - `backtrace`, `frame <n>`, `up`, `down` per section 5.4
-17. **Watch commands** - `watch <var>`, `unwatch <var>`, `list watches` per section 5.5
-18. **Memory commands** - `x/<fmt> <addr>`, `dump <start> <end>` per section 5.6
-19. **Disassembly commands** - `disasm <addr/symbol>`, `disasm /s` (with source) per section 5.7
-20. **Enhanced JSON output** - Structured JSON for all commands for CI/CD automation
-21. **Context-aware completion** - Tab completion for symbols, addresses, registers
-22. **Persistent history** - Save command history across sessions
+**Phase 4: Manager Enhancements**
+13. **Logging system** - Capture component stdout/stderr to log files with rotation
+14. **Configuration file** - YAML/TOML config for ports, paths, component options
+15. **Health checks** - Periodic component health verification with alerts
+16. **Automated restart** - Crash detection and automatic component restart
 
-**Phase 5: TUI Debugger (see [10--TUI_Debugger](../10--TUI_Debugger/01--Study.md))**
-23. **Implement TUI framework** - Textual-based application with panel layout
-24. **Source viewer panel** - Code display with line highlighting, breakpoint markers
-25. **Register/stack panel** - Real-time register and stack frame display
-26. **Watch panel** - Variable watch list with value updates
-27. **Console panel** - Command input and output
-28. **Keyboard shortcuts** - Navigation, stepping, breakpoint toggle per section 7
-
-**Phase 6: VS Code Integration (see [11--vscode_debugger](../11--vscode_debugger/01--Study.md))**
-29. **Implement DAP adapter** - Debug Adapter Protocol server per section 3
-30. **Launch configuration** - VS Code `launch.json` integration
-31. **Breakpoint synchronization** - IDE breakpoints ↔ executive breakpoints
-32. **Variable inspection** - VS Code variables view integration
-33. **Debug console** - REPL integration in IDE
-
-**Phase 7: Manager Enhancements**
-34. **Logging system** - Capture component stdout/stderr to log files with rotation
-35. **Configuration file** - YAML/TOML config for ports, paths, component options
-36. **Health checks** - Periodic component health verification with alerts
-37. **Automated restart** - Crash detection and automatic component restart
-
-**Phase 8: Testing and Documentation**
-38. **Expand test coverage** - Unit tests for debugger core modules (transport, session, events, cache, commands)
-39. **Integration tests** - Full debugger workflows (attach, break, step, inspect, detach)
-40. **User guide** - Comprehensive documentation of debugger commands and workflows
-41. **Automation examples** - Sample JSON scripts for CI/CD integration
-42. **Packaging** - Cross-platform installers for Windows, macOS, Linux
+**Phase 5: Testing and Documentation**
+17. **Expand test coverage** - Unit tests for debugger core modules (transport, session, events, cache, commands)
+18. **Integration tests** - Manager lifecycle tests, debugger core integration tests
+19. **User guide** - Manager commands and configuration documentation
+20. **Packaging** - Cross-platform installers for Windows, macOS, Linux
 
 **Cross-References:**
 - Design Requirements: DR-1.3, DR-3.1, DR-8.1
@@ -218,10 +163,9 @@ _Ordered steps to close the gaps._
 - Related: Executive debugger APIs (session, events, stack, symbols, breakpoints) - see 02--Executive Phase 4
 - Dependencies: Executive must implement debugger RPC APIs before full debugger functionality possible
 - Toolchain symbol generation (.sym files) - see 05--Toolchain Phase 3
-- TUI implementation - see [10--TUI_Debugger](../10--TUI_Debugger/01--Study.md)
-- VS Code DAP - see [11--vscode_debugger](../11--vscode_debugger/01--Study.md)
+- **Debugger frontends:** CLI debugger [09--Debugger](../09--Debugger/01--Study.md), TUI [10--TUI_Debugger](../10--TUI_Debugger/01--Study.md), VS Code [11--vscode_debugger](../11--vscode_debugger/01--Study.md)
 
 ---
 
 **Last Updated:** 2025-10-31  
-**Status:** Partially Implemented (Manager functional, shell client basic, debugger core and TUI/VSCode missing)
+**Status:** Partially Implemented (Manager functional, `hsxdbg` core package missing, debugger frontends in separate studies)
