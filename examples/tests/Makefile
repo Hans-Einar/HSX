@@ -100,12 +100,7 @@ $(BUILD_DIR)/$(LINKER_TEST)/%.ll: $(LINKER_TEST)/%.c
 # ---------- Generic test pipeline ----------
 $(BUILD_DIR)/%/main.hxe: $(BUILD_DIR)/%/main.mvasm
 	$(MKDIR_CMD)
-	"$(PYTHON)" "$(HXE_BUILDER)" \
-	  --asm    "$(REPO_ROOT)/python/asm.py" \
-	  --linker "$(REPO_ROOT)/python/hld.py" \
-	  --main   "$<" \
-	  --out    "$@" \
-	  $(foreach lib,$(HSX_EXTRA_MVASM_$*),--extra "$(lib)")
+	$(PYTHON) -c "import subprocess, sys; subprocess.run([sys.executable, '$(HXE_BUILDER)', '--asm', '$(REPO_ROOT)/python/asm.py', '--linker', '$(REPO_ROOT)/python/hld.py', '--main', '$<', '--out', '$@'] + [item for pair in [['--extra', lib] for lib in [$(foreach lib,$(HSX_EXTRA_MVASM_$*),'$(lib)',)]] for item in pair], check=True)"
 
 $(BUILD_DIR)/%/main.mvasm: $(BUILD_DIR)/%/main.ll
 	$(MKDIR_CMD)
