@@ -247,6 +247,7 @@ The script ensures complete debug metadata generation through coordinated flag p
 
 ### Compilation Stage (clang)
 ```bash
+# $(PROJECT_ROOT) represents the project root path, e.g., /home/user/project
 clang -g -O0 -fdebug-prefix-map=$(PROJECT_ROOT)=. source.c -S -emit-llvm -o source.ll
 ```
 
@@ -269,7 +270,7 @@ hsx-llc.py source.ll -o source.asm --emit-debug source.dbg
 
 ### Linking Stage (hld.py)
 ```bash
-hld.py source.hxo -o app.hxe --debug-info source.dbg --emit-sym app.sym --app-name myapp
+hld.py source.hxo --app-name myapp -o app.hxe --debug-info source.dbg --emit-sym app.sym
 ```
 
 **Output:**
@@ -405,7 +406,7 @@ Example GitHub Actions workflow:
 - name: Build HSX Debug Build
   run: |
     python3 python/hsx-cc-build.py --debug -C . -j 4
-    
+
 - name: Upload Debug Artifacts
   uses: actions/upload-artifact@v3
   with:
@@ -533,11 +534,13 @@ Test individual HSXBuilder methods in isolation:
 ```python
 def test_compile_c_to_ll_debug_flags():
     """Verify debug flags are passed to clang"""
-    builder = HSXBuilder(args_with_debug=True)
+    args = argparse.Namespace(debug=True, verbose=False, directory=None, build_dir=None)
+    builder = HSXBuilder(args)
     # Mock subprocess.run and verify -g, -O0, -fdebug-prefix-map in call
     
 def test_find_tool_precedence():
     """Verify local tools are found before system tools"""
+    args = argparse.Namespace(debug=False, verbose=False, directory=None, build_dir=None)
     builder = HSXBuilder(args)
     tool_path = builder.find_tool('hsx-llc.py')
     assert 'python/' in str(tool_path)
@@ -599,7 +602,7 @@ pytest tests/toolchain/test_hsx_cc_build.py -v
 
 ## Implementation Notes
 
-- Script requires Python 3.11+ for modern pathlib and subprocess features
+- Script requires Python 3.9+ (compatible with project requirements)
 - Depends on `clang` being available in PATH
 - All paths use `pathlib.Path` for cross-platform compatibility
 - Subprocess invocations use `check=True` for fail-fast behavior
