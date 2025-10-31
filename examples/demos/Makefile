@@ -43,7 +43,7 @@ runlongrun: longrun
 
 $(BUILD_DIR)/longrun/main.hxe: $(BUILD_DIR)/longrun/main.mvasm
 	$(MKDIR_CMD)
-	$(PYTHON) "$(REPO_ROOT)/python/build_hxe.py" --asm "$(REPO_ROOT)/python/asm.py" --linker "$(REPO_ROOT)/python/hld.py" --main "$<" --out "$@"
+	$(PYTHON) -c "import subprocess, sys; subprocess.run([sys.executable, '$(REPO_ROOT)/python/build_hxe.py', '--asm', '$(REPO_ROOT)/python/asm.py', '--linker', '$(REPO_ROOT)/python/hld.py', '--main', '$<', '--out', '$@'], check=True)"
 
 $(BUILD_DIR)/longrun/main.mvasm: $(BUILD_DIR)/longrun/main.ll
 	$(MKDIR_CMD)
@@ -65,7 +65,7 @@ run_mailbox_consumer: mailbox_consumer
 
 $(BUILD_DIR)/mailbox/producer.hxe: $(BUILD_DIR)/mailbox/producer.mvasm
 	$(MKDIR_CMD)
-	$(PYTHON) "$(REPO_ROOT)/python/build_hxe.py" --asm "$(REPO_ROOT)/python/asm.py" --linker "$(REPO_ROOT)/python/hld.py" --main "$<" --out "$@" $(foreach lib,$(HSX_EXTRA_MVASM_mailbox_producer),--extra "$(lib)")
+	$(PYTHON) -c "import subprocess, sys; subprocess.run([sys.executable, '$(REPO_ROOT)/python/build_hxe.py', '--asm', '$(REPO_ROOT)/python/asm.py', '--linker', '$(REPO_ROOT)/python/hld.py', '--main', '$<', '--out', '$@'] + [item for pair in [['--extra', lib] for lib in [$(foreach lib,$(HSX_EXTRA_MVASM_mailbox_producer),'$(lib)',)]] for item in pair], check=True)"
 
 $(BUILD_DIR)/mailbox/producer.mvasm: $(BUILD_DIR)/mailbox/producer.ll
 	$(MKDIR_CMD)
@@ -77,7 +77,7 @@ $(BUILD_DIR)/mailbox/producer.ll: mailbox/producer.c
 
 $(BUILD_DIR)/mailbox/consumer.hxe: $(BUILD_DIR)/mailbox/consumer.mvasm
 	$(MKDIR_CMD)
-	$(PYTHON) "$(REPO_ROOT)/python/build_hxe.py" --asm "$(REPO_ROOT)/python/asm.py" --linker "$(REPO_ROOT)/python/hld.py" --main "$<" --out "$@" $(foreach lib,$(HSX_EXTRA_MVASM_mailbox_consumer),--extra "$(lib)")
+	$(PYTHON) -c "import subprocess, sys; subprocess.run([sys.executable, '$(REPO_ROOT)/python/build_hxe.py', '--asm', '$(REPO_ROOT)/python/asm.py', '--linker', '$(REPO_ROOT)/python/hld.py', '--main', '$<', '--out', '$@'] + [item for pair in [['--extra', lib] for lib in [$(foreach lib,$(HSX_EXTRA_MVASM_mailbox_consumer),'$(lib)',)]] for item in pair], check=True)"
 
 $(BUILD_DIR)/mailbox/consumer.mvasm: $(BUILD_DIR)/mailbox/consumer.ll
 	$(MKDIR_CMD)
