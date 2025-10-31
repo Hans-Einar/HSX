@@ -256,24 +256,33 @@ Executive must provide scheduler primitives for blocking/unblocking PIDs and eve
 ### 07--Provisioning
 
 **Status:** 🔴 Not Started  
-**Priority:** P2 (Medium - deployment support)  
-**Implementation Plan:** [07--Provisioning/02--ImplementationPlan.md](./07--Provisioning/02--ImplementationPlan.md) *(To be created)*
+**Priority:** P2 (Medium - deployment and persistence support)  
+**Implementation Plan:** [07--Provisioning/02--ImplementationPlan.md](./07--Provisioning/02--ImplementationPlan.md)
 
 **Dependencies:**
-- **Requires:** VM Phase 1.6 (streaming HXE loader)
-- **Requires:** VM Phase 2 (C port for embedded targets)
+- **Requires:** VM Phase 1.6 (Streaming HXE loader APIs)
+- **Requires:** Executive Phase 2 (Event streaming with back-pressure)
+- **Requires:** ValCmd Phases 1-5 (Metadata registration)
+- **Requires:** Toolchain Phase 1 (HXE v2 format support)
+- **Requires:** HAL (Filesystem, CAN, SD, UART, FRAM/flash drivers)
 
 **Provides To:**
-- Deployment: CAN/UART provisioning
-- Embedded targets: Over-the-air updates
+- Deployment: HXE loading with streaming, persistence, transports
+- Embedded targets: Over-the-air updates, rollback, calibration persistence
+- Executive: Provisioning service orchestration
 
-**Current Phase:** Not Started
+**Current Phase:** Phase 1 (Provisioning Service Foundation)
 
 **Completion Criteria:**
-- [ ] Streaming provisioning protocol implemented
-- [ ] CAN transport implemented
-- [ ] UART transport implemented
-- [ ] Provisioning tools complete
+- [ ] Provisioning service with state machine and HXE v2 metadata processing
+- [ ] Streaming APIs (vm_load_begin/write/end/abort)
+- [ ] Progress events with rate-limiting
+- [ ] Monolithic loader enhancement with pre-verification and source tracking
+- [ ] Transport bindings (filesystem, CAN, SD, UART)
+- [ ] Persistence layer (FRAM/flash with commit protocol, rollback, wear management)
+- [ ] Policy & security (access control, signature verification, capability checks, resource budgets)
+- [ ] Boot sequence (boot config, source scanning, value restoration, fallback)
+- [ ] Comprehensive testing and documentation
 
 ---
 
@@ -474,6 +483,7 @@ Executive must provide scheduler primitives for blocking/unblocking PIDs and eve
 | 2025-10-31 | ValCmd | 🔴 Not Started | Implementation Plan created with 9 phases for complete telemetry/control subsystem |
 | 2025-10-31 | Toolchain | 🟡 In Progress | Implementation Plan created with 7 phases for HXE v2, debug metadata, and ISA completion |
 | 2025-10-31 | Toolkit | 🟡 In Progress | Implementation Plan created with 5 phases for hsxdbg core package and manager enhancements |
+| 2025-10-31 | Provisioning | 🔴 Not Started | Implementation Plan created with 9 phases for HXE loading, persistence, transports, and boot sequence |
 | 2025-10-31 | Debugger (CLI) | 🔴 Not Started | Implementation Plan created with 6 phases for CLI debugger with REPL |
 | 2025-10-31 | TUI_Debugger | 🔴 Not Started | Implementation Plan created with 7 phases for Textual-based full-screen debugger |
 | 2025-10-31 | vscode_debugger | 🔴 Not Started | Implementation Plan created with 7 phases for DAP adapter and VS Code extension |
