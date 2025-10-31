@@ -6,8 +6,20 @@ _Brief synopsis of the design document and links back to the design specificatio
 
 **Design Reference:** [04.06--Toolkit.md](../../../04--Design/04.06--Toolkit.md)
 
-**Summary:** 
-<!-- Summarize the key objectives and scope of the Toolkit design here -->
+**Summary:**  
+The Toolkit design specifies user-facing interfaces to the HSX runtime, coordinating all operations through executive RPC. It comprises:
+
+- **Process Manager** (`hsx_manager.py`) - lifecycle coordinator for MiniVM, Executive, and Shell components
+- **Debugger Core** (`hsxdbg` package) - shared functionality including transport, session management, event bus, state cache, and command layer
+- **CLI Debugger** - interactive REPL and scriptable JSON commands for automation
+- **TUI Debugger** - Textual-based visual debugger (see [04.10--TUI_Debugger.md](../../../04--Design/04.10--TUI_Debugger.md))
+- **VS Code Integration** - Debug Adapter Protocol support (see [04.11--vscode_debugger.md](../../../04--Design/04.11--vscode_debugger.md))
+- **Cross-platform packaging** - distribution for Windows, macOS, and Linux
+
+**Related Specifications:**
+- [04.09--Debugger.md](../../../04--Design/04.09--Debugger.md) - Debugger protocol and CLI implementation
+- [04.10--TUI_Debugger.md](../../../04--Design/04.10--TUI_Debugger.md) - TUI debugger specification
+- [04.11--vscode_debugger.md](../../../04--Design/04.11--vscode_debugger.md) - VS Code debugger integration
 
 ---
 
@@ -16,16 +28,53 @@ _Brief synopsis of the design document and links back to the design specificatio
 _What already exists today that satisfies the design intent._
 
 **Code Paths:**
-- <!-- List relevant source files, modules, or packages -->
+- **Process Manager:** `python/hsx_manager.py` (362 lines)
+  - Interactive command prompt with help system
+  - Component lifecycle management (start/stop/restart for vm/exec/shell)
+  - Status monitoring for all components
+  - Load command forwarding to executive
+  - Graceful shutdown with timeout handling
+  - Cross-platform terminal detection and spawning
+- **Shell Client:** `python/shell_client.py` (1,574 lines)
+  - Interactive REPL connecting to executive RPC
+  - Executive command execution (ps, load, clock, step, etc.)
+  - Mailbox listening and stdio streaming
+  - JSON output mode for automation
+  - Tab completion and command history
+- **Visual Monitor:** `python/blinkenlights.py` (451 lines)
+  - Real-time visual monitoring of mailbox activity
+  - Not in design spec but provides observability
+- **Debugger Core Package:** **Not implemented** - `hsxdbg` package does not exist
+  - No transport layer module
+  - No session manager module
+  - No event bus module
+  - No state cache module
+  - No command layer module
+- **CLI Debugger:** **Minimal implementation** in shell_client.py
+  - Basic step/resume/pause commands exist
+  - No dedicated debugger mode or structured protocol
+  - No breakpoint management
+  - No stack reconstruction
+  - No watch expressions
+  - No JSON output for automation
+- **TUI Debugger:** **Not implemented** - no Textual-based visual debugger
+- **VS Code Integration:** **Not implemented** - no Debug Adapter Protocol support
 
 **Tests:**
-- <!-- List test files or test suites that validate this component -->
+- `python/tests/test_shell_client.py` (123 lines) - Shell client unit tests
+- `python/tests/test_debugger_basic.py` (98 lines) - Basic debugger function tests
+- **Total test coverage:** 221 lines across 2 test files (minimal)
 
 **Tools:**
-- <!-- List any tooling that supports this component -->
+- `python/hsx_manager.py` - Standalone manager CLI
+- `python/shell_client.py` - Standalone shell CLI with basic debug commands
+- `python/blinkenlights.py` - Visual monitoring tool
 
 **Documentation:**
-- <!-- List relevant documentation files -->
+- `docs/executive_protocol.md` - Executive RPC protocol specification
+- Design documents: `main/04--Design/04.06--Toolkit.md`, `04.09--Debugger.md`, `04.10--TUI_Debugger.md`, `04.11--vscode_debugger.md`
+- Architecture: `main/03--Architecture/03.05--Toolkit.md` (focuses on shell/debugger concept)
+- Implementation notes: `main/05--Implementation/toolkit/debugger.md`, `debugger_implementation.md`
 
 ---
 
@@ -34,13 +83,68 @@ _What already exists today that satisfies the design intent._
 _Gaps that block full compliance with the design._
 
 **Open Items:**
-- <!-- List missing features, partial implementations, or known bugs -->
+
+**Manager (6.1-6.3):**
+- **Logging system (6.3):** Design specifies capturing component stdout/stderr to log files. Not implemented - output goes to console only.
+- **Configuration file (6.3):** Design specifies config file support for default ports and paths. Not implemented - uses hardcoded defaults.
+- **Health checks (6.3):** Design mentions periodic verification of component health. Not implemented - no automatic health monitoring.
+- **Automated restart (6.3):** Design mentions detecting crashes and restarting components. Not implemented - manual restart only.
+
+**Debugger Core Package (4.2.1, 5):**
+- **Complete `hsxdbg` package missing:** Design specifies comprehensive Python module with 5 major components. Package does not exist.
+  - **Transport layer (`hsxdbg.transport`):** JSON-over-TCP RPC with connection management, request/response handling, reconnection logic
+  - **Session manager (`hsxdbg.session`):** Connection lifecycle, protocol negotiation, PID attachments, session state
+  - **Event bus (`hsxdbg.events`):** Async dispatcher for event streaming with bounded queues
+  - **State cache (`hsxdbg.cache`):** Register/memory/stack/watch/mailbox caching to minimize RPC round-trips
+  - **Command layer (`hsxdbg.commands`):** Typed command helpers (`step`, `resume`, `set_breakpoint`, `read_memory`)
+
+**CLI Debugger (4.2.2, 6):**
+- **Structured debugger protocol (5):** Design specifies complete session management, event streaming, and control protocol. Shell client has basic commands but no formal protocol implementation.
+- **Session management (5.1):** No `session.open`/`close` with capability negotiation, heartbeats, or PID locking
+- **Event streaming (5.2):** No event subscription, no async event delivery, no back-pressure handling
+- **Breakpoint management (5.3):** No `set_breakpoint`, `clear_breakpoint`, `list_breakpoints` commands
+- **Stack reconstruction (5.4):** No `stack.backtrace` with frame unwinding and symbol resolution
+- **Watch expressions (5.5):** No watch variable management or update notifications
+- **Memory inspection (5.6):** No formatted memory dumps or region queries
+- **Disassembly (5.7):** No instruction disassembly with symbol annotations
+- **JSON output mode (4.2.2):** Design specifies machine-readable output for CI/CD. Shell has basic JSON but not comprehensive.
+- **Tab completion (4.2.2):** Design specifies context-aware completion for commands, symbols, addresses. Shell has basic completion but not debugger-aware.
+- **Persistent history (4.2.2):** Design specifies history across sessions. Shell has session history but not persistent.
+
+**TUI Debugger (4.2.2, [04.10]):**
+- **Complete TUI missing:** Design specifies Textual-based visual debugger with multiple panels. Not implemented.
+  - No source code viewer with line highlighting
+  - No register/stack/watch panels
+  - No breakpoint management UI
+  - No memory viewer
+  - No mailbox/event viewer
+  - No keyboard shortcuts and navigation
+
+**VS Code Integration (4.2.2, [04.11]):**
+- **Complete DAP adapter missing:** Design specifies Debug Adapter Protocol implementation. Not implemented.
+  - No `debugAdapter` protocol messages
+  - No launch configuration support
+  - No source-level stepping with breakpoints
+  - No variable inspection in IDE
+  - No debug console integration
+
+**Executive Integration:**
+- **Debugger RPC APIs missing:** Design assumes executive implements session/event/debugger RPCs. Executive gap analysis shows these are not implemented (see 02--Executive study).
+- **Symbol loading:** Design assumes executive loads .sym files. Not implemented in executive.
+- **Event emission:** Design requires executive to emit structured events. Event streaming infrastructure missing in executive.
 
 **Deferred Features:**
-- <!-- List features that are explicitly postponed -->
+- **Advanced TUI features (DO-8.a):** Enhanced visualizations, custom layouts, scripting in TUI
+- **Remote debugging relay (DO-relay):** TCP relay for debugging remote/embedded targets
+- **Multi-session support:** Concurrent debugging of multiple PIDs
+- **Reverse debugging:** Recording and replay of execution
+- **Watchpoints:** Data breakpoints on memory/register changes
 
 **Documentation Gaps:**
-- <!-- List missing or incomplete documentation -->
+- Executive protocol specification incomplete - debugger RPCs not fully documented in `executive_protocol.md`
+- No user guide for debugger commands and workflows
+- No examples of JSON automation scripts
+- No packaging/distribution instructions for cross-platform installers
 
 ---
 
@@ -49,14 +153,75 @@ _Gaps that block full compliance with the design._
 _Ordered steps to close the gaps._
 
 **Priority Actions:**
-1. <!-- Action item 1 -->
-2. <!-- Action item 2 -->
-3. <!-- Action item 3 -->
+
+**Phase 1: Debugger Core Infrastructure (coordinates with Executive Phase 4)**
+1. **Create `hsxdbg` package structure** - Initialize Python package with proper module organization
+2. **Implement transport layer** - JSON-over-TCP RPC client with connection management, timeout handling, reconnection logic
+3. **Implement session manager** - Connection lifecycle, capability negotiation per section 5.1, session state tracking
+4. **Implement command layer** - Typed helpers for debugger operations (`step`, `resume`, `read_memory`, etc.)
+5. **Protocol specification** - Formalize JSON schemas for debugger RPC messages per section 5
+
+**Phase 2: Event Streaming (coordinates with Executive Phase 4)**
+6. **Implement event bus** - Async event dispatcher with bounded queues, subscriber management
+7. **Event protocol** - Define event schemas for `trace_step`, `debug_break`, `mailbox_*`, `scheduler`, `watch_update`, `stdout/stderr`
+8. **Back-pressure handling** - Queue overflow detection, slow-down requests per section 5.2.3
+9. **Event filtering** - Selective subscription by event type and PID
+
+**Phase 3: State Cache**
+10. **Implement cache module** - Mirror registers, memory ranges, call stacks, watches, mailbox descriptors
+11. **Cache invalidation** - Update cache on events, invalidate on control operations
+12. **Cache query API** - Efficient local queries without RPC round-trips
+
+**Phase 4: CLI Debugger Enhancement**
+13. **Refactor shell_client** - Separate shell commands from debugger commands
+14. **Session management commands** - `attach <pid>`, `detach`, `observer <pid>` per section 5.1
+15. **Breakpoint commands** - `break <addr/symbol>`, `delete <bp>`, `list breakpoints` per section 5.3
+16. **Stack commands** - `backtrace`, `frame <n>`, `up`, `down` per section 5.4
+17. **Watch commands** - `watch <var>`, `unwatch <var>`, `list watches` per section 5.5
+18. **Memory commands** - `x/<fmt> <addr>`, `dump <start> <end>` per section 5.6
+19. **Disassembly commands** - `disasm <addr/symbol>`, `disasm /s` (with source) per section 5.7
+20. **Enhanced JSON output** - Structured JSON for all commands for CI/CD automation
+21. **Context-aware completion** - Tab completion for symbols, addresses, registers
+22. **Persistent history** - Save command history across sessions
+
+**Phase 5: TUI Debugger (see [10--TUI_Debugger](../10--TUI_Debugger/01--Study.md))**
+23. **Implement TUI framework** - Textual-based application with panel layout
+24. **Source viewer panel** - Code display with line highlighting, breakpoint markers
+25. **Register/stack panel** - Real-time register and stack frame display
+26. **Watch panel** - Variable watch list with value updates
+27. **Console panel** - Command input and output
+28. **Keyboard shortcuts** - Navigation, stepping, breakpoint toggle per section 7
+
+**Phase 6: VS Code Integration (see [11--vscode_debugger](../11--vscode_debugger/01--Study.md))**
+29. **Implement DAP adapter** - Debug Adapter Protocol server per section 3
+30. **Launch configuration** - VS Code `launch.json` integration
+31. **Breakpoint synchronization** - IDE breakpoints ↔ executive breakpoints
+32. **Variable inspection** - VS Code variables view integration
+33. **Debug console** - REPL integration in IDE
+
+**Phase 7: Manager Enhancements**
+34. **Logging system** - Capture component stdout/stderr to log files with rotation
+35. **Configuration file** - YAML/TOML config for ports, paths, component options
+36. **Health checks** - Periodic component health verification with alerts
+37. **Automated restart** - Crash detection and automatic component restart
+
+**Phase 8: Testing and Documentation**
+38. **Expand test coverage** - Unit tests for debugger core modules (transport, session, events, cache, commands)
+39. **Integration tests** - Full debugger workflows (attach, break, step, inspect, detach)
+40. **User guide** - Comprehensive documentation of debugger commands and workflows
+41. **Automation examples** - Sample JSON scripts for CI/CD integration
+42. **Packaging** - Cross-platform installers for Windows, macOS, Linux
 
 **Cross-References:**
-- <!-- Link to issues, milestones, or TODO items -->
+- Design Requirements: DR-1.3, DR-3.1, DR-8.1
+- Design Goals: DG-1.4, DG-8.1, DG-8.2, DG-8.3
+- Related: Executive debugger APIs (session, events, stack, symbols, breakpoints) - see 02--Executive Phase 4
+- Dependencies: Executive must implement debugger RPC APIs before full debugger functionality possible
+- Toolchain symbol generation (.sym files) - see 05--Toolchain Phase 3
+- TUI implementation - see [10--TUI_Debugger](../10--TUI_Debugger/01--Study.md)
+- VS Code DAP - see [11--vscode_debugger](../11--vscode_debugger/01--Study.md)
 
 ---
 
-**Last Updated:** _[Date not set]_  
-**Status:** _[Not Started | In Progress | Complete]_
+**Last Updated:** 2025-10-31  
+**Status:** Partially Implemented (Manager functional, shell client basic, debugger core and TUI/VSCode missing)
