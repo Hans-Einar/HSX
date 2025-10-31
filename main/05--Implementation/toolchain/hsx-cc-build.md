@@ -270,7 +270,7 @@ hsx-llc.py source.ll -o source.asm --emit-debug source.dbg
 
 ### Linking Stage (hld.py)
 ```bash
-hld.py source.hxo --app-name myapp -o app.hxe --debug-info source.dbg --emit-sym app.sym
+hld.py source.hxo -o app.hxe --app-name myapp --debug-info source.dbg --emit-sym app.sym
 ```
 
 **Output:**
