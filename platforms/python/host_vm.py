@@ -424,6 +424,8 @@ class MiniVM:
         self.call_stack: List[int] = []
         self._last_pc: Optional[int] = None
         self._repeat_pc_count: int = 0
+        self._last_opcode: Optional[int] = None
+        self._last_regs: List[int] = [0] * 16
         self._legacy_exec_module_warned: bool = False
         self.debug_enabled: bool = False
         self.debug_breakpoints: Set[int] = set()
@@ -903,6 +905,19 @@ class MiniVM:
             self._log(
                 f"[TRACE] 0x{self.pc & 0xFFFF:04X}: 0x{ins:08X} {mnemonic}{operand_text}"
             )
+        self._last_pc = self.pc & 0xFFFFFFFF
+        self._last_opcode = ins & 0xFFFFFFFF
+        qb = {
+            "type": "trace_step",
+            "pc": self._last_pc,
+            "opcode": self._last_opcode,
+            "flags": self.flags & 0xFF,
+            "regs": [self.regs[i] & 0xFFFFFFFF for i in range(16)],
+            "steps": self.steps,
+        }
+        ctx = self.context
+        if ctx and ctx.pid is not None:
+            qb["pid"] = ctx.pid
 
         adv = 4
         if op == 0x01:  # LDI
@@ -1250,7 +1265,38 @@ class MiniVM:
                 )
         else:
             self._repeat_pc_count = 0
-        self._last_pc = self.pc
+        last_regs_snapshot = [self.regs[i] & 0xFFFFFFFF for i in range(16)]
+        self._last_pc = prev_pc & 0xFFFFFFFF
+        self._last_opcode = ins & 0xFFFFFFFF
+        self._last_regs = last_regs_snapshot
+
+        if self.trace or self.trace_out:
+            event = {
+                "type": "trace_step",
+                "pc": self._last_pc,
+                "next_pc": self.pc & 0xFFFFFFFF,
+                "opcode": self._last_opcode,
+                "flags": self.flags & 0xFF,
+                "regs": last_regs_snapshot,
+                "steps": self.steps,
+            }
+            ctx = self.context
+            if ctx and ctx.pid is not None:
+                event["pid"] = ctx.pid
+            self.emit_event(event)
+
+    def get_last_pc(self) -> int:
+        if self._last_pc is None:
+            return self.pc & 0xFFFFFFFF
+        return self._last_pc & 0xFFFFFFFF
+
+    def get_last_opcode(self) -> int:
+        if self._last_opcode is None:
+            return 0
+        return self._last_opcode & 0xFFFFFFFF
+
+    def get_last_regs(self) -> List[int]:
+        return list(self._last_regs)
 
     def handle_svc(self, mod, fn):
         if mod == 0x0 and fn == 0:

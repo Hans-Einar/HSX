@@ -64,3 +64,14 @@
   - Documented behaviour in the ISA notes (`docs/MVASM_SPEC.md:58`, `docs/abi_syscalls.md:25`) and supplied dedicated regression coverage (`python/tests/test_vm_div.py`).
 - **Testing:** `python -m pytest python/tests/test_vm_div.py` and full `python -m pytest python/tests`.
 - **Next steps:** Move to Phase 1.5 (trace APIs) and remaining Phase 1 deliverables (streaming loader).
+
+## 2025-11-01 - Codex (Session 6)
+
+### Phase 1.5 - Trace API scaffolding
+- **Status:** DONE (Python VM exposes trace accessors and emits structured events).
+- **What was done:**
+  - Added `MiniVM.get_last_pc/opcode/regs` accessors with internal snapshots updated after each step (`platforms/python/host_vm.py:963`).
+  - Emitted `trace_step` events (when trace enabled) carrying PC/opcode/register snapshots and updated documentation metadata.
+  - Added regression tests to confirm API surfaces correct data and event payloads (`python/tests/test_vm_trace_api.py`).
+- **Testing:** `python -m pytest python/tests/test_vm_trace_api.py` and full `python -m pytest python/tests`.
+- **Follow-ups:** Finish remaining Phase 1 tasks (streaming loader, trace documentation polish) and align executive-side consumers.
