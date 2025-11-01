@@ -108,6 +108,8 @@ class ExecutiveState:
         self._last_session_prune = 0.0
         self._session_prune_interval = 5.0
         self.session_supported_features = {"events", "stack"}
+        self.debug_attached: Set[int] = set()
+        self.breakpoints: Dict[int, Set[int]] = {}
         self.event_lock = threading.RLock()
         self.event_seq = 1
         self.event_history: Deque[Dict[str, Any]] = deque(maxlen=4096)
@@ -290,6 +292,105 @@ class ExecutiveState:
             return
         if session_id is None or owner != session_id:
             raise SessionError(f"pid_locked:{pid}")
+
+    @staticmethod
+    def _coerce_int(value: Any) -> int:
+        if isinstance(value, int):
+            return value
+        if isinstance(value, str):
+            return int(value, 0)
+        raise ValueError(f"expected integer-compatible value, got {value!r}")
+
+    def _vm_debug(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        response = self.vm.request(payload)
+        if response.get("status") != "ok":
+            raise RuntimeError(response.get("error", "debug error"))
+        block = response.get("debug")
+        return block if isinstance(block, dict) else {}
+
+    def _ensure_debug_session(self, pid: int) -> None:
+        if pid in self.debug_attached:
+            return
+        attach_payload = {"cmd": "dbg", "op": "attach", "pid": pid}
+        with self.lock:
+            debug = self._vm_debug(attach_payload)
+        breakpoints = debug.get("breakpoints", []) if isinstance(debug, dict) else []
+        if isinstance(breakpoints, list):
+            self.breakpoints[pid] = {self._coerce_int(addr) & 0xFFFF for addr in breakpoints}
+        else:
+            self.breakpoints[pid] = set()
+        self.debug_attached.add(pid)
+
+    def _detach_debug_session(self, pid: int) -> None:
+        if pid not in self.debug_attached:
+            self.breakpoints.pop(pid, None)
+            return
+        detach_payload = {"cmd": "dbg", "op": "detach", "pid": pid}
+        try:
+            with self.lock:
+                self._vm_debug(detach_payload)
+        except Exception:
+            pass
+        self.debug_attached.discard(pid)
+        self.breakpoints.pop(pid, None)
+
+    def _extract_breakpoints(self, pid: int, debug_block: Dict[str, Any]) -> List[int]:
+        raw = debug_block.get("breakpoints") if isinstance(debug_block, dict) else []
+        result: List[int] = []
+        if isinstance(raw, list):
+            for item in raw:
+                try:
+                    result.append(self._coerce_int(item) & 0xFFFF)
+                except (TypeError, ValueError):
+                    continue
+        self.breakpoints[pid] = set(result)
+        return sorted(result)
+
+    def breakpoint_list(self, pid: int) -> Dict[str, Any]:
+        self.get_task(pid)
+        self._ensure_debug_session(pid)
+        payload = {"cmd": "dbg", "op": "bp", "pid": pid, "action": "list"}
+        with self.lock:
+            debug = self._vm_debug(payload)
+        breakpoints = self._extract_breakpoints(pid, debug)
+        return {"pid": pid, "breakpoints": breakpoints}
+
+    def breakpoint_add(self, pid: int, addr: int) -> Dict[str, Any]:
+        self.get_task(pid)
+        self._ensure_debug_session(pid)
+        addr_int = self._coerce_int(addr) & 0xFFFF
+        payload = {"cmd": "dbg", "op": "bp", "pid": pid, "action": "add", "addr": addr_int}
+        with self.lock:
+            debug = self._vm_debug(payload)
+        breakpoints = self._extract_breakpoints(pid, debug)
+        self.log("info", "breakpoint added", pid=pid, addr=addr_int)
+        return {"pid": pid, "breakpoints": breakpoints}
+
+    def breakpoint_clear(self, pid: int, addr: int) -> Dict[str, Any]:
+        self.get_task(pid)
+        self._ensure_debug_session(pid)
+        addr_int = self._coerce_int(addr) & 0xFFFF
+        payload = {"cmd": "dbg", "op": "bp", "pid": pid, "action": "remove", "addr": addr_int}
+        with self.lock:
+            debug = self._vm_debug(payload)
+        breakpoints = self._extract_breakpoints(pid, debug)
+        self.log("info", "breakpoint removed", pid=pid, addr=addr_int)
+        return {"pid": pid, "breakpoints": breakpoints}
+
+    def breakpoint_clear_all(self, pid: int) -> Dict[str, Any]:
+        # ensure session and current snapshot
+        info = self.breakpoint_list(pid)
+        existing = list(info.get("breakpoints", []))
+        for addr in existing:
+            payload = {"cmd": "dbg", "op": "bp", "pid": pid, "action": "remove", "addr": addr}
+            with self.lock:
+                self._vm_debug(payload)
+        payload = {"cmd": "dbg", "op": "bp", "pid": pid, "action": "list"}
+        with self.lock:
+            debug = self._vm_debug(payload)
+        breakpoints = self._extract_breakpoints(pid, debug)
+        self.log("info", "breakpoints cleared", pid=pid)
+        return {"pid": pid, "breakpoints": breakpoints}
 
     def _next_event_seq(self) -> int:
         with self.event_lock:
@@ -512,6 +613,7 @@ class ExecutiveState:
             self.current_pid = snapshot.get("current_pid")
         self.tasks = {}
         new_states: Dict[int, Dict[str, Any]] = {}
+        current_pids: Set[int] = set()
         for task in tasks:
             if not isinstance(task, dict):
                 continue
@@ -526,7 +628,17 @@ class ExecutiveState:
                 context["trace"] = task.get("trace")
             state_entry["context"] = context
             new_states[pid] = state_entry
+            current_pids.add(pid)
+            bp_set = self.breakpoints.get(pid)
+            if bp_set:
+                task["breakpoints"] = sorted(bp_set)
+            elif "breakpoints" in task:
+                task.pop("breakpoints", None)
         self.task_states = new_states
+        stale = set(self.breakpoints.keys()) - current_pids
+        for pid in stale:
+            self.breakpoints.pop(pid, None)
+            self.debug_attached.discard(pid)
 
     def log(self, level: str, message: str, **fields: Any) -> None:
         entry = {
@@ -714,6 +826,7 @@ class ExecutiveState:
         with self.lock:
             self.vm.kill(pid)
         self._refresh_tasks()
+        self._detach_debug_session(pid)
         return {"pid": pid, "state": "terminated"}
 
     def set_task_attrs(self, pid: int, *, priority: Optional[int] = None, quantum: Optional[int] = None) -> Dict[str, Any]:
@@ -1398,6 +1511,43 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 result = self.state.step(steps_int, pid=pid_int, source="manual")
                 status = self.state.get_clock_status()
                 return {"version": 1, "status": "ok", "result": result, "clock": status}
+            if cmd == "bp":
+                op_value = request.get("op", request.get("action"))
+                op = str(op_value or "").lower()
+                pid_value = request.get("pid")
+                if pid_value is None:
+                    raise ValueError("bp requires 'pid'")
+                pid_int = int(pid_value)
+                if op in {"", "list", "ls"}:
+                    info = self.state.breakpoint_list(pid_int)
+                    return {"version": 1, "status": "ok", "pid": pid_int, "breakpoints": info.get("breakpoints", [])}
+                if op in {"set", "add"}:
+                    addr_value = request.get("addr")
+                    if addr_value is None:
+                        raise ValueError("bp set requires 'addr'")
+                    try:
+                        addr_int = int(addr_value, 0) if isinstance(addr_value, str) else int(addr_value)
+                    except (TypeError, ValueError) as exc:
+                        raise ValueError(f"invalid breakpoint addr '{addr_value}'") from exc
+                    self.state.ensure_pid_access(pid_int, session_id)
+                    info = self.state.breakpoint_add(pid_int, addr_int)
+                    return {"version": 1, "status": "ok", "pid": pid_int, "breakpoints": info.get("breakpoints", [])}
+                if op in {"clear", "remove", "rm", "del", "delete"}:
+                    addr_value = request.get("addr")
+                    if addr_value is None:
+                        raise ValueError("bp clear requires 'addr'")
+                    try:
+                        addr_int = int(addr_value, 0) if isinstance(addr_value, str) else int(addr_value)
+                    except (TypeError, ValueError) as exc:
+                        raise ValueError(f"invalid breakpoint addr '{addr_value}'") from exc
+                    self.state.ensure_pid_access(pid_int, session_id)
+                    info = self.state.breakpoint_clear(pid_int, addr_int)
+                    return {"version": 1, "status": "ok", "pid": pid_int, "breakpoints": info.get("breakpoints", [])}
+                if op in {"clear_all", "clearall", "reset"}:
+                    self.state.ensure_pid_access(pid_int, session_id)
+                    info = self.state.breakpoint_clear_all(pid_int)
+                    return {"version": 1, "status": "ok", "pid": pid_int, "breakpoints": info.get("breakpoints", [])}
+                raise ValueError(f"unknown bp op '{op}'")
             if cmd == "trace":
                 pid_value = request.get("pid")
                 if pid_value is None:

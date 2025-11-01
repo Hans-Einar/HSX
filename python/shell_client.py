@@ -4,11 +4,14 @@ import atexit
 import json
 import math
 import os
-import socket
 import sys
 from datetime import datetime
 from pathlib import Path
 import shlex
+import threading
+from typing import Optional
+
+from executive_session import ExecutiveSession
 
 try:
     import readline  # type: ignore
@@ -33,12 +36,14 @@ HELP_ALIASES = {
 COMMAND_NAMES = sorted(
     [
         "attach",
+        "bp",
         "cd",
         "clock",
         "detach",
         "dbg",
         "dumpregs",
         "dmesg",
+        "events",
         "exec",
         "exit",
         "help",
@@ -67,6 +72,55 @@ COMMAND_NAMES = sorted(
         "step",
     ]
 )
+
+_DEFAULT_EVENT_FILTER = {
+    "categories": [
+        "debug_break",
+        "scheduler",
+        "mailbox_wait",
+        "mailbox_wake",
+        "mailbox_timeout",
+        "mailbox_error",
+        "warning",
+        "stdout",
+        "stderr",
+    ]
+}
+
+_SESSION_MANAGER: Optional[ExecutiveSession] = None
+_SESSION_LOCK = threading.Lock()
+
+
+def _ensure_session(host: str, port: int, *, auto_events: bool = False) -> ExecutiveSession:
+    global _SESSION_MANAGER
+    with _SESSION_LOCK:
+        if _SESSION_MANAGER and (_SESSION_MANAGER.host != host or _SESSION_MANAGER.port != port):
+            _SESSION_MANAGER.close()
+            _SESSION_MANAGER = None
+        if _SESSION_MANAGER is None:
+            _SESSION_MANAGER = ExecutiveSession(
+                host,
+                port,
+                client_name="hsx-shell",
+                features=["events", "stack"],
+                max_events=256,
+            )
+        session = _SESSION_MANAGER
+    if auto_events:
+        session.start_event_stream(filters=_DEFAULT_EVENT_FILTER, callback=None, ack_interval=5)
+    return session
+
+
+def _close_session() -> None:
+    global _SESSION_MANAGER
+    with _SESSION_LOCK:
+        if _SESSION_MANAGER is not None:
+            _SESSION_MANAGER.close()
+            _SESSION_MANAGER = None
+
+
+atexit.register(_close_session)
+
 def _command_usage(name: str) -> str:
     filename = HELP_ALIASES.get(name, name)
     path = HELP_DIR / f"{filename}.txt"
@@ -359,6 +413,44 @@ def _pretty_info(payload: dict) -> None:
         print(f"    throttle    : {clock.get('throttled')} ({clock.get('throttle_reason')})  last_wait_s: {clock.get('last_wait_s')}")
         print(f"    auto        : steps={clock.get('auto_steps')}  total={clock.get('auto_total_steps')}")
         print(f"    manual      : steps={clock.get('manual_steps')}  total={clock.get('manual_total_steps')}")
+
+
+def _pretty_bp(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    pid = payload.get("pid")
+    breakpoints = payload.get("breakpoints", [])
+    print(f"breakpoints for pid {pid}:")
+    if not breakpoints:
+        print("  (none)")
+        return
+    for addr in breakpoints:
+        try:
+            addr_int = int(addr)
+        except (TypeError, ValueError):
+            print(f"  {addr}")
+        else:
+            print(f"  0x{addr_int:04X} ({addr_int})")
+
+
+def _pretty_events(events: list[dict]) -> None:
+    for event in events:
+        seq = event.get("seq", "-")
+        etype = event.get("type", "?")
+        pid = event.get("pid")
+        ts_value = event.get("ts")
+        if isinstance(ts_value, (int, float)):
+            timestamp = datetime.fromtimestamp(ts_value).strftime("%H:%M:%S")
+        else:
+            timestamp = "?"
+        data = event.get("data", {})
+        if isinstance(data, dict):
+            data_items = ", ".join(f"{k}={data[k]}" for k in sorted(data))
+        else:
+            data_items = str(data)
+        pid_text = "None" if pid is None else str(pid)
+        print(f"[{seq:>6}] {timestamp}  {etype:<16} pid={pid_text:<5}  {data_items}")
     selected = info.get('selected_registers')
     if isinstance(selected, dict):
         print(f"  selected_pid: {info.get('selected_pid')}")
@@ -850,6 +942,7 @@ PRETTY_HANDLERS = {
     'dumpregs': _pretty_dumpregs,
     'info': _pretty_info,
     'attach': _pretty_info,
+    'bp': _pretty_bp,
     'ps': _pretty_ps,
     'list': _pretty_list,
     'reload': _pretty_reload,
@@ -904,17 +997,12 @@ def _render_register_block(registers: dict, indent: str = "  ") -> None:
             print(f"{indent}  R{idx:02}: 0x{value & 0xFFFFFFFF:08X}")
 
 
-def send_request(host: str, port: int, payload: dict) -> dict:
-    with socket.create_connection((host, port), timeout=5.0) as sock:
-        with sock.makefile("w", encoding="utf-8", newline="\n") as wfile, sock.makefile("r", encoding="utf-8", newline="\n") as rfile:
-            payload = dict(payload)
-            payload.setdefault("version", 1)
-            wfile.write(json.dumps(payload, separators=(",", ":")) + "\n")
-            wfile.flush()
-            line = rfile.readline()
-            if not line:
-                raise RuntimeError("executive closed connection")
-            return json.loads(line)
+def send_request(host: str, port: int, payload: dict, *, auto_events: bool = False) -> dict:
+    session = _ensure_session(host, port, auto_events=auto_events)
+    payload = dict(payload)
+    cmd = str(payload.get("cmd", "")).lower()
+    use_session = not cmd.startswith("session.")
+    return session.request(payload, use_session=use_session)
 
 
 
@@ -929,6 +1017,9 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
         if args:
             payload["pid"] = args[0]
         return payload
+
+    if cmd == "bp":
+        return _build_bp_payload(args)
 
     if cmd == "dbg":
         if not args:
@@ -1294,9 +1385,45 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
         return payload
 
     return payload
+
+
+def _build_bp_payload(args: list[str]) -> dict:
+    if not args:
+        raise ValueError("bp usage: bp <list|set|clear|clearall> ...")
+    action = args[0].lower()
+    tokens = args[1:]
+    payload: dict[str, object] = {"cmd": "bp"}
+    if action in {"list", "ls"}:
+        if not tokens:
+            raise ValueError("bp list requires <pid>")
+        payload["op"] = "list"
+        payload["pid"] = int(tokens[0], 0)
+        return payload
+    if action in {"set", "add"}:
+        if len(tokens) < 2:
+            raise ValueError("bp set requires <pid> <addr>")
+        payload["op"] = "set"
+        payload["pid"] = int(tokens[0], 0)
+        payload["addr"] = int(tokens[1], 0)
+        return payload
+    if action in {"clear", "remove", "rm", "del", "delete"}:
+        if len(tokens) < 2:
+            raise ValueError("bp clear requires <pid> <addr>")
+        payload["op"] = "clear"
+        payload["pid"] = int(tokens[0], 0)
+        payload["addr"] = int(tokens[1], 0)
+        return payload
+    if action in {"clear_all", "clearall", "reset"}:
+        if not tokens:
+            raise ValueError("bp clear_all requires <pid>")
+        payload["op"] = "clear_all"
+        payload["pid"] = int(tokens[0], 0)
+        return payload
+    raise ValueError(f"bp unknown action '{action}'")
 def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: bool = False) -> None:
     _init_history()
     current_dir = (cwd or Path.cwd()).resolve()
+    _ensure_session(host, port, auto_events=True)
     print(f"Connected to executive at {host}:{port}. Type 'help' for commands or 'help <command>' for details.")
     while True:
         try:
@@ -1327,14 +1454,34 @@ def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: boo
         for token in raw_args:
             if token == '--json':
                 force_json = True
-            else:
-                args.append(token)
+        else:
+            args.append(token)
+
+        session = _ensure_session(host, port, auto_events=True)
 
         if cmd == 'help':
             if args:
                 _print_topic_help(args[0])
             else:
                 _print_general_help()
+            continue
+        if cmd == 'events':
+            limit = 10
+            if args:
+                try:
+                    limit = int(args[0], 0)
+                except ValueError:
+                    print("usage: events [count]")
+                    continue
+            events = session.get_recent_events(limit)
+            if not events:
+                print("events: <no buffered events>")
+                continue
+            if force_json:
+                for event in events:
+                    print(json.dumps(event, indent=2, sort_keys=True))
+            else:
+                _pretty_events(events)
             continue
         if cmd in {'load', 'exec'}:
             tokens = list(args)
@@ -1477,6 +1624,36 @@ def main() -> None:
         else:
             _print_general_help()
         return
+    if cmd == 'events':
+        session = _ensure_session(args_ns.host, args_ns.port, auto_events=True)
+        limit = 10
+        if args:
+            try:
+                limit = int(args[0], 0)
+            except ValueError:
+                parser.error("events expects an optional integer count")
+        events = session.get_recent_events(limit)
+        if not events:
+            print("events: <no buffered events>")
+            return
+        if force_json:
+            for event in events:
+                print(json.dumps(event, indent=2, sort_keys=True))
+        else:
+            _pretty_events(events)
+        return
+    if cmd == 'bp':
+        try:
+            payload = _build_bp_payload(args)
+        except ValueError as exc:
+            parser.error(str(exc))
+        resp = send_request(args_ns.host, args_ns.port, payload)
+        handler = PRETTY_HANDLERS.get('bp')
+        if handler and not force_json:
+            handler(resp)
+        else:
+            print(json.dumps(resp, indent=2, sort_keys=True))
+        return
 
     if cmd in {'load', 'exec'}:
         tokens = list(args)
@@ -1572,3 +1749,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

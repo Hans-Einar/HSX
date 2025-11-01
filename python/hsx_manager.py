@@ -19,6 +19,7 @@ Commands (type `help` after launching for the list):
 
 
 import argparse
+import atexit
 import json
 import os
 import shlex
@@ -28,29 +29,51 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+import threading
 from typing import Callable, Dict, List, Optional
+
+from executive_session import ExecutiveSession
 
 DEFAULT_VM_PORT = 9999
 DEFAULT_EXEC_PORT = 9998
 
+_EXEC_SESSION: Optional[ExecutiveSession] = None
+_EXEC_SESSION_LOCK = threading.Lock()
+
+
+def _ensure_exec_session(host: str, port: int) -> ExecutiveSession:
+    global _EXEC_SESSION
+    with _EXEC_SESSION_LOCK:
+        if _EXEC_SESSION and (_EXEC_SESSION.host != host or _EXEC_SESSION.port != port):
+            _EXEC_SESSION.close()
+            _EXEC_SESSION = None
+        if _EXEC_SESSION is None:
+            _EXEC_SESSION = ExecutiveSession(
+                host,
+                port,
+                client_name="hsx-manager",
+                features=["events"],
+                max_events=128,
+            )
+        return _EXEC_SESSION
+
+
+def _close_exec_session() -> None:
+    global _EXEC_SESSION
+    with _EXEC_SESSION_LOCK:
+        if _EXEC_SESSION is not None:
+            _EXEC_SESSION.close()
+            _EXEC_SESSION = None
+
+
+atexit.register(_close_exec_session)
+
 
 def send_exec_request(host: str, port: int, payload: Dict[str, object]) -> Dict[str, object]:
-    payload = dict(payload)
-    payload.setdefault("version", 1)
-    with socket.create_connection((host, port), timeout=5.0) as sock:
-        with sock.makefile("w", encoding="utf-8", newline="\n") as wfile, sock.makefile(
-            "r", encoding="utf-8", newline="\n"
-        ) as rfile:
-            wfile.write(json_dumps(payload) + "\n")
-            wfile.flush()
-            line = rfile.readline()
-            if not line:
-                raise RuntimeError("executive closed connection")
-            return json.loads(line)
-
-
-def json_dumps(obj: object) -> str:
-    return json.dumps(obj, separators=(",", ":"))
+    session = _ensure_exec_session(host, port)
+    cmd = str(payload.get("cmd", "")).lower()
+    use_session = not cmd.startswith("session.")
+    return session.request(payload, use_session=use_session)
 
 
 class ManagedProcess:
@@ -360,3 +383,5 @@ if __name__ == "__main__":
     import json
 
     main()
+
+

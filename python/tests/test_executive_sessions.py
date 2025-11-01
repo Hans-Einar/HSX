@@ -162,3 +162,68 @@ def test_events_queue_drop_emits_warning():
     types = {evt["type"] for evt in collected if evt}
     assert "warning" in types
     assert any(evt["type"] == "trace_step" and evt["data"]["pc"] == 0x18 for evt in collected)
+
+
+class DebugVM:
+    def __init__(self) -> None:
+        self.breakpoints: set[int] = set()
+        self.requests: list[dict] = []
+        self.attach_calls = 0
+
+    def request(self, payload: dict) -> dict:
+        self.requests.append(payload)
+        if payload.get('cmd') != 'dbg':
+            raise AssertionError('unexpected cmd')
+        op = payload.get('op')
+        if op == 'attach':
+            self.attach_calls += 1
+            return {'status': 'ok', 'debug': {'breakpoints': sorted(self.breakpoints)}}
+        if op == 'detach':
+            if self.attach_calls > 0:
+                self.attach_calls -= 1
+            return {'status': 'ok', 'debug': {'breakpoints': sorted(self.breakpoints)}}
+        if op == 'bp':
+            action = (payload.get('action') or 'list').lower()
+            if action in {'', 'list'}:
+                return {'status': 'ok', 'debug': {'breakpoints': sorted(self.breakpoints)}}
+            if action == 'add':
+                addr_raw = payload.get('addr')
+                addr_int = int(addr_raw, 0) if isinstance(addr_raw, str) else int(addr_raw)
+                self.breakpoints.add(addr_int & 0xFFFF)
+                return {'status': 'ok', 'debug': {'breakpoints': sorted(self.breakpoints)}}
+            if action == 'remove':
+                addr_raw = payload.get('addr')
+                addr_int = int(addr_raw, 0) if isinstance(addr_raw, str) else int(addr_raw)
+                self.breakpoints.discard(addr_int & 0xFFFF)
+                return {'status': 'ok', 'debug': {'breakpoints': sorted(self.breakpoints)}}
+            return {'status': 'error', 'error': 'unknown_action'}
+        raise AssertionError(f'unhandled dbg op {op!r}')
+
+
+def make_debug_state() -> tuple[ExecutiveState, DebugVM]:
+    vm = DebugVM()
+    state = ExecutiveState(vm)
+    state.tasks[1] = {'pid': 1}
+    return state, vm
+
+
+def test_breakpoint_add_list_clear():
+    state, vm = make_debug_state()
+    info = state.breakpoint_add(1, 0x200)
+    assert info['breakpoints'] == [0x200]
+    assert vm.breakpoints == {0x200}
+    info = state.breakpoint_list(1)
+    assert info['breakpoints'] == [0x200]
+    info = state.breakpoint_clear(1, 0x200)
+    assert info['breakpoints'] == []
+    assert vm.breakpoints == set()
+
+
+def test_breakpoint_clear_all():
+    state, vm = make_debug_state()
+    state.breakpoint_add(1, 0x10)
+    state.breakpoint_add(1, 0x20)
+    info = state.breakpoint_clear_all(1)
+    assert info['breakpoints'] == []
+    assert vm.breakpoints == set()
+

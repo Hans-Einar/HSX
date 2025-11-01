@@ -8,10 +8,11 @@ displayed in a scrollable list with register readouts and per-task controls.
 
 import argparse
 import json
-import socket
 import sys
 import time
 from typing import Dict, List, Optional, Tuple
+
+from executive_session import ExecutiveSession
 
 try:
     import tkinter as tk
@@ -25,68 +26,47 @@ except ImportError:  # pragma: no cover - pygame optional
     pygame = None
 
 
+_EVENT_FILTER = {
+    "categories": [
+        "debug_break",
+        "scheduler",
+        "mailbox_wait",
+        "mailbox_wake",
+        "mailbox_timeout",
+        "mailbox_error",
+        "warning",
+    ]
+}
+
+
 class ShellRPC:
-    """Minimal persistent JSON-RPC client for the executive server."""
+    """Session-aware wrapper for the executive RPC server."""
 
     def __init__(self, host: str, port: int, timeout: float = 5.0) -> None:
-        self.host = host
-        self.port = port
-        self.timeout = timeout
-        self.sock: Optional[socket.socket] = None
-        self.rfile = None
-        self.wfile = None
+        self.session = ExecutiveSession(
+            host,
+            port,
+            client_name="hsx-blinkenlights",
+            features=["events", "stack"],
+            max_events=512,
+            timeout=timeout,
+            event_buffer=512,
+        )
+        # Start streaming non-trace events so the UI can poll the buffer.
+        self.session.start_event_stream(filters=_EVENT_FILTER, callback=None, ack_interval=10)
         self.current_pid: Optional[int] = None
 
     def close(self) -> None:
-        if self.rfile:
-            try:
-                self.rfile.close()
-            finally:
-                self.rfile = None
-        if self.wfile:
-            try:
-                self.wfile.close()
-            finally:
-                self.wfile = None
-        if self.sock:
-            try:
-                self.sock.close()
-            finally:
-                self.sock = None
-
-    def _connect(self) -> None:
-        self.close()
-        sock = socket.create_connection((self.host, self.port), timeout=self.timeout)
-        self.sock = sock
-        self.rfile = sock.makefile("r", encoding="utf-8", newline="\n")
-        self.wfile = sock.makefile("w", encoding="utf-8", newline="\n")
+        self.session.close()
 
     def request(self, payload: Dict[str, object]) -> Dict[str, object]:
-        if self.sock is None:
-            self._connect()
-        assert self.wfile and self.rfile
-        try:
-            payload = dict(payload)
-            payload.setdefault("version", 1)
-            data = json.dumps(payload, separators=(",", ":"))
-            self.wfile.write(data + "\n")
-            self.wfile.flush()
-            line = self.rfile.readline()
-            if not line:
-                raise RuntimeError("connection closed")
-            resp = json.loads(line)
-        except (OSError, json.JSONDecodeError):
-            self._connect()
-            data = json.dumps(payload, separators=(",", ":"))
-            self.wfile.write(data + "\n")
-            self.wfile.flush()
-            line = self.rfile.readline()
-            if not line:
-                raise RuntimeError("connection closed")
-            resp = json.loads(line)
-        if resp.get("status") != "ok":
-            raise RuntimeError(str(resp.get("error", "exec error")))
-        return resp
+        response = self.session.request(payload)
+        if response.get("status") != "ok":
+            raise RuntimeError(str(response.get("error", "exec error")))
+        return response
+
+    def recent_events(self, limit: int = 20) -> List[Dict[str, object]]:
+        return self.session.get_recent_events(limit)
 
     def info(self) -> Dict[str, object]:
         return self.request({"cmd": "info"}).get("info", {})

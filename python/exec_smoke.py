@@ -7,44 +7,31 @@ Example:
 
 import argparse
 import json
-import socket
 import sys
 from pathlib import Path
 from typing import Dict
 
+from executive_session import ExecutiveSession
+
 
 class ExecClient:
     def __init__(self, host: str, port: int, timeout: float = 5.0) -> None:
-        self.host = host
-        self.port = port
-        self.timeout = timeout
-        self.sock = socket.create_connection((host, port), timeout=timeout)
-        self.rfile = self.sock.makefile("r", encoding="utf-8", newline="\n")
-        self.wfile = self.sock.makefile("w", encoding="utf-8", newline="\n")
+        self.session = ExecutiveSession(
+            host,
+            port,
+            client_name="hsx-exec-smoke",
+            features=["events"],
+            timeout=timeout,
+        )
 
     def close(self) -> None:
-        try:
-            self.rfile.close()
-        finally:
-            try:
-                self.wfile.close()
-            finally:
-                self.sock.close()
+        self.session.close()
 
     def request(self, payload: Dict[str, object]) -> Dict[str, object]:
-        payload = dict(payload)
-        payload.setdefault("version", 1)
-        self.wfile.write(json.dumps(payload, separators=(",", ":")) + "\n")
-        self.wfile.flush()
-        line = self.rfile.readline()
-        if not line:
-            raise RuntimeError("executive closed connection")
-        resp = json.loads(line)
-        if resp.get("version", 1) != 1:
-            raise RuntimeError(f"unsupported protocol version {resp.get('version')}")
-        if resp.get("status") != "ok":
-            raise RuntimeError(str(resp.get("error", "exec error")))
-        return resp
+        response = self.session.request(payload)
+        if response.get("status") != "ok":
+            raise RuntimeError(str(response.get("error", "exec error")))
+        return response
 
 
 def main(argv=None) -> int:

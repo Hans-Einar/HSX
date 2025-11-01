@@ -39,6 +39,7 @@ Core Commands
 | `clock` | `{ "version": 1, "cmd": "clock", "op": "rate", "rate": 10 }` | `{ "version": 1, "status": "ok", "clock": { ... } }` | Sets auto-loop rate in Hz (`0` = unlimited). |
 | `step` | `{ "version": 1, "cmd": "step", "steps": 500 [, "pid": 2] }` | `{ "version": 1, "status": "ok", "result": { ... }, "clock": { ... } }` | Alias for `clock` `op: "step"`; honours the same `steps`/`pid` fields. |
 | `trace` | `{ "version": 1, "cmd": "trace", "pid": 1, "mode": "on" }` | `{ "version": 1, "status": "ok", "trace": { "pid": 1, "enabled": true } }` | Enable or disable instruction tracing for a task (`mode` optional to toggle). |
+| `bp` | `{ "version": 1, "cmd": "bp", "op": "set", "pid": 1, "addr": 4096 }` | `{ "version": 1, "status": "ok", "pid": 1, "breakpoints": [4096] }` | Manage per-task breakpoints (`op`: `list`/`set`/`clear`/`clear_all`). |
 | `pause` | `{ "version": 1, "cmd": "pause", "pid": 1 }` | `{ "version": 1, "status": "ok", "task": { ... } }` | Pauses the specified task (global pause if `pid` omitted). |
 | `resume` | `{ "version": 1, "cmd": "resume", "pid": 1 }` | `{ "version": 1, "status": "ok", "task": { ... } }` | Resumes the specified task (global resume if `pid` omitted). |
 | `kill` | `{ "version": 1, "cmd": "kill", "pid": 1 }` | `{ "version": 1, "status": "ok", "task": { ... } }` | Stops auto loop, resets VM, removes task. |
@@ -199,6 +200,15 @@ Session ownership and PID locks
 - Include the `session` identifier with commands that mutate task state (pause/resume/kill, PID-scoped `clock`/`step`, `trace`, `reload`, `poke`, `sched`, mailbox operations, `send`, etc.).
 - When a PID is locked by another session the executive replies with `{"status":"error","error":"pid_locked:<pid>"}`. Sessionless callers receive the same error.
 - Missing or expired sessions return `{"status":"error","error":"session_required"}`. Use `session.keepalive` to refresh active sessions; timed-out sessions release their locks automatically.
+
+Breakpoint management
+~~~~~~~~~~~~~~~~~~~~~~
+
+- `bp list <pid>` returns the current breakpoint list for a task (`{"pid": <pid>, "breakpoints": [...]}`).
+- `bp set <pid> <addr>` adds a breakpoint (addresses accept decimal or 0x-prefixed values).
+- `bp clear <pid> <addr>` removes a breakpoint; `bp clearall <pid>` removes every breakpoint owned by the task.
+- Breakpoint mutation commands require ownership of the PID via `session.open` locking; observers may still issue `bp list`.
+- Breakpoints are programmed into the underlying VM debug engine; if the guest task exits the executive automatically discards stale breakpoint state.
 
 ### Event object schema
 
