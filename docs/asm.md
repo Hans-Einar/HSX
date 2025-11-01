@@ -86,6 +86,35 @@ Derived from the source file to retain contextual metadata:
 
 Tooling (debugger, IDE integrations) can consume this JSON to show annotated disassemblies without having to parse MVASM directly.
 
+## `.sym` Symbol Files
+
+Linker builds may emit a companion `<program>.sym` JSON file containing richer debug metadata. The executive symbol loader expects the following schema (additional keys are ignored for forwards compatibility):
+
+- `version` (int, optional)
+- `symbols`: list _or_ mapping describing named symbols. Each entry should provide at least:
+  - `name`: symbol identifier.
+  - `address`/`addr`/`abs_addr`: absolute address in bytes.
+  - Optional metadata: `size`, `type` (`function`, `object`, etc.), `file`, `line`.
+- `lines`/`line_table`/`line_map`: list or mapping of `{ "address": <int>, "file": <str>, "line": <int> }` describing source line breakpoints.
+
+Example:
+
+```json
+{
+  "version": 1,
+  "symbols": [
+    {"name": "main", "address": 4096, "size": 32, "type": "function", "file": "main.c", "line": 12},
+    {"name": "global_var", "address": 8192, "type": "object"}
+  ],
+  "lines": [
+    {"address": 4096, "file": "main.c", "line": 12},
+    {"address": 4100, "file": "main.c", "line": 18}
+  ]
+}
+```
+
+When present alongside the `.hxe` binary, the executive loads the `.sym` file automatically. Clients can override the path via the `sym load` RPC.
+
 ## Relationship to Packaging
 
 - `docs/hxe_format.md` remains the canonical binary specification. This document only describes the textual/JSON artefacts emitted alongside `.hxe`.

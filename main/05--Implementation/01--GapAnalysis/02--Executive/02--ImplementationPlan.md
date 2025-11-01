@@ -106,13 +106,13 @@ Design specifies .sym JSON file loading and caching at task load time (section 5
 **Todo:**
 - [ ] Define .sym JSON file format (functions, variables, types)
 - [ ] Implement symbol file loader (parse JSON, validate structure)
-- [ ] Add symbol caching per PID (load at task load time)
-- [ ] Add symbol lookup by address (for stack frames)
-- [ ] Add symbol lookup by name (for watch expressions)
-- [ ] Add symbol file path configuration (default: same dir as HXE + .sym extension)
+- [x] Add symbol caching per PID (load at task load time)
+- [x] Add symbol lookup by address (for stack frames)
+- [x] Add symbol lookup by name (for watch expressions)
+- [x] Add symbol file path configuration (default: same dir as HXE + .sym extension)
 - [ ] Handle missing symbol files gracefully (no crash, just no symbols)
-- [ ] Add symbol loading tests (valid/invalid format, lookup tests)
-- [ ] Document .sym file format in `docs/` directory
+- [x] Add symbol loading tests (valid/invalid format, lookup tests)
+- [x] Document .sym file format in `docs/` directory
 
 ---
 

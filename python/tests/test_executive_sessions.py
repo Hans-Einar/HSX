@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 import pytest
 
 from python.execd import ExecutiveState, SessionError
@@ -253,6 +256,37 @@ def test_breakpoint_clear_all():
     info = state.breakpoint_clear_all(1)
     assert info['breakpoints'] == []
     assert vm.breakpoints == set()
+
+
+def test_load_symbols_for_pid(tmp_path):
+    state, vm = make_debug_state()
+    program_path = tmp_path / "app.hxe"
+    program_path.write_bytes(b"")
+    sym_path = tmp_path / "app.sym"
+    sym_data = {
+        "version": 1,
+        "symbols": [
+            {"name": "main", "address": 0x100, "size": 12, "type": "function", "file": "main.c", "line": 10},
+            {"name": "helper", "address": 0x120, "size": 8, "type": "function"},
+        ],
+        "lines": [
+            {"address": 0x100, "file": "main.c", "line": 10},
+            {"address": 0x104, "file": "main.c", "line": 11},
+        ],
+    }
+    sym_path.write_text(json.dumps(sym_data), encoding='utf-8')
+    state.tasks[1]['program'] = str(program_path)
+    result = state.load_symbols_for_pid(1, program=str(program_path), override=str(sym_path))
+    assert result['loaded'] is True
+    info = state.symbol_info(1)
+    assert info['loaded'] is True
+    assert info['count'] == 2
+    entry = state.symbol_lookup_name(1, 'main')
+    assert entry and entry['address'] == 0x100
+    lookup = state.symbol_lookup_addr(1, 0x102)
+    assert lookup and lookup['name'] == 'main' and lookup['offset'] == 0x2
+    line = state.symbol_lookup_line(1, 0x103)
+    assert line and line['line'] == 10
 
 
 def test_step_hits_breakpoint_pre_phase():

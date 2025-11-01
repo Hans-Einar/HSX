@@ -40,6 +40,7 @@ Core Commands
 | `step` | `{ "version": 1, "cmd": "step", "steps": 500 [, "pid": 2] }` | `{ "version": 1, "status": "ok", "result": { ... }, "clock": { ... } }` | Alias for `clock` `op: "step"`; honours the same `steps`/`pid` fields. |
 | `trace` | `{ "version": 1, "cmd": "trace", "pid": 1, "mode": "on" }` | `{ "version": 1, "status": "ok", "trace": { "pid": 1, "enabled": true } }` | Enable or disable instruction tracing for a task (`mode` optional to toggle). |
 | `bp` | `{ "version": 1, "cmd": "bp", "op": "set", "pid": 1, "addr": 4096 }` | `{ "version": 1, "status": "ok", "pid": 1, "breakpoints": [4096] }` | Manage per-task breakpoints (`op`: `list`/`set`/`clear`/`clear_all`). |
+| `sym` | `{ "version": 1, "cmd": "sym", "op": "addr", "pid": 1, "address": 4096 }` | `{ "version": 1, "status": "ok", "symbol": { ... } }` | Symbol table helpers (`op`: `info`/`addr`/`name`/`line`/`load`). |
 | `pause` | `{ "version": 1, "cmd": "pause", "pid": 1 }` | `{ "version": 1, "status": "ok", "task": { ... } }` | Pauses the specified task (global pause if `pid` omitted). |
 | `resume` | `{ "version": 1, "cmd": "resume", "pid": 1 }` | `{ "version": 1, "status": "ok", "task": { ... } }` | Resumes the specified task (global resume if `pid` omitted). |
 | `kill` | `{ "version": 1, "cmd": "kill", "pid": 1 }` | `{ "version": 1, "status": "ok", "task": { ... } }` | Stops auto loop, resets VM, removes task. |
@@ -209,6 +210,15 @@ Breakpoint management
 - `bp clear <pid> <addr>` removes a breakpoint; `bp clearall <pid>` removes every breakpoint owned by the task.
 - Breakpoint mutation commands require ownership of the PID via `session.open` locking; observers may still issue `bp list`.
 - Breakpoints are programmed into the underlying VM debug engine; if the guest task exits the executive automatically discards stale breakpoint state.
+
+Symbol lookup
+~~~~~~~~~~~~~
+
+- `sym info <pid>` reports whether a symbol table is loaded for the task (and provides the current path/count).
+- `sym addr <pid> <addr>` resolves the nearest symbol at/before `addr`, returning the offset inside the symbol.
+- `sym name <pid> <symbol>` returns symbol metadata by name; `sym line` maps addresses to source lines (when present).
+- `sym load <pid> <path>` reloads symbols from an explicit file. By default the executive loads `<program>.sym` from the same directory as the HXE image after `load/exec`.
+- Symbol operations are read-only for observers; `sym load` requires PID ownership so that debugger sessions do not clobber each other's settings.
 
 ### Event object schema
 

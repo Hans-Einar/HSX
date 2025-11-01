@@ -68,6 +68,7 @@ COMMAND_NAMES = sorted(
         "send",
         "shutdown",
         "stdio",
+        "sym",
         "trace",
         "step",
     ]
@@ -341,12 +342,15 @@ def _perform_load_sequence(
     *,
     verbose: bool = False,
     rpc_cmd: str = "load",
+    symbols: Optional[str] = None,
 ) -> list[tuple[Path, dict]]:
     outputs: list[tuple[Path, dict]] = []
     for path in paths:
         payload: dict[str, object] = {"cmd": rpc_cmd, "path": str(path)}
         if verbose:
             payload["verbose"] = True
+        if symbols and len(paths) == 1:
+            payload["symbols"] = symbols
         resp = send_request(host, port, payload)
         outputs.append((path, resp))
     return outputs
@@ -451,6 +455,51 @@ def _pretty_events(events: list[dict]) -> None:
             data_items = str(data)
         pid_text = "None" if pid is None else str(pid)
         print(f"[{seq:>6}] {timestamp}  {etype:<16} pid={pid_text:<5}  {data_items}")
+
+
+def _pretty_sym(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    if "symbols" in payload:
+        info = payload["symbols"]
+        if not info or not info.get("loaded"):
+            print(f"symbols for pid {info.get('pid', '?')}: (not loaded)")
+            return
+        print(f"symbols for pid {info.get('pid', '?')}:")
+        print(f"  path : {info.get('path')}")
+        print(f"  count: {info.get('count')}")
+        return
+    if "symbol" in payload:
+        symbol = payload.get("symbol")
+        if not symbol:
+            print("symbol: <not found>")
+            return
+        print("symbol:")
+        for key in ("name", "address", "offset", "size", "type", "file", "line"):
+            if key in symbol and symbol[key] is not None:
+                value = symbol[key]
+                if key in {"address", "offset", "size"}:
+                    try:
+                        value_int = int(value)
+                        value = f"0x{value_int:X} ({value_int})"
+                    except (TypeError, ValueError):
+                        pass
+                print(f"  {key:<7}: {value}")
+        return
+    if "line" in payload:
+        line = payload.get("line")
+        if not line:
+            print("line: <not found>")
+            return
+        print("line mapping:")
+        print(f"  file : {line.get('file')}")
+        print(f"  line : {line.get('line')}")
+        addr = line.get('address')
+        if isinstance(addr, int):
+            print(f"  addr : 0x{addr:X} ({addr})")
+        return
+    print(json.dumps(payload, indent=2, sort_keys=True))
     selected = info.get('selected_registers')
     if isinstance(selected, dict):
         print(f"  selected_pid: {info.get('selected_pid')}")
@@ -943,6 +992,8 @@ PRETTY_HANDLERS = {
     'info': _pretty_info,
     'attach': _pretty_info,
     'bp': _pretty_bp,
+    'sym': _pretty_sym,
+    'sym': None,
     'ps': _pretty_ps,
     'list': _pretty_list,
     'reload': _pretty_reload,
@@ -1420,6 +1471,49 @@ def _build_bp_payload(args: list[str]) -> dict:
         payload["pid"] = int(tokens[0], 0)
         return payload
     raise ValueError(f"bp unknown action '{action}'")
+
+
+def _build_sym_payload(args: list[str]) -> dict:
+    if not args:
+        raise ValueError("sym usage: sym <info|addr|name|line|load> ...")
+    subcmd = args[0].lower()
+    tokens = args[1:]
+    payload: dict[str, object] = {"cmd": "sym"}
+    if subcmd in {"info", "i"}:
+        if not tokens:
+            raise ValueError("sym info requires <pid>")
+        payload["op"] = "info"
+        payload["pid"] = int(tokens[0], 0)
+        return payload
+    if subcmd in {"addr", "lookup", "lookup_addr"}:
+        if len(tokens) < 2:
+            raise ValueError("sym addr requires <pid> <address>")
+        payload["op"] = "lookup_addr"
+        payload["pid"] = int(tokens[0], 0)
+        payload["address"] = tokens[1]
+        return payload
+    if subcmd in {"name", "lookup_name"}:
+        if len(tokens) < 2:
+            raise ValueError("sym name requires <pid> <symbol>")
+        payload["op"] = "lookup_name"
+        payload["pid"] = int(tokens[0], 0)
+        payload["name"] = tokens[1]
+        return payload
+    if subcmd in {"line", "lookup_line"}:
+        if len(tokens) < 2:
+            raise ValueError("sym line requires <pid> <address>")
+        payload["op"] = "lookup_line"
+        payload["pid"] = int(tokens[0], 0)
+        payload["address"] = tokens[1]
+        return payload
+    if subcmd in {"load", "set"}:
+        if len(tokens) < 2:
+            raise ValueError("sym load requires <pid> <path>")
+        payload["op"] = "load"
+        payload["pid"] = int(tokens[0], 0)
+        payload["path"] = tokens[1]
+        return payload
+    raise ValueError(f"sym unknown subcommand '{subcmd}'")
 def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: bool = False) -> None:
     _init_history()
     current_dir = (cwd or Path.cwd()).resolve()
@@ -1454,8 +1548,8 @@ def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: boo
         for token in raw_args:
             if token == '--json':
                 force_json = True
-        else:
-            args.append(token)
+            else:
+                args.append(token)
 
         session = _ensure_session(host, port, auto_events=True)
 
@@ -1483,9 +1577,40 @@ def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: boo
             else:
                 _pretty_events(events)
             continue
+        if cmd == 'sym':
+            try:
+                payload = _build_sym_payload(args)
+            except ValueError as exc:
+                print(exc)
+                continue
+            try:
+                resp = send_request(host, port, payload)
+            except Exception as exc:
+                print(f"error: {exc}")
+                continue
+            handler = PRETTY_HANDLERS.get('sym')
+            if handler and not force_json:
+                handler(resp)
+            else:
+                print(json.dumps(resp, indent=2, sort_keys=True))
+            continue
         if cmd in {'load', 'exec'}:
             tokens = list(args)
             verbose_flag = False
+            symbols_override: Optional[str] = None
+            i = 0
+            while i < len(tokens):
+                token = tokens[i]
+                if token in {'--symbols', '--sym'}:
+                    if i + 1 >= len(tokens):
+                        print(f"usage: {cmd} <path|bundle> [--symbols <path>] [verbose]")
+                        symbols_override = None
+                        tokens = []
+                        break
+                    symbols_override = tokens[i + 1]
+                    del tokens[i:i + 2]
+                    continue
+                i += 1
             if tokens and tokens[-1].lower() in {"verbose", "--verbose"}:
                 verbose_flag = True
                 tokens = tokens[:-1]
@@ -1498,8 +1623,16 @@ def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: boo
                 print(exc)
                 continue
             rpc_cmd = 'exec' if cmd == 'exec' else 'load'
+            sym_override_resolved = None
+            if symbols_override:
+                sym_path = Path(symbols_override)
+                if not sym_path.is_absolute():
+                    sym_path = (current_dir / sym_path).resolve(strict=False)
+                else:
+                    sym_path = sym_path.resolve(strict=False)
+                sym_override_resolved = str(sym_path)
             try:
-                results = _perform_load_sequence(host, port, targets, verbose=verbose_flag, rpc_cmd=rpc_cmd)
+                results = _perform_load_sequence(host, port, targets, verbose=verbose_flag, rpc_cmd=rpc_cmd, symbols=sym_override_resolved)
             except Exception as exc:
                 print(f"error: {exc}")
                 continue
@@ -1605,6 +1738,7 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=9998, help="executive port")
     parser.add_argument("--steps", type=int, help="steps for step command")
     parser.add_argument("--path", help="path for load/exec commands")
+    parser.add_argument("--symbols", help="override symbol file for load/exec commands")
     parser.add_argument("--verbose", action="store_true", help="verbose load")
     parser.add_argument("--json", action="store_true", help="print raw JSON responses")
     args_ns = parser.parse_args()
@@ -1654,6 +1788,18 @@ def main() -> None:
         else:
             print(json.dumps(resp, indent=2, sort_keys=True))
         return
+    if cmd == 'sym':
+        try:
+            payload = _build_sym_payload(args)
+        except ValueError as exc:
+            parser.error(str(exc))
+        resp = send_request(args_ns.host, args_ns.port, payload)
+        handler = PRETTY_HANDLERS.get('sym')
+        if handler and not force_json:
+            handler(resp)
+        else:
+            print(json.dumps(resp, indent=2, sort_keys=True))
+        return
 
     if cmd in {'load', 'exec'}:
         tokens = list(args)
@@ -1669,6 +1815,14 @@ def main() -> None:
             targets = _resolve_load_targets(tokens[0], Path.cwd())
         except ValueError as exc:
             parser.error(str(exc))
+        sym_override = args_ns.symbols
+        if sym_override:
+            sym_path = Path(sym_override)
+            if not sym_path.is_absolute():
+                sym_path = (Path.cwd() / sym_path).resolve(strict=False)
+            else:
+                sym_path = sym_path.resolve(strict=False)
+            sym_override = str(sym_path)
         try:
             results = _perform_load_sequence(
                 args_ns.host,
@@ -1676,6 +1830,7 @@ def main() -> None:
                 targets,
                 verbose=verbose_flag,
                 rpc_cmd='exec' if cmd == 'exec' else 'load',
+                symbols=sym_override,
             )
         except Exception as exc:
             parser.error(str(exc))

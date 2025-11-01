@@ -16,6 +16,7 @@ and exposes a TCP JSON interface for shell clients. This is an initial scaffold;
 future work will add task tables, stdout routing, and richer scheduling.
 """
 import argparse
+import bisect
 import json
 import os
 import socketserver
@@ -116,6 +117,8 @@ class ExecutiveState:
         self.event_subscriptions: Dict[str, EventSubscription] = {}
         self.session_event_map: Dict[str, str] = {}
         self.event_retention_ms = 5000
+        self.symbol_tables: Dict[int, Dict[str, Any]] = {}
+        self.symbol_cache_lock = threading.RLock()
 
     def _normalise_pid_list(self, pid_lock: Any) -> List[int]:
         if pid_lock is None:
@@ -441,6 +444,206 @@ class ExecutiveState:
             return self._handle_breakpoint_hit(target_pid, pc, phase="post")
         return None
 
+    def _resolve_symbol_path(self, pid: int, *, program: Optional[str], override: Optional[str]) -> Optional[Path]:
+        if override:
+            candidate = Path(override)
+            if not candidate.is_absolute():
+                base = Path(program).parent if program else Path.cwd()
+                candidate = (base / candidate).resolve()
+            return candidate if candidate.exists() else candidate
+        if not program:
+            return None
+        program_path = Path(program)
+        sym_path = program_path.with_suffix(".sym")
+        return sym_path
+
+    @staticmethod
+    def _extract_symbol_entries(data: Any) -> List[Dict[str, Any]]:
+        entries: List[Dict[str, Any]] = []
+
+        def normalise(name: str, info: Dict[str, Any]) -> Dict[str, Any]:
+            address = (
+                info.get("address")
+                or info.get("addr")
+                or info.get("abs_addr")
+                or info.get("absolute")
+                or info.get("offset")
+                or 0
+            )
+            try:
+                address_int = int(address)
+            except (TypeError, ValueError):
+                address_int = 0
+            entry = {
+                "name": name,
+                "address": address_int & 0xFFFFFFFF,
+                "size": info.get("size"),
+                "type": info.get("type") or info.get("kind") or info.get("section"),
+                "file": info.get("file") or info.get("source"),
+                "line": info.get("line"),
+            }
+            return entry
+
+        if isinstance(data, dict):
+            sym_block = data.get("symbols")
+            if isinstance(sym_block, dict):
+                for name, info in sym_block.items():
+                    if isinstance(info, dict):
+                        entries.append(normalise(str(name), info))
+            elif isinstance(sym_block, list):
+                for info in sym_block:
+                    if isinstance(info, dict):
+                        name = info.get("name") or info.get("symbol")
+                        if not name:
+                            continue
+                        entries.append(normalise(str(name), info))
+            functions = data.get("functions")
+            if isinstance(functions, list):
+                for info in functions:
+                    if isinstance(info, dict):
+                        name = info.get("name")
+                        if name:
+                            info.setdefault("type", "function")
+                            entries.append(normalise(str(name), info))
+        return entries
+
+    @staticmethod
+    def _extract_line_entries(data: Any) -> List[Dict[str, Any]]:
+        line_block = None
+        if isinstance(data, dict):
+            for key in ("lines", "line_table", "line_map"):
+                if key in data:
+                    line_block = data[key]
+                    break
+        lines: List[Dict[str, Any]] = []
+        if isinstance(line_block, list):
+            for item in line_block:
+                if isinstance(item, dict):
+                    address = item.get("address")
+                    try:
+                        address_int = int(address)
+                    except (TypeError, ValueError):
+                        continue
+                    lines.append(
+                        {
+                            "address": address_int & 0xFFFFFFFF,
+                            "file": item.get("file") or item.get("source"),
+                            "line": item.get("line"),
+                        }
+                    )
+        elif isinstance(line_block, dict):
+            for key, value in line_block.items():
+                try:
+                    address_int = int(key)
+                except (TypeError, ValueError):
+                    continue
+                if isinstance(value, dict):
+                    lines.append(
+                        {
+                            "address": address_int & 0xFFFFFFFF,
+                            "file": value.get("file") or value.get("source"),
+                            "line": value.get("line"),
+                        }
+                    )
+        return lines
+
+    def _parse_symbol_file(self, path: Path) -> Dict[str, Any]:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        entries = self._extract_symbol_entries(data)
+        lines = self._extract_line_entries(data)
+        by_name = {entry["name"]: entry for entry in entries if entry.get("name")}
+        addresses = sorted(entries, key=lambda item: item.get("address", 0))
+        line_index = sorted(lines, key=lambda item: item.get("address", 0))
+        return {
+            "path": str(path),
+            "symbols": entries,
+            "by_name": by_name,
+            "addresses": addresses,
+            "lines": line_index,
+        }
+
+    def load_symbols_for_pid(
+        self,
+        pid: int,
+        *,
+        program: Optional[str] = None,
+        override: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        self.get_task(pid)
+        sym_path = self._resolve_symbol_path(pid, program=program, override=override)
+        if sym_path is None:
+            self.symbol_tables.pop(pid, None)
+            return {"pid": pid, "loaded": False, "path": None}
+        try:
+            table = self._parse_symbol_file(sym_path)
+            with self.symbol_cache_lock:
+                self.symbol_tables[pid] = table
+            self.log("info", "symbols loaded", pid=pid, path=str(sym_path))
+            return {"pid": pid, "loaded": True, "path": str(sym_path), "count": len(table["symbols"])}
+        except FileNotFoundError:
+            self.log("warning", "symbol file missing", pid=pid, path=str(sym_path))
+            with self.symbol_cache_lock:
+                self.symbol_tables.pop(pid, None)
+            return {"pid": pid, "loaded": False, "path": str(sym_path)}
+        except Exception as exc:
+            self.log("error", "symbol load failed", pid=pid, path=str(sym_path), error=str(exc))
+            with self.symbol_cache_lock:
+                self.symbol_tables.pop(pid, None)
+            return {"pid": pid, "loaded": False, "path": str(sym_path), "error": str(exc)}
+
+    def symbol_info(self, pid: int) -> Dict[str, Any]:
+        self.get_task(pid)
+        with self.symbol_cache_lock:
+            table = self.symbol_tables.get(pid)
+            if not table:
+                return {"pid": pid, "loaded": False}
+            return {
+                "pid": pid,
+                "loaded": True,
+                "path": table.get("path"),
+                "count": len(table.get("symbols", [])),
+            }
+
+    def symbol_lookup_name(self, pid: int, name: str) -> Optional[Dict[str, Any]]:
+        with self.symbol_cache_lock:
+            table = self.symbol_tables.get(pid)
+            if not table:
+                return None
+            entry = table["by_name"].get(name)
+            if not entry:
+                return None
+            return dict(entry)
+
+    def symbol_lookup_addr(self, pid: int, address: int) -> Optional[Dict[str, Any]]:
+        with self.symbol_cache_lock:
+            table = self.symbol_tables.get(pid)
+            if not table:
+                return None
+            addr_list = table["addresses"]
+            if not addr_list:
+                return None
+            addresses = [entry["address"] for entry in addr_list]
+            idx = bisect.bisect_right(addresses, address) - 1
+            if idx < 0:
+                return None
+            entry = dict(addr_list[idx])
+            entry["offset"] = address - entry.get("address", 0)
+            return entry
+
+    def symbol_lookup_line(self, pid: int, address: int) -> Optional[Dict[str, Any]]:
+        with self.symbol_cache_lock:
+            table = self.symbol_tables.get(pid)
+            if not table:
+                return None
+            lines = table.get("lines", [])
+            if not lines:
+                return None
+            addresses = [item["address"] for item in lines]
+            idx = bisect.bisect_right(addresses, address) - 1
+            if idx < 0:
+                return None
+            return dict(lines[idx])
+
     def _next_event_seq(self) -> int:
         with self.event_lock:
             seq = self.event_seq
@@ -683,11 +886,22 @@ class ExecutiveState:
                 task["breakpoints"] = sorted(bp_set)
             elif "breakpoints" in task:
                 task.pop("breakpoints", None)
+            symbol_table = self.symbol_tables.get(pid)
+            if symbol_table:
+                task["symbols"] = {
+                    "path": symbol_table.get("path"),
+                    "count": len(symbol_table.get("symbols", [])),
+                }
+            elif "symbols" in task:
+                task.pop("symbols", None)
         self.task_states = new_states
         stale = set(self.breakpoints.keys()) - current_pids
         for pid in stale:
             self.breakpoints.pop(pid, None)
             self.debug_attached.discard(pid)
+        stale_symbols = set(self.symbol_tables.keys()) - current_pids
+        for pid in stale_symbols:
+            self.symbol_tables.pop(pid, None)
 
     def log(self, level: str, message: str, **fields: Any) -> None:
         entry = {
@@ -724,9 +938,15 @@ class ExecutiveState:
         payload["clock"] = clock
         return payload
 
-    def load(self, path: str, verbose: bool = False) -> Dict[str, Any]:
-        info = self.vm.load(str(Path(path)), verbose=verbose)
+    def load(self, path: str, verbose: bool = False, *, symbols: Optional[str] = None) -> Dict[str, Any]:
+        program_path = Path(path)
+        info = self.vm.load(str(program_path), verbose=verbose)
         self._refresh_tasks()
+        pid = info.get("pid")
+        if pid is not None:
+            task = self.tasks.get(pid, {})
+            program = task.get("program") or info.get("program") or str(program_path)
+            self.load_symbols_for_pid(pid, program=program, override=symbols)
         return info
 
     def step(self, steps: Optional[int] = None, *, pid: Optional[int] = None, source: str = "manual") -> Dict[str, Any]:
@@ -897,6 +1117,8 @@ class ExecutiveState:
             self.vm.kill(pid)
         self._refresh_tasks()
         self._detach_debug_session(pid)
+        with self.symbol_cache_lock:
+            self.symbol_tables.pop(pid, None)
         return {"pid": pid, "state": "terminated"}
 
     def set_task_attrs(self, pid: int, *, priority: Optional[int] = None, quantum: Optional[int] = None) -> Dict[str, Any]:
@@ -1569,7 +1791,9 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 path_value = request.get("path")
                 if not path_value:
                     raise ValueError(f"{cmd} requires 'path'")
-                info = self.state.load(str(path_value), verbose=bool(request.get("verbose")))
+                symbols_override = request.get("symbols")
+                sym_path = str(symbols_override) if isinstance(symbols_override, str) else None
+                info = self.state.load(str(path_value), verbose=bool(request.get("verbose")), symbols=sym_path)
                 return {"version": 1, "status": "ok", "image": info}
             if cmd == "step":
                 steps_value = request.get("steps")
@@ -1618,6 +1842,49 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                     info = self.state.breakpoint_clear_all(pid_int)
                     return {"version": 1, "status": "ok", "pid": pid_int, "breakpoints": info.get("breakpoints", [])}
                 raise ValueError(f"unknown bp op '{op}'")
+            if cmd == "sym":
+                op = str(request.get("op") or "info").lower()
+                pid_value = request.get("pid")
+                if pid_value is None:
+                    raise ValueError("sym requires 'pid'")
+                pid_int = int(pid_value)
+                if op == "info":
+                    info = self.state.symbol_info(pid_int)
+                    return {"version": 1, "status": "ok", "symbols": info}
+                if op in {"load", "set"}:
+                    path_value = request.get("path")
+                    if not path_value:
+                        raise ValueError("sym load requires 'path'")
+                    self.state.ensure_pid_access(pid_int, session_id)
+                    result = self.state.load_symbols_for_pid(pid_int, program=self.state.tasks.get(pid_int, {}).get("program"), override=str(path_value))
+                    return {"version": 1, "status": "ok", "symbols": result}
+                if op in {"lookup", "lookup_name", "name"}:
+                    name_value = request.get("name")
+                    if not isinstance(name_value, str):
+                        raise ValueError("sym lookup requires 'name'")
+                    result = self.state.symbol_lookup_name(pid_int, name_value)
+                    return {"version": 1, "status": "ok", "symbol": result, "pid": pid_int, "name": name_value}
+                if op in {"lookup_addr", "addr"}:
+                    addr_value = request.get("address")
+                    if addr_value is None:
+                        raise ValueError("sym addr requires 'address'")
+                    try:
+                        address_int = int(addr_value, 0) if isinstance(addr_value, str) else int(addr_value)
+                    except (TypeError, ValueError) as exc:
+                        raise ValueError(f"invalid address {addr_value!r}") from exc
+                    result = self.state.symbol_lookup_addr(pid_int, address_int)
+                    return {"version": 1, "status": "ok", "symbol": result, "pid": pid_int, "address": address_int}
+                if op in {"line", "lookup_line"}:
+                    addr_value = request.get("address")
+                    if addr_value is None:
+                        raise ValueError("sym line requires 'address'")
+                    try:
+                        address_int = int(addr_value, 0) if isinstance(addr_value, str) else int(addr_value)
+                    except (TypeError, ValueError) as exc:
+                        raise ValueError(f"invalid address {addr_value!r}") from exc
+                    result = self.state.symbol_lookup_line(pid_int, address_int)
+                    return {"version": 1, "status": "ok", "line": result, "pid": pid_int, "address": address_int}
+                raise ValueError(f"unknown sym op '{op}'")
             if cmd == "trace":
                 pid_value = request.get("pid")
                 if pid_value is None:

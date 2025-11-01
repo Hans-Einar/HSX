@@ -11,6 +11,8 @@
 ## Commit Log
 | Date | Commit hash | Message | Author | Notes |
 | --- | --- | --- | --- | --- |
+| 2025-11-01 | pending | Symbol loader & sym RPC | Codex | Tests: `python -m pytest python/tests/test_executive_sessions.py` |
+| 2025-11-01 | cf5ccc0327d2 | Breakpoint halt semantics | Codex | Tests: `python -m pytest python/tests/test_executive_sessions.py` |
 | 2025-11-01 | pending | Session wiring + breakpoint RPC | Codex | Tests: `python -m pytest python/tests/test_executive_sessions.py` |
 | 2025-11-01 | ee9f0a2ac36c | Executive Phase 1 - Sessions & Event Streaming | Hans Einar | Tests: `python -m pytest python/tests/test_executive_sessions.py`
 

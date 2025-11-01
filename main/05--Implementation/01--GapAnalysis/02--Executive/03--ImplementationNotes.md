@@ -100,3 +100,23 @@ Start new sections chronologically. Keep notes concise but actionable so the nex
   - `python -m pytest python/tests/test_executive_sessions.py` → PASS
 - Follow-up actions / hand-off notes.
   - Surface breakpoint info in downstream debugger UI/UX components in later milestones.
+
+
+## 2025-11-01 - Codex (Session 5)
+
+### Focus
+- Task(s) tackled: Phase 1.4 symbol loading (schema, loader, lookups, CLI/doc integration).
+- Dependencies touched: `python/execd.py`, `python/shell_client.py`, `python/tests/test_executive_sessions.py`, `docs/asm.md`, `docs/executive_protocol.md`, new helper `python/executive_session.py` and `help/sym.txt`.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions.
+  - Added symbol table loader/caching with address & name lookups, plus `sym` RPC for info/address/name/line queries and manual path overrides.
+  - Updated shell tooling (CLI + interactive) with `sym` commands and symbol-aware loads (`--symbols`); auto-loads `<program>.sym` when present.
+  - Documented `.sym` JSON format in `docs/asm.md` and expanded the protocol guide with `sym` usage.
+- Tests run (commands + result).
+  - `python -m pytest python/tests/test_executive_sessions.py` → PASS
+- Follow-up actions / hand-off notes.
+  - Integrate symbol lookups into future TUI/IDE debugger features (stack traces, watch panes).
