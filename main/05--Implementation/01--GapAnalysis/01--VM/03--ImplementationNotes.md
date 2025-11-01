@@ -28,3 +28,16 @@
   - Documented the instructions in `docs/MVASM_SPEC.md:33` and recorded the opcode IDs in `docs/abi_syscalls.md:23`.
 - **Testing:** `python -m pytest python/tests/test_vm_shift_ops.py`
 - **Follow-ups:** Full PSW implementation (carry/negative/overflow) remains open under plan item 1.3; revisit shift flag semantics once that work lands.
+
+## 2025-11-01 - Codex (Session 3)
+
+### Phase 1.3 - Complete PSW flag implementation
+- **Status:** DONE (all core ALU instructions now update Z/C/N/V).
+- **What was done:**
+  - Defined flag bit constants (`FLAG_Z`, `FLAG_C`, `FLAG_N`, `FLAG_V`) and surfaced them via `MiniVM` for tests (`platforms/python/host_vm.py:60`, `platforms/python/host_vm.py:393`).
+  - Replaced the old `set_flags` helper with a full updater that preserves unspecified bits and accepts carry/overflow inputs (`platforms/python/host_vm.py:776`-`803`).
+  - Added local helpers `add_with_flags` / `sub_with_flags` and wired `ADD`, `SUB`, `CMP`, logical ops, shifts, and `MUL` to feed carry/overflow state (`platforms/python/host_vm.py:807`-`930`).
+  - Extended shift instructions to emit carry when bits are shifted out and documented behaviour in `docs/MVASM_SPEC.md:43`.
+  - Authored dedicated regression coverage for PSW semantics and branching (`python/tests/test_vm_psw_flags.py`).
+- **Testing:** `python -m pytest python/tests/test_vm_psw_flags.py`
+- **Follow-ups:** None for PSW; next plan item is to plumb ADC/SBC (Phase 1.2) atop the new flag infrastructure.

@@ -56,6 +56,21 @@ Opcode values follow `OPC` in `python/asm.py`; tooling should treat mnemonics as
 
 `LSL` and `LSR` treat the shift amount modulo 32 and always operate on the logical (zero-extended) source value. `ASR` performs an arithmetic right shift with sign extension using the same modulo-32 shift amount.
 
+## Processor Status Word (PSW)
+
+The MiniVM tracks condition codes in the low nibble of `PSW`:
+
+| Bit | Flag | Meaning | Updated by |
+|-----|------|---------|------------|
+| 0 | `Z` | Zero | All ALU/logic ops (set when result == 0) |
+| 1 | `C` | Carry / !borrow | `ADD`, `SUB`, `CMP`, shifts (when shift > 0), `MUL` (set if high 32 bits non-zero) |
+| 2 | `N` | Negative | All ALU/logic ops (mirrors bit 31 of the result) |
+| 3 | `V` | Signed overflow | `ADD`, `SUB`, `CMP`, `MUL` |
+
+- `SUB` and `CMP` set `C = 1` when no borrow occurs (`Rsrc1 >= Rsrc2`), making it safe to cascade for multi-precision arithmetic.
+- Logical operations (`AND`, `OR`, `XOR`, `NOT`) clear `C` and `V`. Shift instructions clear `V` and set `C` to the last bit shifted out when the amount is non-zero.
+- Branch instructions currently test `Z` (`JZ` / `JNZ`); future opcodes may consume the other flags.
+
 ## Labels and Relocations
 - Labels end with `:` and bind to the current section offset.
 - `CALL symbol`, `JMP label`, and similar forms create relocations resolved at link time.

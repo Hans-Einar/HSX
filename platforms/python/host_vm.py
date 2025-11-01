@@ -55,6 +55,11 @@ REGISTER_REGION_START = 0x1000  # leave lower memory for code/data
 VM_ADDRESS_SPACE_SIZE = 0x10000  # 64 KiB
 STACK_ALIGNMENT = 4
 
+FLAG_Z = 0x01  # Zero
+FLAG_C = 0x02  # Carry / !borrow
+FLAG_N = 0x04  # Negative
+FLAG_V = 0x08  # Overflow
+
 
 def _align_down(value: int, alignment: int) -> int:
     if alignment <= 0:
@@ -383,6 +388,10 @@ class FSStub:
     def mkdir(self, path): return 0
 
 class MiniVM:
+    FLAG_Z = FLAG_Z
+    FLAG_C = FLAG_C
+    FLAG_N = FLAG_N
+    FLAG_V = FLAG_V
     def __init__(
         self,
         code: bytes,
@@ -764,10 +773,50 @@ class MiniVM:
         if imm & 0x800:
             imm -= 0x1000
 
-        def set_flags(v):
-            self.flags = 0
-            if v == 0:
-                self.flags |= 1  # Z flag
+        def set_flags(value, *, carry=None, overflow=None):
+            masked = value & 0xFFFFFFFF
+            flags = self.flags & 0xFF
+
+            if masked == 0:
+                flags |= FLAG_Z
+            else:
+                flags &= ~FLAG_Z
+
+            if masked & 0x80000000:
+                flags |= FLAG_N
+            else:
+                flags &= ~FLAG_N
+
+            if carry is not None:
+                if carry:
+                    flags |= FLAG_C
+                else:
+                    flags &= ~FLAG_C
+
+            if overflow is not None:
+                if overflow:
+                    flags |= FLAG_V
+                else:
+                    flags &= ~FLAG_V
+
+            self.flags = flags & 0xFF
+
+        def add_with_flags(a, b):
+            ua = a & 0xFFFFFFFF
+            ub = b & 0xFFFFFFFF
+            total = ua + ub
+            result = total & 0xFFFFFFFF
+            carry = (total >> 32) & 0x1
+            overflow = (~(ua ^ ub) & (ua ^ result) & 0x80000000) != 0
+            return result, bool(carry), overflow
+
+        def sub_with_flags(a, b):
+            ua = a & 0xFFFFFFFF
+            ub = b & 0xFFFFFFFF
+            diff = (ua - ub) & 0xFFFFFFFF
+            carry = ua >= ub
+            overflow = ((ua ^ ub) & (ua ^ diff) & 0x80000000) != 0
+            return diff, carry, overflow
 
         def ensure_range(addr, size):
             if addr < 0 or addr + size > len(self.mem):
@@ -888,44 +937,57 @@ class MiniVM:
                 trap_memory_fault()
                 return
         elif op == 0x10:  # ADD
-            v = (self.regs[rs1] + self.regs[rs2]) & 0xFFFFFFFF
-            self.regs[rd] = v
-            set_flags(v)
+            result, carry, overflow = add_with_flags(self.regs[rs1], self.regs[rs2])
+            self.regs[rd] = result
+            set_flags(result, carry=carry, overflow=overflow)
         elif op == 0x11:  # SUB
-            v = (self.regs[rs1] - self.regs[rs2]) & 0xFFFFFFFF
-            self.regs[rd] = v
-            set_flags(v)
+            result, carry, overflow = sub_with_flags(self.regs[rs1], self.regs[rs2])
+            self.regs[rd] = result
+            set_flags(result, carry=carry, overflow=overflow)
         elif op == 0x12:  # MUL
-            v = (self.regs[rs1] * self.regs[rs2]) & 0xFFFFFFFF
-            self.regs[rd] = v
-            set_flags(v)
+            ua = self.regs[rs1] & 0xFFFFFFFF
+            ub = self.regs[rs2] & 0xFFFFFFFF
+            product = ua * ub
+            result = product & 0xFFFFFFFF
+            carry = (product >> 32) != 0
+            self.regs[rd] = result
+            set_flags(result, carry=carry, overflow=carry)
         elif op == 0x14:  # AND
             v = self.regs[rs1] & self.regs[rs2]
             self.regs[rd] = v & 0xFFFFFFFF
-            set_flags(v)
+            set_flags(v, carry=False, overflow=False)
         elif op == 0x15:  # OR
             v = self.regs[rs1] | self.regs[rs2]
             self.regs[rd] = v & 0xFFFFFFFF
-            set_flags(v)
+            set_flags(v, carry=False, overflow=False)
         elif op == 0x16:  # XOR
             v = self.regs[rs1] ^ self.regs[rs2]
             self.regs[rd] = v & 0xFFFFFFFF
-            set_flags(v)
+            set_flags(v, carry=False, overflow=False)
         elif op == 0x17:  # NOT
             v = (~self.regs[rs1]) & 0xFFFFFFFF
             self.regs[rd] = v
-            set_flags(v)
+            set_flags(v, carry=False, overflow=False)
         elif op == 0x31:  # LSL
             shift = self.regs[rs2] & 0x1F
-            v = (self.regs[rs1] << shift) & 0xFFFFFFFF
+            value = self.regs[rs1] & 0xFFFFFFFF
+            if shift:
+                carry = ((value << shift) >> 32) & 0x1
+            else:
+                carry = None
+            v = (value << shift) & 0xFFFFFFFF
             self.regs[rd] = v
-            set_flags(v)
+            set_flags(v, carry=bool(carry) if shift else None, overflow=False if shift else None)
         elif op == 0x32:  # LSR
             shift = self.regs[rs2] & 0x1F
             value = self.regs[rs1] & 0xFFFFFFFF
+            if shift:
+                carry = (value >> (shift - 1)) & 0x1
+            else:
+                carry = None
             v = (value >> shift) & 0xFFFFFFFF
             self.regs[rd] = v
-            set_flags(v)
+            set_flags(v, carry=bool(carry) if shift else None, overflow=False if shift else None)
         elif op == 0x33:  # ASR
             shift = self.regs[rs2] & 0x1F
             value = self.regs[rs1] & 0xFFFFFFFF
@@ -933,12 +995,16 @@ class MiniVM:
                 signed = value - 0x100000000
             else:
                 signed = value
+            if shift:
+                carry = (value >> (shift - 1)) & 0x1
+            else:
+                carry = None
             v = (signed >> shift) & 0xFFFFFFFF
             self.regs[rd] = v
-            set_flags(v)
+            set_flags(v, carry=bool(carry) if shift else None, overflow=False if shift else None)
         elif op == 0x20:  # CMP
-            v = (self.regs[rs1] - self.regs[rs2]) & 0xFFFFFFFF
-            set_flags(v)
+            result, carry, overflow = sub_with_flags(self.regs[rs1], self.regs[rs2])
+            set_flags(result, carry=carry, overflow=overflow)
         elif op == 0x21:  # JMP
             self.pc = imm_raw & 0xFFFFFFFF
             adv = 0
