@@ -392,6 +392,55 @@ class ExecutiveState:
         self.log("info", "breakpoints cleared", pid=pid)
         return {"pid": pid, "breakpoints": breakpoints}
 
+    def _handle_breakpoint_hit(self, pid: int, pc: int, *, phase: str) -> Dict[str, Any]:
+        self.log("info", "breakpoint hit", pid=pid, pc=pc, phase=phase)
+        self.stop_auto()
+        try:
+            self.pause_task(pid)
+        except Exception as exc:
+            self.log("error", "pause failed after breakpoint", pid=pid, error=str(exc))
+        event = self.emit_event(
+            "debug_break",
+            pid=pid,
+            data={"pc": pc, "phase": phase, "reason": "breakpoint"},
+        )
+        return event
+
+    def _check_breakpoint_before_step(self, pid: Optional[int]) -> Optional[Dict[str, Any]]:
+        if pid is None:
+            return None
+        bp_set = self.breakpoints.get(pid)
+        if not bp_set:
+            return None
+        with self.lock:
+            regs = self.vm.read_regs(pid=pid)
+        pc = regs.get("pc")
+        if not isinstance(pc, int):
+            return None
+        if (pc & 0xFFFF) in bp_set:
+            return self._handle_breakpoint_hit(pid, pc, phase="pre")
+        return None
+
+    def _check_breakpoint_after_step(self, requested_pid: Optional[int], result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        if requested_pid is not None:
+            target_pid = requested_pid
+        else:
+            current = result.get("current_pid")
+            target_pid = current if isinstance(current, int) else None
+        if target_pid is None:
+            return None
+        bp_set = self.breakpoints.get(target_pid)
+        if not bp_set:
+            return None
+        with self.lock:
+            regs = self.vm.read_regs(pid=target_pid)
+        pc = regs.get("pc")
+        if not isinstance(pc, int):
+            return None
+        if (pc & 0xFFFF) in bp_set:
+            return self._handle_breakpoint_hit(target_pid, pc, phase="post")
+        return None
+
     def _next_event_seq(self) -> int:
         with self.event_lock:
             seq = self.event_seq
@@ -682,6 +731,21 @@ class ExecutiveState:
 
     def step(self, steps: Optional[int] = None, *, pid: Optional[int] = None, source: str = "manual") -> Dict[str, Any]:
         budget = steps if steps is not None else self.step_batch
+        pre_event = self._check_breakpoint_before_step(pid)
+        if pre_event is not None:
+            if source == "auto":
+                self.auto_step_count += 1
+            else:
+                self.manual_step_count += 1
+            result = {
+                "executed": 0,
+                "running": False,
+                "paused": True,
+                "current_pid": pid,
+                "events": [pre_event],
+            }
+            self._refresh_tasks()
+            return result
         with self.lock:
             result = self.vm.step(budget, pid=pid)
         events = result.get('events') or []
@@ -700,6 +764,12 @@ class ExecutiveState:
             self.manual_step_count += 1
             self.manual_step_total += executed
         running_flag = bool(result.get("running", True))
+        post_event = self._check_breakpoint_after_step(pid, result)
+        if post_event is not None:
+            result.setdefault("events", []).append(post_event)
+            result["paused"] = True
+            result["running"] = False
+            running_flag = False
         if (not running_flag) and (executed > 0 or self._last_vm_running):
             self.log(
                 "info",

@@ -34,15 +34,15 @@ This implementation plan addresses the gaps identified in the Executive Study do
 Design specifies session.open/close/keepalive with PID locks and capability negotiation (section 5.2). System/Executive.md notes: "Implement PID lock table + capability negotiation" as a core requirement. Foundation for all client interactions.
 
 **Todo:**
-- [ ] Design session state structure (session_id, client_info, capabilities, owned_pids, timestamp)
-- [ ] Implement `session.open` RPC command with capability negotiation
-- [ ] Implement `session.close` RPC command with PID lock cleanup
-- [ ] Implement `session.keepalive` RPC command with timeout detection
-- [ ] Add session lock table tracking which PIDs are owned by which sessions
-- [ ] Add EBUSY error handling when attempting operations on locked PIDs
-- [ ] Add session timeout handling (auto-close inactive sessions)
-- [ ] Add session tests (open/close lifecycle, timeout, PID locking)
-- [ ] Update `docs/executive_protocol.md` with session management API
+- [x] Design session state structure (session_id, client_info, capabilities, owned_pids, timestamp)
+- [x] Implement `session.open` RPC command with capability negotiation
+- [x] Implement `session.close` RPC command with PID lock cleanup
+- [x] Implement `session.keepalive` RPC command with timeout detection
+- [x] Add session lock table tracking which PIDs are owned by which sessions
+- [x] Add EBUSY error handling when attempting operations on locked PIDs
+- [x] Add session timeout handling (auto-close inactive sessions)
+- [x] Add session tests (open/close lifecycle, timeout, PID locking)
+- [x] Update `docs/executive_protocol.md` with session management API
 
 ---
 
@@ -56,17 +56,17 @@ Design specifies session.open/close/keepalive with PID locks and capability nego
 Design specifies comprehensive event streaming with subscribe/unsubscribe/ack (Section 7). System/Executive.md notes: "Build EventStreamer with bounded queue + ACK handling per docs/executive_protocol.md; include warning events on drop." Critical for debugger and tooling integration.
 
 **Todo:**
-- [ ] Design event schema structure (seq, ts, pid, type, data) per Section 7.1
-- [ ] Implement bounded ring buffer per session (configurable size: 100-1000 events)
-- [ ] Implement `events.subscribe` RPC command with event type filtering
-- [ ] Implement `events.unsubscribe` RPC command
-- [ ] Implement `events.ack` RPC command for flow control
-- [ ] Add drop-oldest policy when buffer is full
-- [ ] Emit warning events when events are dropped (back-pressure indication)
-- [ ] Add event routing from VM to subscribed sessions
-- [ ] Define core event types: trace_step, debug_break, task_state, scheduler
-- [ ] Add event streaming tests (subscribe, buffer overflow, ack protocol)
-- [ ] Update `docs/executive_protocol.md` with event streaming API and schema
+- [x] Design event schema structure (seq, ts, pid, type, data) per Section 7.1
+- [x] Implement bounded ring buffer per session (configurable size: 100-1000 events)
+- [x] Implement `events.subscribe` RPC command with event type filtering
+- [x] Implement `events.unsubscribe` RPC command
+- [x] Implement `events.ack` RPC command for flow control
+- [x] Add drop-oldest policy when buffer is full
+- [x] Emit warning events when events are dropped (back-pressure indication)
+- [x] Add event routing from VM to subscribed sessions
+- [x] Define core event types: trace_step, debug_break, task_state, scheduler
+- [x] Add event streaming tests (subscribe, buffer overflow, ack protocol)
+- [x] Update `docs/executive_protocol.md` with event streaming API and schema
 
 ---
 
@@ -80,17 +80,17 @@ Design specifies comprehensive event streaming with subscribe/unsubscribe/ack (S
 Design specifies bp.set/clear/list with per-PID breakpoint sets and pre/post-step checking (sections 5.2, 8.6). Essential debugger feature.
 
 **Todo:**
-- [ ] Design breakpoint structure (address, pid, enabled, hit_count)
-- [ ] Implement per-PID breakpoint sets (dict mapping PID to set of breakpoints)
-- [ ] Implement `bp.set(pid, address)` RPC command
-- [ ] Implement `bp.clear(pid, address)` RPC command
-- [ ] Implement `bp.list(pid)` RPC command
-- [ ] Add pre-step breakpoint checking (before VM step)
-- [ ] Add post-step breakpoint checking (after VM step)
-- [ ] Emit debug_break event when breakpoint hits
-- [ ] Pause task on breakpoint hit
-- [ ] Add breakpoint tests (set/clear, hit detection, multiple breakpoints)
-- [ ] Update `docs/executive_protocol.md` with breakpoint API
+- [x] Design breakpoint structure (address, pid, enabled, hit_count)
+- [x] Implement per-PID breakpoint sets (dict mapping PID to set of breakpoints)
+- [x] Implement `bp.set(pid, address)` RPC command
+- [x] Implement `bp.clear(pid, address)` RPC command
+- [x] Implement `bp.list(pid)` RPC command
+- [x] Add pre-step breakpoint checking (before VM step)
+- [x] Add post-step breakpoint checking (after VM step)
+- [x] Emit debug_break event when breakpoint hits
+- [x] Pause task on breakpoint hit
+- [x] Add breakpoint tests (set/clear, hit detection, multiple breakpoints)
+- [x] Update `docs/executive_protocol.md` with breakpoint API
 
 ---
 

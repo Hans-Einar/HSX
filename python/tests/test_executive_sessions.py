@@ -169,6 +169,10 @@ class DebugVM:
         self.breakpoints: set[int] = set()
         self.requests: list[dict] = []
         self.attach_calls = 0
+        self.pc = 0
+        self.step_delta = 0x10
+        self.step_calls = 0
+        self.paused = False
 
     def request(self, payload: dict) -> dict:
         self.requests.append(payload)
@@ -199,6 +203,29 @@ class DebugVM:
             return {'status': 'error', 'error': 'unknown_action'}
         raise AssertionError(f'unhandled dbg op {op!r}')
 
+    def ps(self) -> dict:
+        state = "paused" if self.paused else "running"
+        return {"tasks": [{"pid": 1, "state": state}], "current_pid": 1}
+
+    def info(self, pid: int | None = None) -> dict:
+        state = "paused" if self.paused else "running"
+        return {"tasks": {"tasks": [{"pid": 1, "state": state}], "current_pid": 1}}
+
+    def read_regs(self, pid: int | None = None) -> dict:
+        return {"pc": self.pc}
+
+    def pause(self, pid: int | None = None) -> None:
+        self.paused = True
+
+    def resume(self, pid: int | None = None) -> None:
+        self.paused = False
+
+    def step(self, steps: int, pid: int | None = None) -> dict:
+        self.step_calls += 1
+        self.paused = False
+        self.pc = (self.pc + self.step_delta) & 0xFFFF
+        return {"executed": 1 if steps is not None else 0, "running": True, "current_pid": pid, "paused": False}
+
 
 def make_debug_state() -> tuple[ExecutiveState, DebugVM]:
     vm = DebugVM()
@@ -226,4 +253,34 @@ def test_breakpoint_clear_all():
     info = state.breakpoint_clear_all(1)
     assert info['breakpoints'] == []
     assert vm.breakpoints == set()
+
+
+def test_step_hits_breakpoint_pre_phase():
+    state, vm = make_debug_state()
+    vm.pc = 0x200
+    state.breakpoint_add(1, 0x200)
+    result = state.step(steps=1, pid=1)
+    assert vm.step_calls == 0
+    assert vm.paused is True
+    assert result['paused'] is True
+    assert result['running'] is False
+    assert result['executed'] == 0
+    events = result.get('events', [])
+    assert events and events[0]['type'] == 'debug_break'
+    assert events[0]['data'].get('phase') == 'pre'
+    assert events[0]['data'].get('reason') == 'breakpoint'
+
+
+def test_step_hits_breakpoint_post_phase():
+    state, vm = make_debug_state()
+    state.breakpoint_add(1, 0x200)
+    vm.pc = 0x1F0
+    vm.step_delta = 0x10
+    result = state.step(steps=1, pid=1)
+    assert vm.step_calls == 1
+    assert vm.paused is True
+    events = result.get('events', [])
+    assert any(evt['data'].get('phase') == 'post' for evt in events)
+    assert result['paused'] is True
+    assert result['running'] is False
 
