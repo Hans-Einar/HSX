@@ -15,6 +15,7 @@
 | 2025-11-01 | e20d92cdae354701ad9e38d4dfea690718567ae1 | MiniVM PSW flags | Hans Einar | Implements full Z/C/N/V handling across ADD/SUB/CMP/MUL/logic/shift ops, documents PSW semantics, and adds `python/tests/test_vm_psw_flags.py`. ✔ `python -m pytest python/tests` |
 | 2025-11-01 | 7f7cc5b7696d3c149ffae2b903a119e65ad7110e | Carry-aware arithmetic | Hans Einar | Adds ADC/SBC opcodes (VM + assembler/disassembler), updates docs, and extends PSW tests. ✔ `python -m pytest python/tests` |
 | 2025-11-01 | 9e8b9c7054734151461cf7778d5a12f435a14eb5 | Integer DIV support | Hans Einar | Implements signed DIV with zero-trap handling, updates docs, and adds `python/tests/test_vm_div.py`. ✔ `python -m pytest python/tests` |
+| 2025-11-01 | 0caa12fc66d4601322a21c20d9215dc40093d575 | Trace API snapshot | Hans Einar | Adds VM trace accessors/events, updates gap notes, and adds `python/tests/test_vm_trace_api.py`. ✔ `python -m pytest python/tests` |
 
 ## Pull Request
 - PR URL / ID: _TBD_

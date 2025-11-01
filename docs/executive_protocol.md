@@ -201,7 +201,7 @@ Debugger Sessions & Event Streaming
 
 Typical payloads:
 
-- `trace_step`: `{ "pc": <uint32>, "opcode": <string>, "flags": <string?> }`
+- `trace_step`: `{ "pc": <uint32>, "next_pc": <uint32>, "opcode": <string>, "flags": <string?>, "regs": [<uint32> x16], "steps": <uint64?> }`
 - `debug_break`: `{ "pc": <uint32>, "reason": "BRK" | "virtual", "breakpoint_id": <int?> }`
 - `scheduler`: `{ "state": "READY|RUNNING|WAIT_MBX|SLEEPING|PAUSED|RETURNED", "prev_pid": <int?>, "next_pid": <int?> }`
 - `mailbox_send` / `mailbox_recv`: `{ "descriptor": <int>, "length": <int>, "flags": <uint16>, "channel": <uint16> }`
