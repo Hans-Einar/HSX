@@ -175,12 +175,12 @@ Design specifies disasm.read with symbol annotations and caching strategies (sec
 Design specifies symbols.list API for function/variable enumeration (section 5.5). Useful for debugger UI autocomplete and exploration.
 
 **Todo:**
-- [ ] Implement `symbols.list(pid, type)` RPC command
-- [ ] Support type filters: 'functions', 'variables', 'all'
-- [ ] Return symbol list with names, addresses, sizes, types
-- [ ] Add pagination support for large symbol tables
-- [ ] Add symbol tests (enumerate functions, variables, filtering)
-- [ ] Update `docs/executive_protocol.md` with symbols.list API
+- [x] Implement `symbols.list(pid, type)` RPC command
+- [x] Support type filters: 'functions', 'variables', 'all'
+- [x] Return symbol list with names, addresses, sizes, types
+- [x] Add pagination support for large symbol tables
+- [x] Add symbol tests (enumerate functions, variables, filtering)
+- [x] Update `docs/executive_protocol.md` with symbols.list API
 
 ---
 

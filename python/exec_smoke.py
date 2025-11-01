@@ -20,7 +20,7 @@ class ExecClient:
             host,
             port,
             client_name="hsx-exec-smoke",
-            features=["events", "stack", "disasm"],
+            features=["events", "stack", "symbols", "disasm"],
             timeout=timeout,
         )
 

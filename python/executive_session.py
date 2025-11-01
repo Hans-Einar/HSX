@@ -76,6 +76,7 @@ class ExecutiveSession:
         self._stack_cache: Dict[int, Tuple[float, JsonDict]] = {}
         self._stack_cache_lock = threading.Lock()
         self._disasm_supported: Optional[bool] = None
+        self._symbols_supported: Optional[bool] = None
 
     # ------------------------------------------------------------------ Basics
 
@@ -94,6 +95,7 @@ class ExecutiveSession:
             self._stack_cache.clear()
         self._stack_supported = None
         self._disasm_supported = None
+        self._symbols_supported = None
 
     # Public API --------------------------------------------------------------
 
@@ -256,6 +258,44 @@ class ExecutiveSession:
         if "disasm" in self.negotiated_features:
             return True
         return bool(self._disasm_supported)
+
+    def supports_symbols(self) -> bool:
+        if self.session_disabled:
+            return False
+        if "symbols" in self.negotiated_features:
+            return True
+        return bool(self._symbols_supported)
+
+    def symbols_list(
+        self,
+        pid: int,
+        *,
+        kind: Optional[str] = None,
+        offset: Optional[int] = None,
+        limit: Optional[int] = None,
+    ) -> Optional[JsonDict]:
+        payload: JsonDict = {"cmd": "symbols", "pid": int(pid)}
+        if kind is not None:
+            payload["type"] = str(kind)
+        if offset is not None:
+            payload["offset"] = int(offset)
+        if limit is not None:
+            payload["limit"] = int(limit)
+        try:
+            response = self.request(payload)
+        except Exception as exc:  # pragma: no cover - transport error
+            raise ExecutiveSessionError(f"symbols request failed: {exc}") from exc
+        if response.get("status") != "ok":
+            error = str(response.get("error", "symbols error"))
+            if "unknown_cmd" in error or "unsupported" in error:
+                self._symbols_supported = False
+                return None
+            raise ExecutiveSessionError(error)
+        block = response.get("symbols")
+        if not isinstance(block, dict):
+            return None
+        self._symbols_supported = True
+        return copy.deepcopy(block)
 
     def disasm_read(
         self,

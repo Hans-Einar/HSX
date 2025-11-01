@@ -52,7 +52,7 @@ def _ensure_exec_session(host: str, port: int) -> ExecutiveSession:
                 host,
                 port,
                 client_name="hsx-manager",
-                features=["events", "stack", "disasm"],
+                features=["events", "stack", "symbols", "disasm"],
                 max_events=128,
             )
         return _EXEC_SESSION

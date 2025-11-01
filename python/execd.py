@@ -113,7 +113,7 @@ class ExecutiveState:
         self.session_events_max = 2048
         self._last_session_prune = 0.0
         self._session_prune_interval = 5.0
-        self.session_supported_features = {"events", "stack", "disasm"}
+        self.session_supported_features = {"events", "stack", "disasm", "symbols"}
         self.debug_attached: Set[int] = set()
         self.breakpoints: Dict[int, Set[int]] = {}
         self.event_lock = threading.RLock()
@@ -671,6 +671,60 @@ class ExecutiveState:
             if idx < 0:
                 return None
             return dict(lines[idx])
+
+    def symbols_list(
+        self,
+        pid: int,
+        *,
+        kind: Optional[str] = None,
+        offset: int = 0,
+        limit: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        self.get_task(pid)
+        try:
+            offset = max(0, int(offset))
+        except (TypeError, ValueError):
+            offset = 0
+        try:
+            limit_value = int(limit) if limit is not None else None
+        except (TypeError, ValueError):
+            limit_value = None
+        if limit_value is not None:
+            limit_value = max(1, min(limit_value, 256))
+        kind_normalised = (kind or "all").lower()
+        allowed_kinds = {"functions", "variables", "all"}
+        if kind_normalised not in allowed_kinds:
+            raise ValueError("symbols.list type must be 'functions', 'variables', or 'all'")
+        with self.symbol_cache_lock:
+            table = self.symbol_tables.get(pid)
+            if not table:
+                return {
+                    "pid": pid,
+                    "count": 0,
+                    "offset": 0,
+                    "limit": limit_value,
+                    "type": kind_normalised,
+                    "symbols": [],
+                }
+            entries = list(table.get("symbols", []))
+        if kind_normalised != "all":
+            if kind_normalised == "functions":
+                entries = [item for item in entries if str(item.get("type") or "").lower() == "function"]
+            else:
+                entries = [item for item in entries if str(item.get("type") or "").lower() != "function"]
+        entries.sort(key=lambda item: item.get("address", 0))
+        total = len(entries)
+        start = min(offset, total)
+        end = total if limit_value is None else min(total, start + limit_value)
+        view = [dict(entry) for entry in entries[start:end]]
+        return {
+            "pid": pid,
+            "count": total,
+            "offset": start,
+            "limit": limit_value,
+            "type": kind_normalised,
+            "symbols": view,
+        }
 
     @staticmethod
     def _decode_instruction_word(word: int) -> Dict[str, int]:
@@ -2261,6 +2315,20 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                     info = self.state.stack_info(pid_int, max_frames=max_frames)
                     return {"version": 1, "status": "ok", "stack": info}
                 raise ValueError(f"unknown stack op '{op}'")
+            if cmd == "symbols":
+                op_value = request.get("op")
+                op = str(op_value or "list").lower()
+                pid_value = request.get("pid")
+                if pid_value is None:
+                    raise ValueError("symbols requires 'pid'")
+                pid_int = int(pid_value)
+                if op in {"", "list", "ls"}:
+                    type_value = request.get("type") or request.get("kind")
+                    offset_value = request.get("offset")
+                    limit_value = request.get("limit") or request.get("count")
+                    info = self.state.symbols_list(pid_int, kind=type_value, offset=offset_value or 0, limit=limit_value)
+                    return {"version": 1, "status": "ok", "symbols": info}
+                raise ValueError(f"unknown symbols op '{op}'")
             if cmd == "disasm":
                 pid_value = request.get("pid")
                 if pid_value is None:

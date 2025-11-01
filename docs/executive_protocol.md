@@ -42,6 +42,7 @@ Core Commands
 | `bp` | `{ "version": 1, "cmd": "bp", "op": "set", "pid": 1, "addr": 4096 }` | `{ "version": 1, "status": "ok", "pid": 1, "breakpoints": [4096] }` | Manage per-task breakpoints (`op`: `list`/`set`/`clear`/`clear_all`). |
 | `disasm` | `{ "version": 1, "cmd": "disasm", "pid": 1 [, "addr": 0x1000, "count": 8, "mode": "cached" ] }` | `{ "version": 1, "status": "ok", "disasm": { ... } }` | Disassemble a slice of task memory. |
 | `sym` | `{ "version": 1, "cmd": "sym", "op": "addr", "pid": 1, "address": 4096 }` | `{ "version": 1, "status": "ok", "symbol": { ... } }` | Symbol table helpers (`op`: `info`/`addr`/`name`/`line`/`load`). |
+| `symbols` | `{ "version": 1, "cmd": "symbols", "pid": 1 [, "type": "functions", "offset": 0, "limit": 20 ] }` | `{ "version": 1, "status": "ok", "symbols": { ... } }` | List symbols for a task with optional filtering/pagination. |
 | `stack` | `{ "version": 1, "cmd": "stack", "pid": 1 [, "max": 8] }` | `{ "version": 1, "status": "ok", "stack": { ... } }` | Reconstructs the PID stack (`max` frames; defaults to executive limit). |
 | `pause` | `{ "version": 1, "cmd": "pause", "pid": 1 }` | `{ "version": 1, "status": "ok", "task": { ... } }` | Pauses the specified task (global pause if `pid` omitted). |
 | `resume` | `{ "version": 1, "cmd": "resume", "pid": 1 }` | `{ "version": 1, "status": "ok", "task": { ... } }` | Resumes the specified task (global resume if `pid` omitted). |
@@ -221,6 +222,13 @@ Symbol lookup
 - `sym name <pid> <symbol>` returns symbol metadata by name; `sym line` maps addresses to source lines (when present).
 - `sym load <pid> <path>` reloads symbols from an explicit file. By default the executive loads `<program>.sym` from the same directory as the HXE image after `load/exec`.
 - Symbol operations are read-only for observers; `sym load` requires PID ownership so that debugger sessions do not clobber each other's settings.
+
+Symbol enumeration
+~~~~~~~~~~~~~~~~~~
+
+- `symbols list <pid> [--type functions|variables|all] [--offset N] [--limit N]` lists entries from the cached symbol table. The response includes `count`, `offset`, and `limit` metadata so clients can paginate.
+- `type` filters by symbol kind (`functions` restricts to type `function`; `variables` shows everything else). `offset` skips the first `N` entries and `limit` caps the number returned (default: return all remaining entries).
+- Each returned symbol entry mirrors the `.sym` schema (`name`, `address`, `size`, `type`, `file`, `line`), enabling tooling to populate menus, autocompletion, or sidebars without re-parsing the `.sym` file.
 
 Stack reconstruction
 ~~~~~~~~~~~~~~~~~~~~

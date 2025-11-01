@@ -1,9 +1,11 @@
-from python.executive_session import ExecutiveSession
+import pytest
+
+from python.executive_session import ExecutiveSession, ExecutiveSessionError
 
 
 class StubSession(ExecutiveSession):
-    def __init__(self, responses):
-        super().__init__("127.0.0.1", 9998, client_name="test", features=["stack"])
+    def __init__(self, responses, *, features=None):
+        super().__init__("127.0.0.1", 9998, client_name="test", features=features or ["stack"])
         self._responses = list(responses)
         self.sent = []
 
@@ -70,3 +72,51 @@ def test_stack_info_unsupported_graceful():
     assert session.supports_stack() is False
     assert session.stack_info(2, refresh=False) is None
     assert session.stack_frames(2, refresh=False) == []
+
+
+def test_symbols_list_success_and_payload_copy():
+    symbol_block = {
+        "pid": 5,
+        "count": 3,
+        "offset": 1,
+        "limit": 1,
+        "type": "functions",
+        "symbols": [
+            {"name": "alpha", "address": 0x100, "size": 12, "type": "function"},
+            {"name": "beta", "address": 0x110, "size": 8, "type": "function"},
+            {"name": "gamma", "address": 0x120, "size": 6, "type": "function"},
+        ],
+    }
+    session = StubSession(
+        [make_handshake(["events"]), {"status": "ok", "symbols": symbol_block}],
+        features=["symbols"],
+    )
+    info = session.symbols_list(5, kind="functions", offset=1, limit=1)
+    assert info == symbol_block
+    assert session.supports_symbols() is True
+    assert session.sent[-1]["cmd"] == "symbols"
+    assert session.sent[-1]["type"] == "functions"
+    assert session.sent[-1]["offset"] == 1
+    assert session.sent[-1]["limit"] == 1
+    # result should be a detached copy
+    info["symbols"][0]["name"] = "mutated"
+    assert symbol_block["symbols"][0]["name"] == "alpha"
+
+
+def test_symbols_list_unknown_marks_unsupported():
+    session = StubSession(
+        [make_handshake(["events"]), {"status": "error", "error": "unknown_cmd:symbols"}],
+        features=["symbols"],
+    )
+    result = session.symbols_list(3)
+    assert result is None
+    assert session.supports_symbols() is False
+
+
+def test_symbols_list_other_error_raises():
+    session = StubSession(
+        [make_handshake(["events"]), {"status": "error", "error": "internal failure"}],
+        features=["symbols"],
+    )
+    with pytest.raises(ExecutiveSessionError):
+        session.symbols_list(4)

@@ -47,7 +47,7 @@ class ShellRPC:
             host,
             port,
             client_name="hsx-blinkenlights",
-            features=["events", "stack", "disasm"],
+            features=["events", "stack", "symbols", "disasm"],
             max_events=512,
             timeout=timeout,
             event_buffer=512,

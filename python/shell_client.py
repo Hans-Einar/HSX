@@ -70,6 +70,7 @@ COMMAND_NAMES = sorted(
         "stdio",
         "disasm",
         "stack",
+        "symbols",
         "sym",
         "trace",
         "step",
@@ -105,7 +106,7 @@ def _ensure_session(host: str, port: int, *, auto_events: bool = False) -> Execu
                 host,
                 port,
                 client_name="hsx-shell",
-                features=["events", "stack", "disasm"],
+                features=["events", "stack", "symbols", "disasm"],
                 max_events=256,
             )
         session = _SESSION_MANAGER
@@ -502,6 +503,57 @@ def _pretty_sym(payload: dict) -> None:
             print(f"  addr : 0x{addr:X} ({addr})")
         return
     print(json.dumps(payload, indent=2, sort_keys=True))
+
+
+def _pretty_symbols(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    block = payload.get("symbols")
+    if not isinstance(block, dict):
+        print("symbols: <no data>")
+        return
+    pid = block.get("pid", "?")
+    sym_type = block.get("type") or "all"
+    total = block.get("count", 0)
+    try:
+        offset_value = int(block.get("offset", 0))
+    except (TypeError, ValueError):
+        offset_value = block.get("offset", 0)
+    limit = block.get("limit")
+    limit_text = "∞" if limit is None else str(limit)
+    print(f"symbols pid={pid} type={sym_type} count={total} offset={offset_value} limit={limit_text}")
+    entries = block.get("symbols") or []
+    if not entries:
+        print("  <no entries>")
+        return
+    for item in entries:
+        name = item.get("name", "<unnamed>")
+        address = item.get("address")
+        addr_text = "<unknown>"
+        if isinstance(address, int):
+            addr_text = f"0x{address:08X}"
+        elif isinstance(address, str):
+            try:
+                addr_text = f"0x{int(address, 0):08X}"
+            except ValueError:
+                addr_text = address
+        size = item.get("size")
+        try:
+            size_value = int(size) if size is not None else None
+        except (TypeError, ValueError):
+            size_value = None
+        size_text = "-" if size_value is None else str(size_value)
+        kind = item.get("type", "-")
+        file = item.get("file")
+        line = item.get("line")
+        details = []
+        if file:
+            details.append(str(file))
+        if line is not None:
+            details.append(f"line {line}")
+        suffix = f" ({', '.join(details)})" if details else ""
+        print(f"  {addr_text}  {size_text:>4}  {kind:<9}  {name}{suffix}")
 
 
 def _pretty_stack(payload: dict) -> None:
@@ -1132,6 +1184,7 @@ PRETTY_HANDLERS = {
     'attach': _pretty_info,
     'bp': _pretty_bp,
     'sym': _pretty_sym,
+    'symbols': _pretty_symbols,
     'disasm': _pretty_disasm,
     'stack': _pretty_stack,
     'ps': _pretty_ps,
@@ -1211,6 +1264,8 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
 
     if cmd == "bp":
         return _build_bp_payload(args)
+    if cmd == "symbols":
+        return _build_symbols_payload(args)
     if cmd == "sym":
         return _build_sym_payload(args)
     if cmd == "disasm":
@@ -1666,6 +1721,34 @@ def _build_bp_payload(args: list[str]) -> dict:
     raise ValueError(f"bp unknown action '{action}'")
 
 
+def _build_symbols_payload(args: list[str]) -> dict:
+    if not args:
+        raise ValueError("symbols usage: symbols <pid> [--type functions|variables|all] [--offset N] [--limit N]")
+    payload: dict[str, object] = {"cmd": "symbols", "pid": int(args[0], 0)}
+    i = 1
+    while i < len(args):
+        token = args[i]
+        if token in {"--type", "--kind", "-t"}:
+            i += 1
+            if i >= len(args):
+                raise ValueError("symbols --type requires a value")
+            payload["type"] = args[i]
+        elif token in {"--offset", "-o"}:
+            i += 1
+            if i >= len(args):
+                raise ValueError("symbols --offset requires a value")
+            payload["offset"] = int(args[i], 0)
+        elif token in {"--limit", "-l"}:
+            i += 1
+            if i >= len(args):
+                raise ValueError("symbols --limit requires a value")
+            payload["limit"] = int(args[i], 0)
+        else:
+            raise ValueError("symbols usage: symbols <pid> [--type functions|variables|all] [--offset N] [--limit N]")
+        i += 1
+    return payload
+
+
 def _build_sym_payload(args: list[str]) -> dict:
     if not args:
         raise ValueError("sym usage: sym <info|addr|name|line|load> ...")
@@ -1769,6 +1852,23 @@ def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: boo
                     print(json.dumps(event, indent=2, sort_keys=True))
             else:
                 _pretty_events(events)
+            continue
+        if cmd == 'symbols':
+            try:
+                payload = _build_symbols_payload(args)
+            except ValueError as exc:
+                print(exc)
+                continue
+            try:
+                resp = send_request(host, port, payload)
+            except Exception as exc:
+                print(f"error: {exc}")
+                continue
+            handler = PRETTY_HANDLERS.get('symbols')
+            if handler and not force_json:
+                handler(resp)
+            else:
+                print(json.dumps(resp, indent=2, sort_keys=True))
             continue
         if cmd == 'sym':
             try:
@@ -1981,6 +2081,18 @@ def main() -> None:
         else:
             print(json.dumps(resp, indent=2, sort_keys=True))
         return
+    if cmd == 'symbols':
+        try:
+            payload = _build_symbols_payload(args)
+        except ValueError as exc:
+            parser.error(str(exc))
+        resp = send_request(args_ns.host, args_ns.port, payload)
+        handler = PRETTY_HANDLERS.get('symbols')
+        if handler and not force_json:
+            handler(resp)
+        else:
+            print(json.dumps(resp, indent=2, sort_keys=True))
+        return
     if cmd == 'sym':
         try:
             payload = _build_sym_payload(args)
@@ -2097,4 +2209,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

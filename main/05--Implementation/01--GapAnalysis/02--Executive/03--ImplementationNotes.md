@@ -159,32 +159,6 @@ Start new sections chronologically. Keep notes concise but actionable so the nex
 - Follow-up actions / hand-off notes.
   - Consider richer UI affordances (frame drill-down, symbol hover) once extended metadata becomes available.
 
-## 2025-11-01 - Codex (Session 7)
-
-### Focus
-- Task(s) tackled: Expose stack RPC via ExecutiveSession and surface traces in higher-level clients (Blinkenlights UI, smoke tests, manager CLI).
-- Dependencies touched: , , , , .
-
-### Status
-- DONE
-
-### Details
-- Summary of code changes / key decisions.
-  - Added cached  helpers to  with graceful fallback when unsupported, plus targeted unit tests for success/error paths.
-  - Updated Blinkenlights to render per-task stack summaries and extended exec_smoke/manager tooling with stack-aware commands and summaries.
-  - Ensured all front-ends request the stack capability and reuse shared helper methods.
-- Tests run (commands + result).
-  - ============================= test session starts =============================
-platform win32 -- Python 3.14.0, pytest-8.4.2, pluggy-1.6.0
-rootdir: C:\Users\Hans Einar\Documents\GIT\HSX
-collected 21 items
-
-python\tests\test_executive_session_helpers.py ..                        [  9%]
-python\tests\test_executive_sessions.py ...................              [100%]
-
-============================= 21 passed in 0.30s ============================== → PASS
-- Follow-up actions / hand-off notes.
-  - Consider richer UI affordances (frame drill-down, symbol hover) once extended metadata becomes available.
 ## 2025-11-01 - Codex (Session 8)
 
 ### Focus
@@ -203,3 +177,22 @@ python\tests\test_executive_sessions.py ...................              [100%]
   - `/mnt/c/Windows/py.exe -3.14 -m pytest python/tests/test_executive_session_helpers.py python/tests/test_executive_sessions.py` ? PASS
 - Follow-up actions / hand-off notes.
   - Consider richer CLI filters (e.g., symbol/breakpoint overlays) once downstream tooling consumes the API.
+
+## 2025-11-02 - Codex (Session 9)
+
+### Focus
+- Task(s) tackled: Phase 2.1 symbol enumeration coverage and ExecutiveSession support (`symbols.list`, client helpers, regression tests).
+- Dependencies touched: `python/execd.py`, `python/executive_session.py`, `python/tests/test_executive_sessions.py`, `python/tests/test_executive_session_helpers.py`, implementation docs.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions.
+  - Extended the test harness with symbol enumeration coverage (filtering, pagination, invalid kind handling) and enhanced seed helper to accept typed entries.
+  - Added ExecutiveSession support for symbol enumeration (`supports_symbols`, `symbols_list`) with comprehensive unit tests, including transport error handling.
+  - Restored the session helper file to the committed layout and wired `_symbols_supported` reset paths to keep feature negotiation consistent.
+- Tests run (commands + result).
+  - `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py python/tests/test_executive_session_helpers.py` ✅ PASS
+- Follow-up actions / hand-off notes.
+  - Next up: tackle Phase 2.2 memory region reporting and continue plumbing symbol metadata into higher-level clients.

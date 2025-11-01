@@ -355,10 +355,30 @@ def _write_bytes(vm: DebugVM, addr: int, data: bytes) -> None:
         vm.memory[(addr + i) & 0xFFFFFFFF] = byte
 
 
-def _seed_symbol_table(state: ExecutiveState, pid: int, entries: list[tuple[str, int, int]]) -> None:
-    symbols = [{"name": name, "address": addr, "size": size, "type": "function"} for name, addr, size in entries]
-    addresses = [{"name": item["name"], "address": item["address"], "size": item["size"], "type": item["type"]} for item in symbols]
-    lines = [{"address": addr, "file": "prog.c", "line": 10 + idx * 5} for idx, (_, addr, _) in enumerate(entries)]
+def _seed_symbol_table(state: ExecutiveState, pid: int, entries: list[tuple[str, int, int] | dict]) -> None:
+    symbols: list[dict] = []
+    for entry in entries:
+        if isinstance(entry, dict):
+            symbol = dict(entry)
+        else:
+            name, addr, size = entry
+            symbol = {"name": name, "address": addr, "size": size, "type": "function"}
+        symbol.setdefault("size", 0)
+        symbol.setdefault("type", "function")
+        symbols.append(symbol)
+    addresses = [
+        {
+            "name": item["name"],
+            "address": item["address"],
+            "size": item["size"],
+            "type": item.get("type", "function"),
+        }
+        for item in symbols
+    ]
+    lines = [
+        {"address": item["address"], "file": "prog.c", "line": 10 + idx * 5}
+        for idx, item in enumerate(symbols)
+    ]
     table = {
         "path": "test.sym",
         "symbols": symbols,
@@ -368,6 +388,50 @@ def _seed_symbol_table(state: ExecutiveState, pid: int, entries: list[tuple[str,
     }
     with state.symbol_cache_lock:
         state.symbol_tables[pid] = table
+
+
+def test_symbols_list_filters_and_paginate():
+    state, _ = make_debug_state()
+    _seed_symbol_table(
+        state,
+        1,
+        [
+            {"name": "alpha", "address": 0x100, "size": 12, "type": "function"},
+            {"name": "beta", "address": 0x120, "size": 8, "type": "function"},
+            {"name": "buffer", "address": 0x200, "size": 16, "type": "object"},
+            {"name": "flag", "address": 0x210, "size": 2, "type": "variable"},
+        ],
+    )
+    all_symbols = state.symbols_list(1)
+    assert all_symbols["count"] == 4
+    assert [entry["name"] for entry in all_symbols["symbols"]] == ["alpha", "beta", "buffer", "flag"]
+
+    funcs = state.symbols_list(1, kind="functions")
+    assert funcs["count"] == 2
+    assert [entry["name"] for entry in funcs["symbols"]] == ["alpha", "beta"]
+
+    vars_only = state.symbols_list(1, kind="variables")
+    assert vars_only["count"] == 2
+    assert [entry["name"] for entry in vars_only["symbols"]] == ["buffer", "flag"]
+
+    paged = state.symbols_list(1, offset=1, limit=2)
+    assert paged["offset"] == 1
+    assert paged["limit"] == 2
+    assert [entry["name"] for entry in paged["symbols"]] == ["beta", "buffer"]
+
+
+def test_symbols_list_missing_table_returns_empty():
+    state, _ = make_debug_state()
+    result = state.symbols_list(1, offset=0, limit=5)
+    assert result["count"] == 0
+    assert result["offset"] == 0
+    assert result["symbols"] == []
+
+
+def test_symbols_list_invalid_kind_raises():
+    state, _ = make_debug_state()
+    with pytest.raises(ValueError):
+        state.symbols_list(1, kind="registers")
 
 
 def test_stack_info_two_frames_with_symbols():
