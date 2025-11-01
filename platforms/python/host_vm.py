@@ -1560,6 +1560,7 @@ class VMController:
         self._task_memory: Dict[int, Dict[str, int]] = {}
         self.scheduler_trace: deque[Dict[str, Any]] = deque(maxlen=256)
         self.scheduler_counters: Dict[int, Dict[str, int]] = defaultdict(dict)
+        self.streaming_sessions: Dict[int, Dict[str, Any]] = {}
 
     def _trace_mailbox_regs(self, label: str, vm: MiniVM, fn: int, *, extra: Optional[Dict[str, Any]] = None) -> None:
         """Append a compact register/PC snapshot to the mailbox trace log."""
@@ -1595,6 +1596,7 @@ class VMController:
         self._task_memory.clear()
         self.scheduler_trace.clear()
         self.scheduler_counters.clear()
+        self.streaming_sessions.clear()
         return {"status": "ok"}
 
     def mailbox_snapshot(self) -> List[Dict[str, Any]]:
@@ -2432,18 +2434,40 @@ class VMController:
         if self.server is not None:
             threading.Thread(target=self.server.shutdown, daemon=True).start()
 
-    def load_from_path(self, path: str, *, verbose: bool = False) -> Dict[str, Any]:
-        self._store_active_state()
-        header, code, rodata = load_hxe(path, verbose=verbose)
-        temp_vm = MiniVM(code, entry=header["entry"], rodata=rodata, trace=self.trace, svc_trace=self.svc_trace, dev_libm=self.dev_libm)
+    def _finalize_loaded_image(
+        self,
+        header: Dict[str, Any],
+        code: bytes,
+        rodata: bytes,
+        *,
+        pid: Optional[int] = None,
+        program_path: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        temp_vm = MiniVM(
+            code,
+            entry=header["entry"],
+            rodata=rodata,
+            trace=self.trace,
+            svc_trace=self.svc_trace,
+            dev_libm=self.dev_libm,
+        )
         state = temp_vm.snapshot_state()
-        pid = self.next_pid
-        self.next_pid += 1
+        if pid is None:
+            pid = self.next_pid
+            self.next_pid += 1
+        else:
+            # Ensure next_pid always advances beyond explicitly provided pid.
+            self.next_pid = max(self.next_pid, pid + 1)
         ctx = state["context"]
-        allocation = self._allocate_task_memory(pid)
+        allocation = self._task_memory.get(pid)
+        if allocation is None:
+            allocation = self._allocate_task_memory(pid)
         mem = state.get("mem")
         if mem is None:
             mem = bytearray(VM_ADDRESS_SPACE_SIZE)
+            state["mem"] = mem
+        elif not isinstance(mem, bytearray):
+            mem = bytearray(mem)
             state["mem"] = mem
         regs = list(ctx.get("regs", [0] * 16))
         for idx, value in enumerate(regs):
@@ -2468,9 +2492,13 @@ class VMController:
         ctx["sp"] = allocation["sp"]
         ctx["stack_size"] = allocation["stack_size"]
         state["context"] = ctx
+        if program_path is None:
+            program_label = f"<stream:{pid}>"
+        else:
+            program_label = str(program_path)
         self.tasks[pid] = {
             "pid": pid,
-            "program": str(Path(path).resolve()),
+            "program": program_label,
             "state": "running",
             "priority": ctx.get("priority", 10),
             "quantum": ctx.get("time_slice_steps", 1),
@@ -2501,7 +2529,7 @@ class VMController:
             }
         )
         ctx["fd_table"] = fd_table
-        self.program_path = self.tasks[pid]["program"]
+        self.program_path = program_label
         self._activate_task(pid, state_override=state)
         return {
             "pid": pid,
@@ -2510,6 +2538,91 @@ class VMController:
             "ro_len": header["ro_len"],
             "bss": header["bss_size"],
         }
+
+    def load_from_path(self, path: str, *, verbose: bool = False) -> Dict[str, Any]:
+        self._store_active_state()
+        header, code, rodata = load_hxe(path, verbose=verbose)
+        program_label = str(Path(path).resolve())
+        return self._finalize_loaded_image(header, code, rodata, program_path=program_label)
+
+    def load_stream_begin(self, *, label: Optional[str] = None) -> Dict[str, Any]:
+        pid = self.next_pid
+        self.next_pid += 1
+        self.streaming_sessions[pid] = {
+            "pid": pid,
+            "buffer": bytearray(),
+            "state": "writing",
+            "header": None,
+            "expected_total": None,
+            "program": label,
+        }
+        return {"status": "ok", "pid": pid}
+
+    def load_stream_write(self, pid: int, chunk: bytes) -> Dict[str, Any]:
+        session = self.streaming_sessions.get(pid)
+        if session is None:
+            return {"status": "error", "error": "ESRCH", "message": f"unknown streaming pid {pid}"}
+        if session.get("state") != "writing":
+            return {"status": "error", "error": "EBUSY", "message": "streaming session not writable"}
+        if not chunk:
+            return {"status": "ok", "bytes": 0}
+        if not isinstance(chunk, (bytes, bytearray, memoryview)):
+            chunk = bytes(chunk)
+        buffer = session["buffer"]
+        buffer.extend(chunk)
+        if session["header"] is None and len(buffer) >= HEADER.size:
+            header_bytes = bytes(buffer[: HEADER.size])
+            header = dict(zip(HEADER_FIELDS, HEADER.unpack_from(header_bytes)))
+            try:
+                _validate_hxe_header(header)
+            except ValueError as exc:  # pragma: no cover - defensive
+                session["state"] = "error"
+                return {"status": "error", "error": "EBADMSG", "message": str(exc)}
+            session["header"] = header
+            session["expected_total"] = HEADER.size + header["code_len"] + header["ro_len"]
+        expected_total = session.get("expected_total")
+        if expected_total is not None and len(buffer) > expected_total:
+            session["state"] = "error"
+            return {"status": "error", "error": "EBADMSG", "message": "stream exceeds declared length"}
+        return {"status": "ok", "bytes": len(chunk)}
+
+    def load_stream_end(self, pid: int, *, verbose: bool = False) -> Dict[str, Any]:
+        session = self.streaming_sessions.get(pid)
+        if session is None:
+            return {"status": "error", "error": "ESRCH", "message": f"unknown streaming pid {pid}"}
+        if session.get("state") == "error":
+            return {"status": "error", "error": "EBUSY", "message": "streaming session is in an error state"}
+        expected_total = session.get("expected_total")
+        if expected_total is None:
+            return {"status": "error", "error": "EBADMSG", "message": "HXE header incomplete"} 
+        buffer = session["buffer"]
+        if len(buffer) != expected_total:
+            return {"status": "error", "error": "EBADMSG", "message": "HXE payload incomplete"}
+        try:
+            header, code, rodata = load_hxe_bytes(bytes(buffer), verbose=verbose)
+        except ValueError as exc:
+            session["state"] = "error"
+            return {"status": "error", "error": "EBADMSG", "message": str(exc)}
+        self.streaming_sessions.pop(pid, None)
+        self._store_active_state()
+        program_label = session.get("program")
+        result = self._finalize_loaded_image(header, code, rodata, pid=pid, program_path=program_label)
+        result["status"] = "ok"
+        return result
+
+    def load_stream_abort(self, pid: int) -> Dict[str, Any]:
+        session = self.streaming_sessions.pop(pid, None)
+        if session is None:
+            return {"status": "error", "error": "ESRCH", "message": f"unknown streaming pid {pid}"}
+        buffer = session.get("buffer")
+        if isinstance(buffer, bytearray):
+            buffer.clear()
+        # Release any reserved memory if we allocated earlier.
+        if pid in self._task_memory:
+            self._release_task_memory(pid)
+        self.tasks.pop(pid, None)
+        self.task_states.pop(pid, None)
+        return {"status": "ok"}
 
     # ------------------------------------------------------------------
     # Task/context helpers
@@ -3404,19 +3517,37 @@ class VMServer(socketserver.ThreadingTCPServer):
         self.controller = controller
         controller.server = self
 
-def load_hxe(path, *, verbose: bool = False):
-    data = Path(path).read_bytes()
+def _validate_hxe_header(header: Dict[str, int]) -> None:
+    if header["magic"] != HSX_MAGIC:
+        raise ValueError(f"Bad magic 0x{header['magic']:08X}")
+    if header["version"] != HSX_VERSION:
+        raise ValueError(f"Unsupported HSXE version 0x{header['version']:04X}")
+    code_len = header["code_len"]
+    ro_len = header["ro_len"]
+    bss_size = header["bss_size"]
+    entry = header["entry"]
+    if code_len < 0 or ro_len < 0 or bss_size < 0:
+        raise ValueError("Negative section length not permitted")
+    if code_len > MAX_CODE_LEN:
+        raise ValueError("Code section exceeds VM capacity")
+    if ro_len > MAX_RODATA_LEN:
+        raise ValueError("RODATA section exceeds VM capacity")
+    if bss_size > MAX_BSS_SIZE:
+        raise ValueError("BSS size exceeds VM capacity")
+    if code_len % 4 != 0:
+        raise ValueError("Code section must be 4-byte aligned")
+    if entry % 4 != 0:
+        raise ValueError("Entry address must be 4-byte aligned")
+
+
+def load_hxe_bytes(data: bytes, *, verbose: bool = False):
     if len(data) < HEADER.size:
         raise ValueError(".hxe file too small")
 
     fields = HEADER.unpack_from(data)
     header = dict(zip(HEADER_FIELDS, fields))
 
-    if header["magic"] != HSX_MAGIC:
-        raise ValueError(f"Bad magic 0x{header['magic']:08X}")
-    if header["version"] != HSX_VERSION:
-        raise ValueError(f"Unsupported HSXE version 0x{header['version']:04X}")
-
+    _validate_hxe_header(header)
     crc_input = data[: HEADER.size - 4] + data[HEADER.size :]
     calc_crc = zlib.crc32(crc_input) & 0xFFFFFFFF
     if calc_crc != header["crc32"]:
@@ -3446,7 +3577,6 @@ def load_hxe(path, *, verbose: bool = False):
 
     if ro_end > len(data):
         raise ValueError(".hxe truncated: sections exceed file length")
-
     if entry < 0 or entry >= code_len:
         raise ValueError("Entry point outside code section")
 
@@ -3458,6 +3588,11 @@ def load_hxe(path, *, verbose: bool = False):
             f"[HXE] entry=0x{entry:08X} code_len={code_len} ro_len={ro_len} bss={bss_size} caps=0x{header['req_caps']:08X}"
         )
     return header, code, rodata
+
+
+def load_hxe(path, *, verbose: bool = False):
+    data = Path(path).read_bytes()
+    return load_hxe_bytes(data, verbose=verbose)
 
 def main():
     ap = argparse.ArgumentParser(description="HSX Python VM")

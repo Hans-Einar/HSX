@@ -75,3 +75,15 @@
   - Added regression tests to confirm API surfaces correct data and event payloads (`python/tests/test_vm_trace_api.py`).
 - **Testing:** `python -m pytest python/tests/test_vm_trace_api.py` and full `python -m pytest python/tests`.
 - **Follow-ups:** Finish remaining Phase 1 tasks (streaming loader, trace documentation polish) and align executive-side consumers.
+
+## 2025-11-01 - Codex (Session 7)
+
+### Phase 1.6 - Streaming HXE loader
+- **Status:** DONE (Python VM controller supports begin/write/end/abort workflow).
+- **What was done:**
+  - Refactored `load_hxe` into reusable `load_hxe_bytes` and introduced `_finalize_loaded_image` so streaming and monolithic paths share instantiation logic (`platforms/python/host_vm.py:3470`).
+  - Added controller APIs `load_stream_{begin,write,end,abort}` with buffering, header validation, and CRC-checked finalisation (`platforms/python/host_vm.py:3537`).
+  - Ensured streaming end reuses the existing task registration flow and emits errors for overflow/truncated payload scenarios.
+  - Added regression coverage in `python/tests/test_vm_stream_loader.py` to exercise success, overflow, and incomplete-stream cases.
+- **Testing:** `python -m pytest python/tests/test_vm_stream_loader.py` and full `python -m pytest python/tests`.
+- **Follow-ups:** Coordinate with provisioning/executive layers to wire the new RPC commands and document the streaming state machine.
