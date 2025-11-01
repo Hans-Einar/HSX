@@ -271,3 +271,22 @@ Start new sections chronologically. Keep notes concise but actionable so the nex
 
 ### Follow-up actions / hand-off notes
 - Surface the new task_state stream inside higher-level debugger front-ends (IDE/TUI) and consider richer reason/detail taxonomies once telemetry is captured in practice.
+
+## 2025-11-03 - Codex (Session 14)
+
+### Focus
+- Task(s) tackled: Phase 2.6 register change tracking (trace_step diffing, CLI/doc integration, regression tests).
+- Dependencies touched: `python/execd.py`, `python/shell_client.py`, `docs/executive_protocol.md`, `python/tests/test_executive_sessions.py`, `main/05--Implementation/01--GapAnalysis/02--Executive/02--ImplementationPlan.md`.
+
+### Status
+- DONE
+
+### Details
+- Added per-task register snapshots and `_handle_trace_step_event` to compute `changed_regs`, including PC/PSW tracking and optional toggle; cleared snapshots when tasks terminate.
+- Updated shell `events` formatter to highlight the trimmed register list, refreshed protocol docs to document the field, and introduced regression tests covering diffs, toggle behaviour, and baseline handling.
+
+### Tests run (commands + result)
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py`
+
+### Follow-up actions / hand-off notes
+- Consider surfacing `changed_regs` in higher-level debugger views (e.g., selective register refresh) and exposing a configuration knob once client requirements solidify.

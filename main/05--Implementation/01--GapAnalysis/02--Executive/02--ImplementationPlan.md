@@ -276,12 +276,12 @@ Design specifies structured task_state events with reason codes (section 7.2). E
 Design specifies optional changed_regs field in trace_step events to optimize TUI (section 7.2). Performance optimization for debugger displays.
 
 **Todo:**
-- [ ] Track previous register values per PID
-- [ ] Compare registers after each step
-- [ ] Add changed_regs field to trace_step events (array of register IDs)
-- [ ] Make register change tracking optional (config flag)
-- [ ] Add register change tests
-- [ ] Document changed_regs field in event schema
+- [x] Track previous register values per PID
+- [x] Compare registers after each step
+- [x] Add changed_regs field to trace_step events (array of register IDs)
+- [x] Make register change tracking optional (config flag)
+- [x] Add register change tests
+- [x] Document changed_regs field in event schema
 
 ---
 

@@ -152,6 +152,8 @@ class ExecutiveState:
         self.watchers: Dict[int, Dict[int, Dict[str, Any]]] = {}
         self._next_watch_id = 1
         self.task_state_pending: Dict[int, Dict[str, Any]] = {}
+        self.trace_last_regs: Dict[int, Dict[str, Any]] = {}
+        self.trace_track_changed_regs = True
         self.symbol_cache_lock = threading.RLock()
         self.default_stack_frames = 16
 
@@ -1608,6 +1610,51 @@ class ExecutiveState:
             return "returned"
         return None
 
+    def _handle_trace_step_event(self, pid: int, payload: Dict[str, Any]) -> None:
+        regs_value = payload.get("regs")
+        if not isinstance(regs_value, (list, tuple)):
+            self.trace_last_regs.pop(pid, None)
+            return
+        regs_list = list(regs_value[:16])
+        clean_regs: List[int] = []
+        for value in regs_list:
+            try:
+                clean_regs.append(int(value) & 0xFFFFFFFF)
+            except (TypeError, ValueError):
+                clean_regs.append(0)
+        while len(clean_regs) < 16:
+            clean_regs.append(0)
+        pc_value_raw = payload.get("pc")
+        pc_value: Optional[int]
+        try:
+            pc_value = int(pc_value_raw) & 0xFFFFFFFF if pc_value_raw is not None else None
+        except (TypeError, ValueError):
+            pc_value = None
+        flags_raw = payload.get("flags")
+        try:
+            flags_value = int(flags_raw) & 0xFFFFFFFF if flags_raw is not None else None
+        except (TypeError, ValueError):
+            flags_value = None
+        last_entry = self.trace_last_regs.get(pid)
+        changed: List[str] = []
+        if last_entry is None or not isinstance(last_entry.get("regs"), list):
+            changed = [f"R{i}" for i in range(len(clean_regs))]
+        else:
+            last_regs = last_entry.get("regs", [])
+            for idx, value in enumerate(clean_regs):
+                prev_value = last_regs[idx] if idx < len(last_regs) else None
+                if prev_value is None or prev_value != value:
+                    changed.append(f"R{idx}")
+        last_pc = last_entry.get("pc") if last_entry else None
+        if pc_value is not None and (last_pc is None or pc_value != last_pc):
+            changed.append("PC")
+        last_flags = last_entry.get("flags") if last_entry else None
+        if flags_value is not None and (last_flags is None or flags_value != last_flags):
+            changed.append("PSW")
+        if self.trace_track_changed_regs and changed:
+            payload["changed_regs"] = changed
+        self.trace_last_regs[pid] = {"regs": clean_regs, "pc": pc_value, "flags": flags_value}
+
     def _parse_event_filters(self, filters: Optional[Dict[str, Any]]) -> Tuple[Optional[Set[int]], Optional[Set[str]], Optional[int]]:
         if not isinstance(filters, dict):
             return None, None, None
@@ -1932,6 +1979,7 @@ class ExecutiveState:
                 ts=ts,
                 state_entry=prev_entry,
             )
+            self.trace_last_regs.pop(pid, None)
 
         self.task_states = new_states
         stale = set(self.breakpoints.keys()) - current_pids
@@ -1950,6 +1998,9 @@ class ExecutiveState:
         stale_layouts = set(self.memory_layouts.keys()) - current_pids
         for pid in stale_layouts:
             self.memory_layouts.pop(pid, None)
+        stale_trace = set(self.trace_last_regs.keys()) - current_pids
+        for pid in stale_trace:
+            self.trace_last_regs.pop(pid, None)
 
     def log(self, level: str, message: str, **fields: Any) -> None:
         entry = {
@@ -2442,6 +2493,8 @@ class ExecutiveState:
             pid = int(pid_value) if pid_value is not None else None
             payload = {k: v for k, v in event.items() if k not in {"type", "pid", "ts", "seq"}}
             event_type = str(etype or "vm")
+            if etype == "trace_step" and pid is not None:
+                self._handle_trace_step_event(pid, payload)
             self.emit_event(event_type, pid=pid, data=payload, ts=event.get("ts"))
             if etype == "mailbox_wait" and pid is not None:
                 self._mark_task_wait_mailbox(pid, event)

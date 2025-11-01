@@ -377,13 +377,15 @@ Disassembly
 
 Typical payloads:
 
-- `trace_step`: `{ "pc": <uint32>, "next_pc": <uint32>, "opcode": <string>, "flags": <string?>, "regs": [<uint32> x16], "steps": <uint64?> }`
+- `trace_step`: `{ "pc": <uint32>, "next_pc": <uint32>, "opcode": <string>, "flags": <string?>, "regs": [<uint32> x16], "steps": <uint64?>, "changed_regs": ["R0", "PC", "PSW"]? }`
 - `debug_break`: `{ "pc": <uint32>, "reason": "BRK" | "virtual", "breakpoint_id": <int?> }`
 - `scheduler`: `{ "state": "READY|RUNNING|WAIT_MBX|SLEEPING|PAUSED|RETURNED", "prev_pid": <int?>, "next_pid": <int?> }`
 - `mailbox_send` / `mailbox_recv`: `{ "descriptor": <int>, "length": <int>, "flags": <uint16>, "channel": <uint16> }`
 - `watch_update`: `{ "watch_id": <string>, "value": <string>, "formatted": <string?> }`
 - `stdout` / `stderr`: `{ "text": <string> }`
 - `warning`: `{ "message": <string>, "category": <string> }`
+
+`trace_step.data.changed_regs` is optional and, when present, lists the architectural registers that changed relative to the previous step for the same PID. Register names follow the `R<N>` convention with `PC` and `PSW` used for the program counter and processor status word respectively. Clients may use the list to highlight deltas without diffing the full register file.
 
 ### Back-pressure & errors
 

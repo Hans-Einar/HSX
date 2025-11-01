@@ -11,3 +11,6 @@ Task state transitions are summarised as `task_state` entries of the form
 `prev -> new reason=<...>` with optional details (e.g., mailbox descriptors,
 exit status) when the executive records `mailbox_wait`, `timeout`, `returned`,
 or `killed` transitions.
+
+Instruction trace entries (`trace_step`) show a trimmed `changed_regs` list so
+you can spot which registers moved without diffing the full register bank.

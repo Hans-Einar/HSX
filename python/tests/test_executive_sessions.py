@@ -300,6 +300,81 @@ def test_events_metrics_track_pending_and_reset_after_ack():
     assert metrics_after["pending"] == 0
 
 
+def test_trace_step_changed_regs_tracks_diffs():
+    state = make_state()
+    state.event_history.clear()
+    state.trace_last_regs.clear()
+    state._process_vm_events(
+        [
+            {
+                "type": "trace_step",
+                "pid": 1,
+                "pc": 0x100,
+                "regs": [0] * 16,
+                "flags": 0,
+            }
+        ]
+    )
+    trace_events = [evt for evt in state.event_history if evt.get("type") == "trace_step"]
+    assert trace_events, "expected trace_step event"
+    first_changed = set(trace_events[-1]["data"].get("changed_regs", []))
+    assert "R0" in first_changed
+    assert "PC" in first_changed
+
+    state.event_history.clear()
+    state._process_vm_events(
+        [
+            {
+                "type": "trace_step",
+                "pid": 1,
+                "pc": 0x104,
+                "regs": [0] * 16,
+                "flags": 0,
+            }
+        ]
+    )
+    followup = [evt for evt in state.event_history if evt.get("type") == "trace_step"]
+    assert followup[-1]["data"].get("changed_regs") == ["PC"]
+
+
+def test_trace_step_changed_regs_toggle_respected():
+    state = make_state()
+    state.trace_track_changed_regs = False
+    state.event_history.clear()
+    state._process_vm_events(
+        [
+            {
+                "type": "trace_step",
+                "pid": 1,
+                "pc": 0x200,
+                "regs": [0] * 16,
+                "flags": 0,
+            }
+        ]
+    )
+    trace_events = [evt for evt in state.event_history if evt.get("type") == "trace_step"]
+    assert trace_events and "changed_regs" not in trace_events[-1]["data"]
+
+    state.trace_track_changed_regs = True
+    state.event_history.clear()
+    regs = [0] * 16
+    regs[3] = 0x1234
+    state._process_vm_events(
+        [
+            {
+                "type": "trace_step",
+                "pid": 1,
+                "pc": 0x204,
+                "regs": regs,
+                "flags": 0,
+            }
+        ]
+    )
+    changed = [evt for evt in state.event_history if evt.get("type") == "trace_step"][-1]["data"].get("changed_regs", [])
+    assert "R3" in changed
+    assert "PC" in changed
+
+
 def _task_state_events(state: ExecutiveState) -> List[dict]:
     return [evt for evt in state.event_history if evt.get("type") == "task_state"]
 
