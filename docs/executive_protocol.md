@@ -40,6 +40,7 @@ Core Commands
 | `step` | `{ "version": 1, "cmd": "step", "steps": 500 [, "pid": 2] }` | `{ "version": 1, "status": "ok", "result": { ... }, "clock": { ... } }` | Alias for `clock` `op: "step"`; honours the same `steps`/`pid` fields. |
 | `trace` | `{ "version": 1, "cmd": "trace", "pid": 1, "mode": "on" }` | `{ "version": 1, "status": "ok", "trace": { "pid": 1, "enabled": true } }` | Enable or disable instruction tracing for a task (`mode` optional to toggle). |
 | `bp` | `{ "version": 1, "cmd": "bp", "op": "set", "pid": 1, "addr": 4096 }` | `{ "version": 1, "status": "ok", "pid": 1, "breakpoints": [4096] }` | Manage per-task breakpoints (`op`: `list`/`set`/`clear`/`clear_all`). |
+| `disasm` | `{ "version": 1, "cmd": "disasm", "pid": 1 [, "addr": 0x1000, "count": 8, "mode": "cached" ] }` | `{ "version": 1, "status": "ok", "disasm": { ... } }` | Disassemble a slice of task memory. |
 | `sym` | `{ "version": 1, "cmd": "sym", "op": "addr", "pid": 1, "address": 4096 }` | `{ "version": 1, "status": "ok", "symbol": { ... } }` | Symbol table helpers (`op`: `info`/`addr`/`name`/`line`/`load`). |
 | `stack` | `{ "version": 1, "cmd": "stack", "pid": 1 [, "max": 8] }` | `{ "version": 1, "status": "ok", "stack": { ... } }` | Reconstructs the PID stack (`max` frames; defaults to executive limit). |
 | `pause` | `{ "version": 1, "cmd": "pause", "pid": 1 }` | `{ "version": 1, "status": "ok", "task": { ... } }` | Pauses the specified task (global pause if `pid` omitted). |
@@ -259,6 +260,46 @@ Stack reconstruction
 - `errors` accumulates diagnostics when the executive aborts a walk early (e.g. unaligned frame pointer, out-of-range stack address, failed memory read, or a detected FP cycle). `truncated: true` indicates the walk terminated prematurely due to these errors or because the frame limit was reached.
 - The current implementation assumes tasks follow the HSX ABI convention that uses R7 as the frame pointer and stores `[prev_fp, return_pc]` at `fp`. Tasks compiled without frame pointers may report a single frame containing the current program counter.
 
+Disassembly
+~~~~~~~~~~~
+
+- `disasm <pid> [addr] [count] [--mode on-demand|cached]` decodes instructions from task memory. `addr` defaults to the current PC if omitted and `count` defaults to eight instructions. `--mode cached` reuses the most recent listing for the address/count pair (when available) without re-reading VM memory.
+- Responses look like:
+  ```json
+  {
+    "pid": 1,
+    "address": 32768,
+    "count": 6,
+    "requested": 8,
+    "mode": "cached",
+    "cached": true,
+    "truncated": false,
+    "bytes_read": 28,
+    "data": "01100230…",
+    "instructions": [
+      {
+        "index": 0,
+        "pc": 32768,
+        "size": 4,
+        "mnemonic": "LDI",
+        "operands": "R1 <- 0x123",
+        "symbol": {"name": "main", "address": 32768, "offset": 0},
+        "line": {"file": "main.c", "line": 42}
+      },
+      {
+        "index": 1,
+        "pc": 32772,
+        "size": 8,
+        "mnemonic": "LDI32",
+        "operands": "R2 <- 0xDEADBEEF",
+        "extended_word": 3735928559
+      }
+    ]
+  }
+  ```
+- Each instruction entry includes the decoded `mnemonic`, operands, raw words (`word` / `extended_word`), and any available symbol/line annotations. Branch instructions report `target`/`target_symbol` when the immediate matches a known address.
+- Cached responses set `cached: true`; the server maintains a small per-task cache that is invalidated whenever a task reloads or changes.
+
 ### Event object schema
 
 | Field | Type | Description |
@@ -290,3 +331,4 @@ Typical payloads:
 - After disconnection clients should resume with `since_seq` set to the last processed sequence to avoid gaps. If the requested range was evicted the executive replies with `status:"error","error":"seq_evicted"` so clients can perform a full refresh.
 
 Clients must continue sending `session.keepalive` within the advertised heartbeat interval (default 30 seconds). Inactivity causes the executive to close the session and release PID locks automatically. Observer sessions that lapse simply stop receiving events; owner sessions incur `pid_lock` release notifications so tooling can warn the user.
+

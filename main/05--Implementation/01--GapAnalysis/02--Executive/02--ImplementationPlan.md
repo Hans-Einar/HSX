@@ -104,8 +104,8 @@ Design specifies bp.set/clear/list with per-PID breakpoint sets and pre/post-ste
 Design specifies .sym JSON file loading and caching at task load time (section 5.4). Required for stack reconstruction, disassembly annotations, and symbol enumeration.
 
 **Todo:**
-- [ ] Define .sym JSON file format (functions, variables, types)
-- [ ] Implement symbol file loader (parse JSON, validate structure)
+- [x] Define .sym JSON file format (functions, variables, types)
+- [x] Implement symbol file loader (parse JSON, validate structure)
 - [x] Add symbol caching per PID (load at task load time)
 - [x] Add symbol lookup by address (for stack frames)
 - [x] Add symbol lookup by name (for watch expressions)
@@ -136,8 +136,8 @@ Design specifies stack.info API with frame pointer walking and symbol lookup (se
 - [x] Add error handling for corrupted stacks
 - [x] Add stack reconstruction tests (normal calls, deep stacks, no symbols)
 - [x] Update `docs/executive_protocol.md` with stack.info API
-- [ ] Enhance UI stack views with interactive frame drill-down / symbol annotations
-- [ ] Thread `stack.info` helper through remaining debugger front-ends once they migrate from scaffolding
+- [x] Enhance UI stack views with interactive frame drill-down / symbol annotations
+- [x] Thread `stack.info` helper through remaining debugger front-ends once they migrate from scaffolding
 
 ---
 
@@ -151,15 +151,15 @@ Design specifies stack.info API with frame pointer walking and symbol lookup (se
 Design specifies disasm.read with symbol annotations and caching strategies (section 5.4). Enables source-level debugging views.
 
 **Todo:**
-- [ ] Implement `disasm.read(pid, addr, count, mode)` RPC command
-- [ ] Integrate with existing Python disassembler (`python/disassemble.py`)
-- [ ] Add symbol annotation (label function names, variable references)
-- [ ] Support modes: on-demand (no cache), cached (cache results)
-- [ ] Read task memory via VM memory access APIs
-- [ ] Add address-to-symbol mapping in output
-- [ ] Handle disassembly errors (invalid opcodes, out-of-bounds)
-- [ ] Add disassembly tests (various opcodes, with/without symbols)
-- [ ] Update `docs/executive_protocol.md` with disasm.read API
+- [x] Implement `disasm.read(pid, addr, count, mode)` RPC command
+- [x] Integrate with existing Python disassembler (`python/disassemble.py`)
+- [x] Add symbol annotation (label function names, variable references)
+- [x] Support modes: on-demand (no cache), cached (cache results)
+- [x] Read task memory via VM memory access APIs
+- [x] Add address-to-symbol mapping in output
+- [x] Handle disassembly errors (invalid opcodes, out-of-bounds)
+- [x] Add disassembly tests (various opcodes, with/without symbols)
+- [x] Update `docs/executive_protocol.md` with disasm.read API
 
 ---
 
@@ -685,7 +685,7 @@ This implementation is considered complete when all of the following criteria ar
 - [ ] Breakpoint management working (set/clear/list, hit detection)
 - [ ] Symbol loading operational (.sym file parsing, lookup)
 - [ ] Stack reconstruction functional (frame walking, symbol mapping)
-- [ ] Disassembly API working (with symbol annotations)
+- [x] Disassembly API working (with symbol annotations)
 - [ ] All Phase 1 tests pass with 100% success rate
 - [ ] Code review completed
 - [ ] No regression in existing functionality

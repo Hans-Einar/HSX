@@ -9,6 +9,11 @@ try:
 except ImportError:
     import hsx_mailbox_constants as mbx_const
 
+try:
+    from . import disasm_util
+except ImportError:
+    import disasm_util
+
 """HSX executive daemon.
 
 Connects to the HSX VM RPC server, takes over scheduling (attach/pause/resume),
@@ -108,7 +113,7 @@ class ExecutiveState:
         self.session_events_max = 2048
         self._last_session_prune = 0.0
         self._session_prune_interval = 5.0
-        self.session_supported_features = {"events", "stack"}
+        self.session_supported_features = {"events", "stack", "disasm"}
         self.debug_attached: Set[int] = set()
         self.breakpoints: Dict[int, Set[int]] = {}
         self.event_lock = threading.RLock()
@@ -118,6 +123,7 @@ class ExecutiveState:
         self.session_event_map: Dict[str, str] = {}
         self.event_retention_ms = 5000
         self.symbol_tables: Dict[int, Dict[str, Any]] = {}
+        self.disasm_cache: Dict[int, Dict[Tuple[int, int], Dict[str, Any]]] = {}
         self.symbol_cache_lock = threading.RLock()
         self.default_stack_frames = 16
 
@@ -666,6 +672,199 @@ class ExecutiveState:
                 return None
             return dict(lines[idx])
 
+    @staticmethod
+    def _decode_instruction_word(word: int) -> Dict[str, int]:
+        op = (word >> 24) & 0xFF
+        rd = (word >> 20) & 0x0F
+        rs1 = (word >> 16) & 0x0F
+        rs2 = (word >> 12) & 0x0F
+        imm_raw = word & 0x0FFF
+        imm = imm_raw
+        if imm & 0x800:
+            imm -= 0x1000
+        return {
+            "op": op,
+            "rd": rd,
+            "rs1": rs1,
+            "rs2": rs2,
+            "imm": imm,
+            "imm_raw": imm_raw,
+        }
+
+    def _disassemble_bytes(
+        self,
+        pid: int,
+        data: bytes,
+        base_addr: int,
+        count: int,
+        *,
+        reg_values: Optional[List[int]] = None,
+    ) -> Tuple[List[Dict[str, Any]], bool, int]:
+        listing: List[Dict[str, Any]] = []
+        offset = 0
+        truncated = False
+        consumed = 0
+        unsigned_ops = {0x21, 0x22, 0x23, 0x30, 0x7F}
+        data_len = len(data)
+        for index in range(count):
+            if offset + 4 > data_len:
+                truncated = True
+                break
+            word = int.from_bytes(data[offset:offset + 4], "big")
+            decoded = self._decode_instruction_word(word)
+            opcode = decoded["op"]
+            mnemonic = disasm_util.OPCODE_NAMES.get(opcode, f"0x{opcode:02X}")
+            size = disasm_util.instruction_size(mnemonic)
+            next_word = None
+            if size == 8:
+                if offset + 8 > data_len:
+                    truncated = True
+                    break
+                next_word = int.from_bytes(data[offset + 4:offset + 8], "big")
+            imm_effective = decoded["imm_raw"] if opcode in unsigned_ops else decoded["imm"]
+            operands = disasm_util.format_operands(
+                mnemonic,
+                decoded["rd"],
+                decoded["rs1"],
+                decoded["rs2"],
+                imm=imm_effective,
+                imm_raw=decoded["imm_raw"],
+                reg_values=reg_values,
+                next_word=next_word,
+                pc=base_addr + offset,
+            )
+            inst_addr = (base_addr + offset) & 0xFFFFFFFF
+            entry: Dict[str, Any] = {
+                "index": index,
+                "pc": inst_addr,
+                "size": size,
+                "word": word,
+                "mnemonic": mnemonic,
+                "rd": decoded["rd"],
+                "rs1": decoded["rs1"],
+                "rs2": decoded["rs2"],
+                "imm": decoded["imm"],
+                "imm_raw": decoded["imm_raw"],
+                "operands": operands,
+                "bytes": data[offset:offset + size].hex(),
+            }
+            if next_word is not None:
+                entry["extended_word"] = next_word
+            if mnemonic in {"JMP", "JZ", "JNZ", "CALL"}:
+                target = imm_effective & 0xFFFFFFFF
+                entry["target"] = target
+                target_symbol = self.symbol_lookup_addr(pid, target)
+                if target_symbol:
+                    entry["target_symbol"] = dict(target_symbol)
+            listing.append(entry)
+            offset += size
+            consumed = offset
+        if offset < data_len and len(listing) >= count:
+            consumed = offset
+        return listing, truncated, consumed
+
+    def disasm_read(
+        self,
+        pid: int,
+        *,
+        address: Optional[int] = None,
+        count: Optional[int] = None,
+        mode: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        self.get_task(pid)
+        try:
+            count_value = 8 if count is None else int(count)
+        except (TypeError, ValueError):
+            raise ValueError("count must be an integer") from None
+        count_value = max(1, min(count_value, 64))
+
+        mode_value = (mode or "on-demand").strip().lower()
+        if mode_value not in {"on-demand", "cached"}:
+            raise ValueError("mode must be 'on-demand' or 'cached'")
+        cache_enabled = mode_value == "cached"
+
+        regs = self.request_dump_regs(pid)
+        pc = regs.get("pc")
+        if address is None:
+            start_addr = int(pc) & 0xFFFFFFFF if isinstance(pc, int) else 0
+        else:
+            try:
+                start_addr = int(address) & 0xFFFFFFFF
+            except (TypeError, ValueError) as exc:
+                raise ValueError("address must be integer") from exc
+
+        cache_key = (start_addr, count_value)
+        if cache_enabled:
+            cache_for_pid = self.disasm_cache.get(pid, {})
+            cached_entry = cache_for_pid.get(cache_key)
+            if cached_entry:
+                result = dict(cached_entry["result"])
+                result["cached"] = True
+                return result
+
+        max_bytes = min(count_value * 8, 4096)
+        try:
+            with self.lock:
+                raw = self.vm.read_mem(start_addr, max_bytes, pid=pid)
+        except Exception as exc:
+            raise ValueError(f"disassembly memory read failed: {exc}") from exc
+
+        if isinstance(raw, str):
+            try:
+                raw_bytes = bytes.fromhex(raw)
+            except ValueError:
+                raw_bytes = raw.encode("utf-8", errors="ignore")
+        elif isinstance(raw, (bytes, bytearray)):
+            raw_bytes = bytes(raw)
+        else:
+            raise ValueError("unexpected memory payload from VM")
+
+        reg_values = None
+        regs_block = regs.get("regs")
+        if isinstance(regs_block, list):
+            reg_values = [int(val) & 0xFFFFFFFF for val in regs_block if isinstance(val, int)]
+
+        instructions, truncated, consumed = self._disassemble_bytes(
+            pid,
+            raw_bytes,
+            start_addr,
+            count_value,
+            reg_values=reg_values,
+        )
+
+        for entry in instructions:
+            symbol = self.symbol_lookup_addr(pid, entry["pc"])
+            if symbol:
+                entry["symbol"] = dict(symbol)
+            line = self.symbol_lookup_line(pid, entry["pc"])
+            if line:
+                entry["line"] = dict(line)
+            offset = symbol.get("offset") if symbol else None
+            if symbol and (offset is None or offset == 0):
+                entry["label"] = symbol.get("name")
+
+        result = {
+            "pid": pid,
+            "address": start_addr,
+            "count": len(instructions),
+            "requested": count_value,
+            "mode": mode_value,
+            "cached": False,
+            "truncated": truncated,
+            "bytes_read": consumed,
+            "data": raw_bytes[:consumed].hex(),
+            "instructions": instructions,
+        }
+
+        if cache_enabled:
+            cache_for_pid = self.disasm_cache.setdefault(pid, {})
+            cache_for_pid[cache_key] = {
+                "result": dict(result),
+                "timestamp": time.time(),
+            }
+
+        return result
+
     def stack_info(self, pid: int, *, max_frames: Optional[int] = None) -> Dict[str, Any]:
         self.get_task(pid)
         regs = self.request_dump_regs(pid)
@@ -1081,6 +1280,9 @@ class ExecutiveState:
         stale_symbols = set(self.symbol_tables.keys()) - current_pids
         for pid in stale_symbols:
             self.symbol_tables.pop(pid, None)
+        stale_disasm = set(self.disasm_cache.keys()) - current_pids
+        for pid in stale_disasm:
+            self.disasm_cache.pop(pid, None)
 
     def log(self, level: str, message: str, **fields: Any) -> None:
         entry = {
@@ -1123,10 +1325,16 @@ class ExecutiveState:
         self._refresh_tasks()
         pid = info.get("pid")
         symbol_status: Optional[Dict[str, Any]] = None
-        if pid is not None:
-            task = self.tasks.get(pid, {})
+        pid_int: Optional[int]
+        try:
+            pid_int = int(pid) if pid is not None else None
+        except (TypeError, ValueError):
+            pid_int = None
+        if pid_int is not None:
+            self.disasm_cache.pop(pid_int, None)
+            task = self.tasks.get(pid_int, {})
             program = task.get("program") or info.get("program") or str(program_path)
-            symbol_status = self.load_symbols_for_pid(pid, program=program, override=symbols)
+            symbol_status = self.load_symbols_for_pid(pid_int, program=program, override=symbols)
         if symbol_status is not None:
             info["symbols"] = symbol_status
             if not symbol_status.get("loaded"):
@@ -1311,6 +1519,7 @@ class ExecutiveState:
         self._detach_debug_session(pid)
         with self.symbol_cache_lock:
             self.symbol_tables.pop(pid, None)
+        self.disasm_cache.pop(pid, None)
         return {"pid": pid, "state": "terminated"}
 
     def set_task_attrs(self, pid: int, *, priority: Optional[int] = None, quantum: Optional[int] = None) -> Dict[str, Any]:
@@ -2052,6 +2261,28 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                     info = self.state.stack_info(pid_int, max_frames=max_frames)
                     return {"version": 1, "status": "ok", "stack": info}
                 raise ValueError(f"unknown stack op '{op}'")
+            if cmd == "disasm":
+                pid_value = request.get("pid")
+                if pid_value is None:
+                    raise ValueError("disasm requires 'pid'")
+                pid_int = int(pid_value)
+                addr_value = request.get("addr") or request.get("address")
+                count_value = request.get("count")
+                mode_value = request.get("mode")
+                address = None
+                if addr_value is not None:
+                    if isinstance(addr_value, str):
+                        address = int(addr_value, 0)
+                    else:
+                        address = int(addr_value)
+                count = None
+                if count_value is not None:
+                    if isinstance(count_value, str):
+                        count = int(count_value, 0)
+                    else:
+                        count = int(count_value)
+                info = self.state.disasm_read(pid_int, address=address, count=count, mode=mode_value)
+                return {"version": 1, "status": "ok", "disasm": info}
             if cmd == "sym":
                 op = str(request.get("op") or "info").lower()
                 pid_value = request.get("pid")

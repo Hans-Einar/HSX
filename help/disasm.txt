@@ -1,0 +1,23 @@
+disasm
+======
+
+Display a disassembly listing for a task.
+
+Usage::
+
+    disasm <pid> [addr] [count] [--mode on-demand|cached]
+
+Arguments:
+- ``pid``: target task id.
+- ``addr``: optional start address (defaults to current PC).
+- ``count``: optional instruction count (default: 8).
+
+Options:
+- ``--mode`` / ``-m``: select ``on-demand`` (default) or ``cached``.
+- ``--cached`` / ``-C``: shorthand for ``--mode cached``.
+- ``--addr`` / ``-a`` and ``--count`` / ``-c`` allow explicit values when
+  providing parameters after the pid.
+
+The shell prints each instruction with PC, mnemonic, operands, and
+symbol/line annotations when available. Use cached mode to reuse the
+executive’s previous listing without re-reading VM memory.

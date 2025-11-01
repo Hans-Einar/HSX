@@ -68,6 +68,7 @@ COMMAND_NAMES = sorted(
         "send",
         "shutdown",
         "stdio",
+        "disasm",
         "stack",
         "sym",
         "trace",
@@ -104,7 +105,7 @@ def _ensure_session(host: str, port: int, *, auto_events: bool = False) -> Execu
                 host,
                 port,
                 client_name="hsx-shell",
-                features=["events", "stack"],
+                features=["events", "stack", "disasm"],
                 max_events=256,
             )
         session = _SESSION_MANAGER
@@ -582,6 +583,85 @@ def _pretty_stack(payload: dict) -> None:
             print(f"    - {item}")
 
 
+def _pretty_disasm(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    block = payload.get("disasm", {})
+    if not isinstance(block, dict):
+        print("disasm: <no data>")
+        return
+    print("disasm:")
+    pid = block.get("pid")
+    base = block.get("address")
+    count = block.get("count")
+    requested = block.get("requested")
+    mode = block.get("mode")
+    cached = block.get("cached")
+    truncated = block.get("truncated")
+    summary = []
+    if pid is not None:
+        summary.append(f"pid={pid}")
+    if base is not None:
+        summary.append(f"base=0x{int(base) & 0xFFFFFFFF:08X}")
+    if count is not None:
+        summary.append(f"count={count}")
+    if requested is not None and requested != count:
+        summary.append(f"requested={requested}")
+    if mode:
+        summary.append(f"mode={mode}")
+    if cached:
+        summary.append("cached")
+    if truncated:
+        summary.append("truncated")
+    if summary:
+        print(f"  {'; '.join(summary)}")
+    instructions = block.get("instructions") or []
+    if not instructions:
+        print("  (no instructions)")
+        return
+    for inst in instructions:
+        idx = inst.get("index")
+        idx_text = f"{idx:02}" if isinstance(idx, int) else "??"
+        pc = inst.get("pc")
+        if isinstance(pc, int):
+            heading = f"  [{idx_text}] 0x{pc & 0xFFFFFFFF:08X}:"
+        else:
+            heading = f"  [{idx_text}] ?:"
+        mnemonic = inst.get("mnemonic", "")
+        if mnemonic:
+            heading += f" {mnemonic}"
+        operands = inst.get("operands")
+        if operands:
+            heading += f" {operands}"
+        label = inst.get("label")
+        if not label:
+            symbol_block = inst.get("symbol")
+            if isinstance(symbol_block, dict):
+                label = symbol_block.get("name")
+        if label:
+            heading += f"    ; {label}"
+        print(heading)
+        details = []
+        target = inst.get("target")
+        if isinstance(target, int):
+            detail = f"target=0x{target & 0xFFFFFFFF:08X}"
+            target_symbol = inst.get("target_symbol")
+            if isinstance(target_symbol, dict) and target_symbol.get("name"):
+                detail += f" ({target_symbol['name']})"
+            details.append(detail)
+        line_info = inst.get("line")
+        if isinstance(line_info, dict):
+            src = line_info.get("file") or "<unknown>"
+            lineno = line_info.get("line")
+            if lineno is not None:
+                details.append(f"src={src}:{lineno}")
+            else:
+                details.append(f"src={src}")
+        if details:
+            print(f"       {'; '.join(details)}")
+
+
 def _pretty_ps(payload: dict) -> None:
     if payload.get("status") != "ok":
         print(json.dumps(payload, indent=2, sort_keys=True))
@@ -1052,6 +1132,7 @@ PRETTY_HANDLERS = {
     'attach': _pretty_info,
     'bp': _pretty_bp,
     'sym': _pretty_sym,
+    'disasm': _pretty_disasm,
     'stack': _pretty_stack,
     'ps': _pretty_ps,
     'list': _pretty_list,
@@ -1120,7 +1201,7 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
     payload_cmd = cmd
     payload: dict[str, object] = {"cmd": payload_cmd}
 
-    if cmd in {"attach", "detach", "ps", "clock", "shutdown", "pause", "resume", "kill", "load", "exec", "reload", "list", "step", "listen", "send", "sched", "info", "peek", "poke", "dumpregs", "stdio", "mbox", "mailboxes", "mailbox_snapshot", "mailbox_open", "mailbox_close", "mailbox_bind", "mailbox_send", "mailbox_recv", "mailbox_peek", "mailbox_tap", "dbg", "stack"}:
+    if cmd in {"attach", "detach", "ps", "clock", "shutdown", "pause", "resume", "kill", "load", "exec", "reload", "list", "step", "listen", "send", "sched", "info", "peek", "poke", "dumpregs", "stdio", "mbox", "mailboxes", "mailbox_snapshot", "mailbox_open", "mailbox_close", "mailbox_bind", "mailbox_send", "mailbox_recv", "mailbox_peek", "mailbox_tap", "dbg", "disasm", "stack"}:
         pass
 
     if cmd == "info":
@@ -1132,6 +1213,50 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
         return _build_bp_payload(args)
     if cmd == "sym":
         return _build_sym_payload(args)
+    if cmd == "disasm":
+        if not args:
+            raise ValueError("disasm requires <pid> [options]")
+        payload["pid"] = int(args[0], 0)
+        addr_set = False
+        count_set = False
+        mode_set = False
+        i = 1
+        while i < len(args):
+            token = args[i]
+            if token in {"--addr", "-a"}:
+                i += 1
+                if i >= len(args):
+                    raise ValueError("disasm --addr requires a value")
+                payload["addr"] = int(args[i], 0)
+                addr_set = True
+            elif token in {"--count", "-c"}:
+                i += 1
+                if i >= len(args):
+                    raise ValueError("disasm --count requires a value")
+                payload["count"] = int(args[i], 0)
+                count_set = True
+            elif token in {"--mode", "-m"}:
+                i += 1
+                if i >= len(args):
+                    raise ValueError("disasm --mode requires a value")
+                payload["mode"] = args[i]
+                mode_set = True
+            elif token in {"--cached", "-C"}:
+                payload["mode"] = "cached"
+                mode_set = True
+            else:
+                if not addr_set:
+                    payload["addr"] = int(token, 0)
+                    addr_set = True
+                elif not count_set:
+                    payload["count"] = int(token, 0)
+                    count_set = True
+                else:
+                    raise ValueError("disasm usage: disasm <pid> [addr] [count] [--mode on-demand|cached]")
+            i += 1
+        if not mode_set:
+            payload.setdefault("mode", "on-demand")
+        return payload
     if cmd == "stack":
         if not args:
             raise ValueError("stack requires <pid> [frames]")

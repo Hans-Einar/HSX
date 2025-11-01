@@ -350,6 +350,11 @@ def _write_word(vm: DebugVM, addr: int, value: int) -> None:
         vm.memory[(addr + i) & 0xFFFFFFFF] = (value >> (8 * i)) & 0xFF
 
 
+def _write_bytes(vm: DebugVM, addr: int, data: bytes) -> None:
+    for i, byte in enumerate(data):
+        vm.memory[(addr + i) & 0xFFFFFFFF] = byte
+
+
 def _seed_symbol_table(state: ExecutiveState, pid: int, entries: list[tuple[str, int, int]]) -> None:
     symbols = [{"name": name, "address": addr, "size": size, "type": "function"} for name, addr, size in entries]
     addresses = [{"name": item["name"], "address": item["address"], "size": item["size"], "type": item["type"]} for item in symbols]
@@ -445,3 +450,30 @@ def test_stack_info_reports_read_error():
     assert frames[0]["return_pc"] == 0x3100
     assert frames[1]["return_pc"] is None
 
+
+def test_disasm_read_basic():
+    state, vm = make_debug_state()
+    base = 0x9000
+    word_ldi = (0x01 << 24) | (1 << 20) | (0 << 16) | (0 << 12) | 0x123
+    word_add = (0x10 << 24) | (2 << 20) | (1 << 16) | (1 << 12)
+    word_brk = (0x7F << 24)
+    _write_bytes(vm, base, word_ldi.to_bytes(4, "big"))
+    _write_bytes(vm, base + 4, word_add.to_bytes(4, "big"))
+    _write_bytes(vm, base + 8, word_brk.to_bytes(4, "big"))
+    vm.pc = base
+    _seed_symbol_table(state, 1, [("func_start", base, 12)])
+
+    result = state.disasm_read(1, address=base, count=3, mode="on-demand")
+    assert result["count"] == 3
+    assert result["cached"] is False
+    instructions = result["instructions"]
+    assert instructions[0]["mnemonic"] == "LDI"
+    assert instructions[0].get("label") == "func_start"
+    assert instructions[1]["mnemonic"] == "ADD"
+    assert instructions[2]["mnemonic"] == "BRK"
+
+    cached_first = state.disasm_read(1, address=base, count=3, mode="cached")
+    assert cached_first["mode"] == "cached"
+    assert cached_first["cached"] is False
+    cached_second = state.disasm_read(1, address=base, count=3, mode="cached")
+    assert cached_second["cached"] is True

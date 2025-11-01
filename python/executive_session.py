@@ -75,6 +75,7 @@ class ExecutiveSession:
         self._stack_supported: Optional[bool] = None
         self._stack_cache: Dict[int, Tuple[float, JsonDict]] = {}
         self._stack_cache_lock = threading.Lock()
+        self._disasm_supported: Optional[bool] = None
 
     # ------------------------------------------------------------------ Basics
 
@@ -92,6 +93,7 @@ class ExecutiveSession:
         with self._stack_cache_lock:
             self._stack_cache.clear()
         self._stack_supported = None
+        self._disasm_supported = None
 
     # Public API --------------------------------------------------------------
 
@@ -247,6 +249,50 @@ class ExecutiveSession:
         if isinstance(frames, list):
             return copy.deepcopy(frames)
         return []
+
+    def supports_disasm(self) -> bool:
+        if self.session_disabled:
+            return False
+        if "disasm" in self.negotiated_features:
+            return True
+        return bool(self._disasm_supported)
+
+    def disasm_read(
+        self,
+        pid: int,
+        *,
+        address: Optional[int] = None,
+        count: Optional[int] = None,
+        mode: Optional[str] = None,
+    ) -> Optional[JsonDict]:
+        payload: JsonDict = {"cmd": "disasm", "pid": int(pid)}
+        if address is not None:
+            try:
+                payload["addr"] = int(str(address), 0)
+            except (TypeError, ValueError) as exc:
+                raise ExecutiveSessionError("address must be integer-compatible") from exc
+        if count is not None:
+            try:
+                payload["count"] = int(count)
+            except (TypeError, ValueError) as exc:
+                raise ExecutiveSessionError("count must be integer-compatible") from exc
+        if mode is not None:
+            payload["mode"] = str(mode)
+        try:
+            response = self.request(payload)
+        except Exception as exc:  # pragma: no cover - transport errors
+            raise ExecutiveSessionError(f"disasm request failed: {exc}") from exc
+        if response.get("status") != "ok":
+            error = str(response.get("error", "disasm error"))
+            if "unknown_cmd" in error or "unsupported" in error:
+                self._disasm_supported = False
+                return None
+            raise ExecutiveSessionError(error)
+        block = response.get("disasm")
+        if not isinstance(block, dict):
+            return None
+        self._disasm_supported = True
+        return copy.deepcopy(block)
 
     # ---------------------------------------------------------------- Private
 

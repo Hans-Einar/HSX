@@ -185,3 +185,21 @@ python\tests\test_executive_sessions.py ...................              [100%]
 ============================= 21 passed in 0.30s ============================== → PASS
 - Follow-up actions / hand-off notes.
   - Consider richer UI affordances (frame drill-down, symbol hover) once extended metadata becomes available.
+## 2025-11-01 - Codex (Session 8)
+
+### Focus
+- Task(s) tackled: Phase 1.6 disassembly API (disasm.read RPC, shell integration, documentation).
+- Dependencies touched: `python/execd.py`, `python/executive_session.py`, `python/shell_client.py`, `python/disasm_util.py`, `docs/executive_protocol.md`, `python/tests/test_executive_sessions.py`, new `help/disasm.txt`.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions.
+  - Added `disasm.read` RPC with caching support plus symbol/line annotations and target hints, exposing it through ExecutiveSession and the shell CLI.
+  - Hooked CLI/help layers with a formatter and command parser; consumers request the new `disasm` capability and can reuse cached listings.
+  - Extended unit coverage for disassembly decoding and updated protocol docs/help assets.
+- Tests run (commands + result).
+  - `/mnt/c/Windows/py.exe -3.14 -m pytest python/tests/test_executive_session_helpers.py python/tests/test_executive_sessions.py` ? PASS
+- Follow-up actions / hand-off notes.
+  - Consider richer CLI filters (e.g., symbol/breakpoint overlays) once downstream tooling consumes the API.

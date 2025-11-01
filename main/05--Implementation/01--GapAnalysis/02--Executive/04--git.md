@@ -11,6 +11,8 @@
 ## Commit Log
 | Date | Commit hash | Message | Author | Notes |
 | --- | --- | --- | --- | --- |
+| 2025-11-01 | pending | Disassembly RPC & CLI | Codex | Tests: `/mnt/c/Windows/py.exe -3.14 -m pytest python/tests/test_executive_session_helpers.py python/tests/test_executive_sessions.py` |
+| 2025-11-01 | f1eefc19062a | Stack UI drill-down & summaries | Codex | Tests: `/mnt/c/Windows/py.exe -3.14 -m pytest python/tests/test_executive_session_helpers.py python/tests/test_executive_sessions.py` |
 | 2025-11-01 | 8bd0c21e460a | Stack helpers & client plumbing | Codex | Tests: `/mnt/c/Windows/py.exe -3.14 -m pytest python/tests/test_executive_session_helpers.py python/tests/test_executive_sessions.py` |
 | 2025-11-01 | 9d9c8a27d571 | Stack Debugging | Codex | Tests: `/mnt/c/Windows/py.exe -3.14 -m pytest python/tests/test_executive_sessions.py` |
 | 2025-11-01 | 6bff2d020baa | Symbol loader & sym RPC | Codex | Tests: `python -m pytest python/tests/test_executive_sessions.py` |
@@ -28,3 +30,4 @@
 ## Additional Notes
 - Update this file whenever new commits land or PR state changes.
 - Link CI runs, code reviews, or related issues as the implementation progresses.
+
