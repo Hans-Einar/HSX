@@ -153,9 +153,12 @@ class Button:
 
 class BlinkenlightsApp:
     SIDEBAR_WIDTH = 220
-    TASK_HEIGHT = 190
+    TASK_HEIGHT = 230
     TASK_MARGIN = 12
     POLL_INTERVAL = 0.5
+    STACK_SUMMARY_COUNT = 4
+    STACK_DETAIL_COUNT = 8
+    STACK_MAX_FRAMES = 16
 
     def __init__(self, host: str, port: int, refresh: float) -> None:
         self.host = host
@@ -174,6 +177,7 @@ class BlinkenlightsApp:
         self.tasks: List[Dict[str, object]] = []
         self.task_regs: Dict[int, Dict[str, object]] = {}
         self.task_stacks: Dict[int, Dict[str, object]] = {}
+        self.stack_state: Dict[int, Dict[str, object]] = {}
         self.global_buttons: List[Button] = []
         self.sidebar_surface = pygame.Surface((self.SIDEBAR_WIDTH, self.screen.get_height()))
         self.status_message: str = ""
@@ -285,29 +289,90 @@ class BlinkenlightsApp:
         self.last_poll = 0
         return "Refresh queued"
 
+    def toggle_stack(self, pid: int) -> str:
+        state = self.stack_state.setdefault(pid, {"expanded": False, "offset": 0})
+        expanded = bool(state.get("expanded"))
+        if expanded:
+            state["expanded"] = False
+            state["offset"] = 0
+            self.last_poll = 0
+            return f"Stack collapsed for pid {pid}"
+        try:
+            info = self.rpc.stack_info(pid, max_frames=self.STACK_MAX_FRAMES, refresh=True)
+        except RuntimeError as exc:
+            return f"Stack fetch failed: {exc}"
+        if info:
+            self.task_stacks[pid] = info
+        state["expanded"] = True
+        state["offset"] = 0
+        self.last_poll = 0
+        return f"Stack expanded for pid {pid}"
+
+    def scroll_stack(self, pid: int, delta: int) -> str:
+        state = self.stack_state.get(pid)
+        stack = self.task_stacks.get(pid)
+        if not state or not state.get("expanded") or not stack:
+            return "No stack to scroll"
+        frames = stack.get("frames") or []
+        if not frames:
+            return "No stack to scroll"
+        current = int(state.get("offset", 0))
+        target = current + delta
+        max_offset = max(0, len(frames) - self.STACK_DETAIL_COUNT)
+        target = max(0, min(max_offset, target))
+        if target == current:
+            if delta < 0 and current == 0:
+                return "Top of stack"
+            if delta > 0 and current == max_offset:
+                return "End of captured stack"
+            return "Stack unchanged"
+        state["offset"] = target
+        self.last_poll = 0
+        direction = "up" if delta < 0 else "down"
+        return f"Stack scrolled {direction} (offset {target})"
+
     def fetch_state(self) -> None:
         try:
             tasks = self.rpc.ps()
             regs_map: Dict[int, Dict[str, object]] = {}
             stacks_map: Dict[int, Dict[str, object]] = {}
+            visible_pids: set[int] = set()
             for task in tasks:
                 pid = int(task.get("pid", -1))
                 if pid < 0:
                     continue
+                visible_pids.add(pid)
+                state = self.stack_state.setdefault(pid, {"expanded": False, "offset": 0})
                 try:
                     regs_map[pid] = self.rpc.dumpregs(pid)
                 except RuntimeError:
-                    continue
+                    regs_map.pop(pid, None)
+                refresh_stack = bool(state.get("expanded"))
                 try:
-                    stack = self.rpc.stack_info(pid, max_frames=6)
+                    stack = self.rpc.stack_info(pid, max_frames=self.STACK_MAX_FRAMES, refresh=refresh_stack)
+                    if not stack:
+                        stack = self.rpc.stack_info(pid, max_frames=self.STACK_MAX_FRAMES, refresh=False)
                 except RuntimeError:
                     stack = {}
                 if stack:
+                    frames = stack.get("frames") or []
                     stacks_map[pid] = stack
+                    if frames:
+                        max_offset = max(0, len(frames) - self.STACK_DETAIL_COUNT)
+                        state["offset"] = max(0, min(int(state.get("offset", 0)), max_offset))
+                    else:
+                        state["offset"] = 0
+                elif pid in self.task_stacks:
+                    stacks_map[pid] = self.task_stacks[pid]
+                    state["offset"] = 0
             self.tasks = tasks
             self.task_regs = regs_map
             self.task_stacks = stacks_map
             self.current_pid = self.rpc.current_pid
+            for stale_pid in list(self.stack_state.keys()):
+                if stale_pid not in visible_pids:
+                    self.stack_state.pop(stale_pid, None)
+                    self.task_stacks.pop(stale_pid, None)
         except RuntimeError as exc:
             self.set_status(f"RPC error: {exc}")
 
@@ -347,13 +412,28 @@ class BlinkenlightsApp:
                     self.draw_register(task_area, box.x + 12, box.y + 60 + idx * 10, idx, int(value))
             self.draw_stack(task_area, box, pid)
 
+            state = self.stack_state.get(pid, {"expanded": False, "offset": 0})
+            expanded = bool(state.get("expanded"))
+            stack_frames = self.task_stacks.get(pid, {}).get("frames") or []
+            stack_button_label = "Stack+" if not expanded else "Stack-"
+            button_specs = [
+                ("Pause", 68, lambda p=pid: self.rpc.pause(p)),
+                ("Resume", 72, lambda p=pid: self.rpc.resume(p)),
+                (stack_button_label, 72, lambda p=pid: self.toggle_stack(p)),
+                ("Kill", 60, lambda p=pid: self.rpc.kill(p)),
+            ]
+            if expanded and stack_frames and len(stack_frames) > self.STACK_DETAIL_COUNT:
+                button_specs.append(("S▲", 40, lambda p=pid: self.scroll_stack(p, -1)))
+                button_specs.append(("S▼", 40, lambda p=pid: self.scroll_stack(p, 1)))
+
+            spacing = 8
+            total_width = sum(width for _, width, _ in button_specs) + spacing * (len(button_specs) - 1)
+            start_x = max(box.x + 12, box.right - total_width - 12)
             button_y = box.bottom - 40
-            pause_rect = pygame.Rect(box.right - 240, button_y, 60, 28)
-            resume_rect = pygame.Rect(box.right - 170, button_y, 70, 28)
-            kill_rect = pygame.Rect(box.right - 90, button_y, 60, 28)
-            self.draw_task_button(task_area, pause_rect, "Pause", lambda p=pid: self.rpc.pause(p))
-            self.draw_task_button(task_area, resume_rect, "Resume", lambda p=pid: self.rpc.resume(p))
-            self.draw_task_button(task_area, kill_rect, "Kill", lambda p=pid: self.rpc.kill(p))
+            for label, width, callback in button_specs:
+                rect = pygame.Rect(start_x, button_y, width, 28)
+                self.draw_task_button(task_area, rect, label, callback)
+                start_x += width + spacing
 
             y += self.TASK_HEIGHT + self.TASK_MARGIN
         self.screen.blit(task_area, (self.SIDEBAR_WIDTH, 0))
@@ -380,19 +460,38 @@ class BlinkenlightsApp:
         self._task_buttons.append((rect.move(self.SIDEBAR_WIDTH, 0), label, action))
 
     def draw_stack(self, surface: pygame.Surface, box: pygame.Rect, pid: int) -> None:
+        state = self.stack_state.setdefault(pid, {"expanded": False, "offset": 0})
         stack = self.task_stacks.get(pid)
-        if not stack:
-            return
-        frames = stack.get("frames") or []
-        if not frames:
-            return
-        max_display = 5
         stack_x = box.x + 210
         stack_y = box.y + 60
-        label = self.small_font.render("Stack:", True, (200, 210, 240))
-        surface.blit(label, (stack_x, stack_y - 14))
-        shown = min(len(frames), max_display)
-        for idx, frame in enumerate(frames[:shown]):
+        header = self.small_font.render("Stack:", True, (200, 210, 240))
+        surface.blit(header, (stack_x, stack_y - 14))
+
+        if not stack:
+            message = "stack unsupported" if not self.rpc.session.supports_stack() else "(no stack data yet)"
+            rendered = self.small_font.render(message, True, (180, 180, 200))
+            surface.blit(rendered, (stack_x, stack_y))
+            return
+
+        frames = stack.get("frames") or []
+        if not frames:
+            rendered = self.small_font.render("(stack empty)", True, (180, 180, 200))
+            surface.blit(rendered, (stack_x, stack_y))
+            return
+
+        line_height = 14
+        expanded = bool(state.get("expanded"))
+        max_visible = self.STACK_DETAIL_COUNT if expanded else self.STACK_SUMMARY_COUNT
+        offset = int(state.get("offset", 0)) if expanded else 0
+        max_offset = max(0, len(frames) - max_visible)
+        if offset > max_offset:
+            offset = max_offset
+            state["offset"] = offset
+        frames_slice = frames[offset: offset + max_visible]
+        y_cursor = stack_y
+
+        for local_idx, frame in enumerate(frames_slice):
+            actual_idx = offset + local_idx
             pc = int(frame.get("pc", 0))
             func = frame.get("func_name")
             if not func:
@@ -400,25 +499,56 @@ class BlinkenlightsApp:
                 if isinstance(symbol, dict):
                     func = symbol.get("name")
             if not func:
-                func = f"0x{pc:04X}"
-            offset = frame.get("func_offset")
-            if isinstance(offset, int) and offset:
-                func_text = f"[{idx}] {func}+0x{offset:X}"
+                func = f"0x{pc & 0xFFFF:04X}"
+            offset_val = frame.get("func_offset")
+            if isinstance(offset_val, int) and offset_val:
+                func_label = f"{func}+0x{offset_val:X}"
             else:
-                func_text = f"[{idx}] {func}"
-            frame_text = f"{func_text} (pc=0x{pc & 0xFFFF:04X})"
-            rendered = self.small_font.render(frame_text, True, (210, 210, 220))
-            surface.blit(rendered, (stack_x, stack_y + idx * 14))
-        truncated = stack.get("truncated")
+                func_label = func
+            primary_line = f"[{actual_idx:02}] {func_label} @ 0x{pc & 0xFFFF:04X}"
+            primary_color = (255, 220, 160) if actual_idx == 0 else (210, 210, 220)
+            primary_render = self.small_font.render(primary_line, True, primary_color)
+            surface.blit(primary_render, (stack_x, y_cursor))
+            y_cursor += line_height
+
+            if expanded:
+                detail_parts = []
+                line_info = frame.get("line")
+                if isinstance(line_info, dict):
+                    file = line_info.get("file")
+                    line_no = line_info.get("line")
+                    if file and line_no is not None:
+                        detail_parts.append(f"{file}:{line_no}")
+                    elif file:
+                        detail_parts.append(file)
+                    elif line_no is not None:
+                        detail_parts.append(f"line {line_no}")
+                ret_pc = frame.get("return_pc")
+                if isinstance(ret_pc, int) and ret_pc:
+                    detail_parts.append(f"ret 0x{ret_pc & 0xFFFF:04X}")
+                sp_val = frame.get("sp")
+                if isinstance(sp_val, int):
+                    detail_parts.append(f"sp 0x{sp_val & 0xFFFFFFFF:08X}")
+                details_text = "; ".join(detail_parts)
+                if details_text:
+                    detail_render = self.small_font.render(f"    {details_text}", True, (180, 190, 210))
+                    surface.blit(detail_render, (stack_x, y_cursor))
+                    y_cursor += line_height
+
+        truncated = bool(stack.get("truncated"))
         errors = stack.get("errors") or []
-        note_lines = []
         if truncated:
-            note_lines.append("… truncated …")
-        if errors:
-            note_lines.append(f"warn: {errors[0]}")
-        for offset_idx, text in enumerate(note_lines):
-            rendered = self.small_font.render(text, True, (235, 180, 120))
-            surface.blit(rendered, (stack_x, stack_y + (shown + offset_idx) * 14))
+            truncated_render = self.small_font.render("… truncated …", True, (235, 180, 120))
+            surface.blit(truncated_render, (stack_x, y_cursor))
+            y_cursor += line_height
+        for err in errors[:2]:
+            err_render = self.small_font.render(f"warn: {err}", True, (235, 160, 120))
+            surface.blit(err_render, (stack_x, y_cursor))
+            y_cursor += line_height
+        if expanded and len(frames) > max_visible:
+            range_text = f"Showing {offset + 1}-{offset + len(frames_slice)} of {len(frames)}"
+            range_render = self.small_font.render(range_text, True, (190, 200, 215))
+            surface.blit(range_render, (stack_x, y_cursor))
 
     def run(self) -> None:
         while self.running:
@@ -456,8 +586,11 @@ class BlinkenlightsApp:
             for rect, label, cb in self._task_buttons:
                 if rect.collidepoint(pos):
                     try:
-                        cb()
-                        self.set_status(f"{label} OK")
+                        result = cb()
+                        if result:
+                            self.set_status(str(result))
+                        else:
+                            self.set_status(f"{label} OK")
                     except RuntimeError as exc:
                         self.set_status(f"{label} failed: {exc}")
                     self.manual_refresh()

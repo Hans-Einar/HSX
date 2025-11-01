@@ -93,7 +93,7 @@ def main(argv=None) -> int:
             frames = stack_block.get("frames") if isinstance(stack_block, dict) else None
             if frames:
                 lines = []
-                for frame in frames[:3]:
+                for idx, frame in enumerate(frames[:3]):
                     func = frame.get("func_name")
                     if not func:
                         symbol = frame.get("symbol")
@@ -109,10 +109,26 @@ def main(argv=None) -> int:
                         func_text = f"0x{pc & 0xFFFF:04X}"
                     else:
                         func_text = "<unknown>"
-                    lines.append(f"[{len(lines)}] {func_text}")
+                    details = []
+                    line_info = frame.get("line")
+                    if isinstance(line_info, dict):
+                        file = line_info.get("file")
+                        line_no = line_info.get("line")
+                        if file and line_no is not None:
+                            details.append(f"{file}:{line_no}")
+                        elif file:
+                            details.append(file)
+                    ret_pc = frame.get("return_pc")
+                    if isinstance(ret_pc, int) and ret_pc:
+                        details.append(f"ret=0x{ret_pc & 0xFFFF:04X}")
+                    suffix = f" ({'; '.join(details)})" if details else ""
+                    lines.append(f"[{idx}] {func_text}{suffix}")
                 stack_line = "; ".join(lines)
                 if stack_block.get("truncated"):
                     stack_line += " …"
+                errors = stack_block.get("errors")
+                if isinstance(errors, list) and errors:
+                    stack_line += f" [errors: {', '.join(str(err) for err in errors[:2])}]"
                 summary.append(f"stack -> {stack_line}")
             else:
                 summary.append("stack -> unavailable")

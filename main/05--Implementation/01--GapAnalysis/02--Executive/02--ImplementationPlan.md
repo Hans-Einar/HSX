@@ -136,6 +136,8 @@ Design specifies stack.info API with frame pointer walking and symbol lookup (se
 - [x] Add error handling for corrupted stacks
 - [x] Add stack reconstruction tests (normal calls, deep stacks, no symbols)
 - [x] Update `docs/executive_protocol.md` with stack.info API
+- [ ] Enhance UI stack views with interactive frame drill-down / symbol annotations
+- [ ] Thread `stack.info` helper through remaining debugger front-ends once they migrate from scaffolding
 
 ---
 

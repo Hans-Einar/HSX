@@ -253,9 +253,44 @@ class Manager:
             print(f"[stack] error: {exc}")
             return
         if not info:
-            print("[stack] unavailable (feature disabled)")
+            if session.supports_stack():
+                print(f"[stack] pid {pid}: no stack data")
+            else:
+                print("[stack] feature disabled by executive")
             return
-        print(json.dumps(info, indent=2, sort_keys=True))
+        frames_block = info.get("frames") or []
+        truncated = "yes" if info.get("truncated") else "no"
+        print(f"[stack] pid {pid} (frames={len(frames_block)} truncated={truncated})")
+        for idx, frame in enumerate(frames_block):
+            pc = frame.get("pc", 0)
+            func = frame.get("func_name")
+            if not func:
+                symbol = frame.get("symbol")
+                if isinstance(symbol, dict):
+                    func = symbol.get("name")
+            offset = frame.get("func_offset")
+            if func:
+                if isinstance(offset, int) and offset:
+                    func_label = f"{func}+0x{offset:X}"
+                else:
+                    func_label = func
+            else:
+                func_label = f"0x{pc & 0xFFFF:04X}"
+            line_info = frame.get("line")
+            file_line = ""
+            if isinstance(line_info, dict):
+                file = line_info.get("file")
+                line_no = line_info.get("line")
+                if file and line_no is not None:
+                    file_line = f" {file}:{line_no}"
+                elif file:
+                    file_line = f" {file}"
+            ret_pc = frame.get("return_pc")
+            ret_text = f" -> 0x{ret_pc & 0xFFFF:04X}" if isinstance(ret_pc, int) and ret_pc else ""
+            print(f"  [{idx:02}] {func_label} @ 0x{pc & 0xFFFF:04X}{file_line}{ret_text}")
+        errors = info.get("errors")
+        if isinstance(errors, list) and errors:
+            print(f"  errors: {', '.join(str(err) for err in errors)}")
 
     def shutdown_all(self) -> None:
         for name in ["shell", "exec", "vm"]:
