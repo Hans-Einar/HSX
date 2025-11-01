@@ -216,6 +216,30 @@ Debugger Sessions & Event Streaming
    ```
    - Each subscription reply includes a `token`. The executive automatically tears down the stream when the TCP connection closes, when `events.unsubscribe` is called, or when the owning session expires.
 
+Task state events
+~~~~~~~~~~~~~~~~~
+
+- Every task transition generates a `task_state` event with the shape:
+  ```json
+  {
+    "type": "task_state",
+    "pid": 1,
+    "data": {
+      "prev_state": "running",
+      "new_state": "paused",
+      "reason": "debug_break",
+      "details": {
+        "pc": 8192,
+        "phase": "pre"
+      }
+    }
+  }
+  ```
+  - `prev_state` and `new_state` mirror the scheduler-level state strings reported by `ps`.
+  - `reason` captures why the transition occurred. The executive emits at least the following reasons: `loaded`, `debug_break`, `sleep`, `mailbox_wait`, `mailbox_wake`, `timeout`, `returned`, and `killed`. Additional reasons such as `resume`, `user_pause`, or other tooling-specific annotations may be added over time; clients must tolerate unknown values.
+  - `details` is optional metadata that may include mailbox descriptors/handles, timeout status codes, or exit status information for `returned` transitions.
+- When a task disappears from the snapshot (e.g., after `kill` or normal exit) the executive emits a final `task_state` with `new_state: "terminated"` so observers can retire stale UI entries cleanly.
+
 Session ownership and PID locks
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

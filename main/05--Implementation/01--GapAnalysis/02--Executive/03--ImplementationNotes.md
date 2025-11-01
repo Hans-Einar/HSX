@@ -251,3 +251,23 @@ Start new sections chronologically. Keep notes concise but actionable so the nex
 
 ### Follow-up actions / hand-off notes
 - Thread backlog metrics into higher-level clients/telemetry dashboards and tune thresholds once real workloads exercise the stream.
+
+## 2025-11-03 - Codex (Session 13)
+
+### Focus
+- Task(s) tackled: Phase 2.5 task_state events (state tracking, reason codes, docs/CLI updates, regression tests).
+- Dependencies touched: `python/execd.py`, `python/shell_client.py`, `docs/executive_protocol.md`, `help/events.txt`, `python/tests/test_executive_sessions.py`, `main/05--Implementation/01--GapAnalysis/02--Executive/02--ImplementationPlan.md`.
+
+### Status
+- DONE
+
+### Details
+- Added task-state bookkeeping with pending-reason map, emitted `task_state` events for loads, mailbox waits/wakes, sleeps, debug breaks, exits, and kills, plus optional metadata payloads.
+- Extended CLI formatting so `events` summarises transitions (`prev -> new reason=...`), refreshed help/docs with the expanded schema, and introduced a targeted TaskStateVM stub with pytest coverage for all core reasons.
+- Ensured removal paths publish a terminal `"terminated"` event and wired user pause/resume flows to produce informative reasons.
+
+### Tests run (commands + result)
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py`
+
+### Follow-up actions / hand-off notes
+- Surface the new task_state stream inside higher-level debugger front-ends (IDE/TUI) and consider richer reason/detail taxonomies once telemetry is captured in practice.

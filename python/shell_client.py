@@ -454,6 +454,19 @@ def _pretty_events(events: list[dict]) -> None:
         else:
             timestamp = "?"
         data = event.get("data", {})
+        if etype == "task_state" and isinstance(data, dict):
+            prev_state = data.get("prev_state")
+            new_state = data.get("new_state")
+            reason = data.get("reason")
+            details = data.get("details")
+            detail_text = ""
+            if isinstance(details, dict) and details:
+                detail_text = ", ".join(f"{k}={details[k]}" for k in sorted(details))
+                detail_text = f" ({detail_text})"
+            reason_text = f" reason={reason}" if reason else ""
+            pid_text = "None" if pid is None else str(pid)
+            print(f"[{seq:>6}] {timestamp}  {etype:<16} pid={pid_text:<5}  {prev_state} -> {new_state}{reason_text}{detail_text}")
+            continue
         if isinstance(data, dict):
             data_items = ", ".join(f"{k}={data[k]}" for k in sorted(data))
         else:

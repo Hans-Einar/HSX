@@ -257,12 +257,12 @@ Design specifies events.ack protocol and drop-oldest policy (section 7.3). Syste
 Design specifies structured task_state events with reason codes (section 7.2). Essential for debugger UI state tracking.
 
 **Todo:**
-- [ ] Define task_state event structure (pid, old_state, new_state, reason)
-- [ ] Define reason codes: debug_break, sleep, mailbox_wait, timeout, returned, killed, loaded
-- [ ] Emit task_state events on all state transitions
-- [ ] Add reason field to state transition logic
-- [ ] Add task state event tests
-- [ ] Update event schema documentation with task_state event
+- [x] Define task_state event structure (pid, old_state, new_state, reason)
+- [x] Define reason codes: debug_break, sleep, mailbox_wait, timeout, returned, killed, loaded
+- [x] Emit task_state events on all state transitions
+- [x] Add reason field to state transition logic
+- [x] Add task state event tests
+- [x] Update event schema documentation with task_state event
 
 ---
 

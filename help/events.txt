@@ -3,6 +3,11 @@ events: show recent executive events.
 Usage:
   events [count]
 
-Displays the most recent streamed events captured by the current session
-(default 10 entries). Use `--json` to emit raw JSON payloads instead of the
-compact summary view.
+Displays the most recent streamed events captured by the current session
+(default 10 entries). Use `--json` to emit raw JSON payloads instead of the
+compact summary view.
+
+Task state transitions are summarised as `task_state` entries of the form
+`prev -> new reason=<...>` with optional details (e.g., mailbox descriptors,
+exit status) when the executive records `mailbox_wait`, `timeout`, `returned`,
+or `killed` transitions.

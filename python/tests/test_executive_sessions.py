@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import pytest
 
@@ -26,6 +26,90 @@ class DummyVM:
 
 def make_state():
     return ExecutiveState(DummyVM(), step_batch=1)
+
+
+class TaskStateVM:
+    def __init__(self) -> None:
+        self.alive = True
+        self.state = "running"
+        self.sleep_pending = False
+        self.exit_status: Optional[int] = None
+        self.paused = False
+        self.pc = 0
+        self.fp = 0
+        self.sp = 0x2000
+
+    def attach(self) -> dict:
+        return {}
+
+    def detach(self) -> dict:
+        return {}
+
+    def info(self, pid: Optional[int] = None) -> dict:
+        if not self.alive:
+            return {"tasks": {"tasks": [], "current_pid": None}}
+        task = {
+            "pid": 1,
+            "state": self.state,
+            "stack_base": 0,
+            "stack_limit": 0,
+            "sleep_pending": self.sleep_pending,
+        }
+        if self.exit_status is not None:
+            task["exit_status"] = self.exit_status
+        return {"tasks": {"tasks": [task], "current_pid": 1}}
+
+    def ps(self) -> dict:
+        if not self.alive:
+            return {"tasks": {"tasks": [], "current_pid": None}}
+        task = {
+            "pid": 1,
+            "state": self.state,
+            "program": "app.hxe",
+            "sleep_pending": self.sleep_pending,
+        }
+        if self.exit_status is not None:
+            task["exit_status"] = self.exit_status
+        return {"tasks": {"tasks": [task], "current_pid": 1}}
+
+    def restart(self, targets):
+        return {}
+
+    def pause(self, pid: Optional[int] = None) -> None:
+        self.paused = True
+        self.state = "paused"
+
+    def resume(self, pid: Optional[int] = None) -> None:
+        self.paused = False
+        self.state = "running"
+        self.exit_status = None
+
+    def kill(self, pid: int) -> dict:
+        self.paused = False
+        self.state = "terminated"
+        self.alive = False
+        self.exit_status = None
+        return {"status": "ok"}
+
+    def read_regs(self, pid: Optional[int] = None) -> dict:
+        regs = [0] * 16
+        regs[7] = self.fp & 0xFFFFFFFF
+        return {
+            "pc": self.pc,
+            "regs": regs,
+            "sp": self.sp,
+            "fp": self.fp,
+            "stack_base": 0,
+            "stack_size": 0,
+            "stack_limit": 0,
+            "context": {"state": self.state},
+        }
+
+
+def make_task_state_env() -> tuple[ExecutiveState, TaskStateVM]:
+    vm = TaskStateVM()
+    state = ExecutiveState(vm, step_batch=1)
+    return state, vm
 
 
 def test_session_open_records_pid_lock_and_warnings():
@@ -214,6 +298,118 @@ def test_events_metrics_track_pending_and_reset_after_ack():
     state.events_ack(session_id, metrics["delivered_seq"])
     metrics_after = state.events_metrics(session_id)
     assert metrics_after["pending"] == 0
+
+
+def _task_state_events(state: ExecutiveState) -> List[dict]:
+    return [evt for evt in state.event_history if evt.get("type") == "task_state"]
+
+
+def test_task_state_loaded_event():
+    state, vm = make_task_state_env()
+    state.event_history.clear()
+    state._refresh_tasks()
+    events = _task_state_events(state)
+    assert events, "expected initial task_state event"
+    data = events[-1]["data"]
+    assert data["reason"] == "loaded"
+    assert data["new_state"] == "running"
+
+
+def test_task_state_mailbox_wait_and_wake_events():
+    state, vm = make_task_state_env()
+    state._refresh_tasks()
+    state.event_history.clear()
+
+    wait_event = {"descriptor": 7, "handle": 2, "timeout": 50}
+    state._mark_task_wait_mailbox(1, wait_event)
+    vm.state = "waiting_mbx"
+    state._refresh_tasks()
+    events = _task_state_events(state)
+    assert events, "expected mailbox wait event"
+    data = events[-1]["data"]
+    assert data["reason"] == "mailbox_wait"
+    assert data["new_state"] == "waiting_mbx"
+    assert data.get("details", {}).get("descriptor") == 7
+
+    state.event_history.clear()
+    vm.state = "ready"
+    state._mark_task_ready(1, {"descriptor": 7}, reason="mailbox_wake")
+    state._refresh_tasks()
+    wake_events = _task_state_events(state)
+    assert wake_events, "expected mailbox wake event"
+    wake_data = wake_events[-1]["data"]
+    assert wake_data["reason"] == "mailbox_wake"
+    assert wake_data["new_state"] == "ready"
+
+
+def test_task_state_mailbox_timeout_reason():
+    state, vm = make_task_state_env()
+    state._refresh_tasks()
+    state.event_history.clear()
+    vm.state = "ready"
+    timeout_event = {"descriptor": 3, "status": 0xFFFF}
+    state._mark_task_ready(1, timeout_event, reason="timeout")
+    state._refresh_tasks()
+    events = _task_state_events(state)
+    assert events, "expected timeout event"
+    data = events[-1]["data"]
+    assert data["reason"] == "timeout"
+    assert data["new_state"] == "ready"
+    assert data.get("details", {}).get("descriptor") == 3
+
+
+def test_task_state_debug_break_reason():
+    state, vm = make_task_state_env()
+    state._refresh_tasks()
+    state.event_history.clear()
+    event = state._handle_breakpoint_hit(1, 0x200, phase="pre")
+    assert event["type"] == "debug_break"
+    debug_events = _task_state_events(state)
+    assert debug_events, "expected task_state event after debug break"
+    data = debug_events[-1]["data"]
+    assert data["reason"] == "debug_break"
+    assert data["new_state"] == "paused"
+
+
+def test_task_state_sleep_reason():
+    state, vm = make_task_state_env()
+    state._refresh_tasks()
+    state.event_history.clear()
+    vm.sleep_pending = True
+    state._refresh_tasks()
+    events = _task_state_events(state)
+    assert events, "expected sleep task_state event"
+    data = events[-1]["data"]
+    assert data["reason"] == "sleep"
+    assert data["new_state"] == "running"
+    assert data.get("details", {}).get("sleep_pending") is True
+
+
+def test_task_state_returned_reason():
+    state, vm = make_task_state_env()
+    state._refresh_tasks()
+    state.event_history.clear()
+    vm.state = "returned"
+    vm.exit_status = 0
+    state._refresh_tasks()
+    events = _task_state_events(state)
+    assert events, "expected returned event"
+    data = events[-1]["data"]
+    assert data["reason"] == "returned"
+    assert data["new_state"] == "returned"
+    assert data.get("details", {}).get("exit_status") == 0
+
+
+def test_task_state_killed_reason():
+    state, vm = make_task_state_env()
+    state._refresh_tasks()
+    state.event_history.clear()
+    state.kill_task(1)
+    events = _task_state_events(state)
+    assert events, "expected kill event"
+    data = events[-1]["data"]
+    assert data["reason"] == "killed"
+    assert data["new_state"] == "terminated"
 
 class DebugVM:
     def __init__(self) -> None:

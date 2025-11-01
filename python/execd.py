@@ -151,6 +151,7 @@ class ExecutiveState:
         self.memory_layouts: Dict[int, Dict[str, int]] = {}
         self.watchers: Dict[int, Dict[int, Dict[str, Any]]] = {}
         self._next_watch_id = 1
+        self.task_state_pending: Dict[int, Dict[str, Any]] = {}
         self.symbol_cache_lock = threading.RLock()
         self.default_stack_frames = 16
 
@@ -432,6 +433,13 @@ class ExecutiveState:
     def _handle_breakpoint_hit(self, pid: int, pc: int, *, phase: str) -> Dict[str, Any]:
         self.log("info", "breakpoint hit", pid=pid, pc=pc, phase=phase)
         self.stop_auto()
+        self._set_task_state_pending(
+            pid,
+            "debug_break",
+            target_state="paused",
+            details={"pc": pc, "phase": phase},
+            ts=time.time(),
+        )
         try:
             self.pause_task(pid)
         except Exception as exc:
@@ -1524,6 +1532,82 @@ class ExecutiveState:
             if pending is not None:
                 self._apply_backpressure(sub, pending)
 
+    def _set_task_state_pending(
+        self,
+        pid: int,
+        reason: str,
+        *,
+        target_state: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None,
+        ts: Optional[float] = None,
+        force: bool = False,
+    ) -> None:
+        if not reason:
+            return
+        payload: Dict[str, Any] = {
+            "reason": reason,
+            "target_state": target_state,
+            "details": dict(details) if isinstance(details, dict) else (details if details is None else {"value": details}),
+            "ts": ts,
+            "force": force,
+        }
+        self.task_state_pending[pid] = payload
+
+    def _emit_task_state_event(
+        self,
+        pid: int,
+        prev_state: Optional[str],
+        new_state: Optional[str],
+        *,
+        reason: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None,
+        ts: Optional[float] = None,
+        state_entry: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        if state_entry is None:
+            state_entry = self.task_states.setdefault(pid, {})
+        data: Dict[str, Any] = {
+            "prev_state": prev_state,
+            "new_state": new_state,
+        }
+        if reason is not None:
+            data["reason"] = reason
+        if details:
+            data["details"] = details
+        event = self.emit_event("task_state", pid=pid, data=data, ts=ts)
+        state_entry["state"] = new_state
+        if reason is not None:
+            state_entry["last_reason"] = reason
+        state_entry["last_state_ts"] = time.time()
+        return event
+
+    def _infer_task_state_reason(
+        self,
+        prev_state: Optional[str],
+        new_state: Optional[str],
+        task: Dict[str, Any],
+        state_entry: Dict[str, Any],
+    ) -> Optional[str]:
+        prev = str(prev_state or "").lower()
+        new = str(new_state or "").lower()
+        if new == "waiting_mbx":
+            return "mailbox_wait"
+        if prev == "waiting_mbx" and new in {"ready", "running"}:
+            return "mailbox_wake"
+        if new == "returned":
+            return "returned"
+        if new == "terminated":
+            last_reason = state_entry.get("last_reason")
+            if last_reason in {"killed", "timeout"}:
+                return last_reason
+            return "killed"
+        if new == "paused" and state_entry.get("last_reason") == "debug_break":
+            return "debug_break"
+        exit_status = task.get("exit_status")
+        if exit_status is not None and new in {"stopped", "returned"}:
+            return "returned"
+        return None
+
     def _parse_event_filters(self, filters: Optional[Dict[str, Any]]) -> Tuple[Optional[Set[int]], Optional[Set[str]], Optional[int]]:
         if not isinstance(filters, dict):
             return None, None, None
@@ -1705,21 +1789,46 @@ class ExecutiveState:
         else:
             tasks = tasks_block
             self.current_pid = snapshot.get("current_pid")
+        prev_states = self.task_states
         self.tasks = {}
         new_states: Dict[int, Dict[str, Any]] = {}
         current_pids: Set[int] = set()
+        now = time.time()
         for task in tasks:
             if not isinstance(task, dict):
                 continue
-            pid = int(task.get("pid", 0))
+            pid_raw = task.get("pid", 0)
+            try:
+                pid = int(pid_raw)
+            except (TypeError, ValueError):
+                continue
             self.tasks[pid] = task
-            state_entry = self.task_states.get(pid, {})
-            context = state_entry.get("context", {})
+            prev_entry = prev_states.get(pid)
+            state_entry: Dict[str, Any]
+            if isinstance(prev_entry, dict):
+                state_entry = prev_entry
+            else:
+                state_entry = {}
+            context = state_entry.get("context")
+            if not isinstance(context, dict):
+                context = {}
             context["state"] = task.get("state")
             if "exit_status" in task:
                 context["exit_status"] = task.get("exit_status")
+            elif "exit_status" in context and "exit_status" not in task:
+                context.pop("exit_status", None)
             if "trace" in task:
                 context["trace"] = task.get("trace")
+            prev_state = state_entry.get("state")
+            prev_sleep = bool(state_entry.get("sleep_pending"))
+            new_state_value = task.get("state")
+            if new_state_value is None:
+                new_state = context.get("state") or prev_state
+            else:
+                new_state = str(new_state_value)
+            state_entry["state"] = new_state
+            sleep_flag = bool(task.get("sleep_pending"))
+            state_entry["sleep_pending"] = sleep_flag
             state_entry["context"] = context
             new_states[pid] = state_entry
             current_pids.add(pid)
@@ -1736,6 +1845,94 @@ class ExecutiveState:
                 }
             elif "symbols" in task:
                 task.pop("symbols", None)
+
+            reason: Optional[str] = None
+            details: Optional[Dict[str, Any]] = None
+            ts: Optional[float] = None
+            emit_same_state = False
+            pending = self.task_state_pending.pop(pid, None)
+            if pending:
+                reason = pending.get("reason")
+                details_payload = pending.get("details")
+                if isinstance(details_payload, dict):
+                    details = dict(details_payload)
+                elif details_payload is not None:
+                    details = {"value": details_payload}
+                ts = pending.get("ts")
+                emit_same_state = bool(pending.get("force"))
+                expected_state = pending.get("target_state")
+                if expected_state and expected_state != new_state:
+                    merged = dict(details or {})
+                    merged.setdefault("expected_state", expected_state)
+                    details = merged
+            if reason is None and prev_entry is None:
+                reason = "loaded"
+                ts = ts or now
+            if prev_entry is not None and prev_state != new_state and reason is None:
+                inferred = self._infer_task_state_reason(prev_state, new_state, task, state_entry)
+                if inferred:
+                    reason = inferred
+            if not prev_sleep and sleep_flag:
+                sleep_details = dict(details or {}) if details else {}
+                sleep_details.setdefault("sleep_pending", True)
+                sleep_ms = task.get("sleep_pending_ms")
+                if sleep_ms is not None:
+                    sleep_details.setdefault("sleep_ms", sleep_ms)
+                if reason is None:
+                    reason = "sleep"
+                    details = sleep_details
+                else:
+                    updated = dict(details or {})
+                    updated.update(sleep_details)
+                    details = updated
+                ts = ts or now
+                emit_same_state = True
+            if reason == "returned" and task.get("exit_status") is not None:
+                exit_details = dict(details or {})
+                exit_details.setdefault("exit_status", task.get("exit_status"))
+                details = exit_details
+            if reason is not None or (prev_state != new_state) or emit_same_state:
+                self._emit_task_state_event(
+                    pid,
+                    prev_state,
+                    new_state,
+                    reason=reason,
+                    details=details,
+                    ts=ts,
+                    state_entry=state_entry,
+                )
+
+        removed_pids = set(prev_states.keys()) - current_pids
+        for pid in removed_pids:
+            pending = self.task_state_pending.pop(pid, None)
+            prev_entry = prev_states.get(pid)
+            if not isinstance(prev_entry, dict):
+                prev_entry = {}
+            prev_state = prev_entry.get("state")
+            reason = pending.get("reason") if pending else None
+            details_payload = pending.get("details") if pending else None
+            ts = pending.get("ts") if pending else None
+            if details_payload is not None and not isinstance(details_payload, dict):
+                details = {"value": details_payload}
+            else:
+                details = dict(details_payload) if isinstance(details_payload, dict) else None
+            if reason is None:
+                if prev_state == "returned":
+                    reason = "returned"
+                elif prev_state == "terminated" and prev_entry.get("last_reason"):
+                    reason = prev_entry.get("last_reason")
+                else:
+                    reason = "killed"
+            self._emit_task_state_event(
+                pid,
+                prev_state,
+                "terminated",
+                reason=reason,
+                details=details,
+                ts=ts,
+                state_entry=prev_entry,
+            )
+
         self.task_states = new_states
         stale = set(self.breakpoints.keys()) - current_pids
         for pid in stale:
@@ -1979,6 +2176,8 @@ class ExecutiveState:
 
     def pause_task(self, pid: int) -> Dict[str, Any]:
         self.get_task(pid)
+        if pid not in self.task_state_pending:
+            self._set_task_state_pending(pid, "user_pause", target_state="paused", ts=time.time())
         with self.lock:
             self.vm.pause(pid=pid)
         self._refresh_tasks()
@@ -1986,12 +2185,14 @@ class ExecutiveState:
 
     def resume_task(self, pid: int) -> Dict[str, Any]:
         self.get_task(pid)
+        self._set_task_state_pending(pid, "resume", target_state="running", ts=time.time())
         with self.lock:
             self.vm.resume(pid=pid)
         self._refresh_tasks()
         return dict(self.get_task(pid))
 
     def kill_task(self, pid: int) -> Dict[str, Any]:
+        self._set_task_state_pending(pid, "killed", target_state="terminated", ts=time.time())
         self.stop_auto()
         with self.lock:
             self.vm.kill(pid)
@@ -2252,10 +2453,11 @@ class ExecutiveState:
                     handle=event.get("handle"),
                 )
             elif etype in {"mailbox_wake", "mailbox_timeout"} and pid is not None:
-                self._mark_task_ready(pid, event)
+                reason = "timeout" if etype == "mailbox_timeout" else "mailbox_wake"
+                self._mark_task_ready(pid, event, reason=reason, ts=event.get("ts"))
                 self.log(
                     "debug",
-                    "task mailbox wake",
+                    "task mailbox timeout" if etype == "mailbox_timeout" else "task mailbox wake",
                     pid=pid,
                     descriptor=event.get("descriptor"),
                     timeout=(etype == "mailbox_timeout"),
@@ -2298,8 +2500,24 @@ class ExecutiveState:
             ctx['wait_mailbox'] = descriptor
             if handle is not None:
                 ctx['wait_handle'] = handle
+        details = {
+            k: v
+            for k, v in {
+                "descriptor": descriptor,
+                "handle": handle,
+                "timeout": event.get("timeout"),
+            }.items()
+            if v is not None
+        }
+        self._set_task_state_pending(
+            pid,
+            "mailbox_wait",
+            target_state="waiting_mbx",
+            details=details or None,
+            ts=event.get("ts"),
+        )
 
-    def _mark_task_ready(self, pid: int, event: Dict[str, Any]) -> None:
+    def _mark_task_ready(self, pid: int, event: Dict[str, Any], *, reason: Optional[str] = None, ts: Optional[float] = None) -> None:
         task = self.tasks.get(pid)
         if task is not None:
             task['state'] = 'ready'
@@ -2314,6 +2532,26 @@ class ExecutiveState:
             ctx['wait_deadline'] = None
             ctx['wait_handle'] = None
             state['running'] = True
+        details = {
+            k: v
+            for k, v in {
+                "descriptor": event.get("descriptor"),
+                "status": event.get("status"),
+                "length": event.get("length"),
+                "flags": event.get("flags"),
+                "channel": event.get("channel"),
+                "src_pid": event.get("src_pid"),
+            }.items()
+            if v is not None
+        }
+        pending_reason = reason or ("timeout" if event.get("status") not in (None, 0) else "mailbox_wake")
+        self._set_task_state_pending(
+            pid,
+            pending_reason,
+            target_state="ready",
+            details=details or None,
+            ts=ts,
+        )
 
     def scheduler_stats(self) -> Dict[int, Dict[str, int]]:
         info = self.vm.info()
