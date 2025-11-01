@@ -34,6 +34,7 @@ This implementation plan addresses the gaps identified in the TUI Debugger Study
 Design specifies Textual framework for TUI (section 4.1). Modern Python TUI with asyncio integration.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Add `textual >= 0.58.0` to project requirements
 - [ ] Verify Textual installation and compatibility
 - [ ] Review Textual documentation and examples
@@ -51,6 +52,7 @@ Design specifies Textual framework for TUI (section 4.1). Modern Python TUI with
 New `hsx-tui` command-line tool built on `hsxdbg` core package. Foundation for TUI debugger.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create `python/hsx_tui.py` as main entry point
 - [ ] Integrate with `hsxdbg` core package
 - [ ] Add command-line argument parsing (--host, --port, etc.)
@@ -71,6 +73,7 @@ New `hsx-tui` command-line tool built on `hsxdbg` core package. Foundation for T
 Main Textual app class with layout management and event routing (section 4.3.1). Core TUI architecture.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create main Textual App class
 - [ ] Implement layout management system
 - [ ] Implement event routing between components
@@ -91,6 +94,7 @@ Main Textual app class with layout management and event routing (section 4.3.1).
 Integrate debugger core session and event subscription. Connects TUI to executive.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Integrate hsxdbg core connection
 - [ ] Implement session management (attach/detach)
 - [ ] Subscribe to debugger events
@@ -113,6 +117,7 @@ Integrate debugger core session and event subscription. Connects TUI to executiv
 Display R0-R15, PC, SP, PSW with change highlighting. Essential debugger view.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create Registers widget (Textual Widget subclass)
 - [ ] Display general-purpose registers (R0-R15)
 - [ ] Display special registers (PC, SP, PSW)
@@ -134,6 +139,7 @@ Display R0-R15, PC, SP, PSW with change highlighting. Essential debugger view.
 Show instructions around PC with symbols and breakpoint markers. Core debugging view.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create Disassembly widget
 - [ ] Fetch instructions from executive disassembly API
 - [ ] Display opcodes with address and mnemonic
@@ -156,6 +162,7 @@ Show instructions around PC with symbols and breakpoint markers. Core debugging 
 Stdout/stderr output and command input field. User interaction and output display.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create Console widget (scrollable text area)
 - [ ] Display stdout/stderr streams
 - [ ] Implement command input field
@@ -177,6 +184,7 @@ Stdout/stderr output and command input field. User interaction and output displa
 Connection info, PID, execution state, runtime counters. System status at a glance.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create Status widget (footer bar)
 - [ ] Display connection status (connected/disconnected)
 - [ ] Display current PID
@@ -201,6 +209,7 @@ Connection info, PID, execution state, runtime counters. System status at a glan
 Scrollable execution history with PC, opcode, flags. Historical view of execution.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create Trace widget (scrollable table)
 - [ ] Display trace records (seq, PC, opcode, flags)
 - [ ] Implement auto-scroll to bottom
@@ -222,6 +231,7 @@ Scrollable execution history with PC, opcode, flags. Historical view of executio
 Call stack frames with symbol names. Navigate call hierarchy.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create Stack widget (list view)
 - [ ] Fetch stack frames from executive
 - [ ] Display frame index, function name, address
@@ -243,6 +253,7 @@ Call stack frames with symbol names. Navigate call hierarchy.
 Hex dump with ASCII preview and navigation. Low-level memory inspection.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create Memory widget (hex dump view)
 - [ ] Display memory address, hex values, ASCII
 - [ ] Implement scrolling and navigation (PgUp/PgDn)
@@ -264,6 +275,7 @@ Hex dump with ASCII preview and navigation. Low-level memory inspection.
 Variables and expressions with real-time value updates. Monitor key values.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create Watch widget (list view)
 - [ ] Display watch expression and current value
 - [ ] Add/remove watches interactively
@@ -285,6 +297,7 @@ Variables and expressions with real-time value updates. Monitor key values.
 Descriptor activity and recent messages. Monitor IPC activity.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create Mailbox widget (table view)
 - [ ] Display descriptor list (target, capacity, mode)
 - [ ] Show recent messages (sender, size, seq)
@@ -307,6 +320,7 @@ Descriptor activity and recent messages. Monitor IPC activity.
 Subscribe to debugger core events (trace_step, debug_break, etc.). Drive panel updates.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Subscribe to trace_step events
 - [ ] Subscribe to debug_break events
 - [ ] Subscribe to task_state events
@@ -329,6 +343,7 @@ Subscribe to debugger core events (trace_step, debug_break, etc.). Drive panel u
 Transform events into panel update messages with throttling. Ensure responsive UI (<200ms latency).
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement event-to-update transformation
 - [ ] Add update throttling (limit refresh rate)
 - [ ] Queue updates for batch processing
@@ -349,6 +364,7 @@ Transform events into panel update messages with throttling. Ensure responsive U
 Visual indicators for register/memory changes. Helps user track state changes.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Track previous values for comparison
 - [ ] Highlight changed registers (color/style)
 - [ ] Highlight changed memory bytes
@@ -371,6 +387,7 @@ Visual indicators for register/memory changes. Helps user track state changes.
 F5 (continue), F10 (step over), F11 (step in), F9 (toggle breakpoint). Standard debugger shortcuts.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement F5 (continue execution)
 - [ ] Implement F10 (step over)
 - [ ] Implement F11 (step into)
@@ -392,6 +409,7 @@ F5 (continue), F10 (step over), F11 (step in), F9 (toggle breakpoint). Standard 
 Tab/Shift+Tab to switch focus between panels. Navigate between views.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement Tab (focus next panel)
 - [ ] Implement Shift+Tab (focus previous panel)
 - [ ] Highlight focused panel (border color)
@@ -411,6 +429,7 @@ Tab/Shift+Tab to switch focus between panels. Navigate between views.
 Arrow keys, PgUp/PgDn for scrollable panels. Navigate panel contents.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement Up/Down arrow scrolling
 - [ ] Implement PgUp/PgDn page scrolling
 - [ ] Implement Home/End navigation
@@ -430,6 +449,7 @@ Arrow keys, PgUp/PgDn for scrollable panels. Navigate panel contents.
 `:` to enter command input in console panel. Vi-style command entry.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement `:` key to focus console input
 - [ ] Implement Esc to return to normal mode
 - [ ] Add command mode indicator
@@ -450,6 +470,7 @@ Arrow keys, PgUp/PgDn for scrollable panels. Navigate panel contents.
 Implement standard layout from section 5.1. Organized panel arrangement.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Design default layout (panel positions and sizes)
 - [ ] Implement layout composition
 - [ ] Left column: registers, stack
@@ -472,6 +493,7 @@ Implement standard layout from section 5.1. Organized panel arrangement.
 Dynamic panel sizing based on terminal dimensions. Adapt to different screen sizes.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement responsive grid layout
 - [ ] Handle terminal resize events
 - [ ] Adjust panel sizes proportionally
@@ -492,6 +514,7 @@ Dynamic panel sizing based on terminal dimensions. Adapt to different screen siz
 Dark and light color schemes. User preference support.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Define dark theme (default)
 - [ ] Define light theme
 - [ ] Implement theme switching
@@ -514,6 +537,7 @@ Dark and light color schemes. User preference support.
 Unit tests for individual panel components. Ensure widget quality.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Add registers panel widget tests
 - [ ] Add disassembly panel widget tests
 - [ ] Add console panel widget tests
@@ -536,6 +560,7 @@ Unit tests for individual panel components. Ensure widget quality.
 Full TUI debugging workflows with mock events. End-to-end testing.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create integration test scenarios
 - [ ] Test TUI startup and connection
 - [ ] Test stepping workflow with panel updates
@@ -557,6 +582,7 @@ Full TUI debugging workflows with mock events. End-to-end testing.
 Comprehensive TUI keyboard shortcuts and panel descriptions. User documentation.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Write user guide in `docs/tui_debugger.md`
 - [ ] Document all keyboard shortcuts
 - [ ] Describe each panel and its purpose
@@ -577,6 +603,7 @@ Comprehensive TUI keyboard shortcuts and panel descriptions. User documentation.
 Visual examples of TUI in action. Help users understand interface.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Capture screenshots of TUI
 - [ ] Show default layout
 - [ ] Show different panel views

@@ -1651,6 +1651,8 @@ class ExecutiveState:
         last_flags = last_entry.get("flags") if last_entry else None
         if flags_value is not None and (last_flags is None or flags_value != last_flags):
             changed.append("PSW")
+        if "PC" in changed:
+            changed.remove("PC")
         if self.trace_track_changed_regs and changed:
             payload["changed_regs"] = changed
         self.trace_last_regs[pid] = {"regs": clean_regs, "pc": pc_value, "flags": flags_value}
@@ -2208,6 +2210,12 @@ class ExecutiveState:
         if task is not None:
             task['pc'] = regs.get('pc')
         return regs
+
+    def set_trace_changed_regs(self, enabled: bool) -> Dict[str, Any]:
+        self.trace_track_changed_regs = bool(enabled)
+        if not self.trace_track_changed_regs:
+            self.trace_last_regs.clear()
+        return {"changed_regs": self.trace_track_changed_regs}
 
     def trace_task(self, pid: int, enable: Optional[bool]) -> Dict[str, Any]:
         result = self.vm.trace(pid, enable)
@@ -3167,6 +3175,23 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                     return {"version": 1, "status": "ok", "line": result, "pid": pid_int, "address": address_int}
                 raise ValueError(f"unknown sym op '{op}'")
             if cmd == "trace":
+                op_raw = request.get("op")
+                if op_raw is not None and str(op_raw).strip().lower() == "config":
+                    changed_value = request.get("changed_regs")
+                    if changed_value is None:
+                        raise ValueError("trace.config requires 'changed_regs'")
+                    if isinstance(changed_value, bool):
+                        enabled = changed_value
+                    else:
+                        mode_str = str(changed_value).strip().lower()
+                        if mode_str in {"on", "true", "1"}:
+                            enabled = True
+                        elif mode_str in {"off", "false", "0"}:
+                            enabled = False
+                        else:
+                            raise ValueError("trace.config changed_regs must be 'on' or 'off'")
+                    info = self.state.set_trace_changed_regs(enabled)
+                    return {"version": 1, "status": "ok", "trace": info}
                 pid_value = request.get("pid")
                 if pid_value is None:
                     raise ValueError("trace requires 'pid'")

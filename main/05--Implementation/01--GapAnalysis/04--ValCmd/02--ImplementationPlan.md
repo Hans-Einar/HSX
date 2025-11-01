@@ -36,6 +36,7 @@ This implementation plan addresses the gaps identified in the ValCmd Study docum
 Design references `include/hsx_value.h` and `include/hsx_command.h` but these don't exist. Foundation for all value/command operations.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create `include/hsx_value.h` with status codes, flags, data structures
 - [ ] Create `include/hsx_command.h` with status codes, flags, data structures
 - [ ] Define `HSX_VAL_*` status codes (SUCCESS, ENOENT, EPERM, ENOSPC, etc.)
@@ -58,6 +59,7 @@ Design references `include/hsx_value.h` and `include/hsx_command.h` but these do
 Design specifies 8-byte `hsx_val_entry` structure (section 4.2). Core data structure for value registry.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Define `hsx_val_entry` struct (group_id, value_id, flags, auth_level, owner_pid, last_f16, desc_head)
 - [ ] Implement struct packing to achieve 8-byte size
 - [ ] Add OID calculation from (group_id, value_id)
@@ -78,6 +80,7 @@ Design specifies 8-byte `hsx_val_entry` structure (section 4.2). Core data struc
 Similar to value entry, commands need compact storage structure (section 4.2). Enables command registry.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Define `hsx_cmd_entry` struct (group_id, cmd_id, flags, auth_level, owner_pid, handler_ref, desc_head)
 - [ ] Implement struct packing for compact storage
 - [ ] Add OID calculation for commands
@@ -98,6 +101,7 @@ Similar to value entry, commands need compact storage structure (section 4.2). E
 Design specifies mix-in descriptor pattern for metadata (sections 4.2.2-4.2.4). Enables rich metadata for values/commands.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Define descriptor base type with type tag and next pointer
 - [ ] Implement Group descriptor (group_id, name_offset)
 - [ ] Implement Name descriptor (name_offset)
@@ -121,6 +125,7 @@ Design specifies mix-in descriptor pattern for metadata (sections 4.2.2-4.2.4). 
 Design specifies deduplicated null-terminated string storage (section 4.2.6). Optimizes memory for names, units, help text.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement string table with fixed size pool
 - [ ] Implement string deduplication (hash-based lookup)
 - [ ] Implement string insertion (returns offset)
@@ -142,6 +147,7 @@ Design specifies deduplicated null-terminated string storage (section 4.2.6). Op
 Design specifies fixed-size value/command tables with OID-based lookup (section 4.3). Core registry implementation.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement value registry with configurable table size
 - [ ] Implement command registry with configurable table size
 - [ ] Implement OID-based lookup (hash table or linear scan)
@@ -165,6 +171,7 @@ Design specifies fixed-size value/command tables with OID-based lookup (section 
 First VALUE SVC to implement. Design specifies registration with PID capture and descriptor chain building (section 4.4.1). System/ValCmd.md notes this is SVC 0x0700.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement VALUE_REGISTER SVC handler (0x0700)
 - [ ] Capture caller PID automatically
 - [ ] Allocate value entry in registry
@@ -188,6 +195,7 @@ First VALUE SVC to implement. Design specifies registration with PID capture and
 No-create lookup for existing values. Enables checking if value exists before registration.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement VALUE_LOOKUP SVC handler (0x0701)
 - [ ] Search registry by (group_id, value_id)
 - [ ] Return OID if found, ENOENT if not
@@ -206,6 +214,7 @@ No-create lookup for existing values. Enables checking if value exists before re
 Core read operation. Design specifies PID verification and auth_level checks (section 4.4.2). System/ValCmd.md notes this is SVC 0x0702.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement VALUE_GET SVC handler (0x0702)
 - [ ] Lookup value by OID
 - [ ] Verify caller owns value (PID check) or auth_level allows access
@@ -227,6 +236,7 @@ Core read operation. Design specifies PID verification and auth_level checks (se
 Core write operation. Design specifies epsilon threshold, rate limiting, notification dispatch (section 4.4.2). System/ValCmd.md notes this is SVC 0x0703.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement VALUE_SET SVC handler (0x0703)
 - [ ] Lookup value by OID
 - [ ] Verify caller owns value or auth_level allows write
@@ -251,6 +261,7 @@ Core write operation. Design specifies epsilon threshold, rate limiting, notific
 Enumeration support for tooling. System/ValCmd.md notes this is SVC 0x0704.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement VALUE_LIST SVC handler (0x0704)
 - [ ] Filter by group_id (0xFF for all groups)
 - [ ] Filter by caller PID (only show owned values)
@@ -273,6 +284,7 @@ Enumeration support for tooling. System/ValCmd.md notes this is SVC 0x0704.
 Subscribe to value changes via mailbox (section 4.4.3). System/ValCmd.md notes this is SVC 0x0705.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement VALUE_SUB SVC handler (0x0705)
 - [ ] Lookup value by OID
 - [ ] Verify mailbox target is valid
@@ -293,6 +305,7 @@ Subscribe to value changes via mailbox (section 4.4.3). System/ValCmd.md notes t
 Toggle persistence mode for values (section 4.4.4). System/ValCmd.md notes this is SVC 0x0706.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement VALUE_PERSIST SVC handler (0x0706)
 - [ ] Lookup value by OID
 - [ ] Verify caller owns value
@@ -315,6 +328,7 @@ Toggle persistence mode for values (section 4.4.4). System/ValCmd.md notes this 
 Command registration similar to VALUE_REGISTER (section 4.4.1). System/ValCmd.md notes this is SVC 0x0800.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement CMD_REGISTER SVC handler (0x0800)
 - [ ] Capture caller PID automatically
 - [ ] Allocate command entry in registry
@@ -338,6 +352,7 @@ Command registration similar to VALUE_REGISTER (section 4.4.1). System/ValCmd.md
 No-create lookup for existing commands. System/ValCmd.md notes this is SVC 0x0801.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement CMD_LOOKUP SVC handler (0x0801)
 - [ ] Search registry by (group_id, cmd_id)
 - [ ] Return OID if found, ENOENT if not
@@ -356,6 +371,7 @@ No-create lookup for existing commands. System/ValCmd.md notes this is SVC 0x080
 Synchronous command invocation with auth checks (section 4.4.5). System/ValCmd.md notes this is SVC 0x0802.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement CMD_CALL SVC handler (0x0802)
 - [ ] Lookup command by OID
 - [ ] Verify auth_level allows access
@@ -379,6 +395,7 @@ Synchronous command invocation with auth checks (section 4.4.5). System/ValCmd.m
 Asynchronous command invocation with mailbox result posting. System/ValCmd.md notes this is SVC 0x0803.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement CMD_CALL_ASYNC SVC handler (0x0803)
 - [ ] Lookup command by OID
 - [ ] Verify ASYNC_ALLOWED flag set
@@ -400,6 +417,7 @@ Asynchronous command invocation with mailbox result posting. System/ValCmd.md no
 Retrieve help text from descriptors. System/ValCmd.md notes this is SVC 0x0804.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement CMD_HELP SVC handler (0x0804)
 - [ ] Lookup command by OID
 - [ ] Traverse descriptor chain for help text
@@ -423,6 +441,7 @@ Retrieve help text from descriptors. System/ValCmd.md notes this is SVC 0x0804.
 Design specifies event emission for debugger/tooling (section 5.2). System/ValCmd.md notes: "Event + transport bindings feeding toolkit watch panels."
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Define value_changed event schema (seq, ts, pid, oid, old_f16, new_f16)
 - [ ] Define value_registered event schema (seq, ts, pid, oid, group_id, value_id)
 - [ ] Define cmd_invoked event schema (seq, ts, pid, oid, group_id, cmd_id)
@@ -447,6 +466,7 @@ Design specifies event emission for debugger/tooling (section 5.2). System/ValCm
 Design specifies RPC commands for shell/tooling (section 5.3). System/ValCmd.md notes: val.list, val.get, val.set, cmd.list, cmd.call commands.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement `val.list` RPC command (enumerate values)
 - [ ] Implement `val.get(oid)` RPC command (read value)
 - [ ] Implement `val.set(oid, f16)` RPC command (write value)
@@ -469,6 +489,7 @@ Design specifies RPC commands for shell/tooling (section 5.3). System/ValCmd.md 
 Monitor table occupancy and string table usage against budgets. System/ValCmd.md notes: "Document transport bindings... in formats docs."
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Track value registry occupancy (used/total)
 - [ ] Track command registry occupancy (used/total)
 - [ ] Track string table usage (bytes used/total)
@@ -491,6 +512,7 @@ Monitor table occupancy and string table usage against budgets. System/ValCmd.md
 Design specifies parsing `.value` and `.cmd` sections from HXE header (section 4.4.1). Enables declarative configuration.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Design .value section format (JSON or binary)
 - [ ] Design .cmd section format (JSON or binary)
 - [ ] Implement .value section parser
@@ -512,6 +534,7 @@ Design specifies parsing `.value` and `.cmd` sections from HXE header (section 4
 Design specifies registering all values/commands before VM execution (section 1.1). Ensures resources are ready at task start.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement metadata preprocessing during task load
 - [ ] Call VALUE_REGISTER for each .value entry
 - [ ] Call CMD_REGISTER for each .cmd entry
@@ -532,6 +555,7 @@ Design specifies registering all values/commands before VM execution (section 1.
 Construct descriptor chains from section metadata. Enables rich metadata without manual SVC calls.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Parse descriptor metadata from .value/.cmd sections
 - [ ] Build Group descriptors
 - [ ] Build Name descriptors
@@ -556,6 +580,7 @@ Construct descriptor chains from section metadata. Enables rich metadata without
 Design specifies load-on-boot and debounced writes (section 4.4.4). System/ValCmd.md notes: "Hook persistence writes into provisioning/FRAM layout."
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Design FRAM layout for persisted values
 - [ ] Implement value load from FRAM at boot
 - [ ] Implement debounced value write to FRAM
@@ -577,6 +602,7 @@ Design specifies load-on-boot and debounced writes (section 4.4.4). System/ValCm
 Design specifies delivering value change notifications to subscribers (section 4.4.3). Enables reactive applications.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement notification dispatch on VALUE_SET
 - [ ] Format notification message (oid, old_f16, new_f16)
 - [ ] Send notification to each subscriber's mailbox
@@ -597,6 +623,7 @@ Design specifies delivering value change notifications to subscribers (section 4
 Design specifies epsilon threshold and rate_limit enforcement (section 4.4.2). Reduces unnecessary notifications and persistence writes.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement epsilon threshold check (abs(new - old) < epsilon)
 - [ ] Store epsilon value in descriptor or flags
 - [ ] Implement rate limiting (min time between changes)
@@ -619,6 +646,7 @@ Design specifies epsilon threshold and rate_limit enforcement (section 4.4.2). R
 Design specifies OID-to-CAN mapping for external access (section 4.4.6). Enables CAN-based telemetry and control.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Design CAN frame format for GET/SET/PUB/CALL/RET operations
 - [ ] Implement OID-to-CAN ID mapping
 - [ ] Implement CAN GET handler (read value, send response)
@@ -640,6 +668,7 @@ Design specifies OID-to-CAN mapping for external access (section 4.4.6). Enables
 Design specifies numeric and named value access (section 4.4.7). Enables interactive debugging and control.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement named value lookup (by string name)
 - [ ] Support val.get("my_value") syntax
 - [ ] Support val.set("my_value", 3.14) syntax
@@ -660,6 +689,7 @@ Design specifies numeric and named value access (section 4.4.7). Enables interac
 Design mentions external value/command access without PID checks. Enables UART-based monitoring and control.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Design UART command protocol
 - [ ] Implement UART GET command
 - [ ] Implement UART SET command
@@ -683,6 +713,7 @@ Design mentions external value/command access without PID checks. Enables UART-b
 Design specifies C `Value` type with operator overloads (section 5.4). Provides transparent SVC access for applications.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Define C `Value` struct with OID field
 - [ ] Implement cast operator (Value -> f16) using VALUE_GET SVC
 - [ ] Implement assignment operator (Value = f16) using VALUE_SET SVC
@@ -703,6 +734,7 @@ Design specifies C `Value` type with operator overloads (section 5.4). Provides 
 Operator overloads should invoke SVCs transparently. Simplifies application code.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Verify cast operator generates VALUE_GET SVC
 - [ ] Verify assignment operator generates VALUE_SET SVC
 - [ ] Optimize for minimal code generation
@@ -721,6 +753,7 @@ Operator overloads should invoke SVCs transparently. Simplifies application code
 Sample applications demonstrate value/command usage patterns. Helps developers understand the API.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create example: simple value registration and access
 - [ ] Create example: value subscription and notifications
 - [ ] Create example: command registration and invocation
@@ -743,6 +776,7 @@ Sample applications demonstrate value/command usage patterns. Helps developers u
 Value watch panels enhance debugging experience. Symbol lookup enables named access.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement value watch panel in TUI debugger
 - [ ] Display value OID, name, current f16, unit
 - [ ] Update watch panel on value_changed events
@@ -763,6 +797,7 @@ Value watch panels enhance debugging experience. Symbol lookup enables named acc
 Design specifies Pin flag enforcement and auth_level checks (section 6). Security requirement for production systems.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement auth_level hierarchy (PUBLIC < USER < ADMIN < FACTORY)
 - [ ] Implement PIN token storage and validation
 - [ ] Enforce auth_level on VALUE_GET/SET
@@ -784,6 +819,7 @@ Design specifies Pin flag enforcement and auth_level checks (section 6). Securit
 Design specifies automatically clearing values/commands when task terminates (section 6). Prevents resource leaks.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Hook into task termination event
 - [ ] Enumerate values owned by terminated PID
 - [ ] Enumerate commands owned by terminated PID
@@ -805,6 +841,7 @@ Design specifies automatically clearing values/commands when task terminates (se
 Like VM and Executive, value/command subsystem needs C implementation for MCU deployment.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Port registry to C (`platforms/c/valcmd/`)
 - [ ] Port value/command entries to C
 - [ ] Port descriptor types to C

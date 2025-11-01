@@ -11,7 +11,7 @@
 ## Commit Log
 | Date | Commit hash | Message | Author | Notes |
 | --- | --- | --- | --- | --- |
-| 2025-11-03 | pending | Trace step changed_regs diffing | Codex | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py` |
+| 2025-11-01 | 75fc1873b0db | Trace step changed_regs diffing | Hans Einar | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py` |
 | 2025-11-01 | 8fec000f4dd9 | Task state events & docs | Hans Einar | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py` |
 | 2025-11-01 | bb6969edb48b | Event back-pressure metrics & slow-consumer handling | Hans Einar | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py` |
 | 2025-11-02 | pending | Watch expressions RPC & CLI | Codex | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py python/tests/test_executive_session_helpers.py python/tests/test_shell_client.py` |

@@ -35,6 +35,7 @@ This implementation plan addresses the gaps identified in the VS Code Debugger S
 New `hsx-dap.py` implementing Debug Adapter Protocol server. Foundation for IDE integration.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create `python/hsx_dap.py` as main DAP server
 - [ ] Study DAP specification (https://microsoft.github.io/debug-adapter-protocol/)
 - [ ] Integrate with `hsxdbg` core package
@@ -55,6 +56,7 @@ New `hsx-dap.py` implementing Debug Adapter Protocol server. Foundation for IDE 
 Abstract base implementing stdio/TCP communication per DAP spec. Protocol communication layer.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement DAP base class with protocol handling
 - [ ] Implement stdio communication (standard DAP mode)
 - [ ] Implement message framing (Content-Length headers)
@@ -75,6 +77,7 @@ Abstract base implementing stdio/TCP communication per DAP spec. Protocol commun
 Use `hsxdbg` core for HSX executive RPC connection. Bridge between DAP and executive.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Integrate hsxdbg core connection
 - [ ] Implement session management (attach to executive)
 - [ ] Subscribe to executive events
@@ -95,6 +98,7 @@ Use `hsxdbg` core for HSX executive RPC connection. Bridge between DAP and execu
 Read .sym files and build source line → address mappings. Essential for source-level debugging.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement .sym file parser
 - [ ] Build source file → address map
 - [ ] Build address → source file map
@@ -117,6 +121,7 @@ Read .sym files and build source line → address mappings. Essential for source
 Capability negotiation (breakpoints, stepping, variables). First DAP handshake.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement `initialize` request handler
 - [ ] Declare supported capabilities (supportsConfigurationDoneRequest, etc.)
 - [ ] Return capability response
@@ -135,6 +140,7 @@ Capability negotiation (breakpoints, stepping, variables). First DAP handshake.
 Start debug session with HXE path, spawn executive if needed. Begin debugging workflow.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement `launch` request handler
 - [ ] Parse launch configuration (hxePath, execHost, execPort)
 - [ ] Connect to executive using hsxdbg core
@@ -156,6 +162,7 @@ Start debug session with HXE path, spawn executive if needed. Begin debugging wo
 Map source file:line to addresses, set executive breakpoints. Core debugging feature.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement `setBreakpoints` request handler
 - [ ] Map source locations to instruction addresses using .sym
 - [ ] Set breakpoints in executive at resolved addresses
@@ -176,6 +183,7 @@ Map source file:line to addresses, set executive breakpoints. Core debugging fea
 Implement `continue`, `next`, `stepIn`, `stepOut`, `pause` requests. Stepping and execution control.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement `continue` request (resume execution)
 - [ ] Implement `next` request (step over)
 - [ ] Implement `stepIn` request (step into)
@@ -197,6 +205,7 @@ Implement `continue`, `next`, `stepIn`, `stepOut`, `pause` requests. Stepping an
 Clean up session and close connections. Proper session termination.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement `disconnect` request handler
 - [ ] Close executive connection
 - [ ] Clean up resources
@@ -218,6 +227,7 @@ Clean up session and close connections. Proper session termination.
 Retrieve call stack from executive, map addresses to source locations. Essential debugging feature.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement `stackTrace` request handler
 - [ ] Fetch stack frames from executive
 - [ ] Map frame addresses to source locations using .sym
@@ -238,6 +248,7 @@ Retrieve call stack from executive, map addresses to source locations. Essential
 Enumerate variable scopes (registers, locals, globals). Variable inspection hierarchy.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement `scopes` request handler
 - [ ] Define "Registers" scope
 - [ ] Define "Locals" scope (if available)
@@ -258,6 +269,7 @@ Enumerate variable scopes (registers, locals, globals). Variable inspection hier
 Retrieve register/memory values formatted for VS Code. Display program state.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement `variables` request handler
 - [ ] Fetch register values from executive
 - [ ] Format values for VS Code display
@@ -278,6 +290,7 @@ Retrieve register/memory values formatted for VS Code. Display program state.
 Support watch expressions and hover queries. Interactive expression evaluation.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement `evaluate` request handler
 - [ ] Support register name evaluation (e.g., "r0")
 - [ ] Support address evaluation (e.g., "@0x1000")
@@ -300,6 +313,7 @@ Support watch expressions and hover queries. Interactive expression evaluation.
 Translate executive events to DAP events. Event-driven debugging.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Map debug_break event → `stopped` event (reason: breakpoint)
 - [ ] Map trace_step event → `stopped` event (reason: step)
 - [ ] Map stdout/stderr events → `output` event
@@ -320,6 +334,7 @@ Translate executive events to DAP events. Event-driven debugging.
 Convert instruction addresses in events to source locations. Source-level event notifications.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Map addresses to source locations for stopped events
 - [ ] Include source file and line in stopped events
 - [ ] Handle addresses without source mapping
@@ -338,6 +353,7 @@ Convert instruction addresses in events to source locations. Source-level event 
 Map HSX PIDs to DAP thread IDs. Multi-task debugging support.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement PID → thread ID mapping
 - [ ] Send `thread` event when tasks start/stop
 - [ ] Implement `threads` request handler
@@ -359,6 +375,7 @@ Map HSX PIDs to DAP thread IDs. Multi-task debugging support.
 Create VS Code extension project with TypeScript. Extension foundation.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create VS Code extension directory structure
 - [ ] Initialize TypeScript project
 - [ ] Add VS Code extension dependencies
@@ -379,6 +396,7 @@ Create VS Code extension project with TypeScript. Extension foundation.
 Define debugger contribution and activation events. Extension manifest.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create package.json with extension metadata
 - [ ] Define debugger type ("hsx")
 - [ ] Register debug configuration provider
@@ -399,6 +417,7 @@ Define debugger contribution and activation events. Extension manifest.
 Provide `launch.json` templates for HXE debugging. User configuration interface.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create launch configuration provider
 - [ ] Define launch configuration schema
 - [ ] Provide initial launch.json template
@@ -419,6 +438,7 @@ Provide `launch.json` templates for HXE debugging. User configuration interface.
 Spawn and manage `hsx-dap.py` process. Adapter process management.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement debug adapter descriptor factory
 - [ ] Spawn hsx-dap.py process with stdio communication
 - [ ] Pass configuration to adapter
@@ -439,6 +459,7 @@ Spawn and manage `hsx-dap.py` process. Adapter process management.
 Add VS Code commands for HSX-specific operations. Extended functionality.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Add command: "HSX: Load HXE File"
 - [ ] Add command: "HSX: Connect to Executive"
 - [ ] Add command: "HSX: Show Symbol Information"
@@ -461,6 +482,7 @@ Add VS Code commands for HSX-specific operations. Extended functionality.
 Validate request/response handling against DAP spec. Ensure protocol compliance.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Add protocol message validation tests
 - [ ] Test all DAP request handlers
 - [ ] Test all DAP event emissions
@@ -481,6 +503,7 @@ Validate request/response handling against DAP spec. Ensure protocol compliance.
 Full debugging workflows in VS Code with mock executive. Integration testing.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create end-to-end test scenarios
 - [ ] Test launch workflow
 - [ ] Test breakpoint workflow
@@ -502,6 +525,7 @@ Full debugging workflows in VS Code with mock executive. Integration testing.
 Clear error messages for common failure modes. User-friendly errors.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Handle missing .sym files (clear error message)
 - [ ] Handle executive connection failures
 - [ ] Handle HXE load failures
@@ -522,6 +546,7 @@ Clear error messages for common failure modes. User-friendly errors.
 Optimize symbol lookups and event processing for responsiveness. Good user experience.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Profile adapter performance
 - [ ] Optimize symbol lookup (caching, indexing)
 - [ ] Optimize event processing
@@ -544,6 +569,7 @@ Optimize symbol lookups and event processing for responsiveness. Good user exper
 VS Code debugging tutorial with screenshots. User documentation.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Write user guide in `docs/vscode_debugger.md`
 - [ ] Add installation instructions
 - [ ] Document launch.json configuration
@@ -564,6 +590,7 @@ VS Code debugging tutorial with screenshots. User documentation.
 Sample configurations for common scenarios. Help users get started.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create example: local debugging
 - [ ] Create example: remote executive
 - [ ] Create example: attach to running task
@@ -582,6 +609,7 @@ Sample configurations for common scenarios. Help users get started.
 VSIX bundle for VS Code marketplace distribution. Distribution package.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Package extension as VSIX
 - [ ] Test VSIX installation
 - [ ] Create README for marketplace
@@ -601,6 +629,7 @@ VSIX bundle for VS Code marketplace distribution. Distribution package.
 Common issues and solutions. Support documentation.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Document common DAP adapter issues
 - [ ] Document executive connection issues
 - [ ] Document symbol file issues

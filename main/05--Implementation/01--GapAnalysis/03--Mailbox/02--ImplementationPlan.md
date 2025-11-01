@@ -33,6 +33,7 @@ This implementation plan addresses the gaps identified in the Mailbox Study docu
 Design specifies `HSX_MBX_STATUS_TIMEOUT` (0x07) for timeout expiry (section 5.1.1). Current implementation returns `WOULDBLOCK` on timeout - ABI needs update for compliance.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Add `HSX_MBX_STATUS_TIMEOUT` (0x07) to `include/hsx_mailbox.h`
 - [ ] Add `HSX_MBX_STATUS_TIMEOUT` to `python/hsx_mailbox_constants.py`
 - [ ] Update mailbox manager to return TIMEOUT status on expiry
@@ -53,6 +54,7 @@ Design specifies `HSX_MBX_STATUS_TIMEOUT` (0x07) for timeout expiry (section 5.1
 Design defines `HSX_MBX_STATUS_NO_DESCRIPTOR` (0x05) for descriptor pool exhaustion (section 5.1.1). Not currently in C header or Python constants.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Add `HSX_MBX_STATUS_NO_DESCRIPTOR` (0x05) to `include/hsx_mailbox.h`
 - [ ] Add `HSX_MBX_STATUS_NO_DESCRIPTOR` to `python/hsx_mailbox_constants.py`
 - [ ] Update mailbox manager to return NO_DESCRIPTOR on pool exhaustion
@@ -73,6 +75,7 @@ Design defines `HSX_MBX_STATUS_NO_DESCRIPTOR` (0x05) for descriptor pool exhaust
 Design specifies structured events for debugger/tooling (sections 5.2, 8). System/Mailbox.md notes: "Emit mailbox-related events for debugger/tooling." Essential for visibility and debugging.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Define mailbox event types: mailbox_send, mailbox_recv, mailbox_wait, mailbox_wake, mailbox_timeout, mailbox_overrun
 - [ ] Define event schema for each type (seq, ts, pid, descriptor, handle, size, etc.)
 - [ ] Integrate with executive event streaming (emit_event calls)
@@ -97,6 +100,7 @@ Design specifies structured events for debugger/tooling (sections 5.2, 8). Syste
 Design specifies tracking descriptor usage, queue depth, memory footprint (section 4.6). System/Mailbox.md notes: "Document memory footprint knobs tied to resource budgets."
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Add descriptor usage tracking (active descriptors, max pool size)
 - [ ] Add per-descriptor queue depth tracking (current/max messages)
 - [ ] Add memory footprint calculation (descriptor overhead + message data)
@@ -118,6 +122,7 @@ Design specifies tracking descriptor usage, queue depth, memory footprint (secti
 Design specifies messages acknowledged by all readers are removed (section 4.4.2). Implementation tracks `last_seq` per handle but reclamation logic should be verified.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Review fan-out reclamation algorithm implementation
 - [ ] Verify message cleanup when all readers acknowledge
 - [ ] Add test for fan-out with multiple readers (verify reclamation)
@@ -138,6 +143,7 @@ Design specifies messages acknowledged by all readers are removed (section 4.4.2
 Design states taps should not block descriptor owner (sections 4.4.3, 6). System/Mailbox.md notes: tap mode exists but priority/isolation needs validation.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Review tap implementation for blocking behavior
 - [ ] Verify taps use drop-on-overflow policy
 - [ ] Verify taps don't block owner sends
@@ -160,6 +166,7 @@ Design states taps should not block descriptor owner (sections 4.4.3, 6). System
 Design specifies `.mailbox` metadata section for declarative mailbox creation (section 4.5.1). Schema needs to be defined for toolchain integration.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Design .mailbox section JSON/binary format
 - [ ] Define fields: target, capacity, mode_mask, bindings
 - [ ] Define validation rules (capacity limits, valid targets)
@@ -180,6 +187,7 @@ Design specifies `.mailbox` metadata section for declarative mailbox creation (s
 Parser needed to extract .mailbox metadata from HXE header (section 4.5.1). Enables declarative mailbox configuration.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement .mailbox section parser in executive
 - [ ] Parse JSON/binary .mailbox data from HXE header
 - [ ] Validate .mailbox section contents
@@ -200,6 +208,7 @@ Parser needed to extract .mailbox metadata from HXE header (section 4.5.1). Enab
 Design specifies creating mailboxes before VM execution (section 3.9). Ensures mailboxes are ready when task starts.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement mailbox creation from .mailbox metadata
 - [ ] Create descriptors during task load (before VM execution)
 - [ ] Register mailbox bindings with executive
@@ -220,6 +229,7 @@ Design specifies creating mailboxes before VM execution (section 3.9). Ensures m
 Toolchain needs to generate .mailbox sections from application code. Enables declarative mailbox specification in source.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Design source annotation syntax for mailbox declarations
 - [ ] Update assembler to recognize mailbox directives
 - [ ] Update compiler to generate .mailbox metadata
@@ -242,6 +252,7 @@ Toolchain needs to generate .mailbox sections from application code. Enables dec
 Design specifies explicit `WAIT_MBX` state transition (section 4.3). System/Mailbox.md notes: "Provide hooks for tracing (mailbox_wait/wake) to scheduler." Related to issue #2_scheduler.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Ensure mailbox blocking transitions task to WAIT_MBX state
 - [ ] Verify executive state machine recognizes WAIT_MBX
 - [ ] Add WAIT_MBX state to task state tracking
@@ -262,6 +273,7 @@ Design specifies explicit `WAIT_MBX` state transition (section 4.3). System/Mail
 Design specifies timer heap for blocked mailbox operations (section 4.4.4). Ensures accurate timeout handling.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Integrate mailbox timeouts with executive timer heap
 - [ ] Add timeout deadline calculation for blocking recv
 - [ ] Implement timeout expiry callback (wake task, return TIMEOUT)
@@ -282,6 +294,7 @@ Design specifies timer heap for blocked mailbox operations (section 4.4.4). Ensu
 Design specifies FIFO wake order and tap priority (sections 4.6, 6). Ensures fair wakeup behavior.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Verify waiter list maintains FIFO order
 - [ ] Implement wake priority: owner before taps
 - [ ] Add wake order tests (multiple waiters on same descriptor)
@@ -301,6 +314,7 @@ Design specifies FIFO wake order and tap priority (sections 4.6, 6). Ensures fai
 Design specifies tracking `MAILBOX_STEP`, `MAILBOX_WAKE`, `MAILBOX_TIMEOUT` for diagnostics (section 4.6). Useful for performance analysis.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Add MAILBOX_STEP counter (mailbox operations per step)
 - [ ] Add MAILBOX_WAKE counter (mailbox wake events)
 - [ ] Add MAILBOX_TIMEOUT counter (mailbox timeout events)
@@ -322,6 +336,7 @@ Design specifies tracking `MAILBOX_STEP`, `MAILBOX_WAKE`, `MAILBOX_TIMEOUT` for 
 Design specifies descriptor pool limits and per-task handle limits (section 4.6). System/Mailbox.md notes: "Resource budgets for descriptor pools configured per shared/resource_budgets.md."
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement descriptor pool size limit (configurable)
 - [ ] Implement per-task handle count limit
 - [ ] Enforce limits at BIND and OPEN operations
@@ -342,6 +357,7 @@ Design specifies descriptor pool limits and per-task handle limits (section 4.6)
 Design requires finalizing descriptor pool sizes and capacity defaults (section 4.6). Provides platform-specific resource profiles.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Define descriptor pool sizes for host platform (e.g., 256 descriptors)
 - [ ] Define descriptor pool sizes for embedded platforms (e.g., 16-32 descriptors)
 - [ ] Define default message capacities per profile
@@ -361,6 +377,7 @@ Design requires finalizing descriptor pool sizes and capacity defaults (section 
 Design specifies graceful degradation when descriptor pool exhausted (section 6). Prevents system instability.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Test behavior when descriptor pool exhausted
 - [ ] Verify existing descriptors continue functioning
 - [ ] Verify BIND returns NO_DESCRIPTOR error
@@ -381,6 +398,7 @@ Design specifies graceful degradation when descriptor pool exhausted (section 6)
 Design mentions rate limits for tap consumers to prevent starvation (section 6). Protects stdio performance.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Design rate limiting policy for tap consumers
 - [ ] Implement rate limit tracking per tap
 - [ ] Drop tap messages when rate limit exceeded
@@ -403,6 +421,7 @@ Design mentions rate limits for tap consumers to prevent starvation (section 6).
 Mailbox event types need formal documentation in protocol specification. Enables tool integration.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Document mailbox_send event schema in `docs/executive_protocol.md`
 - [ ] Document mailbox_recv event schema
 - [ ] Document mailbox_wait event schema
@@ -424,6 +443,7 @@ Mailbox event types need formal documentation in protocol specification. Enables
 Examples help developers understand declarative mailbox usage. Documentation gap identified in Study.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create example .mailbox section for simple IPC
 - [ ] Create example for fan-out scenario
 - [ ] Create example for tap monitoring
@@ -443,6 +463,7 @@ Examples help developers understand declarative mailbox usage. Documentation gap
 Documentation gap: missing examples of fan-out and tap usage patterns (Study section 3).
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Document single-reader usage pattern
 - [ ] Document fan-out usage pattern with examples
 - [ ] Document tap usage pattern with examples
@@ -464,6 +485,7 @@ Documentation gap: missing examples of fan-out and tap usage patterns (Study sec
 Test coverage expansion needed for new features and gap closures. Ensures quality and prevents regressions.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Add tests for timeout status code behavior
 - [ ] Add tests for descriptor exhaustion scenarios
 - [ ] Add tests for event emission (all event types)
@@ -490,6 +512,7 @@ Test coverage expansion needed for new features and gap closures. Ensures qualit
 Like VM and Executive, mailbox needs C implementation for MCU deployment. Python is reference only.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create C mailbox manager structure (`platforms/c/mailbox/`)
 - [ ] Port MailboxDescriptor structure to C
 - [ ] Port MailboxMessage structure to C
@@ -516,6 +539,7 @@ Like VM and Executive, mailbox needs C implementation for MCU deployment. Python
 Optimize for embedded without Python overhead. Design specifies C-compatible message headers for zero-copy (Study section 1).
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Design zero-copy message buffer strategy
 - [ ] Implement message buffer pool for C port
 - [ ] Implement zero-copy SEND (pass buffer ownership)
@@ -538,6 +562,7 @@ Optimize for embedded without Python overhead. Design specifies C-compatible mes
 Implement AVR/embedded descriptor pool sizing (section 4.6). Optimize for constrained environments.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Define AVR resource profile (minimal descriptors, small capacities)
 - [ ] Define ARM Cortex-M profile (moderate descriptors)
 - [ ] Define host platform profile (large pools)
@@ -559,6 +584,7 @@ Implement AVR/embedded descriptor pool sizing (section 4.6). Optimize for constr
 Shared test vectors for Python and C implementations. Ensures behavioral equivalence across platforms.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create shared test vector format (JSON test cases)
 - [ ] Define test vector schema (inputs, expected outputs)
 - [ ] Port existing Python tests to test vector format

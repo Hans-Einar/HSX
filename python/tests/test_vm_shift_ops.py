@@ -60,3 +60,20 @@ def test_shift_ops_cover_edge_cases():
     assert vm.regs[11] == 0xC0000000  # ASR wraps shift amount (33 -> 1)
     assert vm.regs[12] == 0  # Shifted zero stays zero
     assert vm.flags & 0x1  # Zero flag set after final shift
+
+
+def test_shift_by_zero_clears_overflow():
+    asm_lines = [
+        ".entry main",
+        ".text",
+        "main:",
+        "    LDI32 R1, 0x7FFFFFFF",
+        "    ADD R2, R1, R1",  # sets overflow
+        "    LDI R3, 0",
+        "    LSR R4, R1, R3",  # shift by 0 must clear V
+        "    BRK 0",
+    ]
+
+    vm = _run_program(asm_lines)
+
+    assert (vm.flags & 0x8) == 0, "Overflow flag should be cleared after zero-width shift"

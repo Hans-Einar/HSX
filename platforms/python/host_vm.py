@@ -1016,7 +1016,7 @@ class MiniVM:
                 carry = None
             v = (value << shift) & 0xFFFFFFFF
             self.regs[rd] = v
-            set_flags(v, carry=bool(carry) if shift else None, overflow=False if shift else None)
+            set_flags(v, carry=bool(carry) if shift else None, overflow=False)
         elif op == 0x32:  # LSR
             shift = self.regs[rs2] & 0x1F
             value = self.regs[rs1] & 0xFFFFFFFF
@@ -1026,7 +1026,7 @@ class MiniVM:
                 carry = None
             v = (value >> shift) & 0xFFFFFFFF
             self.regs[rd] = v
-            set_flags(v, carry=bool(carry) if shift else None, overflow=False if shift else None)
+            set_flags(v, carry=bool(carry) if shift else None, overflow=False)
         elif op == 0x33:  # ASR
             shift = self.regs[rs2] & 0x1F
             value = self.regs[rs1] & 0xFFFFFFFF
@@ -1040,7 +1040,7 @@ class MiniVM:
                 carry = None
             v = (signed >> shift) & 0xFFFFFFFF
             self.regs[rd] = v
-            set_flags(v, carry=bool(carry) if shift else None, overflow=False if shift else None)
+            set_flags(v, carry=bool(carry) if shift else None, overflow=False)
         elif op == 0x34:  # ADC
             carry_in = 1 if (self.flags & FLAG_C) else 0
             ua = self.regs[rs1] & 0xFFFFFFFF

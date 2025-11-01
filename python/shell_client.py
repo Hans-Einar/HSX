@@ -1514,7 +1514,14 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
 
     if cmd == "trace":
         if not args:
-            raise ValueError("trace requires <pid> [on|off]")
+            raise ValueError("trace requires <pid> [on|off] or 'config changed-regs <on|off>'")
+        first = args[0].lower()
+        if first == "config":
+            if len(args) < 3 or args[1].lower() != "changed-regs":
+                raise ValueError("trace config usage: trace config changed-regs <on|off>")
+            payload["op"] = "config"
+            payload["changed_regs"] = args[2]
+            return payload
         payload["pid"] = args[0]
         if len(args) > 1:
             payload["mode"] = args[1]

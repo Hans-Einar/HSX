@@ -39,6 +39,7 @@ Core Commands
 | `clock` | `{ "version": 1, "cmd": "clock", "op": "rate", "rate": 10 }` | `{ "version": 1, "status": "ok", "clock": { ... } }` | Sets auto-loop rate in Hz (`0` = unlimited). |
 | `step` | `{ "version": 1, "cmd": "step", "steps": 500 [, "pid": 2] }` | `{ "version": 1, "status": "ok", "result": { ... }, "clock": { ... } }` | Alias for `clock` `op: "step"`; honours the same `steps`/`pid` fields. |
 | `trace` | `{ "version": 1, "cmd": "trace", "pid": 1, "mode": "on" }` | `{ "version": 1, "status": "ok", "trace": { "pid": 1, "enabled": true } }` | Enable or disable instruction tracing for a task (`mode` optional to toggle). |
+| `trace.config` | `{ "version": 1, "cmd": "trace", "op": "config", "changed_regs": "off" }` | `{ "version": 1, "status": "ok", "trace": { "changed_regs": false } }` | Configure trace behaviour; `changed_regs` controls whether register diffs are emitted in `trace_step` events. |
 | `bp` | `{ "version": 1, "cmd": "bp", "op": "set", "pid": 1, "addr": 4096 }` | `{ "version": 1, "status": "ok", "pid": 1, "breakpoints": [4096] }` | Manage per-task breakpoints (`op`: `list`/`set`/`clear`/`clear_all`). |
 | `disasm` | `{ "version": 1, "cmd": "disasm", "pid": 1 [, "addr": 0x1000, "count": 8, "mode": "cached" ] }` | `{ "version": 1, "status": "ok", "disasm": { ... } }` | Disassemble a slice of task memory. |
 | `sym` | `{ "version": 1, "cmd": "sym", "op": "addr", "pid": 1, "address": 4096 }` | `{ "version": 1, "status": "ok", "symbol": { ... } }` | Symbol table helpers (`op`: `info`/`addr`/`name`/`line`/`load`). |
@@ -377,7 +378,7 @@ Disassembly
 
 Typical payloads:
 
-- `trace_step`: `{ "pc": <uint32>, "next_pc": <uint32>, "opcode": <string>, "flags": <string?>, "regs": [<uint32> x16], "steps": <uint64?>, "changed_regs": ["R0", "PC", "PSW"]? }`
+- `trace_step`: `{ "pc": <uint32>, "next_pc": <uint32>, "opcode": <string>, "flags": <string?>, "regs": [<uint32> x16], "steps": <uint64?>, "changed_regs": ["R0", "PSW"]? }`
 - `debug_break`: `{ "pc": <uint32>, "reason": "BRK" | "virtual", "breakpoint_id": <int?> }`
 - `scheduler`: `{ "state": "READY|RUNNING|WAIT_MBX|SLEEPING|PAUSED|RETURNED", "prev_pid": <int?>, "next_pid": <int?> }`
 - `mailbox_send` / `mailbox_recv`: `{ "descriptor": <int>, "length": <int>, "flags": <uint16>, "channel": <uint16> }`
@@ -385,7 +386,7 @@ Typical payloads:
 - `stdout` / `stderr`: `{ "text": <string> }`
 - `warning`: `{ "message": <string>, "category": <string> }`
 
-`trace_step.data.changed_regs` is optional and, when present, lists the architectural registers that changed relative to the previous step for the same PID. Register names follow the `R<N>` convention with `PC` and `PSW` used for the program counter and processor status word respectively. Clients may use the list to highlight deltas without diffing the full register file.
+`trace_step.data.changed_regs` is optional and, when present, lists the architectural registers that changed relative to the previous step for the same PID. Register names follow the `R<N>` convention with `PSW` used for the processor status word; the program counter is omitted (it advances on every instruction) so consumers can focus on meaningful state deltas without post-filtering. Clients may use the list to highlight deltas without diffing the full register file.
 
 ### Back-pressure & errors
 

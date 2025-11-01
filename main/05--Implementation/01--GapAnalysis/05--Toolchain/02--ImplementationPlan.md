@@ -36,6 +36,7 @@ This implementation plan addresses the gaps identified in the Toolchain Study do
 Design specifies HXE version 0x0002 with metadata sections (sections 4.2.2, 4.2.3). Foundation for declarative value/command/mailbox registration. Blocks ValCmd and Mailbox metadata support.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Add version field support to HXE header (0x0001 vs 0x0002)
 - [ ] Add app_name field (32 bytes at offset 0x20)
 - [ ] Add allow_multiple_instances flag
@@ -58,6 +59,7 @@ Design specifies HXE version 0x0002 with metadata sections (sections 4.2.2, 4.2.
 Section table specifies location and size of .value, .cmd, .mailbox sections. Required for metadata preprocessing.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Design section table entry format (section_type, offset, size)
 - [ ] Define section types: VALUE (0x01), COMMAND (0x02), MAILBOX (0x03)
 - [ ] Specify table layout (array of entries following header)
@@ -78,6 +80,7 @@ Section table specifies location and size of .value, .cmd, .mailbox sections. Re
 Linker must generate HXE v2 executables with metadata sections. Design specifies --app-name and --allow-multiple-instances parameters (section 4.2.3).
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Add `--app-name` parameter to `python/hld.py` (required)
 - [ ] Add `--allow-multiple-instances` flag to `python/hld.py`
 - [ ] Add `--hxe-version` parameter (default v2, allow v1 for compatibility)
@@ -99,6 +102,7 @@ Linker must generate HXE v2 executables with metadata sections. Design specifies
 VM/executive must parse HXE v2 headers and section tables. Enables metadata preprocessing before VM execution.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Update HXE loader to detect version field
 - [ ] Parse v2 header fields (app_name, meta_offset, meta_count)
 - [ ] Parse section table and extract metadata sections
@@ -121,6 +125,7 @@ VM/executive must parse HXE v2 headers and section tables. Enables metadata prep
 Design specifies C preprocessor directives for value/command/mailbox declarations (sections 4.2.1, 4.2.2). Developers need syntax documentation.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Define `#pragma hsx_value(group, id, name, unit, ...)` syntax
 - [ ] Define `#pragma hsx_command(group, id, name, help, ...)` syntax
 - [ ] Define `#pragma hsx_mailbox(name, capacity, mode)` syntax
@@ -141,6 +146,7 @@ Design specifies C preprocessor directives for value/command/mailbox declaration
 Design specifies parsing pragma directives from LLVM IR metadata (section 4.2.1). Extracts value/command/mailbox declarations from C source.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Parse LLVM IR metadata nodes (look for pragma annotations)
 - [ ] Extract value declarations from metadata
 - [ ] Extract command declarations from metadata
@@ -161,6 +167,7 @@ Design specifies parsing pragma directives from LLVM IR metadata (section 4.2.1)
 hsx-llc must emit .value, .cmd, .mailbox MVASM directives from pragma data (section 4.2.2).
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Design MVASM directive syntax (.value group=X id=Y name="..." ...)
 - [ ] Implement .value directive emission
 - [ ] Implement .cmd directive emission
@@ -181,6 +188,7 @@ hsx-llc must emit .value, .cmd, .mailbox MVASM directives from pragma data (sect
 Assembler must parse metadata directives from MVASM source (section 4.2.2).
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement .value directive parser in `python/asm.py`
 - [ ] Implement .cmd directive parser
 - [ ] Implement .mailbox directive parser
@@ -201,6 +209,7 @@ Assembler must parse metadata directives from MVASM source (section 4.2.2).
 Assembler must encode metadata sections per HXE format spec in HXO objects (section 4.2.2).
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Design HXO metadata section format
 - [ ] Implement .value section encoding
 - [ ] Implement .cmd section encoding
@@ -221,6 +230,7 @@ Assembler must encode metadata sections per HXE format spec in HXO objects (sect
 Linker must merge metadata sections from multiple HXO inputs, deduplicate strings, build section table (section 4.2.3).
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement metadata section extraction from HXO inputs
 - [ ] Merge .value sections from multiple objects
 - [ ] Merge .cmd sections from multiple objects
@@ -245,6 +255,7 @@ Linker must merge metadata sections from multiple HXO inputs, deduplicate string
 Design specifies 3-phase plan for debug metadata extraction (section 4.2.1). Phase 1 focuses on function-level metadata.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Parse `!DISubprogram` nodes from LLVM IR
 - [ ] Extract function names from debug metadata
 - [ ] Extract source file names from `!DIFile` nodes
@@ -265,6 +276,7 @@ Design specifies 3-phase plan for debug metadata extraction (section 4.2.1). Pha
 Design specifies --emit-debug flag to generate .dbg JSON files (section 4.2.1).
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Add `--emit-debug` flag to `python/hsx-llc.py`
 - [ ] Design .dbg JSON schema (functions, files, line mappings)
 - [ ] Implement .dbg file generation
@@ -285,6 +297,7 @@ Design specifies --emit-debug flag to generate .dbg JSON files (section 4.2.1).
 Phase 2 requires mapping LLVM instructions to MVASM line numbers (section 4.2.1). Enables source-level debugging.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Parse `!DILocation` metadata for each LLVM instruction
 - [ ] Track source line numbers during lowering
 - [ ] Map LLVM instruction to MVASM line
@@ -305,6 +318,7 @@ Phase 2 requires mapping LLVM instructions to MVASM line numbers (section 4.2.1)
 Design specifies --emit-sym flag to generate debugger symbol files (section 4.2.3). Linker combines .dbg files with final addresses.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Add `--emit-sym` flag to `python/hld.py`
 - [ ] Parse .dbg files from object inputs
 - [ ] Resolve addresses after linking
@@ -326,6 +340,7 @@ Design specifies --emit-sym flag to generate debugger symbol files (section 4.2.
 Complete JSON schema for functions, variables, labels, instructions, memory regions (section 4.2.3). Ensures debugger compatibility.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Finalize .sym JSON schema
 - [ ] Add functions section (name, addr, size, file, line)
 - [ ] Add variables section (name, addr, type, scope)
@@ -349,6 +364,7 @@ Complete JSON schema for functions, variables, labels, instructions, memory regi
 Design specifies using Clang -fdebug-prefix-map for relative paths (section 4.2.4). Enables portable debug builds.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Ensure build scripts use `-fdebug-prefix-map` flag
 - [ ] Test path remapping in debug metadata
 - [ ] Verify relative paths in .dbg files
@@ -368,6 +384,7 @@ Design specifies using Clang -fdebug-prefix-map for relative paths (section 4.2.
 Design specifies sources.json for source list mapping (section 4.2.4). Helps debuggers resolve source files.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Design sources.json format (relative path → absolute path)
 - [ ] Generate sources.json during build
 - [ ] Include all source files compiled
@@ -387,6 +404,7 @@ Design specifies sources.json for source list mapping (section 4.2.4). Helps deb
 Validate debugger can resolve source files across different build environments (section 4.2.4).
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create test builds in different directories
 - [ ] Verify path resolution with sources.json
 - [ ] Test debugger source file loading
@@ -406,6 +424,7 @@ Validate debugger can resolve source files across different build environments (
 Provide examples and guidelines for portable debug builds (section 4.2.4).
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Document recommended build workflow
 - [ ] Provide Makefile examples
 - [ ] Provide build script examples
@@ -427,6 +446,7 @@ Provide examples and guidelines for portable debug builds (section 4.2.4).
 Design references shift operations (LSL, LSR, ASR). Coordinates with VM ISA completion. Essential for LLVM lowering and C compilation.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Define LSL, LSR, ASR opcodes (coordinate with VM)
 - [ ] Implement opcode encoding in `python/asm.py`
 - [ ] Update OPC dictionary with shift opcodes
@@ -447,6 +467,7 @@ Design references shift operations (LSL, LSR, ASR). Coordinates with VM ISA comp
 Design references ADC, SBC for multi-precision arithmetic. Coordinates with VM ISA completion.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Define ADC, SBC opcodes (coordinate with VM)
 - [ ] Implement opcode encoding in `python/asm.py`
 - [ ] Update OPC dictionary with ADC, SBC
@@ -467,6 +488,7 @@ Design references ADC, SBC for multi-precision arithmetic. Coordinates with VM I
 Synchronize OPC dictionary with VM design spec including DIV. Ensures toolchain and VM agree on encoding.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Review VM design spec opcode table
 - [ ] Update OPC dictionary in `python/asm.py`
 - [ ] Add DIV opcode (0x13)
@@ -487,6 +509,7 @@ Synchronize OPC dictionary with VM design spec including DIV. Ensures toolchain 
 Comprehensive testing for all new instructions ensures correctness.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Add assembler tests for shift opcodes
 - [ ] Add assembler tests for ADC/SBC
 - [ ] Add assembler tests for DIV
@@ -509,6 +532,7 @@ Comprehensive testing for all new instructions ensures correctness.
 Design requires bit-identical output for same inputs (section 4.1). Critical for reproducible builds and verification.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Identify sources of non-determinism (timestamps, ordering)
 - [ ] Remove or fix non-deterministic behavior
 - [ ] Add deterministic build tests (build twice, compare outputs)
@@ -528,6 +552,7 @@ Design requires bit-identical output for same inputs (section 4.1). Critical for
 Current linear scan algorithm is basic. Better allocation reduces spills and improves code quality.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Profile current register allocation
 - [ ] Identify common spill scenarios
 - [ ] Implement better spill cost heuristics
@@ -549,6 +574,7 @@ Current linear scan algorithm is basic. Better allocation reduces spills and imp
 Complete build pipeline with debug metadata needs comprehensive testing.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Add end-to-end tests with metadata
 - [ ] Add multi-file compilation tests
 - [ ] Add debug metadata validation tests
@@ -570,6 +596,7 @@ Complete build pipeline with debug metadata needs comprehensive testing.
 Identify and optimize bottlenecks in LLVM lowering and linking. Improves developer experience.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Profile hsx-llc with large inputs
 - [ ] Profile linker with many objects
 - [ ] Identify bottlenecks (parsing, allocation, encoding)
@@ -592,6 +619,7 @@ Identify and optimize bottlenecks in LLVM lowering and linking. Improves develop
 Extract `!DILocalVariable` metadata for watch expressions (section 4.2.1 Phase 3). Enables variable inspection in debugger.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Parse `!DILocalVariable` nodes from LLVM IR
 - [ ] Track variable locations (registers, stack offsets)
 - [ ] Handle variable liveness ranges
@@ -613,6 +641,7 @@ Extract `!DILocalVariable` metadata for watch expressions (section 4.2.1 Phase 3
 Map every MVASM instruction to source line (Phase 2 completion). Enables precise source-level stepping.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Ensure every MVASM instruction has source line mapping
 - [ ] Handle instructions generated without source (prologue, epilogue)
 - [ ] Add line mapping completeness tests
@@ -631,6 +660,7 @@ Map every MVASM instruction to source line (Phase 2 completion). Enables precise
 Design mentions standard library with values/commands/mailboxes. Enables code reuse and standard interfaces.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Design standard library structure
 - [ ] Create common value definitions (version, uptime, etc.)
 - [ ] Create common command definitions (reset, status, etc.)
@@ -652,6 +682,7 @@ Design mentions standard library with values/commands/mailboxes. Enables code re
 Current Python implementation is reference. C/C++ port for performance. Not critical but improves large project build times.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Benchmark Python toolchain performance
 - [ ] Identify performance-critical components
 - [ ] Design C/C++ port architecture

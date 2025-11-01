@@ -34,6 +34,7 @@ This implementation plan addresses the gaps identified in the Executive Study do
 Design specifies session.open/close/keepalive with PID locks and capability negotiation (section 5.2). System/Executive.md notes: "Implement PID lock table + capability negotiation" as a core requirement. Foundation for all client interactions.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [x] Design session state structure (session_id, client_info, capabilities, owned_pids, timestamp)
 - [x] Implement `session.open` RPC command with capability negotiation
 - [x] Implement `session.close` RPC command with PID lock cleanup
@@ -56,6 +57,7 @@ Design specifies session.open/close/keepalive with PID locks and capability nego
 Design specifies comprehensive event streaming with subscribe/unsubscribe/ack (Section 7). System/Executive.md notes: "Build EventStreamer with bounded queue + ACK handling per docs/executive_protocol.md; include warning events on drop." Critical for debugger and tooling integration.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [x] Design event schema structure (seq, ts, pid, type, data) per Section 7.1
 - [x] Implement bounded ring buffer per session (configurable size: 100-1000 events)
 - [x] Implement `events.subscribe` RPC command with event type filtering
@@ -80,6 +82,7 @@ Design specifies comprehensive event streaming with subscribe/unsubscribe/ack (S
 Design specifies bp.set/clear/list with per-PID breakpoint sets and pre/post-step checking (sections 5.2, 8.6). Essential debugger feature.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [x] Design breakpoint structure (address, pid, enabled, hit_count)
 - [x] Implement per-PID breakpoint sets (dict mapping PID to set of breakpoints)
 - [x] Implement `bp.set(pid, address)` RPC command
@@ -104,6 +107,7 @@ Design specifies bp.set/clear/list with per-PID breakpoint sets and pre/post-ste
 Design specifies .sym JSON file loading and caching at task load time (section 5.4). Required for stack reconstruction, disassembly annotations, and symbol enumeration.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [x] Define .sym JSON file format (functions, variables, types)
 - [x] Implement symbol file loader (parse JSON, validate structure)
 - [x] Add symbol caching per PID (load at task load time)
@@ -126,6 +130,7 @@ Design specifies .sym JSON file loading and caching at task load time (section 5
 Design specifies stack.info API with frame pointer walking and symbol lookup (section 5.3). Critical for debugger stack traces.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [x] Implement `stack.info(pid, max_frames)` RPC command
 - [x] Design stack frame structure (pc, sp, fp, func_name, func_addr, line_num)
 - [x] Implement frame pointer walking algorithm
@@ -151,6 +156,7 @@ Design specifies stack.info API with frame pointer walking and symbol lookup (se
 Design specifies disasm.read with symbol annotations and caching strategies (section 5.4). Enables source-level debugging views.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [x] Implement `disasm.read(pid, addr, count, mode)` RPC command
 - [x] Integrate with existing Python disassembler (`python/disassemble.py`)
 - [x] Add symbol annotation (label function names, variable references)
@@ -175,6 +181,7 @@ Design specifies disasm.read with symbol annotations and caching strategies (sec
 Design specifies symbols.list API for function/variable enumeration (section 5.5). Useful for debugger UI autocomplete and exploration.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [x] Implement `symbols.list(pid, type)` RPC command
 - [x] Support type filters: 'functions', 'variables', 'all'
 - [x] Return symbol list with names, addresses, sizes, types
@@ -194,6 +201,7 @@ Design specifies symbols.list API for function/variable enumeration (section 5.5
 Design specifies memory.regions API reporting layout from .sym or HXE header (section 5.6). Helps debuggers understand memory map.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [x] Implement `memory.regions(pid)` RPC command
 - [x] Extract regions from HXE header (code, data, stack, heap)
 - [x] Extract regions from .sym file (if available)
@@ -213,6 +221,7 @@ Design specifies memory.regions API reporting layout from .sym or HXE header (se
 Design specifies watch.add/remove/list with change detection (section 5.7). Enables monitoring of memory locations and variables.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [x] Implement `watch.add(pid, expr, type)` RPC command
 - [x] Implement `watch.remove(pid, watch_id)` RPC command
 - [x] Implement `watch.list(pid)` RPC command
@@ -236,6 +245,7 @@ Design specifies watch.add/remove/list with change detection (section 5.7). Enab
 Design specifies events.ack protocol and drop-oldest policy (section 7.3). System/Executive.md notes: "Build EventStreamer with bounded queue + ACK handling."
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [x] Implement ACK sequence number tracking per session
 - [x] Add flow control based on unacknowledged event count
 - [x] Implement slow client detection (lag threshold)
@@ -257,6 +267,7 @@ Design specifies events.ack protocol and drop-oldest policy (section 7.3). Syste
 Design specifies structured task_state events with reason codes (section 7.2). Essential for debugger UI state tracking.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [x] Define task_state event structure (pid, old_state, new_state, reason)
 - [x] Define reason codes: debug_break, sleep, mailbox_wait, timeout, returned, killed, loaded
 - [x] Emit task_state events on all state transitions
@@ -276,6 +287,7 @@ Design specifies structured task_state events with reason codes (section 7.2). E
 Design specifies optional changed_regs field in trace_step events to optimize TUI (section 7.2). Performance optimization for debugger displays.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [x] Track previous register values per PID
 - [x] Compare registers after each step
 - [x] Add changed_regs field to trace_step events (array of register IDs)
@@ -297,14 +309,14 @@ Design specifies optional changed_regs field in trace_step events to optimize TU
 Design specifies extending loader to handle version 0x0002 with metadata sections (sections 1.2, 3.8). Enables value/command/mailbox metadata.
 
 **Todo:**
-- [ ] Extend HXE loader to detect version field (0x0001 vs 0x0002)
-- [ ] Parse HXE v2 header with metadata section pointers
-- [ ] Parse .value section (value definitions)
-- [ ] Parse .cmd section (command definitions)
-- [ ] Parse .mailbox section (mailbox bindings)
-- [ ] Add HXE v2 format tests (valid headers, various section combinations)
-- [ ] Update `docs/hxe_format.md` with v2 specification
-- [ ] Ensure backward compatibility with v1 format
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+- [ ] Extend Python MiniVM loader to recognise version 0x0002 (app_name, allow_multiple_instances, meta table) while remaining compatible with v1 images.
+- [ ] Expose metadata/detail blocks from `load_hxe_bytes()` so `ExecutiveState.load()` can consume them (including app_name + flags).
+- [ ] Implement metadata table parsing helpers for `.value`, `.cmd`, `.mailbox` sections and build canonical descriptor structures.
+- [ ] Teach `ExecutiveState.load()` to register declarative values/commands/mailboxes with existing managers (or stage stubs if runtime support is pending), and enforce allow_multiple_instances policy + app_name uniqueness.
+- [ ] Surface metadata in task records (`ps`, `info`, etc.) for downstream consumers.
+- [ ] Add pytest coverage for v2 loader paths (header parsing, metadata table, duplicate-instance handling) plus integration smoke via execd load.
+- [ ] Update `docs/hxe_format.md`/protocol docs with any behavioural clarifications discovered during implementation.
 
 ---
 
@@ -318,6 +330,7 @@ Design specifies extending loader to handle version 0x0002 with metadata section
 Design specifies parsing .value/.cmd/.mailbox sections and registering resources before VM execution (sections 1.2, 6.2). Enables declarative resource configuration.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement metadata preprocessing at task load time
 - [ ] Register value resources from .value section
 - [ ] Register command resources from .cmd section
@@ -338,6 +351,7 @@ Design specifies parsing .value/.cmd/.mailbox sections and registering resources
 Design specifies extracting app_name from HXE header with multiple instance tracking (section 4.2). Enables named applications and instance management.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Extract app_name from HXE header (v2 format)
 - [ ] Track app instances with _#0, _#1 suffixes
 - [ ] Return EEXIST error if multiple instances not allowed
@@ -359,6 +373,7 @@ Design specifies extracting app_name from HXE header with multiple instance trac
 Design specifies explicit READY/RUNNING/WAIT_MBX/SLEEPING/PAUSED/RETURNED states with documented transitions (sections 8.1-8.2). System/Executive.md notes importance of scheduler state machine.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Define TaskState enum: READY, RUNNING, WAIT_MBX, SLEEPING, PAUSED, RETURNED, KILLED
 - [ ] Document state transition diagram
 - [ ] Refactor existing task state tracking to use TaskState enum
@@ -379,6 +394,7 @@ Design specifies explicit READY/RUNNING/WAIT_MBX/SLEEPING/PAUSED/RETURNED states
 Design specifies timer heap for sleep deadlines and complete mailbox wait list integration (section 8.4). Completes scheduler functionality.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement timer heap for SLEEPING task deadlines
 - [ ] Add timer expiration checking on each scheduler tick
 - [ ] Integrate mailbox wait lists with WAIT_MBX state
@@ -399,6 +415,7 @@ Design specifies timer heap for sleep deadlines and complete mailbox wait list i
 Design specifies emitting scheduler events on context switches (section 7.2). Enables scheduler visualization and debugging.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Define scheduler event structure (old_pid, new_pid, reason, quantum_remaining)
 - [ ] Emit scheduler events on every context switch
 - [ ] Add reason codes: quantum_expired, sleep, wait_mbx, paused, killed
@@ -417,6 +434,7 @@ Design specifies emitting scheduler events on context switches (section 7.2). En
 Design specifies executive never directly manipulates PC/SP/registers (sections 4.1, 4.2, 8.2). System/Executive.md notes: related to issue #2_scheduler for context switching remediation.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Audit existing executive code for direct context manipulation
 - [ ] Replace direct context access with VM API calls
 - [ ] Ensure executive only uses VM APIs: vm_reg_get, vm_reg_set, vm_reg_get_for, vm_reg_set_for
@@ -439,6 +457,7 @@ Design specifies executive never directly manipulates PC/SP/registers (sections 
 Design specifies configurable trace buffers with variant-specific sizes (section 6.4). System/Executive.md notes need for trace buffer management.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement trace record ring buffer (configurable size: 0, 100, 1000+ records)
 - [ ] Define trace record structure (seq, ts, pid, pc, opcode, regs, flags)
 - [ ] Add trace capture on each step (poll VM trace APIs)
@@ -459,6 +478,7 @@ Design specifies configurable trace buffers with variant-specific sizes (section
 Design specifies standardizing trace record structure (section 6.4). Ensures consistent trace data across tools.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Formalize trace record structure (seq, pid, pc, opcode, regs)
 - [ ] Add optional fields (flags, changed_regs, mem_access)
 - [ ] Implement trace record serialization (for export)
@@ -478,6 +498,7 @@ Design specifies standardizing trace record structure (section 6.4). Ensures con
 Design specifies polling VM minimal trace state after each step (section 6.4). Integrates VM and executive trace systems.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Call vm_get_last_pc() after each VM step
 - [ ] Call vm_get_last_opcode() after each VM step
 - [ ] Call vm_get_last_regs() after each VM step
@@ -500,6 +521,7 @@ Design specifies polling VM minimal trace state after each step (section 6.4). I
 Design specifies refactoring to support pluggable backends (section 1.1). Enables multiple deployment scenarios and C port preparation.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Define backend interface contracts (filesystem, protocol, HAL)
 - [ ] Refactor Python executive into core + backends
 - [ ] Implement filesystem backends: host (Python I/O), SPI SD, CAN
@@ -521,6 +543,7 @@ Design specifies refactoring to support pluggable backends (section 1.1). Enable
 Design specifies minimal/development/full debugger build configurations (section 1.1). Optimizes executive for different deployment scenarios.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Define minimal variant: no trace buffer, basic scheduler, minimal protocol
 - [ ] Define development variant: 100-record trace buffer, debugger APIs, JSON-RPC
 - [ ] Define full debugger variant: 1000+ record trace, all debugger features, event streaming
@@ -541,6 +564,7 @@ Design specifies minimal/development/full debugger build configurations (section
 Design specifies C executive for MCU targets with pluggable modules. Critical for embedded deployment but depends on VM C port.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create C executive structure (`platforms/c/executive/`)
 - [ ] Port core scheduler to C
 - [ ] Port task state management to C
@@ -562,6 +586,7 @@ Design specifies C executive for MCU targets with pluggable modules. Critical fo
 Design specifies multiple backend implementations for different deployment scenarios (section 1.1).
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement SPI SD filesystem backend for C port
 - [ ] Implement CAN filesystem backend for C port
 - [ ] Implement UART protocol backend for C port
@@ -585,6 +610,7 @@ Design specifies multiple backend implementations for different deployment scena
 Design allows read-only observer sessions alongside owner session (sections 3.46, 7.2). Enables multiple monitoring clients.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Add observer capability flag to session.open
 - [ ] Restrict write operations for observer sessions (read-only)
 - [ ] Allow multiple observer sessions simultaneously
@@ -604,6 +630,7 @@ Design allows read-only observer sessions alongside owner session (sections 3.46
 Design specifies value persistence to FRAM with debounce (section 6.6). Enables persistent configuration across reboots.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Design FRAM layout for value persistence
 - [ ] Implement value write debouncing (avoid excessive writes)
 - [ ] Add value load from FRAM at boot
@@ -624,6 +651,7 @@ Design specifies value persistence to FRAM with debounce (section 6.6). Enables 
 Design specifies runtime checks against resource budgets (sections 6.8, 8.5). System/Executive.md notes: "Integrate resource budget telemetry."
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Parse resource budgets from `docs/resource_budgets.md`
 - [ ] Track RAM usage per task (code, data, stack, heap)
 - [ ] Track flash usage per task
@@ -645,6 +673,7 @@ Design specifies runtime checks against resource budgets (sections 6.8, 8.5). Sy
 Design mentions future priority overlays on round-robin (sections 8.2, 8.5). Enhancement for real-time task support.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Add priority field to task state
 - [ ] Implement priority-based ready queue (multiple priority levels)
 - [ ] Modify scheduler to select highest priority ready task
@@ -665,6 +694,7 @@ Design mentions future priority overlays on round-robin (sections 8.2, 8.5). Enh
 System/Executive.md notes: "Expose EXEC_GET_VERSION SVC + RPC command returning shared header info" per DR-2.5. Required for ABI version handshake.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Wait for shared ABI header to be generated (track in DependencyTree.md)
 - [ ] Implement EXEC_GET_VERSION syscall (module 0x00)
 - [ ] Return version information from shared header

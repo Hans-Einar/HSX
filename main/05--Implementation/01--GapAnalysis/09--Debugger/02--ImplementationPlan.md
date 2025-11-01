@@ -35,6 +35,7 @@ This implementation plan addresses the gaps identified in the CLI Debugger Study
 Separate shell commands from debugger commands. Prepare for dedicated CLI debugger tool.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Review `python/shell_client.py` (1,574 lines)
 - [ ] Identify shell-specific vs debugger-specific commands
 - [ ] Extract debugger command logic into separate module
@@ -53,6 +54,7 @@ Separate shell commands from debugger commands. Prepare for dedicated CLI debugg
 New dedicated `hsx-dbg` command-line tool built on `hsxdbg` core package (from Toolkit module).
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create `python/hsx_dbg.py` as main entry point
 - [ ] Integrate with `hsxdbg` core package
 - [ ] Implement basic REPL loop
@@ -73,6 +75,7 @@ New dedicated `hsx-dbg` command-line tool built on `hsxdbg` core package (from T
 Implement REPL using `prompt_toolkit` with command parsing and validation. Design specifies structured command interface.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Install `prompt_toolkit` dependency
 - [ ] Implement command parser with subcommands
 - [ ] Add command validation and help system
@@ -94,6 +97,7 @@ Implement REPL using `prompt_toolkit` with command parsing and validation. Desig
 Design specifies machine-readable output for CI/CD (section 6.2). Enables automation and scripting.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Add `--json` flag to CLI arguments
 - [ ] Implement JSON formatter for all command outputs
 - [ ] Ensure consistent JSON schema across commands
@@ -115,6 +119,7 @@ Design specifies machine-readable output for CI/CD (section 6.2). Enables automa
 Implement `attach <pid>`, `detach`, `observer <pid>` commands per session protocol 5.1. Core debugger functionality.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement `attach <pid>` command (exclusive session)
 - [ ] Implement `detach` command (release PID lock)
 - [ ] Implement `observer <pid>` command (read-only session)
@@ -135,6 +140,7 @@ Implement `attach <pid>`, `detach`, `observer <pid>` commands per session protoc
 `session info`, `session list` commands show active sessions and locks. Helps manage multi-user scenarios.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement `session info` command (current session details)
 - [ ] Implement `session list` command (all active sessions)
 - [ ] Display session capabilities
@@ -154,6 +160,7 @@ Implement `attach <pid>`, `detach`, `observer <pid>` commands per session protoc
 Automatic keepalive messages per heartbeat interval. Prevents session timeout.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement automatic keepalive timer
 - [ ] Send keepalive messages at configured interval
 - [ ] Handle keepalive failures (reconnect or error)
@@ -175,6 +182,7 @@ Automatic keepalive messages per heartbeat interval. Prevents session timeout.
 `break <addr/symbol>`, `break <file>:<line>` commands per section 5.3. Essential debugger functionality.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement `break <address>` command (numeric address)
 - [ ] Implement `break <symbol>` command (function name)
 - [ ] Implement `break <file>:<line>` command (source location)
@@ -196,6 +204,7 @@ Automatic keepalive messages per heartbeat interval. Prevents session timeout.
 `delete <bp_id>`, `clear <addr/symbol>` commands remove breakpoints.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement `delete <bp_id>` command (by ID)
 - [ ] Implement `clear <addr/symbol>` command (by location)
 - [ ] Implement `clear` command (all breakpoints)
@@ -215,6 +224,7 @@ Automatic keepalive messages per heartbeat interval. Prevents session timeout.
 `info breakpoints` command shows all breakpoints with hit counts.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement `info breakpoints` command
 - [ ] Display breakpoint ID, location, type, enabled status
 - [ ] Show hit counts if available
@@ -235,6 +245,7 @@ Automatic keepalive messages per heartbeat interval. Prevents session timeout.
 `enable <bp_id>`, `disable <bp_id>` commands toggle breakpoints without deletion.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement `enable <bp_id>` command
 - [ ] Implement `disable <bp_id>` command
 - [ ] Update breakpoint state in executive
@@ -255,6 +266,7 @@ Automatic keepalive messages per heartbeat interval. Prevents session timeout.
 `backtrace`, `frame <n>`, `up`, `down` commands per section 5.4. Essential for understanding program state.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement `backtrace` command (show call stack)
 - [ ] Implement `frame <n>` command (select frame)
 - [ ] Implement `up` command (move to caller frame)
@@ -276,6 +288,7 @@ Automatic keepalive messages per heartbeat interval. Prevents session timeout.
 `watch <var>`, `unwatch <var>`, `list watches` commands per section 5.5. Monitor variable changes.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement `watch <variable>` command
 - [ ] Implement `watch <address>` command
 - [ ] Implement `unwatch <watch_id>` command
@@ -296,6 +309,7 @@ Automatic keepalive messages per heartbeat interval. Prevents session timeout.
 `x/<fmt> <addr>`, `dump <start> <end>` commands per section 5.6. Inspect memory contents.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement `x/<format> <address>` command (examine memory)
 - [ ] Support format specifiers (x=hex, d=decimal, i=instruction, s=string)
 - [ ] Implement `dump <start> <end>` command (hex dump)
@@ -315,6 +329,7 @@ Automatic keepalive messages per heartbeat interval. Prevents session timeout.
 `disasm <addr/symbol>`, `disasm /s` commands per section 5.7. View assembly instructions with symbols.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement `disasm <address>` command (disassemble at address)
 - [ ] Implement `disasm <symbol>` command (disassemble function)
 - [ ] Implement `disasm /s` flag (show source lines)
@@ -337,6 +352,7 @@ Automatic keepalive messages per heartbeat interval. Prevents session timeout.
 Design specifies tab completion for commands, symbols, addresses, registers using symbol files (section 6.3).
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement command name completion
 - [ ] Implement symbol name completion (functions, variables)
 - [ ] Implement register name completion
@@ -358,6 +374,7 @@ Design specifies tab completion for commands, symbols, addresses, registers usin
 Design specifies history across sessions (section 6.4). Save to `~/.hsx_history`.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement history save to `~/.hsx_history`
 - [ ] Implement history load on startup
 - [ ] Limit history size (configurable)
@@ -377,6 +394,7 @@ Design specifies history across sessions (section 6.4). Save to `~/.hsx_history`
 Execute command files with `-x <script>` flag. Enables automated debugging workflows.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Add `-x <script>` command-line flag
 - [ ] Implement script file execution (read and execute commands)
 - [ ] Support comments in script files
@@ -396,6 +414,7 @@ Execute command files with `-x <script>` flag. Enables automated debugging workf
 Protocol error recovery, reconnection logic per section 7. Robust error handling.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Implement connection loss detection
 - [ ] Add automatic reconnection with backoff
 - [ ] Handle protocol version mismatches gracefully
@@ -417,6 +436,7 @@ Protocol error recovery, reconnection logic per section 7. Robust error handling
 Protocol tests, session management tests, command parsing tests ensure quality.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Add protocol message tests
 - [ ] Add session management tests (attach, detach, conflicts)
 - [ ] Add command parser tests (valid/invalid syntax)
@@ -437,6 +457,7 @@ Protocol tests, session management tests, command parsing tests ensure quality.
 Full debugging workflows: attach, set breakpoints, step, inspect, detach.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create end-to-end test scenarios
 - [ ] Test attach to running task
 - [ ] Test breakpoint workflow (set, hit, continue)
@@ -457,6 +478,7 @@ Full debugging workflows: attach, set breakpoints, step, inspect, detach.
 Comprehensive CLI debugger command reference with examples. Essential for users.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Write user guide in `docs/cli_debugger.md`
 - [ ] Document all commands with syntax and examples
 - [ ] Add common debugging workflows
@@ -477,6 +499,7 @@ Comprehensive CLI debugger command reference with examples. Essential for users.
 Sample JSON scripts for CI/CD integration. Shows automation capabilities.
 
 **Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
 - [ ] Create sample automation scripts
 - [ ] Example: automated test run with breakpoint validation
 - [ ] Example: memory dump automation

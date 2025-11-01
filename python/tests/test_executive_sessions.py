@@ -319,7 +319,7 @@ def test_trace_step_changed_regs_tracks_diffs():
     assert trace_events, "expected trace_step event"
     first_changed = set(trace_events[-1]["data"].get("changed_regs", []))
     assert "R0" in first_changed
-    assert "PC" in first_changed
+    assert "PC" not in first_changed
 
     state.event_history.clear()
     state._process_vm_events(
@@ -334,12 +334,12 @@ def test_trace_step_changed_regs_tracks_diffs():
         ]
     )
     followup = [evt for evt in state.event_history if evt.get("type") == "trace_step"]
-    assert followup[-1]["data"].get("changed_regs") == ["PC"]
+    assert followup[-1]["data"].get("changed_regs") is None
 
 
 def test_trace_step_changed_regs_toggle_respected():
     state = make_state()
-    state.trace_track_changed_regs = False
+    state.set_trace_changed_regs(False)
     state.event_history.clear()
     state._process_vm_events(
         [
@@ -355,7 +355,7 @@ def test_trace_step_changed_regs_toggle_respected():
     trace_events = [evt for evt in state.event_history if evt.get("type") == "trace_step"]
     assert trace_events and "changed_regs" not in trace_events[-1]["data"]
 
-    state.trace_track_changed_regs = True
+    state.set_trace_changed_regs(True)
     state.event_history.clear()
     regs = [0] * 16
     regs[3] = 0x1234
@@ -372,7 +372,7 @@ def test_trace_step_changed_regs_toggle_respected():
     )
     changed = [evt for evt in state.event_history if evt.get("type") == "trace_step"][-1]["data"].get("changed_regs", [])
     assert "R3" in changed
-    assert "PC" in changed
+    assert "PC" not in changed
 
 
 def _task_state_events(state: ExecutiveState) -> List[dict]:

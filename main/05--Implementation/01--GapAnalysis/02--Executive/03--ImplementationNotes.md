@@ -282,8 +282,10 @@ Start new sections chronologically. Keep notes concise but actionable so the nex
 - DONE
 
 ### Details
-- Added per-task register snapshots and `_handle_trace_step_event` to compute `changed_regs`, including PC/PSW tracking and optional toggle; cleared snapshots when tasks terminate.
+- Added per-task register snapshots and `_handle_trace_step_event` to compute `changed_regs`, including PSW tracking; cleared snapshots when tasks terminate and excluded the implicit PC delta to reduce noise.
 - Updated shell `events` formatter to highlight the trimmed register list, refreshed protocol docs to document the field, and introduced regression tests covering diffs, toggle behaviour, and baseline handling.
+- Added `trace config changed-regs <on|off>` RPC/CLI plumbing so clients can toggle register diff emission without touching internal attributes.
+- Cross-checked `04--Design/04.02--Executive.md` trace-step requirements to confirm optional `changed_regs` semantics and ensured implementation stayed aligned with spec.
 
 ### Tests run (commands + result)
 - `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py`

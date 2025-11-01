@@ -1,2 +1,6 @@
-trace <pid> [on|off]
-Toggle instruction tracing for the specified task. Without a mode it flips the current state; use 'on' or 'off' to force a value.
+trace <pid> [on|off]
+trace config changed-regs <on|off>
+
+Toggle instruction tracing for the specified task. Without a mode it flips the current state; use 'on' or 'off' to force a value.
+
+`trace config` adjusts global trace settings. Use `trace config changed-regs off` to suppress per-instruction register diffs (and `... on` to re-enable them).
