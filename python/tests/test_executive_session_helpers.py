@@ -120,3 +120,37 @@ def test_symbols_list_other_error_raises():
     )
     with pytest.raises(ExecutiveSessionError):
         session.symbols_list(4)
+
+
+def test_memory_regions_success():
+    memory_block = {
+        "pid": 7,
+        "program": "demo.hxe",
+        "regions": [
+            {"name": "code", "type": "code", "start": 0x0000, "end": 0x007F, "length": 0x80, "permissions": "rx", "source": "hxe"},
+            {"name": "stack", "type": "stack", "start": 0xF000, "end": 0xF1FF, "length": 0x200, "permissions": "rw", "details": {"sp": 0xF140}},
+        ],
+        "layout": {"code_len": 0x80},
+    }
+    session = StubSession(
+        [make_handshake(["events", "memory"]), {"status": "ok", "memory": memory_block}],
+        features=["memory"],
+    )
+    info = session.memory_regions(7)
+    assert info == memory_block
+    assert session.supports_memory() is True
+    assert session.sent[-1]["cmd"] == "memory"
+    assert session.sent[-1]["op"] == "regions"
+    assert session.sent[-1]["pid"] == 7
+    info["regions"][0]["name"] = "mutated"
+    assert memory_block["regions"][0]["name"] == "code"
+
+
+def test_memory_regions_unknown_marks_unsupported():
+    session = StubSession(
+        [make_handshake(["events"]), {"status": "error", "error": "unknown_cmd:memory"}],
+        features=["memory"],
+    )
+    result = session.memory_regions(9)
+    assert result is None
+    assert session.supports_memory() is False

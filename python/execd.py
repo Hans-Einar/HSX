@@ -78,6 +78,12 @@ class EventSubscription:
 
 
 
+RODATA_BASE = 0x4000
+REGISTER_REGION_START = 0x1000
+REGISTER_BANK_BYTES = 16 * 4
+VM_ADDRESS_SPACE_SIZE = 0x10000
+
+
 class ExecutiveState:
     def __init__(self, vm: VMClient, step_batch: int = 1) -> None:
         self.vm = vm
@@ -113,7 +119,7 @@ class ExecutiveState:
         self.session_events_max = 2048
         self._last_session_prune = 0.0
         self._session_prune_interval = 5.0
-        self.session_supported_features = {"events", "stack", "disasm", "symbols"}
+        self.session_supported_features = {"events", "stack", "disasm", "symbols", "memory"}
         self.debug_attached: Set[int] = set()
         self.breakpoints: Dict[int, Set[int]] = {}
         self.event_lock = threading.RLock()
@@ -124,6 +130,7 @@ class ExecutiveState:
         self.event_retention_ms = 5000
         self.symbol_tables: Dict[int, Dict[str, Any]] = {}
         self.disasm_cache: Dict[int, Dict[Tuple[int, int], Dict[str, Any]]] = {}
+        self.memory_layouts: Dict[int, Dict[str, int]] = {}
         self.symbol_cache_lock = threading.RLock()
         self.default_stack_frames = 16
 
@@ -724,6 +731,127 @@ class ExecutiveState:
             "limit": limit_value,
             "type": kind_normalised,
             "symbols": view,
+        }
+
+    def memory_regions(self, pid: int) -> Dict[str, Any]:
+        task = self.get_task(pid)
+        layout = dict(self.memory_layouts.get(pid, {}))
+        state_entry = self.task_states.get(pid, {})
+        context = state_entry.get("context", {}) if isinstance(state_entry, dict) else {}
+
+        regions: List[Dict[str, Any]] = []
+
+        def _to_int(value: Any) -> Optional[int]:
+            if value is None:
+                return None
+            try:
+                return int(value) & 0xFFFFFFFF
+            except (TypeError, ValueError):
+                return None
+
+        def _add_region(
+            name: str,
+            start: Optional[int],
+            length: Optional[int],
+            *,
+            kind: str,
+            permissions: str,
+            source: Optional[str] = None,
+            details: Optional[Dict[str, Any]] = None,
+        ) -> None:
+            if start is None or length is None:
+                return
+            if length <= 0:
+                return
+            start &= 0xFFFFFFFF
+            end = start + length
+            if VM_ADDRESS_SPACE_SIZE:
+                max_len = VM_ADDRESS_SPACE_SIZE - (start & 0xFFFF)
+                if max_len <= 0:
+                    return
+                length = min(length, max_len)
+                end = start + length
+            region: Dict[str, Any] = {
+                "name": name,
+                "type": kind,
+                "start": start & 0xFFFF,
+                "end": end & 0xFFFF,
+                "length": int(length),
+                "permissions": permissions,
+            }
+            if source:
+                region["source"] = source
+            if details:
+                region["details"] = details
+            regions.append(region)
+
+        code_len = _to_int(layout.get("code_len"))
+        if code_len:
+            _add_region(
+                "code",
+                0,
+                code_len,
+                kind="code",
+                permissions="rx",
+                source="hxe",
+                details={"entry": layout.get("entry")},
+            )
+
+        ro_len = _to_int(layout.get("ro_len"))
+        if ro_len:
+            _add_region(
+                "rodata",
+                RODATA_BASE,
+                ro_len,
+                kind="rodata",
+                permissions="r",
+                source="hxe",
+            )
+
+        bss_size = _to_int(layout.get("bss"))
+        if bss_size:
+            bss_base = RODATA_BASE + (ro_len or 0)
+            _add_region(
+                "bss",
+                bss_base,
+                bss_size,
+                kind="bss",
+                permissions="rw",
+                source="hxe",
+            )
+
+        reg_base = _to_int(context.get("reg_base"))
+        if reg_base:
+            _add_region(
+                "registers",
+                reg_base,
+                REGISTER_BANK_BYTES,
+                kind="registers",
+                permissions="rw",
+                source="vm",
+            )
+
+        stack_base = _to_int(context.get("stack_base"))
+        stack_size = _to_int(context.get("stack_size"))
+        if stack_base and stack_size:
+            sp_value = _to_int(context.get("sp"))
+            details = {"sp": sp_value} if sp_value is not None else None
+            _add_region(
+                "stack",
+                stack_base,
+                stack_size,
+                kind="stack",
+                permissions="rw",
+                source="vm",
+                details=details,
+            )
+
+        regions.sort(key=lambda item: (item.get("start", 0), item.get("name", "")))
+        return {
+            "pid": pid,
+            "program": task.get("program"),
+            "regions": regions,
+            "layout": layout,
         }
 
     @staticmethod
@@ -1337,6 +1465,9 @@ class ExecutiveState:
         stale_disasm = set(self.disasm_cache.keys()) - current_pids
         for pid in stale_disasm:
             self.disasm_cache.pop(pid, None)
+        stale_layouts = set(self.memory_layouts.keys()) - current_pids
+        for pid in stale_layouts:
+            self.memory_layouts.pop(pid, None)
 
     def log(self, level: str, message: str, **fields: Any) -> None:
         entry = {
@@ -1389,6 +1520,13 @@ class ExecutiveState:
             task = self.tasks.get(pid_int, {})
             program = task.get("program") or info.get("program") or str(program_path)
             symbol_status = self.load_symbols_for_pid(pid_int, program=program, override=symbols)
+            layout = {
+                "entry": self._coerce_int(info.get("entry")) if info.get("entry") is not None else None,
+                "code_len": self._coerce_int(info.get("code_len")) if info.get("code_len") is not None else None,
+                "ro_len": self._coerce_int(info.get("ro_len")) if info.get("ro_len") is not None else None,
+                "bss": self._coerce_int(info.get("bss")) if info.get("bss") is not None else None,
+            }
+            self.memory_layouts[pid_int] = {k: v for k, v in layout.items() if v is not None}
         if symbol_status is not None:
             info["symbols"] = symbol_status
             if not symbol_status.get("loaded"):
@@ -1574,6 +1712,7 @@ class ExecutiveState:
         with self.symbol_cache_lock:
             self.symbol_tables.pop(pid, None)
         self.disasm_cache.pop(pid, None)
+        self.memory_layouts.pop(pid, None)
         return {"pid": pid, "state": "terminated"}
 
     def set_task_attrs(self, pid: int, *, priority: Optional[int] = None, quantum: Optional[int] = None) -> Dict[str, Any]:
@@ -2329,6 +2468,17 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                     info = self.state.symbols_list(pid_int, kind=type_value, offset=offset_value or 0, limit=limit_value)
                     return {"version": 1, "status": "ok", "symbols": info}
                 raise ValueError(f"unknown symbols op '{op}'")
+            if cmd == "memory":
+                op_value = request.get("op")
+                op = str(op_value or "regions").lower()
+                pid_value = request.get("pid")
+                if pid_value is None:
+                    raise ValueError("memory requires 'pid'")
+                pid_int = int(pid_value)
+                if op in {"regions", "region", "list"}:
+                    info = self.state.memory_regions(pid_int)
+                    return {"version": 1, "status": "ok", "memory": info}
+                raise ValueError(f"unknown memory op '{op}'")
             if cmd == "disasm":
                 pid_value = request.get("pid")
                 if pid_value is None:

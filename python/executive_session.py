@@ -77,6 +77,7 @@ class ExecutiveSession:
         self._stack_cache_lock = threading.Lock()
         self._disasm_supported: Optional[bool] = None
         self._symbols_supported: Optional[bool] = None
+        self._memory_supported: Optional[bool] = None
 
     # ------------------------------------------------------------------ Basics
 
@@ -96,6 +97,7 @@ class ExecutiveSession:
         self._stack_supported = None
         self._disasm_supported = None
         self._symbols_supported = None
+        self._memory_supported = None
 
     # Public API --------------------------------------------------------------
 
@@ -259,6 +261,13 @@ class ExecutiveSession:
             return True
         return bool(self._disasm_supported)
 
+    def supports_memory(self) -> bool:
+        if self.session_disabled:
+            return False
+        if "memory" in self.negotiated_features:
+            return True
+        return bool(self._memory_supported)
+
     def supports_symbols(self) -> bool:
         if self.session_disabled:
             return False
@@ -295,6 +304,24 @@ class ExecutiveSession:
         if not isinstance(block, dict):
             return None
         self._symbols_supported = True
+        return copy.deepcopy(block)
+
+    def memory_regions(self, pid: int) -> Optional[JsonDict]:
+        payload: JsonDict = {"cmd": "memory", "op": "regions", "pid": int(pid)}
+        try:
+            response = self.request(payload)
+        except Exception as exc:  # pragma: no cover - transport error
+            raise ExecutiveSessionError(f"memory request failed: {exc}") from exc
+        if response.get("status") != "ok":
+            error = str(response.get("error", "memory error"))
+            if "unknown_cmd" in error or "unsupported" in error:
+                self._memory_supported = False
+                return None
+            raise ExecutiveSessionError(error)
+        block = response.get("memory")
+        if not isinstance(block, dict):
+            return None
+        self._memory_supported = True
         return copy.deepcopy(block)
 
     def disasm_read(

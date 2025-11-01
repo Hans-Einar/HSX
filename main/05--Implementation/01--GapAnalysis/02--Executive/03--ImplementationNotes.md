@@ -196,3 +196,20 @@ Start new sections chronologically. Keep notes concise but actionable so the nex
   - `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py python/tests/test_executive_session_helpers.py` ✅ PASS
 - Follow-up actions / hand-off notes.
   - Next up: tackle Phase 2.2 memory region reporting and continue plumbing symbol metadata into higher-level clients.
+## 2025-11-02 - Codex (Session 10)
+
+### Focus
+- Task(s) tackled: Phase 2.2 memory region reporting (RPC, client plumbing, docs/tests).
+- Dependencies touched: `python/execd.py`, `python/executive_session.py`, `python/shell_client.py`, `help/memory.txt`, `docs/executive_protocol.md`, `python/tests/test_executive_sessions.py`, `python/tests/test_executive_session_helpers.py`.
+
+### Status
+- DONE
+
+### Details
+- Added `memory.regions` RPC handling with HXE segment extraction + VM-context stack/register slices and sorted reporting.
+- Extended ExecutiveSession & shell client to request/report memory regions (interactive + CLI) and documented the API/help entry.
+- Backfilled unit tests covering server-side computation and session helper behaviour; refreshed protocol docs.
+- Tests run (commands + result).
+  - `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py python/tests/test_executive_session_helpers.py`
+- Follow-up actions / hand-off notes.
+  - Future: consider enriching region list with `.sym` metadata (heap/data aliases) once format is defined.

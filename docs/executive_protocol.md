@@ -230,6 +230,13 @@ Symbol enumeration
 - `type` filters by symbol kind (`functions` restricts to type `function`; `variables` shows everything else). `offset` skips the first `N` entries and `limit` caps the number returned (default: return all remaining entries).
 - Each returned symbol entry mirrors the `.sym` schema (`name`, `address`, `size`, `type`, `file`, `line`), enabling tooling to populate menus, autocompletion, or sidebars without re-parsing the `.sym` file.
 
+Memory layout
+~~~~~~~~~~~~
+
+- `memory regions <pid>` reports the segments the executive knows about for a task. The response contains a `regions` array with entries describing each segment (`name`, `type`, `start`, `end`, `length`, `permissions`), along with optional `source` (e.g. `hxe` or `vm`) and `details` metadata (such as the current stack pointer).
+- The executive derives the load-time segments (code, rodata, bss) from the HXE header captured during `load/exec`, and augments them with runtime regions reported by the VM (register window, stack allocation). Regions are clamped to the HSX 64 KiB address space.
+- Observers can invoke the command without holding the PID lock; the data is read-only.
+
 Stack reconstruction
 ~~~~~~~~~~~~~~~~~~~~
 

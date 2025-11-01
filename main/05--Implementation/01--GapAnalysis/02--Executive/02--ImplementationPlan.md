@@ -194,12 +194,12 @@ Design specifies symbols.list API for function/variable enumeration (section 5.5
 Design specifies memory.regions API reporting layout from .sym or HXE header (section 5.6). Helps debuggers understand memory map.
 
 **Todo:**
-- [ ] Implement `memory.regions(pid)` RPC command
-- [ ] Extract regions from HXE header (code, data, stack, heap)
-- [ ] Extract regions from .sym file (if available)
-- [ ] Return region list with start, end, type, permissions, name
-- [ ] Add memory region tests
-- [ ] Update `docs/executive_protocol.md` with memory.regions API
+- [x] Implement `memory.regions(pid)` RPC command
+- [x] Extract regions from HXE header (code, data, stack, heap)
+- [x] Extract regions from .sym file (if available)
+- [x] Return region list with start, end, type, permissions, name
+- [x] Add memory region tests
+- [x] Update `docs/executive_protocol.md` with memory.regions API
 
 ---
 

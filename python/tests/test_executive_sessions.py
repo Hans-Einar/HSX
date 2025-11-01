@@ -434,6 +434,47 @@ def test_symbols_list_invalid_kind_raises():
         state.symbols_list(1, kind="registers")
 
 
+def test_memory_regions_reports_layout_and_stack():
+    state, _ = make_debug_state()
+    state.tasks[1]["program"] = "app.hxe"
+    state.memory_layouts[1] = {
+        "entry": 0x10,
+        "code_len": 0x80,
+        "ro_len": 0x20,
+        "bss": 0x10,
+    }
+    state.task_states[1] = {
+        "context": {
+            "reg_base": 0x1200,
+            "stack_base": 0xF000,
+            "stack_size": 0x200,
+            "stack_limit": 0xF000,
+            "sp": 0xF1F0,
+        }
+    }
+    info = state.memory_regions(1)
+    assert info["pid"] == 1
+    assert info["program"] == "app.hxe"
+    regions = {region["name"]: region for region in info["regions"]}
+    assert regions["code"]["start"] == 0x0000 and regions["code"]["length"] == 0x80
+    assert regions["code"]["permissions"] == "rx"
+    assert regions["rodata"]["start"] == 0x4000 and regions["rodata"]["length"] == 0x20
+    assert regions["bss"]["start"] == 0x4020 and regions["bss"]["length"] == 0x10
+    assert regions["registers"]["start"] == 0x1200 and regions["registers"]["length"] == 64
+    assert regions["stack"]["start"] == 0xF000 and regions["stack"]["length"] == 0x200
+    assert regions["stack"]["details"]["sp"] == 0xF1F0
+
+
+def test_memory_regions_handles_missing_context():
+    state, _ = make_debug_state()
+    state.memory_layouts[1] = {"code_len": 0x40}
+    info = state.memory_regions(1)
+    names = [region["name"] for region in info["regions"]]
+    assert "code" in names
+    assert "stack" not in names
+    assert "registers" not in names
+
+
 def test_stack_info_two_frames_with_symbols():
     state, vm = make_debug_state()
     vm.pc = 0x1000

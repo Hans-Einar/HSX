@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 import shlex
 import threading
-from typing import Optional
+from typing import Optional, List
 
 from executive_session import ExecutiveSession
 
@@ -70,6 +70,7 @@ COMMAND_NAMES = sorted(
         "stdio",
         "disasm",
         "stack",
+        "memory",
         "symbols",
         "sym",
         "trace",
@@ -106,7 +107,7 @@ def _ensure_session(host: str, port: int, *, auto_events: bool = False) -> Execu
                 host,
                 port,
                 client_name="hsx-shell",
-                features=["events", "stack", "symbols", "disasm"],
+                features=["events", "stack", "symbols", "memory", "disasm"],
                 max_events=256,
             )
         session = _SESSION_MANAGER
@@ -521,7 +522,7 @@ def _pretty_symbols(payload: dict) -> None:
     except (TypeError, ValueError):
         offset_value = block.get("offset", 0)
     limit = block.get("limit")
-    limit_text = "∞" if limit is None else str(limit)
+    limit_text = "inf" if limit is None else str(limit)
     print(f"symbols pid={pid} type={sym_type} count={total} offset={offset_value} limit={limit_text}")
     entries = block.get("symbols") or []
     if not entries:
@@ -554,6 +555,63 @@ def _pretty_symbols(payload: dict) -> None:
             details.append(f"line {line}")
         suffix = f" ({', '.join(details)})" if details else ""
         print(f"  {addr_text}  {size_text:>4}  {kind:<9}  {name}{suffix}")
+
+
+def _pretty_memory(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    block = payload.get("memory")
+    if not isinstance(block, dict):
+        print("memory: <no data>")
+        return
+    pid = block.get("pid", "?")
+    program = block.get("program")
+    header = f"memory pid={pid}"
+    if program:
+        header += f" program={program}"
+    print(header)
+    regions = block.get("regions") or []
+    if not regions:
+        print("  <no regions>")
+        return
+
+    def _fmt_addr(value: Any) -> str:
+        if isinstance(value, int):
+            return f"0x{value & 0xFFFF:04X}"
+        if value is None:
+            return "-"
+        return str(value)
+
+    for region in regions:
+        start_val = region.get("start")
+        end_val = region.get("end")
+        length_val = region.get("length")
+        perms = region.get("permissions", "-")
+        r_type = region.get("type", "-")
+        name = region.get("name", "")
+        start_text = _fmt_addr(start_val)
+        end_text = _fmt_addr(end_val)
+        if end_text == "-" and isinstance(start_val, int) and isinstance(length_val, int):
+            end_text = _fmt_addr((start_val + length_val) & 0xFFFF)
+        length_text = str(length_val) if isinstance(length_val, int) else str(length_val or "-")
+        details_parts: List[str] = []
+        source = region.get("source")
+        if isinstance(source, str):
+            details_parts.append(source)
+        detail_map = region.get("details")
+        if isinstance(detail_map, dict):
+            for key in sorted(detail_map):
+                value = detail_map[key]
+                if value is None:
+                    continue
+                if isinstance(value, int):
+                    details_parts.append(f"{key}=0x{value & 0xFFFF:04X}")
+                else:
+                    details_parts.append(f"{key}={value}")
+        suffix = f" ({', '.join(details_parts)})" if details_parts else ""
+        label = f" {name}" if name else ""
+        print(f"  {start_text}-{end_text} len={length_text:>5} {perms:<3} {r_type:<9}{label}{suffix}")
 
 
 def _pretty_stack(payload: dict) -> None:
@@ -1185,6 +1243,7 @@ PRETTY_HANDLERS = {
     'bp': _pretty_bp,
     'sym': _pretty_sym,
     'symbols': _pretty_symbols,
+    'memory': _pretty_memory,
     'disasm': _pretty_disasm,
     'stack': _pretty_stack,
     'ps': _pretty_ps,
@@ -1721,6 +1780,20 @@ def _build_bp_payload(args: list[str]) -> dict:
     raise ValueError(f"bp unknown action '{action}'")
 
 
+def _build_memory_payload(args: list[str]) -> dict:
+    if not args:
+        raise ValueError("memory usage: memory regions <pid>")
+    subcmd = args[0].lower()
+    tokens = args[1:]
+    if subcmd not in {"regions", "region", "list"}:
+        raise ValueError("memory usage: memory regions <pid>")
+    if not tokens:
+        raise ValueError("memory regions requires <pid>")
+    if len(tokens) > 1:
+        raise ValueError("memory usage: memory regions <pid>")
+    return {"cmd": "memory", "op": "regions", "pid": int(tokens[0], 0)}
+
+
 def _build_symbols_payload(args: list[str]) -> dict:
     if not args:
         raise ValueError("symbols usage: symbols <pid> [--type functions|variables|all] [--offset N] [--limit N]")
@@ -1852,6 +1925,23 @@ def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: boo
                     print(json.dumps(event, indent=2, sort_keys=True))
             else:
                 _pretty_events(events)
+            continue
+        if cmd == 'memory':
+            try:
+                payload = _build_memory_payload(args)
+            except ValueError as exc:
+                print(exc)
+                continue
+            try:
+                resp = send_request(host, port, payload)
+            except Exception as exc:
+                print(f"error: {exc}")
+                continue
+            handler = PRETTY_HANDLERS.get('memory')
+            if handler and not force_json:
+                handler(resp)
+            else:
+                print(json.dumps(resp, indent=2, sort_keys=True))
             continue
         if cmd == 'symbols':
             try:
@@ -2068,6 +2158,18 @@ def main() -> None:
                 print(json.dumps(event, indent=2, sort_keys=True))
         else:
             _pretty_events(events)
+        return
+    if cmd == 'memory':
+        try:
+            payload = _build_memory_payload(args)
+        except ValueError as exc:
+            parser.error(str(exc))
+        resp = send_request(args_ns.host, args_ns.port, payload)
+        handler = PRETTY_HANDLERS.get('memory')
+        if handler and not force_json:
+            handler(resp)
+        else:
+            print(json.dumps(resp, indent=2, sort_keys=True))
         return
     if cmd == 'bp':
         try:
