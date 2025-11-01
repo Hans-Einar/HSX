@@ -161,6 +161,7 @@ Debugger Sessions & Event Streaming
      "version": 1,
      "status": "ok",
      "events": {
+       "token": "sub-934d5016",
        "max": 512,
        "retention_ms": 5000,
        "cursor": 42
@@ -190,6 +191,7 @@ Debugger Sessions & Event Streaming
    ```json
    { "version": 1, "cmd": "session.close", "session": "<id>" }
    ```
+   - Each subscription reply includes a `token`. The executive automatically tears down the stream when the TCP connection closes, when `events.unsubscribe` is called, or when the owning session expires.
 
 Session ownership and PID locks
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

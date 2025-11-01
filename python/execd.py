@@ -26,7 +26,7 @@ import uuid
 from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Optional, List, Iterable
+from typing import Any, Dict, Optional, List, Iterable, Deque, Set, Tuple
 
 
 class SessionError(RuntimeError):
@@ -44,6 +44,31 @@ class SessionRecord:
     warnings: List[str] = field(default_factory=list)
     created_at: float = field(default_factory=time.time)
     last_seen: float = field(default_factory=time.time)
+
+
+@dataclass
+class EventSubscription:
+    token: str
+    session_id: str
+    pids: Optional[Set[int]]
+    categories: Optional[Set[str]]
+    queue: Deque[Dict[str, Any]]
+    condition: threading.Condition
+    max_events: int
+    last_ack: int = 0
+    active: bool = True
+    since_seq: Optional[int] = None
+
+    def matches(self, event: Dict[str, Any]) -> bool:
+        if self.pids is not None:
+            pid = event.get("pid")
+            if pid not in self.pids:
+                return False
+        if self.categories is not None:
+            etype = event.get("type")
+            if etype not in self.categories:
+                return False
+        return True
 
 
 
@@ -83,6 +108,12 @@ class ExecutiveState:
         self._last_session_prune = 0.0
         self._session_prune_interval = 5.0
         self.session_supported_features = {"events", "stack"}
+        self.event_lock = threading.RLock()
+        self.event_seq = 1
+        self.event_history: Deque[Dict[str, Any]] = deque(maxlen=4096)
+        self.event_subscriptions: Dict[str, EventSubscription] = {}
+        self.session_event_map: Dict[str, str] = {}
+        self.event_retention_ms = 5000
 
     def _normalise_pid_list(self, pid_lock: Any) -> List[int]:
         if pid_lock is None:
@@ -157,6 +188,9 @@ class ExecutiveState:
                 raise ValueError("capabilities.max_events must be an integer when provided")
             if max_events <= 0:
                 raise ValueError("capabilities.max_events must be positive")
+            if max_events < 2:
+                warnings.append("max_events_clamped:2")
+                max_events = 2
             if max_events > self.session_events_max:
                 warnings.append(f"max_events_clamped:{self.session_events_max}")
                 max_events = self.session_events_max
@@ -229,6 +263,7 @@ class ExecutiveState:
                 return False
         self._release_session_locks(record)
         self.log("info", "session closed", session_id=session_id, reason=reason, pid_locks=list(record.pid_locks))
+        self.events_session_disconnected(session_id)
         return True
 
     def session_close(self, session_id: str) -> None:
@@ -255,6 +290,213 @@ class ExecutiveState:
             return
         if session_id is None or owner != session_id:
             raise SessionError(f"pid_locked:{pid}")
+
+    def _next_event_seq(self) -> int:
+        with self.event_lock:
+            seq = self.event_seq
+            self.event_seq += 1
+            return seq
+
+    def _build_event(
+        self,
+        event_type: str,
+        *,
+        pid: Optional[int] = None,
+        data: Optional[Dict[str, Any]] = None,
+        ts: Optional[float] = None,
+        seq: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        event = {
+            "seq": seq if seq is not None else self._next_event_seq(),
+            "ts": ts if ts is not None else time.time(),
+            "type": event_type,
+            "pid": pid,
+            "data": data or {},
+        }
+        return event
+
+    def _store_history(self, event: Dict[str, Any]) -> None:
+        with self.event_lock:
+            self.event_history.append(event)
+
+    def emit_event(
+        self,
+        event_type: str,
+        *,
+        pid: Optional[int] = None,
+        data: Optional[Dict[str, Any]] = None,
+        ts: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        event = self._build_event(event_type, pid=pid, data=data, ts=ts)
+        self._store_history(event)
+        self._broadcast_event(event)
+        return event
+
+    def _deliver_warning(self, subscription: EventSubscription, reason: str, **fields: Any) -> None:
+        warning_event = self._build_event(
+            "warning",
+            pid=None,
+            data={"reason": reason, **fields, "subscription": subscription.token},
+        )
+        # do not store warning-only events globally; they are session specific
+        with subscription.condition:
+            if not subscription.active:
+                return
+            subscription.queue.append(warning_event)
+            subscription.condition.notify_all()
+
+    def _broadcast_event(self, event: Dict[str, Any]) -> None:
+        with self.event_lock:
+            subscribers = list(self.event_subscriptions.values())
+        for sub in subscribers:
+            with sub.condition:
+                if not sub.active:
+                    continue
+                if not sub.matches(event):
+                    continue
+                if sub.max_events > 0 and len(sub.queue) >= sub.max_events:
+                    dropped = sub.queue.popleft()
+                    sub.last_ack = max(sub.last_ack, dropped.get("seq", sub.last_ack))
+                    self._deliver_warning(sub, "event_dropped", dropped_seq=dropped.get("seq"))
+                    # ensure room after warning
+                    if sub.max_events > 0 and len(sub.queue) >= sub.max_events:
+                        sub.queue.popleft()
+                sub.queue.append(event)
+                sub.condition.notify_all()
+
+    def _parse_event_filters(self, filters: Optional[Dict[str, Any]]) -> Tuple[Optional[Set[int]], Optional[Set[str]], Optional[int]]:
+        if not isinstance(filters, dict):
+            return None, None, None
+        pid_values = filters.get("pid")
+        pids: Optional[Set[int]]
+        if pid_values is None:
+            pids = None
+        else:
+            if not isinstance(pid_values, (list, tuple, set)):
+                pid_values = [pid_values]
+            pids = set()
+            for value in pid_values:
+                try:
+                    pid = int(value)
+                except (TypeError, ValueError):
+                    raise ValueError("filters.pid must contain integer PIDs")
+                pids.add(pid)
+        categories_values = filters.get("categories")
+        categories: Optional[Set[str]]
+        if categories_values is None:
+            categories = None
+        else:
+            if not isinstance(categories_values, (list, tuple, set)):
+                categories_values = [categories_values]
+            categories = {str(cat) for cat in categories_values}
+        since_seq_value = filters.get("since_seq")
+        since_seq: Optional[int]
+        if since_seq_value is None:
+            since_seq = None
+        else:
+            try:
+                since_seq = int(since_seq_value)
+            except (TypeError, ValueError):
+                raise ValueError("filters.since_seq must be an integer when provided")
+            if since_seq < 0:
+                raise ValueError("filters.since_seq must be non-negative")
+        return pids, categories, since_seq
+
+    def events_subscribe(
+        self,
+        session_id: str,
+        *,
+        filters: Optional[Dict[str, Any]] = None,
+    ) -> EventSubscription:
+        record = self._get_session(session_id)
+        pids, categories, since_seq = self._parse_event_filters(filters)
+        with self.event_lock:
+            existing_token = self.session_event_map.pop(session_id, None)
+            if existing_token:
+                old = self.event_subscriptions.pop(existing_token, None)
+                if old:
+                    with old.condition:
+                        old.active = False
+                        old.condition.notify_all()
+            token = f"{session_id}:{uuid.uuid4()}"
+            condition = threading.Condition(self.event_lock)
+            subscription = EventSubscription(
+                token=token,
+                session_id=session_id,
+                pids=pids,
+                categories=categories,
+                queue=deque(),
+                condition=condition,
+                max_events=record.max_events,
+                since_seq=since_seq,
+            )
+            # preload history if requested
+            if since_seq is not None:
+                for event in self.event_history:
+                    if event.get("seq", 0) > since_seq and subscription.matches(event):
+                        subscription.queue.append(event)
+            self.event_subscriptions[token] = subscription
+            self.session_event_map[session_id] = token
+            subscription.condition.notify_all()
+        self.log(
+            "info",
+            "events subscribed",
+            session_id=session_id,
+            token=token,
+            filters={"pid": sorted(subscription.pids) if subscription.pids else None, "categories": sorted(subscription.categories) if subscription.categories else None},
+        )
+        return subscription
+
+    def events_unsubscribe(self, session_id: Optional[str] = None, token: Optional[str] = None) -> bool:
+        if token is None and session_id is not None:
+            with self.event_lock:
+                token = self.session_event_map.pop(session_id, None)
+        removed = False
+        if token is None:
+            return False
+        with self.event_lock:
+            sub = self.event_subscriptions.pop(token, None)
+            if sub:
+                if sub.session_id in self.session_event_map and self.session_event_map[sub.session_id] == token:
+                    self.session_event_map.pop(sub.session_id, None)
+                removed = True
+                with sub.condition:
+                    sub.active = False
+                    sub.condition.notify_all()
+        if removed:
+            self.log("info", "events unsubscribed", token=token, session_id=session_id)
+        return removed
+
+    def events_ack(self, session_id: str, seq: int) -> None:
+        if seq < 0:
+            raise ValueError("ack seq must be non-negative")
+        with self.event_lock:
+            token = self.session_event_map.get(session_id)
+            if not token:
+                raise SessionError("session_required")
+            subscription = self.event_subscriptions.get(token)
+        if subscription is None:
+            raise SessionError("session_required")
+        with subscription.condition:
+            subscription.last_ack = max(subscription.last_ack, seq)
+            while subscription.queue and subscription.queue[0].get("seq", 0) <= seq:
+                subscription.queue.popleft()
+            subscription.condition.notify_all()
+
+    def events_next(self, subscription: EventSubscription, timeout: float = 1.0) -> Optional[Dict[str, Any]]:
+        end_time = time.time() + timeout
+        with subscription.condition:
+            while subscription.active:
+                if subscription.queue:
+                    return subscription.queue.popleft()
+                remaining = end_time - time.time()
+                if remaining <= 0:
+                    return None
+                subscription.condition.wait(timeout=remaining)
+        return None
+
+    def events_session_disconnected(self, session_id: str) -> None:
+        self.events_unsubscribe(session_id=session_id)
 
     def _refresh_tasks(self) -> None:
         try:
@@ -709,6 +951,9 @@ class ExecutiveState:
             etype = event.get("type")
             pid_value = event.get("pid")
             pid = int(pid_value) if pid_value is not None else None
+            payload = {k: v for k, v in event.items() if k not in {"type", "pid", "ts", "seq"}}
+            event_type = str(etype or "vm")
+            self.emit_event(event_type, pid=pid, data=payload, ts=event.get("ts"))
             if etype == "mailbox_wait" and pid is not None:
                 self._mark_task_wait_mailbox(pid, event)
                 self.log(
@@ -969,12 +1214,43 @@ class _ShellHandler(socketserver.StreamRequestHandler):
                 self._send({"version": 1, "status": "error", "error": "invalid_json"})
                 continue
             response = self.server.exec_state_handle(request)
+            stream_info = response.get("__stream__") if isinstance(response, dict) else None
+            if stream_info:
+                ack_payload = stream_info.get("ack")
+                if ack_payload is not None:
+                    self._send(ack_payload)
+                subscription: EventSubscription = stream_info.get("subscription")
+                if subscription is not None:
+                    self._stream_events(subscription)
+                break
             self._send(response)
 
     def _send(self, payload: Dict[str, Any]) -> None:
-        data = json.dumps(payload, separators=(",", ":")).encode("utf-8") + b"\n"
+        self._write_json(payload)
+
+    def _write_json(self, payload: Dict[str, Any], *, newline: bool = True) -> None:
+        data = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+        if newline:
+            data += b"\n"
         self.wfile.write(data)
         self.wfile.flush()
+
+    def _stream_events(self, subscription: EventSubscription) -> None:
+        try:
+            while True:
+                event = self.server.state.events_next(subscription, timeout=1.0)
+                if event is None:
+                    if not subscription.active:
+                        break
+                    continue
+                try:
+                    self._write_json(event)
+                except Exception:
+                    raise
+        except Exception:
+            pass
+        finally:
+            self.server.state.events_unsubscribe(token=subscription.token)
 
 class ExecutiveServer(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
@@ -1015,6 +1291,40 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 return {"version": 1, "status": "ok"}
             if session_id is not None:
                 self.state.touch_session(session_id)
+            if cmd == "events.subscribe":
+                if session_id is None:
+                    raise SessionError("session_required")
+                subscription = self.state.events_subscribe(session_id, filters=request.get("filters"))
+                ack_payload = {
+                    "version": 1,
+                    "status": "ok",
+                    "events": {
+                        "token": subscription.token,
+                        "max": subscription.max_events,
+                        "cursor": self.state.event_seq - 1,
+                        "retention_ms": self.state.event_retention_ms,
+                    },
+                }
+                if subscription.since_seq is not None:
+                    ack_payload["events"]["since_seq"] = subscription.since_seq
+                return {"__stream__": {"ack": ack_payload, "subscription": subscription}}
+            if cmd == "events.ack":
+                if session_id is None:
+                    raise SessionError("session_required")
+                seq_value = request.get("seq")
+                if seq_value is None:
+                    raise ValueError("events.ack requires 'seq'")
+                try:
+                    seq = int(seq_value)
+                except (TypeError, ValueError):
+                    raise ValueError("events.ack seq must be an integer")
+                self.state.events_ack(session_id, seq)
+                return {"version": 1, "status": "ok"}
+            if cmd == "events.unsubscribe":
+                if session_id is None:
+                    raise SessionError("session_required")
+                removed = self.state.events_unsubscribe(session_id=session_id)
+                return {"version": 1, "status": "ok", "unsubscribed": bool(removed)}
             if cmd == "ping":
                 return {"version": 1, "status": "ok", "reply": "pong"}
             if cmd == "info":

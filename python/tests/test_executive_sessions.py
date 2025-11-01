@@ -119,3 +119,46 @@ def test_ensure_pid_access_respects_owner():
         state.ensure_pid_access(11, None)
     # unrelated pid remains accessible
     state.ensure_pid_access(42, observer)
+
+
+def test_events_subscribe_receives_emitted_events():
+    state = make_state()
+    session_id = state.session_open(capabilities={"features": ["events"]})["id"]
+    subscription = state.events_subscribe(session_id)
+    state.emit_event("debug_break", pid=3, data={"pc": 0x100})
+    event = state.events_next(subscription, timeout=0.1)
+    assert event is not None
+    assert event["type"] == "debug_break"
+    assert event["pid"] == 3
+    assert event["data"]["pc"] == 0x100
+
+
+def test_events_ack_clears_queue():
+    state = make_state()
+    session_id = state.session_open(capabilities={"features": ["events"]})["id"]
+    subscription = state.events_subscribe(session_id)
+    emitted = state.emit_event("scheduler", pid=None, data={"state": "READY", "next_pid": 1})
+    assert state.events_next(subscription, timeout=0.1) is not None
+    # requeue another event
+    state.emit_event("scheduler", pid=None, data={"state": "RUNNING", "next_pid": 1})
+    state.events_ack(session_id, emitted["seq"])
+    with subscription.condition:
+        assert all(item["seq"] > emitted["seq"] for item in subscription.queue)
+
+
+def test_events_queue_drop_emits_warning():
+    state = make_state()
+    session_id = state.session_open(capabilities={"features": ["events"], "max_events": 2})["id"]
+    subscription = state.events_subscribe(session_id)
+    first = state.emit_event("trace_step", pid=1, data={"pc": 0x10})
+    second = state.emit_event("trace_step", pid=1, data={"pc": 0x14})
+    third = state.emit_event("trace_step", pid=1, data={"pc": 0x18})
+    # drain events to inspect warning presence
+    collected = []
+    for _ in range(3):
+        evt = state.events_next(subscription, timeout=0.1)
+        if evt is not None:
+            collected.append(evt)
+    types = {evt["type"] for evt in collected if evt}
+    assert "warning" in types
+    assert any(evt["type"] == "trace_step" and evt["data"]["pc"] == 0x18 for evt in collected)
