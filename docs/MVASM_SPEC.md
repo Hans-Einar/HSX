@@ -71,6 +71,7 @@ The MiniVM tracks condition codes in the low nibble of `PSW`:
 - `ADC` consumes the incoming carry (`C`) as a +1 term; `SBC` treats `C` as "no borrow yet" (borrow-in = `1 - C`).
 - Logical operations (`AND`, `OR`, `XOR`, `NOT`) clear `C` and `V`. Shift instructions clear `V` and set `C` to the last bit shifted out when the amount is non-zero.
 - Branch instructions currently test `Z` (`JZ` / `JNZ`); future opcodes may consume the other flags.
+- `DIV` performs signed 32-bit integer division with truncation toward zero; divide-by-zero halts execution and latches `HSX_ERR_DIV_ZERO` in `R0`.
 
 ## Labels and Relocations
 - Labels end with `:` and bind to the current section offset.

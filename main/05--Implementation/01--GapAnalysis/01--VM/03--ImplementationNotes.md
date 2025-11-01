@@ -53,3 +53,14 @@
   - Expanded PSW regression coverage with ADC/SBC scenarios (`python/tests/test_vm_psw_flags.py`).
 - **Testing:** `python -m pytest python/tests/test_vm_psw_flags.py`
 - **Follow-ups:** Proceed to Phase 1.4 (DIV opcode) and trace API work per implementation plan.
+
+## 2025-11-01 - Codex (Session 5)
+
+### Phase 1.4 - DIV opcode implementation
+- **Status:** DONE (integer divide now wired through VM/tooling).
+- **What was done:**
+  - Added `HSX_ERR_DIV_ZERO` error code and implemented signed 32-bit division in `platforms/python/host_vm.py:949`, including truncated-to-zero semantics and PSW updates.
+  - Defined a divide-by-zero trap that latches the error in `R0` and halts the VM (`platforms/python/host_vm.py:947`).
+  - Documented behaviour in the ISA notes (`docs/MVASM_SPEC.md:58`, `docs/abi_syscalls.md:25`) and supplied dedicated regression coverage (`python/tests/test_vm_div.py`).
+- **Testing:** `python -m pytest python/tests/test_vm_div.py` and full `python -m pytest python/tests`.
+- **Next steps:** Move to Phase 1.5 (trace APIs) and remaining Phase 1 deliverables (streaming loader).

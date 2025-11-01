@@ -34,6 +34,7 @@ HSX_ERR_ENOSYS = 0xFFFF_FF01
 HSX_ERR_STACK_UNDERFLOW = 0xFFFF_FF02
 HSX_ERR_STACK_OVERFLOW = 0xFFFF_FF03
 HSX_ERR_MEM_FAULT = 0xFFFF_FF04
+HSX_ERR_DIV_ZERO = 0xFFFF_FF05
 HEADER = struct.Struct(">IHHIIIIII")
 HEADER_FIELDS = (
     "magic",
@@ -818,6 +819,14 @@ class MiniVM:
             overflow = ((ua ^ ub) & (ua ^ diff) & 0x80000000) != 0
             return diff, carry, overflow
 
+        def to_signed32(v):
+            v &= 0xFFFFFFFF
+            return v if v < 0x80000000 else v - 0x100000000
+
+        def div_trunc(a, b):
+            abs_q = abs(a) // abs(b)
+            return -abs_q if (a < 0) ^ (b < 0) else abs_q
+
         def ensure_range(addr, size):
             if addr < 0 or addr + size > len(self.mem):
                 raise MemoryError
@@ -952,6 +961,21 @@ class MiniVM:
             carry = (product >> 32) != 0
             self.regs[rd] = result
             set_flags(result, carry=carry, overflow=carry)
+        elif op == 0x13:  # DIV
+            divisor_raw = self.regs[rs2] & 0xFFFFFFFF
+            if divisor_raw == 0:
+                if self.trace or self.trace_out:
+                    self._log("[VM] divide by zero")
+                self.regs[0] = HSX_ERR_DIV_ZERO
+                self.running = False
+                self.save_context()
+                return
+            dividend = to_signed32(self.regs[rs1])
+            divisor = to_signed32(self.regs[rs2])
+            quotient = div_trunc(dividend, divisor)
+            result = quotient & 0xFFFFFFFF
+            self.regs[rd] = result
+            set_flags(result, carry=False, overflow=False)
         elif op == 0x14:  # AND
             v = self.regs[rs1] & self.regs[rs2]
             self.regs[rd] = v & 0xFFFFFFFF
