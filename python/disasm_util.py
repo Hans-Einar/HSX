@@ -7,7 +7,7 @@ OPCODES: Dict[str, int] = {
     "ADD": 0x10, "SUB": 0x11, "MUL": 0x12, "DIV": 0x13,
     "AND": 0x14, "OR": 0x15, "XOR": 0x16, "NOT": 0x17,
     "CMP": 0x20, "JMP": 0x21, "JZ": 0x22, "JNZ": 0x23, "CALL": 0x24, "RET": 0x25,
-    "SVC": 0x30, "PUSH": 0x40, "POP": 0x41,
+    "SVC": 0x30, "LSL": 0x31, "LSR": 0x32, "ASR": 0x33, "PUSH": 0x40, "POP": 0x41,
     "FADD": 0x50, "FSUB": 0x51, "FMUL": 0x52, "FDIV": 0x53, "I2F": 0x54, "F2I": 0x55,
     "LDI32": 0x60, "BRK": 0x7F
 }
@@ -126,6 +126,19 @@ def format_operands(
         return _alu("|", lambda a, b: a | b)
     if mnemonic == "XOR":
         return _alu("^", lambda a, b: a ^ b)
+    if mnemonic == "LSL":
+        return _alu("<<", lambda a, b: (a << (b & 0x1F)) & 0xFFFFFFFF)
+    if mnemonic == "LSR":
+        return _alu(">>", lambda a, b: (a & 0xFFFFFFFF) >> (b & 0x1F))
+    if mnemonic == "ASR":
+        def _asr(a: int, b: int) -> int:
+            amt = b & 0x1F
+            value = a & 0xFFFFFFFF
+            if value & 0x80000000:
+                value = value - 0x100000000
+            return (value >> amt) & 0xFFFFFFFF
+
+        return _alu(">>>", _asr)
     if mnemonic == "NOT":
         src = _reg_src(rs1)
         if reg_values is not None and 0 <= rs1 < len(reg_values):

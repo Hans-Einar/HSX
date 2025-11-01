@@ -47,12 +47,14 @@ main:
 | Category | Mnemonics | Notes |
 |----------|-----------|-------|
 | Data movement | `LDI`, `LD`, `ST`, `MOV`, `LDB`, `LDH`, `STB`, `STH`, `LDI32`, `PUSH`, `POP` | `LDI32` consumes two words: the opcode followed by a 32-bit literal. Byte/halfword loads sign-extend. |
-| Integer ALU | `ADD`, `SUB`, `MUL`, `DIV`, `AND`, `OR`, `XOR`, `NOT`, `CMP` | All register-to-register; `CMP` writes condition codes in the PSW. |
+| Integer ALU | `ADD`, `SUB`, `MUL`, `DIV`, `AND`, `OR`, `XOR`, `NOT`, `CMP`, `LSL`, `LSR`, `ASR` | All register-to-register; `CMP` writes condition codes in the PSW. |
 | Control flow | `JMP`, `JZ`, `JNZ`, `CALL`, `RET`, `BRK` | `JZ/JNZ` test the provided register. `BRK` triggers a debugger stop. |
 | Floating/FP helpers | `FADD`, `FSUB`, `FMUL`, `FDIV`, `I2F`, `F2I` | Operate on f16 values stored in 32-bit registers. |
 | System services | `SVC mod, fn` | Encodes module/function IDs in the immediate field. Arguments travel in `R0`–`R3` per `docs/abi_syscalls.md`. |
 
 Opcode values follow `OPC` in `python/asm.py`; tooling should treat mnemonics as the public contract while opcode IDs remain stable for the VM decoder.
+
+`LSL` and `LSR` treat the shift amount modulo 32 and always operate on the logical (zero-extended) source value. `ASR` performs an arithmetic right shift with sign extension using the same modulo-32 shift amount.
 
 ## Labels and Relocations
 - Labels end with `:` and bind to the current section offset.

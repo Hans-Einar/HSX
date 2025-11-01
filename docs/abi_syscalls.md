@@ -18,6 +18,10 @@ Sources:
 - Mailbox calls return status codes defined in `include/hsx_mailbox.h`. Success is `HSX_MBX_STATUS_OK` (0).
 - All return values are 32 bit. The low 16 bits carry f16 payloads where noted.
 
+## VM ISA notes
+
+- The Python MiniVM exposes dedicated shift instructions `LSL`, `LSR`, and `ASR` (opcodes `0x31`-`0x33`). Shift amounts are taken modulo 32; `ASR` preserves the sign bit on right shifts. Results update the zero flag pending the broader PSW implementation work.
+
 ## Module map
 
 | ID | Module | Implementation status | Notes |

@@ -915,6 +915,27 @@ class MiniVM:
             v = (~self.regs[rs1]) & 0xFFFFFFFF
             self.regs[rd] = v
             set_flags(v)
+        elif op == 0x31:  # LSL
+            shift = self.regs[rs2] & 0x1F
+            v = (self.regs[rs1] << shift) & 0xFFFFFFFF
+            self.regs[rd] = v
+            set_flags(v)
+        elif op == 0x32:  # LSR
+            shift = self.regs[rs2] & 0x1F
+            value = self.regs[rs1] & 0xFFFFFFFF
+            v = (value >> shift) & 0xFFFFFFFF
+            self.regs[rd] = v
+            set_flags(v)
+        elif op == 0x33:  # ASR
+            shift = self.regs[rs2] & 0x1F
+            value = self.regs[rs1] & 0xFFFFFFFF
+            if value & 0x80000000:
+                signed = value - 0x100000000
+            else:
+                signed = value
+            v = (signed >> shift) & 0xFFFFFFFF
+            self.regs[rd] = v
+            set_flags(v)
         elif op == 0x20:  # CMP
             v = (self.regs[rs1] - self.regs[rs2]) & 0xFFFFFFFF
             set_flags(v)
