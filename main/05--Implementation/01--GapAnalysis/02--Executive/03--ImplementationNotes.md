@@ -139,3 +139,49 @@ Start new sections chronologically. Keep notes concise but actionable so the nex
   - `/mnt/c/Windows/py.exe -3.14 -m pytest python/tests/test_executive_sessions.py` → PASS
 - Follow-up actions / hand-off notes.
   - Expose stack helper via higher-level client APIs (ExecutiveSession consumers) and feed frames into downstream debugger UIs once available.
+
+## 2025-11-01 - Codex (Session 7)
+
+### Focus
+- Task(s) tackled: Expose stack RPC via ExecutiveSession and surface traces in higher-level clients (Blinkenlights UI, smoke tests, manager CLI).
+- Dependencies touched: `python/executive_session.py`, `python/blinkenlights.py`, `python/exec_smoke.py`, `python/hsx_manager.py`, `python/tests/test_executive_session_helpers.py`.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions.
+  - Added cached `stack.info` helpers to `ExecutiveSession` with graceful fallback when unsupported, plus targeted unit tests for success/error paths.
+  - Updated Blinkenlights to render per-task stack summaries and extended exec_smoke/manager tooling with stack-aware commands and summaries.
+  - Ensured all front-ends request the stack capability and reuse shared helper methods.
+- Tests run (commands + result).
+  - `/mnt/c/Windows/py.exe -3.14 -m pytest python/tests/test_executive_session_helpers.py python/tests/test_executive_sessions.py` → PASS
+- Follow-up actions / hand-off notes.
+  - Consider richer UI affordances (frame drill-down, symbol hover) once extended metadata becomes available.
+
+## 2025-11-01 - Codex (Session 7)
+
+### Focus
+- Task(s) tackled: Expose stack RPC via ExecutiveSession and surface traces in higher-level clients (Blinkenlights UI, smoke tests, manager CLI).
+- Dependencies touched: , , , , .
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions.
+  - Added cached  helpers to  with graceful fallback when unsupported, plus targeted unit tests for success/error paths.
+  - Updated Blinkenlights to render per-task stack summaries and extended exec_smoke/manager tooling with stack-aware commands and summaries.
+  - Ensured all front-ends request the stack capability and reuse shared helper methods.
+- Tests run (commands + result).
+  - ============================= test session starts =============================
+platform win32 -- Python 3.14.0, pytest-8.4.2, pluggy-1.6.0
+rootdir: C:\Users\Hans Einar\Documents\GIT\HSX
+collected 21 items
+
+python\tests\test_executive_session_helpers.py ..                        [  9%]
+python\tests\test_executive_sessions.py ...................              [100%]
+
+============================= 21 passed in 0.30s ============================== → PASS
+- Follow-up actions / hand-off notes.
+  - Consider richer UI affordances (frame drill-down, symbol hover) once extended metadata becomes available.

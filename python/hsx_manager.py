@@ -32,7 +32,7 @@ from pathlib import Path
 import threading
 from typing import Callable, Dict, List, Optional
 
-from executive_session import ExecutiveSession
+from executive_session import ExecutiveSession, ExecutiveSessionError
 
 DEFAULT_VM_PORT = 9999
 DEFAULT_EXEC_PORT = 9998
@@ -52,7 +52,7 @@ def _ensure_exec_session(host: str, port: int) -> ExecutiveSession:
                 host,
                 port,
                 client_name="hsx-manager",
-                features=["events"],
+                features=["events", "stack"],
                 max_events=128,
             )
         return _EXEC_SESSION
@@ -245,6 +245,18 @@ class Manager:
         resp = send_exec_request(self.host, self.exec_port, payload)
         print(json.dumps(resp, indent=2, sort_keys=True))
 
+    def stack(self, pid: int, frames: int = 6) -> None:
+        session = _ensure_exec_session(self.host, self.exec_port)
+        try:
+            info = session.stack_info(pid, max_frames=frames)
+        except ExecutiveSessionError as exc:
+            print(f"[stack] error: {exc}")
+            return
+        if not info:
+            print("[stack] unavailable (feature disabled)")
+            return
+        print(json.dumps(info, indent=2, sort_keys=True))
+
     def shutdown_all(self) -> None:
         for name in ["shell", "exec", "vm"]:
             self.stop([name])
@@ -271,6 +283,7 @@ class Manager:
                     print("  restart [vm|exec|shell|console|all]")
                     print("  status")
                     print("  load <path>  (send load command to exec)")
+                    print("  stack <pid> [frames]")
                     print("  shell        (spawn shell client)")
                     print("  quit/exit")
                     continue
@@ -290,6 +303,23 @@ class Manager:
                         self.load(args[0])
                 elif cmd == "shell":
                     self.shell()
+                elif cmd == "stack":
+                    if not args:
+                        print("usage: stack <pid> [frames]")
+                    else:
+                        try:
+                            pid = int(args[0], 0)
+                        except ValueError:
+                            print("pid must be an integer")
+                            continue
+                        frames = 6
+                        if len(args) > 1:
+                            try:
+                                frames = int(args[1], 0)
+                            except ValueError:
+                                print("frames must be an integer")
+                                continue
+                        self.stack(pid, frames)
                 else:
                     print(f"unknown command '{cmd}'")
         finally:

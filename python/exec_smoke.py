@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 from typing import Dict
 
-from executive_session import ExecutiveSession
+from executive_session import ExecutiveSession, ExecutiveSessionError
 
 
 class ExecClient:
@@ -20,7 +20,7 @@ class ExecClient:
             host,
             port,
             client_name="hsx-exec-smoke",
-            features=["events"],
+            features=["events", "stack"],
             timeout=timeout,
         )
 
@@ -32,6 +32,15 @@ class ExecClient:
         if response.get("status") != "ok":
             raise RuntimeError(str(response.get("error", "exec error")))
         return response
+
+    def stack_info(self, pid: int, *, max_frames: int = 5) -> Dict[str, object]:
+        try:
+            info = self.session.stack_info(pid, max_frames=max_frames)
+        except ExecutiveSessionError:
+            return {}
+        if not info:
+            return {}
+        return info
 
 
 def main(argv=None) -> int:
@@ -80,6 +89,33 @@ def main(argv=None) -> int:
         summary.append(f"step -> executed={executed} instruction(s)")
 
         if pid is not None:
+            stack_block = client.stack_info(pid)
+            frames = stack_block.get("frames") if isinstance(stack_block, dict) else None
+            if frames:
+                lines = []
+                for frame in frames[:3]:
+                    func = frame.get("func_name")
+                    if not func:
+                        symbol = frame.get("symbol")
+                        if isinstance(symbol, dict):
+                            func = symbol.get("name")
+                    pc = frame.get("pc")
+                    if func:
+                        if frame.get("func_offset"):
+                            func_text = f"{func}+0x{int(frame['func_offset']):X}"
+                        else:
+                            func_text = func
+                    elif isinstance(pc, int):
+                        func_text = f"0x{pc & 0xFFFF:04X}"
+                    else:
+                        func_text = "<unknown>"
+                    lines.append(f"[{len(lines)}] {func_text}")
+                stack_line = "; ".join(lines)
+                if stack_block.get("truncated"):
+                    stack_line += " …"
+                summary.append(f"stack -> {stack_line}")
+            else:
+                summary.append("stack -> unavailable")
             pause_resp = client.request({"cmd": "pause", "pid": pid})
             summary.append(f"pause -> state={pause_resp.get('task', {}).get('state')}")
             resume_resp = client.request({"cmd": "resume", "pid": pid})

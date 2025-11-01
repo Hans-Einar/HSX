@@ -12,7 +12,7 @@ import sys
 import time
 from typing import Dict, List, Optional, Tuple
 
-from executive_session import ExecutiveSession
+from executive_session import ExecutiveSession, ExecutiveSessionError
 
 try:
     import tkinter as tk
@@ -122,6 +122,15 @@ class ShellRPC:
             payload["verbose"] = True
         return self.request(payload).get("image", {})
 
+    def stack_info(self, pid: int, *, max_frames: int = 6, refresh: bool = True) -> Dict[str, object]:
+        try:
+            info = self.session.stack_info(pid, max_frames=max_frames, refresh=refresh)
+        except ExecutiveSessionError as exc:
+            raise RuntimeError(str(exc)) from exc
+        if not info:
+            return {}
+        return info
+
 
 class Button:
     def __init__(self, rect: pygame.Rect, label: str, callback) -> None:
@@ -144,7 +153,7 @@ class Button:
 
 class BlinkenlightsApp:
     SIDEBAR_WIDTH = 220
-    TASK_HEIGHT = 150
+    TASK_HEIGHT = 190
     TASK_MARGIN = 12
     POLL_INTERVAL = 0.5
 
@@ -164,6 +173,7 @@ class BlinkenlightsApp:
         self.scroll_offset = 0
         self.tasks: List[Dict[str, object]] = []
         self.task_regs: Dict[int, Dict[str, object]] = {}
+        self.task_stacks: Dict[int, Dict[str, object]] = {}
         self.global_buttons: List[Button] = []
         self.sidebar_surface = pygame.Surface((self.SIDEBAR_WIDTH, self.screen.get_height()))
         self.status_message: str = ""
@@ -279,6 +289,7 @@ class BlinkenlightsApp:
         try:
             tasks = self.rpc.ps()
             regs_map: Dict[int, Dict[str, object]] = {}
+            stacks_map: Dict[int, Dict[str, object]] = {}
             for task in tasks:
                 pid = int(task.get("pid", -1))
                 if pid < 0:
@@ -287,8 +298,15 @@ class BlinkenlightsApp:
                     regs_map[pid] = self.rpc.dumpregs(pid)
                 except RuntimeError:
                     continue
+                try:
+                    stack = self.rpc.stack_info(pid, max_frames=6)
+                except RuntimeError:
+                    stack = {}
+                if stack:
+                    stacks_map[pid] = stack
             self.tasks = tasks
             self.task_regs = regs_map
+            self.task_stacks = stacks_map
             self.current_pid = self.rpc.current_pid
         except RuntimeError as exc:
             self.set_status(f"RPC error: {exc}")
@@ -327,6 +345,7 @@ class BlinkenlightsApp:
                 reg_values = regs.get("regs", [])
                 for idx, value in enumerate(reg_values[:8]):
                     self.draw_register(task_area, box.x + 12, box.y + 60 + idx * 10, idx, int(value))
+            self.draw_stack(task_area, box, pid)
 
             button_y = box.bottom - 40
             pause_rect = pygame.Rect(box.right - 240, button_y, 60, 28)
@@ -359,6 +378,47 @@ class BlinkenlightsApp:
         surface.blit(text, text.get_rect(center=rect.center))
         # Store callback on rect for click handling
         self._task_buttons.append((rect.move(self.SIDEBAR_WIDTH, 0), label, action))
+
+    def draw_stack(self, surface: pygame.Surface, box: pygame.Rect, pid: int) -> None:
+        stack = self.task_stacks.get(pid)
+        if not stack:
+            return
+        frames = stack.get("frames") or []
+        if not frames:
+            return
+        max_display = 5
+        stack_x = box.x + 210
+        stack_y = box.y + 60
+        label = self.small_font.render("Stack:", True, (200, 210, 240))
+        surface.blit(label, (stack_x, stack_y - 14))
+        shown = min(len(frames), max_display)
+        for idx, frame in enumerate(frames[:shown]):
+            pc = int(frame.get("pc", 0))
+            func = frame.get("func_name")
+            if not func:
+                symbol = frame.get("symbol")
+                if isinstance(symbol, dict):
+                    func = symbol.get("name")
+            if not func:
+                func = f"0x{pc:04X}"
+            offset = frame.get("func_offset")
+            if isinstance(offset, int) and offset:
+                func_text = f"[{idx}] {func}+0x{offset:X}"
+            else:
+                func_text = f"[{idx}] {func}"
+            frame_text = f"{func_text} (pc=0x{pc & 0xFFFF:04X})"
+            rendered = self.small_font.render(frame_text, True, (210, 210, 220))
+            surface.blit(rendered, (stack_x, stack_y + idx * 14))
+        truncated = stack.get("truncated")
+        errors = stack.get("errors") or []
+        note_lines = []
+        if truncated:
+            note_lines.append("… truncated …")
+        if errors:
+            note_lines.append(f"warn: {errors[0]}")
+        for offset_idx, text in enumerate(note_lines):
+            rendered = self.small_font.render(text, True, (235, 180, 120))
+            surface.blit(rendered, (stack_x, stack_y + (shown + offset_idx) * 14))
 
     def run(self) -> None:
         while self.running:

@@ -9,12 +9,13 @@ utility for subscribing to the asynchronous event stream.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import copy
 import json
 import socket
 import threading
 import time
 from collections import deque
-from typing import Any, Callable, Deque, Dict, Iterable, List, Optional
+from typing import Any, Callable, Deque, Dict, Iterable, List, Optional, Tuple
 
 
 JsonDict = Dict[str, Any]
@@ -71,6 +72,9 @@ class ExecutiveSession:
         self._event_buffer: Deque[JsonDict] = deque(maxlen=max(1, event_buffer))
         self._event_buffer_lock = threading.Lock()
         self._event_callback: Optional[EventCallback] = None
+        self._stack_supported: Optional[bool] = None
+        self._stack_cache: Dict[int, Tuple[float, JsonDict]] = {}
+        self._stack_cache_lock = threading.Lock()
 
     # ------------------------------------------------------------------ Basics
 
@@ -85,6 +89,9 @@ class ExecutiveSession:
                 except Exception:
                     pass
             self.session_id = None
+        with self._stack_cache_lock:
+            self._stack_cache.clear()
+        self._stack_supported = None
 
     # Public API --------------------------------------------------------------
 
@@ -161,6 +168,85 @@ class ExecutiveSession:
             if limit <= 0:
                 return list(self._event_buffer)
             return list(self._event_buffer)[-limit:]
+
+    def supports_stack(self) -> bool:
+        """Return ``True`` when the executive advertises stack debugging."""
+        if self.session_disabled:
+            return False
+        if "stack" in self.negotiated_features:
+            return True
+        return bool(self._stack_supported)
+
+    def invalidate_stack_cache(self, pid: Optional[int] = None) -> None:
+        """Clear cached stack traces."""
+        with self._stack_cache_lock:
+            if pid is None:
+                self._stack_cache.clear()
+            else:
+                self._stack_cache.pop(pid, None)
+
+    def stack_info(
+        self,
+        pid: int,
+        *,
+        max_frames: Optional[int] = None,
+        refresh: bool = True,
+    ) -> Optional[JsonDict]:
+        """Fetch stack metadata for *pid*.
+
+        When ``refresh`` is ``False`` the most recent cached stack is returned
+        (or ``None`` if no cache exists).
+        """
+        pid_int = int(pid)
+        if not refresh:
+            with self._stack_cache_lock:
+                cached = self._stack_cache.get(pid_int)
+                if cached:
+                    return copy.deepcopy(cached[1])
+            if self._stack_supported is False:
+                return None
+        payload: JsonDict = {"cmd": "stack", "pid": pid_int}
+        if max_frames is not None:
+            payload["max"] = int(max_frames)
+        try:
+            response = self.request(payload)
+        except Exception as exc:  # pragma: no cover - network failures
+            raise ExecutiveSessionError(f"stack request failed: {exc}") from exc
+        status = response.get("status")
+        if status != "ok":
+            error = str(response.get("error", "stack error"))
+            lowered = error.lower()
+            if any(tag in lowered for tag in ("unknown_cmd", "unsupported", "stack_disabled")):
+                self._stack_supported = False
+                with self._stack_cache_lock:
+                    self._stack_cache.pop(pid_int, None)
+                return None
+            raise ExecutiveSessionError(f"stack error: {error}")
+        stack_block = response.get("stack")
+        if not isinstance(stack_block, dict):
+            return None
+        stack_copy = copy.deepcopy(stack_block)
+        timestamp = time.time()
+        with self._stack_cache_lock:
+            self._stack_cache[pid_int] = (timestamp, stack_copy)
+        self._stack_supported = True
+        return copy.deepcopy(stack_copy)
+
+    def stack_frames(
+        self,
+        pid: int,
+        *,
+        max_frames: Optional[int] = None,
+        refresh: bool = True,
+    ) -> List[JsonDict]:
+        """Convenience wrapper returning the frame list."""
+        info = self.stack_info(pid, max_frames=max_frames, refresh=refresh)
+        if not info:
+            return []
+        frames = info.get("frames")
+        if isinstance(frames, list):
+            return copy.deepcopy(frames)
+        return []
 
     # ---------------------------------------------------------------- Private
 

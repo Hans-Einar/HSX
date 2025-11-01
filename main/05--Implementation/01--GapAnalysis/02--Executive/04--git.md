@@ -11,7 +11,8 @@
 ## Commit Log
 | Date | Commit hash | Message | Author | Notes |
 | --- | --- | --- | --- | --- |
-| 2025-11-01 | pending | Stack reconstruction RPC & CLI | Codex | Tests: `/mnt/c/Windows/py.exe -3.14 -m pytest python/tests/test_executive_sessions.py` |
+| 2025-11-01 | pending | Stack helpers & client plumbing | Codex | Tests: `/mnt/c/Windows/py.exe -3.14 -m pytest python/tests/test_executive_session_helpers.py python/tests/test_executive_sessions.py` |
+| 2025-11-01 | 9d9c8a27d571 | Stack Debugging | Codex | Tests: `/mnt/c/Windows/py.exe -3.14 -m pytest python/tests/test_executive_sessions.py` |
 | 2025-11-01 | 6bff2d020baa | Symbol loader & sym RPC | Codex | Tests: `python -m pytest python/tests/test_executive_sessions.py` |
 | 2025-11-01 | cf5ccc0327d2 | Breakpoint halt semantics | Codex | Tests: `python -m pytest python/tests/test_executive_sessions.py` |
 | 2025-11-01 | pending | Session wiring + breakpoint RPC | Codex | Tests: `python -m pytest python/tests/test_executive_sessions.py` |
