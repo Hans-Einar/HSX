@@ -12,7 +12,7 @@ OPC = {
     "ADD": 0x10, "SUB": 0x11, "MUL": 0x12, "DIV": 0x13,
     "AND": 0x14, "OR": 0x15, "XOR": 0x16, "NOT": 0x17,
     "CMP": 0x20, "JMP": 0x21, "JZ": 0x22, "JNZ": 0x23, "CALL": 0x24, "RET": 0x25,
-    "SVC": 0x30, "LSL": 0x31, "LSR": 0x32, "ASR": 0x33, "PUSH": 0x40, "POP": 0x41,
+    "SVC": 0x30, "LSL": 0x31, "LSR": 0x32, "ASR": 0x33, "ADC": 0x34, "SBC": 0x35, "PUSH": 0x40, "POP": 0x41,
     "FADD": 0x50, "FSUB": 0x51, "FMUL": 0x52, "FDIV": 0x53, "I2F": 0x54, "F2I": 0x55,
     "LDI32": 0x60, "BRK": 0x7F
 }
@@ -485,7 +485,7 @@ def assemble(lines, *, include_base: Path | None = None, for_object: bool = Fals
         elif mnem == 'POP':
             rd = regnum(args[0])
             add_code_word(emit_word(op, rd, 0, 0, 0))
-        elif mnem in ('ADD', 'SUB', 'MUL', 'DIV', 'AND', 'OR', 'XOR', 'LSL', 'LSR', 'ASR', 'FADD', 'FSUB', 'FMUL', 'FDIV'):
+        elif mnem in ('ADD', 'SUB', 'MUL', 'DIV', 'AND', 'OR', 'XOR', 'LSL', 'LSR', 'ASR', 'ADC', 'SBC', 'FADD', 'FSUB', 'FMUL', 'FDIV'):
             rd, rs1, rs2 = regnum(args[0]), regnum(args[1]), regnum(args[2])
             add_code_word(emit_word(op, rd, rs1, rs2, 0))
         elif mnem in ('NOT', 'I2F', 'F2I'):

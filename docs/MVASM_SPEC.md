@@ -47,7 +47,7 @@ main:
 | Category | Mnemonics | Notes |
 |----------|-----------|-------|
 | Data movement | `LDI`, `LD`, `ST`, `MOV`, `LDB`, `LDH`, `STB`, `STH`, `LDI32`, `PUSH`, `POP` | `LDI32` consumes two words: the opcode followed by a 32-bit literal. Byte/halfword loads sign-extend. |
-| Integer ALU | `ADD`, `SUB`, `MUL`, `DIV`, `AND`, `OR`, `XOR`, `NOT`, `CMP`, `LSL`, `LSR`, `ASR` | All register-to-register; `CMP` writes condition codes in the PSW. |
+| Integer ALU | `ADD`, `SUB`, `MUL`, `DIV`, `AND`, `OR`, `XOR`, `NOT`, `CMP`, `LSL`, `LSR`, `ASR`, `ADC`, `SBC` | All register-to-register; `CMP` writes condition codes in the PSW. |
 | Control flow | `JMP`, `JZ`, `JNZ`, `CALL`, `RET`, `BRK` | `JZ/JNZ` test the provided register. `BRK` triggers a debugger stop. |
 | Floating/FP helpers | `FADD`, `FSUB`, `FMUL`, `FDIV`, `I2F`, `F2I` | Operate on f16 values stored in 32-bit registers. |
 | System services | `SVC mod, fn` | Encodes module/function IDs in the immediate field. Arguments travel in `R0`–`R3` per `docs/abi_syscalls.md`. |
@@ -67,7 +67,8 @@ The MiniVM tracks condition codes in the low nibble of `PSW`:
 | 2 | `N` | Negative | All ALU/logic ops (mirrors bit 31 of the result) |
 | 3 | `V` | Signed overflow | `ADD`, `SUB`, `CMP`, `MUL` |
 
-- `SUB` and `CMP` set `C = 1` when no borrow occurs (`Rsrc1 >= Rsrc2`), making it safe to cascade for multi-precision arithmetic.
+- `SUB`, `SBC`, and `CMP` set `C = 1` when no borrow occurs (`Rsrc1 >= Rsrc2 + borrow_in`), making it safe to cascade for multi-precision arithmetic.
+- `ADC` consumes the incoming carry (`C`) as a +1 term; `SBC` treats `C` as "no borrow yet" (borrow-in = `1 - C`).
 - Logical operations (`AND`, `OR`, `XOR`, `NOT`) clear `C` and `V`. Shift instructions clear `V` and set `C` to the last bit shifted out when the amount is non-zero.
 - Branch instructions currently test `Z` (`JZ` / `JNZ`); future opcodes may consume the other flags.
 

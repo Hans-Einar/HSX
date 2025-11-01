@@ -21,6 +21,7 @@ Sources:
 ## VM ISA notes
 
 - The Python MiniVM exposes dedicated shift instructions `LSL`, `LSR`, and `ASR` (opcodes `0x31`-`0x33`). Shift amounts are taken modulo 32; `ASR` preserves the sign bit on right shifts. Results update the zero flag pending the broader PSW implementation work.
+- `ADC` and `SBC` (opcodes `0x34`/`0x35`) use the carry flag as carry-in/no-borrow markers, updating all PSW bits (Z/C/N/V) on completion.
 
 ## Module map
 

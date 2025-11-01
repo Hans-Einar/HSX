@@ -7,7 +7,7 @@ OPCODES: Dict[str, int] = {
     "ADD": 0x10, "SUB": 0x11, "MUL": 0x12, "DIV": 0x13,
     "AND": 0x14, "OR": 0x15, "XOR": 0x16, "NOT": 0x17,
     "CMP": 0x20, "JMP": 0x21, "JZ": 0x22, "JNZ": 0x23, "CALL": 0x24, "RET": 0x25,
-    "SVC": 0x30, "LSL": 0x31, "LSR": 0x32, "ASR": 0x33, "PUSH": 0x40, "POP": 0x41,
+    "SVC": 0x30, "LSL": 0x31, "LSR": 0x32, "ASR": 0x33, "ADC": 0x34, "SBC": 0x35, "PUSH": 0x40, "POP": 0x41,
     "FADD": 0x50, "FSUB": 0x51, "FMUL": 0x52, "FDIV": 0x53, "I2F": 0x54, "F2I": 0x55,
     "LDI32": 0x60, "BRK": 0x7F
 }
@@ -111,6 +111,10 @@ def format_operands(
         return _alu("+", lambda a, b: (a + b) & 0xFFFFFFFF)
     if mnemonic == "SUB":
         return _alu("-", lambda a, b: (a - b) & 0xFFFFFFFF)
+    if mnemonic == "ADC":
+        return f"{_reg_dst(rd)} <- {_reg_src(rs1)} + {_reg_src(rs2)} + C"
+    if mnemonic == "SBC":
+        return f"{_reg_dst(rd)} <- {_reg_src(rs1)} - {_reg_src(rs2)} - (1 - C)"
     if mnemonic == "MUL":
         return _alu("*", lambda a, b: (a * b) & 0xFFFFFFFF)
     if mnemonic == "DIV":

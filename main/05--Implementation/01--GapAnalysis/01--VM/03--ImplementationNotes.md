@@ -41,3 +41,15 @@
   - Authored dedicated regression coverage for PSW semantics and branching (`python/tests/test_vm_psw_flags.py`).
 - **Testing:** `python -m pytest python/tests/test_vm_psw_flags.py`
 - **Follow-ups:** None for PSW; next plan item is to plumb ADC/SBC (Phase 1.2) atop the new flag infrastructure.
+
+## 2025-11-01 - Codex (Session 4)
+
+### Phase 1.2 - Carry-aware arithmetic (ADC/SBC)
+- **Status:** DONE (Python VM + tooling support).
+- **What was done:**
+  - Assigned opcodes `0x34`/`0x35` to `ADC`/`SBC` and taught assembler/disassembler pipelines to encode/decode them (`python/asm.py:15`, `python/disasm_util.py:10`).
+  - Implemented carry-in/borrow-in semantics in `platforms/python/host_vm.py:931`-`970`, reusing the PSW helpers to update Z/C/N/V.
+  - Documented the new instructions in both `docs/MVASM_SPEC.md:50` and `docs/abi_syscalls.md:24`.
+  - Expanded PSW regression coverage with ADC/SBC scenarios (`python/tests/test_vm_psw_flags.py`).
+- **Testing:** `python -m pytest python/tests/test_vm_psw_flags.py`
+- **Follow-ups:** Proceed to Phase 1.4 (DIV opcode) and trace API work per implementation plan.

@@ -142,3 +142,80 @@ def test_branch_observes_zero_flag():
     vm = _run(asm)
     assert vm.regs[0] == 0x123
     assert _flag_set(vm, FLAG_Z)
+
+
+def test_adc_consumes_carry_in():
+    asm = [
+        ".entry main",
+        ".text",
+        "main:",
+        "    LDI32 R1, 0xFFFFFFFF",
+        "    LDI R2, 1",
+        "    ADD R0, R1, R2",  # sets C = 1
+        "    ADC R3, R1, R2",
+        "    BRK 0",
+    ]
+    vm = _run(asm)
+    assert vm.regs[3] == 1
+    assert _flag_set(vm, FLAG_C)
+    assert not _flag_set(vm, FLAG_Z)
+    assert not _flag_set(vm, FLAG_V)
+
+
+def test_adc_sets_overflow_when_carry_used():
+    asm = [
+        ".entry main",
+        ".text",
+        "main:",
+        "    LDI32 R1, 0xFFFFFFFF",
+        "    LDI R2, 1",
+        "    ADD R0, R1, R2",  # sets C = 1
+        "    LDI32 R3, 0x7FFFFFFF",
+        "    LDI R4, 0",
+        "    ADC R5, R3, R4",
+        "    BRK 0",
+    ]
+    vm = _run(asm)
+    assert vm.regs[5] == 0x80000000
+    assert not _flag_set(vm, FLAG_C)
+    assert _flag_set(vm, FLAG_V)
+    assert _flag_set(vm, FLAG_N)
+
+
+def test_sbc_consumes_borrow_when_carry_clear():
+    asm = [
+        ".entry main",
+        ".text",
+        "main:",
+        "    LDI R1, 0",
+        "    LDI R2, 1",
+        "    SUB R0, R1, R2",  # sets C = 0
+        "    LDI R3, 5",
+        "    LDI R4, 3",
+        "    SBC R5, R3, R4",
+        "    BRK 0",
+    ]
+    vm = _run(asm)
+    assert vm.regs[5] == 1
+    assert _flag_set(vm, FLAG_C)
+    assert not _flag_set(vm, FLAG_N)
+    assert not _flag_set(vm, FLAG_V)
+
+
+def test_sbc_sets_borrow_when_needed():
+    asm = [
+        ".entry main",
+        ".text",
+        "main:",
+        "    LDI R1, 4",
+        "    LDI R2, 4",
+        "    SUB R0, R1, R2",  # sets C = 1
+        "    LDI R3, 3",
+        "    LDI R4, 7",
+        "    SBC R5, R3, R4",
+        "    BRK 0",
+    ]
+    vm = _run(asm)
+    assert vm.regs[5] == 0xFFFFFFFC
+    assert not _flag_set(vm, FLAG_C)
+    assert _flag_set(vm, FLAG_N)

@@ -1002,6 +1002,36 @@ class MiniVM:
             v = (signed >> shift) & 0xFFFFFFFF
             self.regs[rd] = v
             set_flags(v, carry=bool(carry) if shift else None, overflow=False if shift else None)
+        elif op == 0x34:  # ADC
+            carry_in = 1 if (self.flags & FLAG_C) else 0
+            ua = self.regs[rs1] & 0xFFFFFFFF
+            ub = self.regs[rs2] & 0xFFFFFFFF
+            total = ua + ub + carry_in
+            result = total & 0xFFFFFFFF
+            carry_out = (total >> 32) & 0x1
+            operand_signed = ((ub + carry_in) & 0xFFFFFFFF)
+            sa = ua if ua < 0x80000000 else ua - 0x100000000
+            sb = operand_signed if operand_signed < 0x80000000 else operand_signed - 0x100000000
+            sr = result if result < 0x80000000 else result - 0x100000000
+            overflow = (sa >= 0 and sb >= 0 and sr < 0) or (sa < 0 and sb < 0 and sr >= 0)
+            self.regs[rd] = result
+            set_flags(result, carry=bool(carry_out), overflow=overflow)
+        elif op == 0x35:  # SBC
+            carry_in = 1 if (self.flags & FLAG_C) else 0
+            borrow = 1 - carry_in
+            ua = self.regs[rs1] & 0xFFFFFFFF
+            ub = self.regs[rs2] & 0xFFFFFFFF
+            operand = ub + borrow
+            total = ua - operand
+            result = total & 0xFFFFFFFF
+            carry_out = total >= 0
+            operand32 = operand & 0xFFFFFFFF
+            sa = ua if ua < 0x80000000 else ua - 0x100000000
+            sb = operand32 if operand32 < 0x80000000 else operand32 - 0x100000000
+            sr = result if result < 0x80000000 else result - 0x100000000
+            overflow = (sa >= 0 and sb < 0 and sr < 0) or (sa < 0 and sb >= 0 and sr >= 0)
+            self.regs[rd] = result
+            set_flags(result, carry=carry_out, overflow=overflow)
         elif op == 0x20:  # CMP
             result, carry, overflow = sub_with_flags(self.regs[rs1], self.regs[rs2])
             set_flags(result, carry=carry, overflow=overflow)
