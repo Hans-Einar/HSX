@@ -62,6 +62,15 @@ class EventSubscription:
     condition: threading.Condition
     max_events: int
     last_ack: int = 0
+    delivered_seq: int = 0
+    drop_count: int = 0
+    slow_count: int = 0
+    high_water: int = 0
+    slow_warning_active: bool = False
+    slow_since: float = 0.0
+    last_warning_ts: float = 0.0
+    last_delivery_ts: float = field(default_factory=time.time)
+    created_at: float = field(default_factory=time.time)
     active: bool = True
     since_seq: Optional[int] = None
 
@@ -75,6 +84,9 @@ class EventSubscription:
             if etype not in self.categories:
                 return False
         return True
+
+    def pending(self) -> int:
+        return max(0, self.delivered_seq - self.last_ack)
 
 
 
@@ -119,7 +131,7 @@ class ExecutiveState:
         self.session_events_max = 2048
         self._last_session_prune = 0.0
         self._session_prune_interval = 5.0
-        self.session_supported_features = {"events", "stack", "disasm", "symbols", "memory"}
+        self.session_supported_features = {"events", "stack", "disasm", "symbols", "memory", "watch"}
         self.debug_attached: Set[int] = set()
         self.breakpoints: Dict[int, Set[int]] = {}
         self.event_lock = threading.RLock()
@@ -128,9 +140,17 @@ class ExecutiveState:
         self.event_subscriptions: Dict[str, EventSubscription] = {}
         self.session_event_map: Dict[str, str] = {}
         self.event_retention_ms = 5000
+        self.event_ack_warn_factor = 2
+        self.event_ack_drop_factor = 4
+        self.event_ack_warn_floor = 64
+        self.event_ack_drop_floor = 256
+        self.event_backpressure_grace = 1.0
+        self.event_slow_warning_interval = 0.5
         self.symbol_tables: Dict[int, Dict[str, Any]] = {}
         self.disasm_cache: Dict[int, Dict[Tuple[int, int], Dict[str, Any]]] = {}
         self.memory_layouts: Dict[int, Dict[str, int]] = {}
+        self.watchers: Dict[int, Dict[int, Dict[str, Any]]] = {}
+        self._next_watch_id = 1
         self.symbol_cache_lock = threading.RLock()
         self.default_stack_frames = 16
 
@@ -854,6 +874,154 @@ class ExecutiveState:
             "layout": layout,
         }
 
+    def watch_add(
+        self,
+        pid: int,
+        expr: str,
+        *,
+        watch_type: Optional[str] = None,
+        length: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        self.get_task(pid)
+        expr_text = str(expr).strip()
+        if not expr_text:
+            raise ValueError("watch expression must be non-empty")
+        resolved = self._resolve_watch_expression(pid, expr_text, watch_type)
+        length_value = 4 if length is None else max(1, int(length))
+        try:
+            address = resolved["address"] & 0xFFFF
+            raw = self.vm.read_mem(address, length_value, pid=pid)
+        except Exception as exc:
+            raise ValueError(f"watch read failed: {exc}") from exc
+        watch_id = self._next_watch_id
+        self._next_watch_id += 1
+        watch_record = {
+            "id": watch_id,
+            "pid": pid,
+            "expr": expr_text,
+            "type": resolved["type"],
+            "address": address,
+            "length": length_value,
+            "symbol": resolved.get("symbol"),
+            "description": resolved.get("description"),
+            "last_value": bytes(raw),
+        }
+        self.watchers.setdefault(pid, {})[watch_id] = watch_record
+        return self._export_watch_record(watch_record)
+
+    def watch_remove(self, pid: int, watch_id: int) -> Dict[str, Any]:
+        watch_map = self.watchers.get(pid)
+        if not watch_map or watch_id not in watch_map:
+            raise ValueError(f"unknown watch {watch_id} for pid {pid}")
+        record = watch_map.pop(watch_id)
+        if not watch_map:
+            self.watchers.pop(pid, None)
+        return self._export_watch_record(record)
+
+    def watch_list(self, pid: int) -> Dict[str, Any]:
+        watch_map = self.watchers.get(pid, {})
+        items = [self._export_watch_record(record) for record in sorted(watch_map.values(), key=lambda item: item["id"])]
+        return {"pid": pid, "count": len(items), "watches": items}
+
+    def _resolve_watch_expression(
+        self,
+        pid: int,
+        expr: str,
+        watch_type: Optional[str],
+    ) -> Dict[str, Any]:
+        expr_type = (watch_type or "").strip().lower()
+        address: Optional[int] = None
+        symbol_name: Optional[str] = None
+        description: Optional[str] = None
+        if expr_type in {"addr", "address"}:
+            try:
+                address = int(expr, 0)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"invalid address '{expr}'") from exc
+            expr_type = "address"
+        elif expr_type in {"symbol", "name"}:
+            entry = self.symbol_lookup_name(pid, expr)
+            if not entry:
+                raise ValueError(f"symbol '{expr}' not found for pid {pid}")
+            address = int(entry.get("address", 0))
+            symbol_name = entry.get("name")
+            description = entry.get("name")
+            expr_type = "symbol"
+        else:
+            try:
+                address = int(expr, 0)
+                expr_type = "address"
+            except (TypeError, ValueError):
+                entry = self.symbol_lookup_name(pid, expr)
+                if not entry:
+                    raise ValueError(f"symbol '{expr}' not found for pid {pid}")
+                address = int(entry.get("address", 0))
+                symbol_name = entry.get("name")
+                description = entry.get("name")
+                expr_type = "symbol"
+        if address is None:
+            raise ValueError("unable to resolve watch expression")
+        return {
+            "type": expr_type,
+            "address": address & 0xFFFF,
+            "symbol": symbol_name,
+            "description": description,
+        }
+
+    def _export_watch_record(self, record: Dict[str, Any]) -> Dict[str, Any]:
+        data = {
+            "id": record["id"],
+            "pid": record["pid"],
+            "expr": record["expr"],
+            "type": record["type"],
+            "address": record["address"],
+            "length": record["length"],
+            "value": record["last_value"].hex(),
+        }
+        if record.get("symbol"):
+            data["symbol"] = record["symbol"]
+        if record.get("description"):
+            data["description"] = record["description"]
+        return data
+
+    def _check_watches(self, pid: Optional[int] = None) -> List[Dict[str, Any]]:
+        events: List[Dict[str, Any]] = []
+        if not self.watchers:
+            return events
+        if pid is not None:
+            pids = [pid]
+        else:
+            pids = list(self.watchers.keys())
+        for watch_pid in pids:
+            watch_map = self.watchers.get(watch_pid)
+            if not watch_map:
+                continue
+            for watch_id, record in list(watch_map.items()):
+                try:
+                    addr = int(record.get("address", 0)) & 0xFFFF
+                    data = self.vm.read_mem(addr, record["length"], pid=watch_pid)
+                except Exception as exc:
+                    self.log("warning", "watch read failed", pid=watch_pid, watch_id=watch_id, error=str(exc))
+                    continue
+                current = bytes(data)
+                if current == record["last_value"]:
+                    continue
+                payload = {
+                    "watch_id": watch_id,
+                    "address": record["address"],
+                    "expr": record["expr"],
+                    "type": record["type"],
+                    "length": record["length"],
+                    "old": record["last_value"].hex(),
+                    "new": current.hex(),
+                }
+                if record.get("symbol"):
+                    payload["symbol"] = record["symbol"]
+                record["last_value"] = current
+                event = self.emit_event("watch_update", pid=watch_pid, data=payload)
+                events.append(event)
+        return events
+
     @staticmethod
     def _decode_instruction_word(word: int) -> Dict[str, int]:
         op = (word >> 24) & 0xFF
@@ -1256,12 +1424,72 @@ class ExecutiveState:
             if not subscription.active:
                 return
             subscription.queue.append(warning_event)
+            pending = self._post_enqueue_locked(subscription, warning_event["seq"])
             subscription.condition.notify_all()
+        # warnings are considered part of the backlog but should not recursively trigger new warnings
+        # immediately, so skip back-pressure evaluation here.
+
+    def _post_enqueue_locked(self, subscription: EventSubscription, seq: int) -> int:
+        """Update delivery metrics after enqueuing an event while the subscription lock is held."""
+        subscription.delivered_seq = max(subscription.delivered_seq, seq)
+        pending = subscription.pending()
+        if pending > subscription.high_water:
+            subscription.high_water = pending
+        subscription.last_delivery_ts = time.time()
+        return pending
+
+    def _apply_backpressure(self, subscription: EventSubscription, pending: Optional[int] = None) -> None:
+        if not subscription.active:
+            return
+        pending_count = subscription.pending() if pending is None else pending
+        now = time.time()
+        if (now - subscription.created_at) < self.event_backpressure_grace:
+            return
+        warn_threshold = max(subscription.max_events * self.event_ack_warn_factor, self.event_ack_warn_floor)
+        drop_threshold = max(subscription.max_events * self.event_ack_drop_factor, self.event_ack_drop_floor)
+        if pending_count >= warn_threshold:
+            if (now - subscription.last_warning_ts) >= self.event_slow_warning_interval:
+                self._deliver_warning(
+                    subscription,
+                    "slow_consumer",
+                    pending=pending_count,
+                    high_water=subscription.high_water,
+                    drops=subscription.drop_count,
+                )
+                subscription.last_warning_ts = now
+                subscription.slow_warning_active = True
+                if not subscription.slow_since:
+                    subscription.slow_since = now
+                subscription.slow_count += 1
+        else:
+            subscription.slow_warning_active = False
+            subscription.slow_since = 0.0
+        if pending_count >= drop_threshold:
+            self.log(
+                "warn",
+                "events subscription dropped due to backpressure",
+                session_id=subscription.session_id,
+                token=subscription.token,
+                pending=pending_count,
+                last_ack=subscription.last_ack,
+                delivered=subscription.delivered_seq,
+                max_events=subscription.max_events,
+                drops=subscription.drop_count,
+            )
+            self._deliver_warning(
+                subscription,
+                "slow_consumer_drop",
+                pending=pending_count,
+                high_water=subscription.high_water,
+                drops=subscription.drop_count,
+            )
+            self.events_unsubscribe(token=subscription.token)
 
     def _broadcast_event(self, event: Dict[str, Any]) -> None:
         with self.event_lock:
             subscribers = list(self.event_subscriptions.values())
         for sub in subscribers:
+            pending: Optional[int] = None
             with sub.condition:
                 if not sub.active:
                     continue
@@ -1269,13 +1497,32 @@ class ExecutiveState:
                     continue
                 if sub.max_events > 0 and len(sub.queue) >= sub.max_events:
                     dropped = sub.queue.popleft()
-                    sub.last_ack = max(sub.last_ack, dropped.get("seq", sub.last_ack))
-                    self._deliver_warning(sub, "event_dropped", dropped_seq=dropped.get("seq"))
+                    dropped_seq = dropped.get("seq", sub.last_ack)
+                    sub.last_ack = max(sub.last_ack, dropped_seq)
+                    sub.drop_count += 1
+                    self.log(
+                        "warn",
+                        "events queue drop",
+                        session_id=sub.session_id,
+                        token=sub.token,
+                        dropped_seq=dropped_seq,
+                        drop_count=sub.drop_count,
+                        max_events=sub.max_events,
+                    )
+                    self._deliver_warning(
+                        sub,
+                        "event_dropped",
+                        dropped_seq=dropped_seq,
+                        drops=sub.drop_count,
+                    )
                     # ensure room after warning
                     if sub.max_events > 0 and len(sub.queue) >= sub.max_events:
                         sub.queue.popleft()
                 sub.queue.append(event)
+                pending = self._post_enqueue_locked(sub, event.get("seq", sub.delivered_seq))
                 sub.condition.notify_all()
+            if pending is not None:
+                self._apply_backpressure(sub, pending)
 
     def _parse_event_filters(self, filters: Optional[Dict[str, Any]]) -> Tuple[Optional[Set[int]], Optional[Set[str]], Optional[int]]:
         if not isinstance(filters, dict):
@@ -1333,6 +1580,8 @@ class ExecutiveState:
                         old.condition.notify_all()
             token = f"{session_id}:{uuid.uuid4()}"
             condition = threading.Condition(self.event_lock)
+            current_seq = self.event_seq - 1
+            initial_ack = since_seq if since_seq is not None else current_seq
             subscription = EventSubscription(
                 token=token,
                 session_id=session_id,
@@ -1341,13 +1590,17 @@ class ExecutiveState:
                 queue=deque(),
                 condition=condition,
                 max_events=record.max_events,
+                last_ack=initial_ack,
+                delivered_seq=initial_ack,
                 since_seq=since_seq,
             )
             # preload history if requested
             if since_seq is not None:
-                for event in self.event_history:
-                    if event.get("seq", 0) > since_seq and subscription.matches(event):
-                        subscription.queue.append(event)
+                with subscription.condition:
+                    for event in self.event_history:
+                        if event.get("seq", 0) > since_seq and subscription.matches(event):
+                            subscription.queue.append(event)
+                            self._post_enqueue_locked(subscription, event.get("seq", initial_ack))
             self.event_subscriptions[token] = subscription
             self.session_event_map[session_id] = token
             subscription.condition.notify_all()
@@ -1394,19 +1647,48 @@ class ExecutiveState:
             subscription.last_ack = max(subscription.last_ack, seq)
             while subscription.queue and subscription.queue[0].get("seq", 0) <= seq:
                 subscription.queue.popleft()
+            pending_after = subscription.pending()
+            if pending_after <= subscription.max_events:
+                subscription.slow_warning_active = False
+                subscription.slow_since = 0.0
             subscription.condition.notify_all()
 
     def events_next(self, subscription: EventSubscription, timeout: float = 1.0) -> Optional[Dict[str, Any]]:
         end_time = time.time() + timeout
         with subscription.condition:
-            while subscription.active:
+            while True:
                 if subscription.queue:
                     return subscription.queue.popleft()
+                if not subscription.active:
+                    return None
                 remaining = end_time - time.time()
                 if remaining <= 0:
                     return None
                 subscription.condition.wait(timeout=remaining)
         return None
+
+    def events_metrics(self, session_id: str) -> Dict[str, Any]:
+        with self.event_lock:
+            token = self.session_event_map.get(session_id)
+            if not token:
+                raise SessionError("session_required")
+            subscription = self.event_subscriptions.get(token)
+        if subscription is None:
+            raise SessionError("session_required")
+        with subscription.condition:
+            pending = subscription.pending()
+            return {
+                "token": subscription.token,
+                "pending": pending,
+                "high_water": subscription.high_water,
+                "drop_count": subscription.drop_count,
+                "slow_count": subscription.slow_count,
+                "last_ack": subscription.last_ack,
+                "delivered_seq": subscription.delivered_seq,
+                "max_events": subscription.max_events,
+                "active": subscription.active,
+                "slow_warning_active": subscription.slow_warning_active,
+            }
 
     def events_session_disconnected(self, session_id: str) -> None:
         self.events_unsubscribe(session_id=session_id)
@@ -1465,6 +1747,9 @@ class ExecutiveState:
         stale_disasm = set(self.disasm_cache.keys()) - current_pids
         for pid in stale_disasm:
             self.disasm_cache.pop(pid, None)
+        stale_watchers = set(self.watchers.keys()) - current_pids
+        for pid in stale_watchers:
+            self.watchers.pop(pid, None)
         stale_layouts = set(self.memory_layouts.keys()) - current_pids
         for pid in stale_layouts:
             self.memory_layouts.pop(pid, None)
@@ -1592,6 +1877,9 @@ class ExecutiveState:
             )
         self._last_vm_running = running_flag
         self._refresh_tasks()
+        watch_events = self._check_watches(pid if pid is not None else None)
+        if watch_events:
+            result.setdefault("events", []).extend(watch_events)
         return result
 
     def start_auto(self) -> None:
@@ -1713,6 +2001,7 @@ class ExecutiveState:
             self.symbol_tables.pop(pid, None)
         self.disasm_cache.pop(pid, None)
         self.memory_layouts.pop(pid, None)
+        self.watchers.pop(pid, None)
         return {"pid": pid, "state": "terminated"}
 
     def set_task_attrs(self, pid: int, *, priority: Optional[int] = None, quantum: Optional[int] = None) -> Dict[str, Any]:
@@ -2294,6 +2583,7 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 if session_id is None:
                     raise SessionError("session_required")
                 subscription = self.state.events_subscribe(session_id, filters=request.get("filters"))
+                metrics = self.state.events_metrics(session_id)
                 ack_payload = {
                     "version": 1,
                     "status": "ok",
@@ -2302,6 +2592,9 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                         "max": subscription.max_events,
                         "cursor": self.state.event_seq - 1,
                         "retention_ms": self.state.event_retention_ms,
+                        "pending": metrics.get("pending"),
+                        "high_water": metrics.get("high_water"),
+                        "drops": metrics.get("drop_count"),
                     },
                 }
                 if subscription.since_seq is not None:
@@ -2318,7 +2611,17 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 except (TypeError, ValueError):
                     raise ValueError("events.ack seq must be an integer")
                 self.state.events_ack(session_id, seq)
-                return {"version": 1, "status": "ok"}
+                metrics = self.state.events_metrics(session_id)
+                return {
+                    "version": 1,
+                    "status": "ok",
+                    "events": {
+                        "pending": metrics.get("pending"),
+                        "high_water": metrics.get("high_water"),
+                        "drops": metrics.get("drop_count"),
+                        "last_ack": metrics.get("last_ack"),
+                    },
+                }
             if cmd == "events.unsubscribe":
                 if session_id is None:
                     raise SessionError("session_required")
@@ -2479,6 +2782,34 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                     info = self.state.memory_regions(pid_int)
                     return {"version": 1, "status": "ok", "memory": info}
                 raise ValueError(f"unknown memory op '{op}'")
+            if cmd == "watch":
+                op_value = request.get("op")
+                op = str(op_value or "list").lower()
+                pid_value = request.get("pid")
+                if pid_value is None:
+                    raise ValueError("watch requires 'pid'")
+                pid_int = int(pid_value)
+                if op in {"add", "create"}:
+                    expr = request.get("expr") or request.get("expression")
+                    if not isinstance(expr, str):
+                        raise ValueError("watch add requires 'expr'")
+                    watch_type = request.get("type") or request.get("kind")
+                    length_value = request.get("length") or request.get("size")
+                    length_int = int(length_value) if length_value is not None else None
+                    self.state.ensure_pid_access(pid_int, session_id)
+                    info = self.state.watch_add(pid_int, expr, watch_type=watch_type, length=length_int)
+                    return {"version": 1, "status": "ok", "watch": info}
+                if op in {"remove", "del", "delete"}:
+                    watch_id = request.get("watch") or request.get("id")
+                    if watch_id is None:
+                        raise ValueError("watch remove requires 'id'")
+                    self.state.ensure_pid_access(pid_int, session_id)
+                    info = self.state.watch_remove(pid_int, int(watch_id))
+                    return {"version": 1, "status": "ok", "watch": info}
+                if op in {"", "list", "ls"}:
+                    info = self.state.watch_list(pid_int)
+                    return {"version": 1, "status": "ok", "watch": info}
+                raise ValueError(f"unknown watch op '{op}'")
             if cmd == "disasm":
                 pid_value = request.get("pid")
                 if pid_value is None:

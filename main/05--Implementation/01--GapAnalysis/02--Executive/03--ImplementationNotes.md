@@ -213,3 +213,41 @@ Start new sections chronologically. Keep notes concise but actionable so the nex
   - `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py python/tests/test_executive_session_helpers.py`
 - Follow-up actions / hand-off notes.
   - Future: consider enriching region list with `.sym` metadata (heap/data aliases) once format is defined.
+
+## 2025-11-02 - Codex (Session 11)
+
+### Focus
+- Task(s) tackled: Phase 2.3 watch expressions (RPC/events, client CLI, docs, tests).
+- Dependencies touched: `python/execd.py`, `python/executive_session.py`, `python/shell_client.py`, `help/watch.txt`, `docs/executive_protocol.md`, `python/tests/test_executive_sessions.py`, `python/tests/test_executive_session_helpers.py`, `python/tests/test_shell_client.py`.
+
+### Status
+- DONE
+
+### Details
+- Added watch manager with address/symbol resolution, change detection, and `watch_update` events plus cleanup on task termination.
+- Exposed `watch.add/remove/list` RPCs, session helpers, and shell commands with corresponding help/docs updates.
+- Expanded unit coverage across executive state, session stubs, and CLI payload builders.
+- Tests run (commands + result).
+  - `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py python/tests/test_executive_session_helpers.py python/tests/test_shell_client.py`
+- Follow-up actions / hand-off notes.
+  - Monitor watch event volume; consider batching/filtering if tooling subscribes heavily in later phases.
+
+## 2025-11-03 - Codex (Session 12)
+
+### Focus
+- Task(s) tackled: Phase 2.4 event back-pressure (ACK tracking, slow-consumer handling, metrics, protocol docs/tests).
+- Dependencies touched: `python/execd.py`, `docs/executive_protocol.md`, `python/tests/test_executive_sessions.py`, `main/05--Implementation/01--GapAnalysis/02--Executive/02--ImplementationPlan.md`.
+
+### Status
+- DONE
+
+### Details
+- Hardened `EventSubscription` bookkeeping with delivered/ack tracking, drop counters, and high-water metrics; wired `_apply_backpressure` to emit `slow_consumer` / `slow_consumer_drop` warnings and auto-unsubscribe lagging clients.
+- Added `events_metrics` helper plus augmented `events.subscribe`/`events.ack` replies to surface backlog statistics; queue drops now log warnings with cumulative counts.
+- Expanded plan/doc coverage and added targeted pytest cases for slow-consumer warnings, drop shutdowns, and metrics reset behaviour.
+
+### Tests run (commands + result)
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py`
+
+### Follow-up actions / hand-off notes
+- Thread backlog metrics into higher-level clients/telemetry dashboards and tune thresholds once real workloads exercise the stream.

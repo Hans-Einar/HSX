@@ -71,6 +71,7 @@ COMMAND_NAMES = sorted(
         "disasm",
         "stack",
         "memory",
+        "watch",
         "symbols",
         "sym",
         "trace",
@@ -107,7 +108,7 @@ def _ensure_session(host: str, port: int, *, auto_events: bool = False) -> Execu
                 host,
                 port,
                 client_name="hsx-shell",
-                features=["events", "stack", "symbols", "memory", "disasm"],
+                features=["events", "stack", "symbols", "memory", "watch", "disasm"],
                 max_events=256,
             )
         session = _SESSION_MANAGER
@@ -612,6 +613,49 @@ def _pretty_memory(payload: dict) -> None:
         suffix = f" ({', '.join(details_parts)})" if details_parts else ""
         label = f" {name}" if name else ""
         print(f"  {start_text}-{end_text} len={length_text:>5} {perms:<3} {r_type:<9}{label}{suffix}")
+
+
+def _pretty_watch(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    block = payload.get("watch")
+    if not isinstance(block, dict):
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    watches = block.get("watches")
+    if isinstance(watches, list):
+        pid = block.get("pid", "?")
+        count = block.get("count", len(watches))
+        print(f"watch pid={pid} count={count}")
+        if not watches:
+            print("  <no watches>")
+            return
+        for entry in watches:
+            _print_watch_entry(entry)
+        return
+    _print_watch_entry(block)
+
+
+def _print_watch_entry(entry: dict) -> None:
+    watch_id = entry.get("id", "?")
+    pid = entry.get("pid", "?")
+    expr = entry.get("expr", "")
+    wtype = entry.get("type", "-")
+    addr = entry.get("address")
+    length = entry.get("length", 0)
+    value = entry.get("value")
+    addr_text = f"0x{int(addr) & 0xFFFF:04X}" if isinstance(addr, int) else str(addr or "-")
+    value_text = value if isinstance(value, str) else "-"
+    symbol = entry.get("symbol")
+    description = entry.get("description")
+    details: List[str] = []
+    if symbol:
+        details.append(f"symbol={symbol}")
+    if description and description != symbol:
+        details.append(description)
+    suffix = f" ({', '.join(details)})" if details else ""
+    print(f"  id={watch_id} pid={pid} type={wtype:<7} addr={addr_text} len={length} value={value_text} expr={expr}{suffix}")
 
 
 def _pretty_stack(payload: dict) -> None:
@@ -1244,6 +1288,7 @@ PRETTY_HANDLERS = {
     'sym': _pretty_sym,
     'symbols': _pretty_symbols,
     'memory': _pretty_memory,
+    'watch': _pretty_watch,
     'disasm': _pretty_disasm,
     'stack': _pretty_stack,
     'ps': _pretty_ps,
@@ -1325,6 +1370,8 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
         return _build_bp_payload(args)
     if cmd == "symbols":
         return _build_symbols_payload(args)
+    if cmd == "watch":
+        return _build_watch_payload(args)
     if cmd == "sym":
         return _build_sym_payload(args)
     if cmd == "disasm":
@@ -1822,6 +1869,44 @@ def _build_symbols_payload(args: list[str]) -> dict:
     return payload
 
 
+def _build_watch_payload(args: list[str]) -> dict:
+    if not args:
+        raise ValueError("watch usage: watch <list|add|remove> ...")
+    action = args[0].lower()
+    tokens = args[1:]
+    if action in {"add", "create"}:
+        if len(tokens) < 2:
+            raise ValueError("watch add requires <pid> <expr>")
+        payload: dict[str, object] = {"cmd": "watch", "op": "add", "pid": int(tokens[0], 0), "expr": tokens[1]}
+        i = 2
+        while i < len(tokens):
+            token = tokens[i]
+            if token in {"--type", "--kind", "-t"}:
+                i += 1
+                if i >= len(tokens):
+                    raise ValueError("watch add --type requires a value")
+                payload["type"] = tokens[i]
+            elif token in {"--length", "--len", "-n"}:
+                i += 1
+                if i >= len(tokens):
+                    raise ValueError("watch add --length requires a value")
+                payload["length"] = int(tokens[i], 0)
+            else:
+                raise ValueError("watch add usage: watch add <pid> <expr> [--type address|symbol] [--length N]")
+            i += 1
+        return payload
+    if action in {"remove", "del", "delete", "rm"}:
+        if len(tokens) < 2:
+            raise ValueError("watch remove requires <pid> <id>")
+        return {"cmd": "watch", "op": "remove", "pid": int(tokens[0], 0), "id": int(tokens[1], 0)}
+    if action in {"list", "ls"}:
+        if not tokens:
+            raise ValueError("watch list requires <pid>")
+        return {"cmd": "watch", "op": "list", "pid": int(tokens[0], 0)}
+    # default: treat first argument as pid for list
+    return {"cmd": "watch", "op": "list", "pid": int(args[0], 0)}
+
+
 def _build_sym_payload(args: list[str]) -> dict:
     if not args:
         raise ValueError("sym usage: sym <info|addr|name|line|load> ...")
@@ -1938,6 +2023,23 @@ def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: boo
                 print(f"error: {exc}")
                 continue
             handler = PRETTY_HANDLERS.get('memory')
+            if handler and not force_json:
+                handler(resp)
+            else:
+                print(json.dumps(resp, indent=2, sort_keys=True))
+            continue
+        if cmd == 'watch':
+            try:
+                payload = _build_watch_payload(args)
+            except ValueError as exc:
+                print(exc)
+                continue
+            try:
+                resp = send_request(host, port, payload)
+            except Exception as exc:
+                print(f"error: {exc}")
+                continue
+            handler = PRETTY_HANDLERS.get('watch')
             if handler and not force_json:
                 handler(resp)
             else:
@@ -2166,6 +2268,18 @@ def main() -> None:
             parser.error(str(exc))
         resp = send_request(args_ns.host, args_ns.port, payload)
         handler = PRETTY_HANDLERS.get('memory')
+        if handler and not force_json:
+            handler(resp)
+        else:
+            print(json.dumps(resp, indent=2, sort_keys=True))
+        return
+    if cmd == 'watch':
+        try:
+            payload = _build_watch_payload(args)
+        except ValueError as exc:
+            parser.error(str(exc))
+        resp = send_request(args_ns.host, args_ns.port, payload)
+        handler = PRETTY_HANDLERS.get('watch')
         if handler and not force_json:
             handler(resp)
         else:

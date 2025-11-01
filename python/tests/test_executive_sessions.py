@@ -38,8 +38,8 @@ def test_session_open_records_pid_lock_and_warnings():
     session_id = session["id"]
     assert session["client"] == "hsxdbg"
     assert session["pid_lock"] == 3
-    # unsupported feature should be rejected with a warning
-    assert "unsupported_feature:watch" in session.get("warnings", [])
+    # requested feature should be negotiated when supported
+    assert "watch" in session.get("features", [])
     # requested max_events honoured within limits
     assert session["max_events"] == 512
     assert state.pid_locks[3] == session_id
@@ -168,6 +168,53 @@ def test_events_queue_drop_emits_warning():
     assert any(evt["type"] == "trace_step" and evt["data"]["pc"] == 0x18 for evt in collected)
 
 
+def test_events_backpressure_warns_and_drops_slow_clients():
+    state = make_state()
+    state.event_ack_warn_floor = 3
+    state.event_ack_drop_floor = 6
+    state.event_ack_warn_factor = 1
+    state.event_ack_drop_factor = 3
+    state.event_backpressure_grace = 0.0
+    state.event_slow_warning_interval = 0.0
+    session_id = state.session_open(capabilities={"features": ["events"], "max_events": 2})["id"]
+    subscription = state.events_subscribe(session_id)
+    warnings: list[str] = []
+    drop_seen = False
+    for i in range(12):
+        state.emit_event("trace_step", pid=1, data={"pc": i})
+        while True:
+            evt = state.events_next(subscription, timeout=0.01)
+            if evt is None:
+                break
+            if evt["type"] == "warning":
+                reason = evt["data"].get("reason")
+                if reason:
+                    warnings.append(reason)
+                    if reason == "slow_consumer_drop":
+                        drop_seen = True
+                        break
+        if drop_seen or not subscription.active:
+            break
+    assert "slow_consumer" in warnings
+    assert "slow_consumer_drop" in warnings
+    assert drop_seen
+    assert not subscription.active
+
+
+def test_events_metrics_track_pending_and_reset_after_ack():
+    state = make_state()
+    session_id = state.session_open(capabilities={"features": ["events"], "max_events": 4})["id"]
+    subscription = state.events_subscribe(session_id)
+    emitted = state.emit_event("debug_break", pid=7, data={"pc": 0x200})
+    # drain event but do not ack yet
+    assert state.events_next(subscription, timeout=0.05) is not None
+    metrics = state.events_metrics(session_id)
+    assert metrics["pending"] >= 1
+    assert metrics["delivered_seq"] >= emitted["seq"]
+    state.events_ack(session_id, metrics["delivered_seq"])
+    metrics_after = state.events_metrics(session_id)
+    assert metrics_after["pending"] == 0
+
 class DebugVM:
     def __init__(self) -> None:
         self.breakpoints: set[int] = set()
@@ -248,6 +295,10 @@ class DebugVM:
 
     def read_mem(self, addr: int, length: int, pid: int | None = None) -> bytes:
         return bytes(self.memory.get((addr + i) & 0xFFFFFFFF, 0) for i in range(length))
+
+    def kill(self, pid: int) -> dict:
+        self.paused = False
+        return {"status": "ok"}
 
 
 def make_debug_state() -> tuple[ExecutiveState, DebugVM]:
@@ -473,6 +524,59 @@ def test_memory_regions_handles_missing_context():
     assert "code" in names
     assert "stack" not in names
     assert "registers" not in names
+
+
+def test_watch_add_emits_event_on_change():
+    state, vm = make_debug_state()
+    addr = 0x0200
+    vm.memory[addr] = 0x10
+    vm.memory[addr + 1] = 0x20
+    watch = state.watch_add(1, f"0x{addr:X}", watch_type="address", length=2)
+    assert watch["address"] == addr
+    assert watch["value"] == "1020"
+
+    vm.memory[addr] = 0x11
+    vm.memory[addr + 1] = 0x22
+    result = state.step(steps=1, pid=1)
+    events = result.get("events", [])
+    updates = [evt for evt in events if evt.get("type") == "watch_update"]
+    assert updates, "expected watch update event"
+    data = updates[0]["data"]
+    assert data["watch_id"] == watch["id"]
+    assert data["old"] == "1020"
+    assert data["new"] == "1122"
+
+
+def test_watch_add_symbol_resolves_address():
+    state, vm = make_debug_state()
+    _seed_symbol_table(state, 1, [("main", 0x1000, 16)])
+    vm.memory[0x1000] = 0xAA
+    watch = state.watch_add(1, "main", watch_type="symbol", length=1)
+    assert watch["symbol"] == "main"
+    assert watch["address"] == 0x1000
+    listing = state.watch_list(1)
+    assert listing["count"] == 1
+    assert listing["watches"][0]["symbol"] == "main"
+
+
+def test_watch_remove_and_cleanup():
+    state, _ = make_debug_state()
+    watch = state.watch_add(1, "0x300", watch_type="address", length=1)
+    removed = state.watch_remove(1, watch["id"])
+    assert removed["id"] == watch["id"]
+    listing = state.watch_list(1)
+    assert listing["count"] == 0
+    with pytest.raises(ValueError):
+        state.watch_remove(1, watch["id"])
+
+
+def test_watch_cleared_on_task_kill():
+    state, _ = make_debug_state()
+    watch = state.watch_add(1, "0x350", watch_type="address", length=1)
+    state.kill_task(1)
+    assert state.watchers.get(1) is None
+    with pytest.raises(ValueError):
+        state.watch_remove(1, watch["id"])
 
 
 def test_stack_info_two_frames_with_symbols():

@@ -154,3 +154,36 @@ def test_memory_regions_unknown_marks_unsupported():
     result = session.memory_regions(9)
     assert result is None
     assert session.supports_memory() is False
+
+
+def test_watch_add_remove_list():
+    watch_block = {"id": 3, "pid": 5, "expr": "0x200", "type": "address", "address": 0x200, "length": 4, "value": "00112233"}
+    session = StubSession(
+        [
+            make_handshake(["events", "watch"]),
+            {"status": "ok", "watch": watch_block},
+            {"status": "ok", "watch": {"pid": 5, "count": 1, "watches": [watch_block]}},
+            {"status": "ok", "watch": watch_block},
+        ],
+        features=["watch"],
+    )
+    added = session.watch_add(5, "0x200", watch_type="address", length=4)
+    assert added["id"] == 3
+    assert session.supports_watch() is True
+    listed = session.watch_list(5)
+    assert listed["count"] == 1
+    removed = session.watch_remove(5, 3)
+    assert removed["id"] == 3
+    assert session.sent[-1]["cmd"] == "watch"
+    assert session.sent[-1]["op"] == "remove"
+    assert session.sent[-1]["id"] == 3
+
+
+def test_watch_unknown_marks_unsupported():
+    session = StubSession(
+        [make_handshake(["events"]), {"status": "error", "error": "unknown_cmd:watch"}],
+        features=["watch"],
+    )
+    result = session.watch_list(2)
+    assert result is None
+    assert session.supports_watch() is False

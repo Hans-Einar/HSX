@@ -1,2 +1,2 @@
-ls [path]
-List files relative to the shell working directory. Paths are resolved on the host filesystem.
+ls [path]
+List files relative to the shell working directory. Paths are resolved on the host filesystem.

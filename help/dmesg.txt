@@ -1,6 +1,6 @@
-dmesg [limit]
-Show recent VM/executive log entries. Provide an optional integer to limit the number of records returned.
-
-Examples
-  dmesg        # show all buffered messages
-  dmesg 20     # show only the latest 20 entries
+dmesg [limit]
+Show recent VM/executive log entries. Provide an optional integer to limit the number of records returned.
+
+Examples
+  dmesg        # show all buffered messages
+  dmesg 20     # show only the latest 20 entries

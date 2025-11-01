@@ -60,6 +60,26 @@ def test_mbox_invalid_namespace(tmp_path: Path) -> None:
         _build_payload("mbox", ["ns", "invalid"], tmp_path)
 
 
+def test_watch_list_payload(tmp_path: Path) -> None:
+    payload = _build_payload("watch", ["list", "5"], tmp_path)
+    assert payload == {"cmd": "watch", "op": "list", "pid": 5}
+
+
+def test_watch_add_payload_with_options(tmp_path: Path) -> None:
+    payload = _build_payload("watch", ["add", "7", "main", "--type", "symbol", "--length", "2"], tmp_path)
+    assert payload["cmd"] == "watch"
+    assert payload["op"] == "add"
+    assert payload["pid"] == 7
+    assert payload["expr"] == "main"
+    assert payload["type"] == "symbol"
+    assert payload["length"] == 2
+
+
+def test_watch_remove_payload(tmp_path: Path) -> None:
+    payload = _build_payload("watch", ["remove", "9", "3"], tmp_path)
+    assert payload == {"cmd": "watch", "op": "remove", "pid": 9, "id": 3}
+
+
 def test_sched_payload_pid(tmp_path: Path) -> None:
     payload = _build_payload("sched", ["7", "priority", "2"], tmp_path)
     assert payload["pid"] == 7

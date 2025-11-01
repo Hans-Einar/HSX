@@ -11,7 +11,8 @@
 ## Commit Log
 | Date | Commit hash | Message | Author | Notes |
 | --- | --- | --- | --- | --- |
-| 2025-11-02 | pending | Memory regions RPC & CLI | Codex | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py python/tests/test_executive_session_helpers.py` |
+| 2025-11-03 | pending | Event back-pressure metrics & slow-consumer handling | Codex | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py` |
+| 2025-11-02 | pending | Watch expressions RPC & CLI | Codex | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py python/tests/test_executive_session_helpers.py python/tests/test_shell_client.py` |
 | 2025-11-02 | pending | Symbol enumeration coverage & client helpers | Codex | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py python/tests/test_executive_session_helpers.py` |
 | 2025-11-01 | 20c4782e99a8 | Disassembly RPC & CLI | Codex | Tests: `/mnt/c/Windows/py.exe -3.14 -m pytest python/tests/test_executive_session_helpers.py python/tests/test_executive_sessions.py` |
 | 2025-11-01 | f1eefc19062a | Stack UI drill-down & summaries | Codex | Tests: `/mnt/c/Windows/py.exe -3.14 -m pytest python/tests/test_executive_session_helpers.py python/tests/test_executive_sessions.py` |
@@ -32,4 +33,3 @@
 ## Additional Notes
 - Update this file whenever new commits land or PR state changes.
 - Link CI runs, code reviews, or related issues as the implementation progresses.
-

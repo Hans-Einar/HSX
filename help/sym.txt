@@ -1,13 +1,13 @@
-sym: symbol table helpers.
-
-Usage:
-  sym info <pid>
-  sym addr <pid> <address>
-  sym name <pid> <symbol>
-  sym line <pid> <address>
-  sym load <pid> <path>
-
-`sym info` reports whether symbols are loaded for a task.
-`sym addr` and `sym name` perform address/name lookups (hex or decimal).
-`sym line` returns the closest source line mapping at/below the address.
-`sym load` overrides the symbol file path for the task (requires ownership).
+sym: symbol table helpers.
+
+Usage:
+  sym info <pid>
+  sym addr <pid> <address>
+  sym name <pid> <symbol>
+  sym line <pid> <address>
+  sym load <pid> <path>
+
+`sym info` reports whether symbols are loaded for a task.
+`sym addr` and `sym name` perform address/name lookups (hex or decimal).
+`sym line` returns the closest source line mapping at/below the address.
+`sym load` overrides the symbol file path for the task (requires ownership).

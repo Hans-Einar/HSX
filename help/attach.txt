@@ -1,2 +1,2 @@
-attach
-Attach the executive to the VM and take over scheduling. Safe to call multiple times.
+attach
+Attach the executive to the VM and take over scheduling. Safe to call multiple times.

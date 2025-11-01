@@ -1,2 +1,2 @@
-exit
-Alias for quit; closes the shell client.
+exit
+Alias for quit; closes the shell client.

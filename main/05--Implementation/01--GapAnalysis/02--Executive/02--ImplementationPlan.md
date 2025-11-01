@@ -213,16 +213,16 @@ Design specifies memory.regions API reporting layout from .sym or HXE header (se
 Design specifies watch.add/remove/list with change detection (section 5.7). Enables monitoring of memory locations and variables.
 
 **Todo:**
-- [ ] Implement `watch.add(pid, expr, type)` RPC command
-- [ ] Implement `watch.remove(pid, watch_id)` RPC command
-- [ ] Implement `watch.list(pid)` RPC command
-- [ ] Support expression types: address, symbol name
-- [ ] Parse symbol names and resolve to addresses
-- [ ] Track previous value for change detection
-- [ ] Check watches after each step (post-step hook)
-- [ ] Emit watch_update events when values change
-- [ ] Add watch expression tests (add/remove, change detection, symbol resolution)
-- [ ] Update `docs/executive_protocol.md` with watch API
+- [x] Implement `watch.add(pid, expr, type)` RPC command
+- [x] Implement `watch.remove(pid, watch_id)` RPC command
+- [x] Implement `watch.list(pid)` RPC command
+- [x] Support expression types: address, symbol name
+- [x] Parse symbol names and resolve to addresses
+- [x] Track previous value for change detection
+- [x] Check watches after each step (post-step hook)
+- [x] Emit watch_update events when values change
+- [x] Add watch expression tests (add/remove, change detection, symbol resolution)
+- [x] Update `docs/executive_protocol.md` with watch API
 
 ---
 
@@ -236,14 +236,14 @@ Design specifies watch.add/remove/list with change detection (section 5.7). Enab
 Design specifies events.ack protocol and drop-oldest policy (section 7.3). System/Executive.md notes: "Build EventStreamer with bounded queue + ACK handling."
 
 **Todo:**
-- [ ] Implement ACK sequence number tracking per session
-- [ ] Add flow control based on unacknowledged event count
-- [ ] Implement slow client detection (lag threshold)
-- [ ] Add configurable buffer size per session
-- [ ] Log warnings when events are dropped
-- [ ] Add back-pressure metrics (drops per session, lag time)
-- [ ] Add back-pressure tests (slow client, buffer overflow)
-- [ ] Document back-pressure behavior in protocol docs
+- [x] Implement ACK sequence number tracking per session
+- [x] Add flow control based on unacknowledged event count
+- [x] Implement slow client detection (lag threshold)
+- [x] Add configurable buffer size per session
+- [x] Log warnings when events are dropped
+- [x] Add back-pressure metrics (drops per session, lag time)
+- [x] Add back-pressure tests (slow client, buffer overflow)
+- [x] Document back-pressure behavior in protocol docs
 
 ---
 

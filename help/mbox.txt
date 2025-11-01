@@ -1,19 +1,26 @@
-mbox [filters]
+﻿mbox [filters]
+=============
+
 List known mailboxes. Without filters every descriptor is shown. Optional filters:
-  all                    force a full dump even if filters were previously applied
-  pid <n> / owner <n>    limit to descriptors owned by PID <n> (alias: pid=<n>)
-  ns <name>              limit to namespace (`pid`, `svc`, `app`, `shared`)
-  app|shared|svc         shorthand namespace filters
+
+- `all`                    force a full dump even if filters were previously applied
+- `pid <n>` / `owner <n>`  limit to descriptors owned by PID `<n>` (alias: `pid=<n>`)
+- `ns <name>`              limit to namespace (`pid`, `svc`, `app`, `shared`)
+- `app|shared|svc`         shorthand namespace filters
 
 Tips
-- `svc:` mailboxes accept `@<pid>` suffixes (e.g. `svc:stdio.out@3`) to inspect another task’s stdio channel.
+----
+
+- `svc:` mailboxes accept `@<pid>` suffixes (e.g. `svc:stdio.out@3`) to inspect another task's stdio channel.
 - `app:` targets without a suffix are global; append `@<pid>` to scope binding to a specific owner.
 - `shared:` targets are always global and may advertise fan-out policies.
 
 Examples
-  mbox                      # list the full descriptor table
-  mbox all                  # reset filters and show everything
-  mbox pid 3                # descriptors owned by PID 3
-  mbox shared               # globally shared mailboxes
-  mbox ns app owner 7       # app: mailboxes attributed to PID 7
-  mbox pid=0 ns shared      # host-side shared mailboxes
+--------
+
+- `mbox`                     # list the full descriptor table
+- `mbox all`                 # reset filters and show everything
+- `mbox pid 3`               # descriptors owned by PID 3
+- `mbox shared`              # globally shared mailboxes
+- `mbox ns app owner 7`      # app: mailboxes attributed to PID 7
+- `mbox pid=0 ns shared`     # host-side shared mailboxes

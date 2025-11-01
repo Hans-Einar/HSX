@@ -1,16 +1,16 @@
-stack
-=====
-
-Display the reconstructed call stack for a task.
-
-Usage::
-
-    stack <pid> [frames]
-
-Arguments:
-- ``pid``: Target task id.
-- ``frames`` (optional): Maximum number of frames to walk (default: executive setting).
-
-Shows per-frame PC/SP/FP along with symbol and source information
-when .sym data is available. Frames are truncated if the executive
-detects an invalid chain or reaches the frame limit.
+stack
+=====
+
+Display the reconstructed call stack for a task.
+
+Usage::
+
+    stack <pid> [frames]
+
+Arguments:
+- ``pid``: Target task id.
+- ``frames`` (optional): Maximum number of frames to walk (default: executive setting).
+
+Shows per-frame PC/SP/FP along with symbol and source information
+when .sym data is available. Frames are truncated if the executive
+detects an invalid chain or reaches the frame limit.

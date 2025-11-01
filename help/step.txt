@@ -1,2 +1,2 @@
-step [steps] [-p <pid>]
-Compatibility alias for `clock step`. Retires one guest instruction per step; optionally limit execution to a specific PID.
+step [steps] [-p <pid>]
+Compatibility alias for `clock step`. Retires one guest instruction per step; optionally limit execution to a specific PID.

@@ -78,6 +78,7 @@ class ExecutiveSession:
         self._disasm_supported: Optional[bool] = None
         self._symbols_supported: Optional[bool] = None
         self._memory_supported: Optional[bool] = None
+        self._watch_supported: Optional[bool] = None
 
     # ------------------------------------------------------------------ Basics
 
@@ -98,6 +99,7 @@ class ExecutiveSession:
         self._disasm_supported = None
         self._symbols_supported = None
         self._memory_supported = None
+        self._watch_supported = None
 
     # Public API --------------------------------------------------------------
 
@@ -268,6 +270,13 @@ class ExecutiveSession:
             return True
         return bool(self._memory_supported)
 
+    def supports_watch(self) -> bool:
+        if self.session_disabled:
+            return False
+        if "watch" in self.negotiated_features:
+            return True
+        return bool(self._watch_supported)
+
     def supports_symbols(self) -> bool:
         if self.session_disabled:
             return False
@@ -322,6 +331,71 @@ class ExecutiveSession:
         if not isinstance(block, dict):
             return None
         self._memory_supported = True
+        return copy.deepcopy(block)
+
+    def watch_add(
+        self,
+        pid: int,
+        expr: str,
+        *,
+        watch_type: Optional[str] = None,
+        length: Optional[int] = None,
+    ) -> Optional[JsonDict]:
+        payload: JsonDict = {"cmd": "watch", "op": "add", "pid": int(pid), "expr": str(expr)}
+        if watch_type is not None:
+            payload["type"] = str(watch_type)
+        if length is not None:
+            payload["length"] = int(length)
+        try:
+            response = self.request(payload)
+        except Exception as exc:  # pragma: no cover - transport error
+            raise ExecutiveSessionError(f"watch add failed: {exc}") from exc
+        if response.get("status") != "ok":
+            error = str(response.get("error", "watch error"))
+            if "unknown_cmd" in error or "unsupported" in error:
+                self._watch_supported = False
+                return None
+            raise ExecutiveSessionError(error)
+        block = response.get("watch")
+        if not isinstance(block, dict):
+            return None
+        self._watch_supported = True
+        return copy.deepcopy(block)
+
+    def watch_remove(self, pid: int, watch_id: int) -> Optional[JsonDict]:
+        payload: JsonDict = {"cmd": "watch", "op": "remove", "pid": int(pid), "id": int(watch_id)}
+        try:
+            response = self.request(payload)
+        except Exception as exc:  # pragma: no cover - transport error
+            raise ExecutiveSessionError(f"watch remove failed: {exc}") from exc
+        if response.get("status") != "ok":
+            error = str(response.get("error", "watch error"))
+            if "unknown_cmd" in error or "unsupported" in error:
+                self._watch_supported = False
+                return None
+            raise ExecutiveSessionError(error)
+        block = response.get("watch")
+        if not isinstance(block, dict):
+            return None
+        self._watch_supported = True
+        return copy.deepcopy(block)
+
+    def watch_list(self, pid: int) -> Optional[JsonDict]:
+        payload: JsonDict = {"cmd": "watch", "op": "list", "pid": int(pid)}
+        try:
+            response = self.request(payload)
+        except Exception as exc:  # pragma: no cover - transport error
+            raise ExecutiveSessionError(f"watch list failed: {exc}") from exc
+        if response.get("status") != "ok":
+            error = str(response.get("error", "watch error"))
+            if "unknown_cmd" in error or "unsupported" in error:
+                self._watch_supported = False
+                return None
+            raise ExecutiveSessionError(error)
+        block = response.get("watch")
+        if not isinstance(block, dict):
+            return None
+        self._watch_supported = True
         return copy.deepcopy(block)
 
     def disasm_read(

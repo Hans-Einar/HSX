@@ -169,10 +169,15 @@ Debugger Sessions & Event Streaming
        "token": "sub-934d5016",
        "max": 512,
        "retention_ms": 5000,
-       "cursor": 42
+       "cursor": 42,
+       "pending": 0,
+       "high_water": 0,
+       "drops": 0
      }
    }
    ```
+   `pending` counts events that have been delivered but not yet acknowledged, `high_water` captures the largest backlog observed for the subscription, and `drops` reports how many queue overflows have been trimmed on this connection.
+
    Then the executive streams JSON events, one per line:
    ```json
    {"seq":17,"ts":1739730951.512,"type":"debug_break","pid":2,"data":{"pc":4096,"symbol":"main.loop","reason":"BRK"}}
@@ -187,7 +192,20 @@ Debugger Sessions & Event Streaming
      "seq": 32
    }
    ```
-   Acknowledgements advance the subscriber cursor. The executive evicts events once every subscriber has ACKed past the sequence or when the retention timer expires (default 5 seconds). Clients that cannot keep up must still ACK to advertise their new high-water mark; otherwise the executive throttles delivery and eventually drops the subscription.
+   Reply:
+   ```json
+   {
+     "version": 1,
+     "status": "ok",
+     "events": {
+       "pending": 12,
+       "high_water": 80,
+       "drops": 1,
+       "last_ack": 32
+     }
+   }
+   ```
+   Acknowledgements advance the subscriber cursor. The executive evicts events once every subscriber has ACKed past the sequence or when the retention timer expires (default 5 seconds). Clients that cannot keep up must still ACK to advertise their new high-water mark; otherwise the executive emits `warning` events with reason `slow_consumer`, and if the backlog keeps growing it sends `slow_consumer_drop` before tearing the subscription down. Both warnings include the current `pending`, `high_water`, and `drops` counters so tooling can surface precise back-pressure diagnostics.
 
 4. **Unsubscribe / close**
    ```json
@@ -236,6 +254,14 @@ Memory layout
 - `memory regions <pid>` reports the segments the executive knows about for a task. The response contains a `regions` array with entries describing each segment (`name`, `type`, `start`, `end`, `length`, `permissions`), along with optional `source` (e.g. `hxe` or `vm`) and `details` metadata (such as the current stack pointer).
 - The executive derives the load-time segments (code, rodata, bss) from the HXE header captured during `load/exec`, and augments them with runtime regions reported by the VM (register window, stack allocation). Regions are clamped to the HSX 64 KiB address space.
 - Observers can invoke the command without holding the PID lock; the data is read-only.
+
+Watch expressions
+~~~~~~~~~~~~~~~~~
+
+- `watch list <pid>` returns all active watches for a task (`id`, `expr`, `type`, `address`, `length`, `value`, and optional `symbol`).
+- `watch add <pid> <expr> [--type address|symbol] [--length N]` registers a watch. Expressions default to auto-detect (parse as integer address or resolve symbol name via the loaded `.sym`). The executive samples the watch target immediately and stores the initial value.
+- `watch remove <pid> <id>` deletes a previously registered watch. Mutation commands require PID ownership via `session.open` locking.
+- Watchers monitor the specified memory region (default 4 bytes) after each VM step. When the value changes the executive emits a `watch_update` event containing the old/new hex payloads, address, length, and expression metadata.
 
 Stack reconstruction
 ~~~~~~~~~~~~~~~~~~~~
