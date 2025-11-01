@@ -115,6 +115,8 @@ Example:
 
 When present alongside the `.hxe` binary, the executive loads the `.sym` file automatically. Clients can override the path via the `sym load` RPC.
 
+> **Debugger note:** Stack reconstruction (`stack info`) assumes HSX code follows the calling convention that preserves R7 as a frame pointer and stores `[prev_fp, return_pc]` on the stack. Programs built without frame pointers (or with custom prologues) may only yield the active frame even when symbols are available.
+
 ## Relationship to Packaging
 
 - `docs/hxe_format.md` remains the canonical binary specification. This document only describes the textual/JSON artefacts emitted alongside `.hxe`.

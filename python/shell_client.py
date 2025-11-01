@@ -68,6 +68,7 @@ COMMAND_NAMES = sorted(
         "send",
         "shutdown",
         "stdio",
+        "stack",
         "sym",
         "trace",
         "step",
@@ -500,27 +501,85 @@ def _pretty_sym(payload: dict) -> None:
             print(f"  addr : 0x{addr:X} ({addr})")
         return
     print(json.dumps(payload, indent=2, sort_keys=True))
-    selected = info.get('selected_registers')
-    if isinstance(selected, dict):
-        print(f"  selected_pid: {info.get('selected_pid')}")
-        _render_register_block(selected, indent="  ")
-    scheduler = info.get('scheduler')
-    if isinstance(scheduler, dict):
-        counters = scheduler.get('counters')
-        trace = scheduler.get('trace')
-        if counters:
-            print("  scheduler counters:")
-            for pid, counts in counters.items():
-                print(f"    pid {pid}:")
-                for event, value in sorted(counts.items()):
-                    print(f"      {event:<8} : {value}")
-        if trace:
-            print("  scheduler trace (most recent first):")
-            for entry in reversed(trace):
-                pid_text = f" pid={entry['pid']}" if 'pid' in entry else ""
-                extra = {k: v for k, v in entry.items() if k not in {'event', 'ts', 'pid'}}
-                extra_text = f" {extra}" if extra else ""
-                print(f"    [{entry['event']}] ts={entry['ts']:.6f}{pid_text}{extra_text}")
+
+
+def _pretty_stack(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    stack = payload.get("stack", {})
+    frames = []
+    truncated = False
+    errors = []
+    stack_base = None
+    stack_limit = None
+    stack_low = None
+    stack_high = None
+    initial_sp = None
+    initial_fp = None
+    if isinstance(stack, dict):
+        frames = stack.get("frames") or []
+        truncated = bool(stack.get("truncated"))
+        errors = stack.get("errors") or []
+        stack_base = stack.get("stack_base")
+        stack_limit = stack.get("stack_limit")
+        stack_low = stack.get("stack_low")
+        stack_high = stack.get("stack_high")
+        initial_sp = stack.get("initial_sp")
+        initial_fp = stack.get("initial_fp")
+    print("stack:")
+    if stack_base is not None or stack_limit is not None:
+        base_text = f"0x{int(stack_base) & 0xFFFFFFFF:08X}" if stack_base is not None else "-"
+        limit_text = f"0x{int(stack_limit) & 0xFFFFFFFF:08X}" if stack_limit is not None else "-"
+        low_text = f"0x{int(stack_low) & 0xFFFFFFFF:08X}" if stack_low is not None else "-"
+        high_text = f"0x{int(stack_high) & 0xFFFFFFFF:08X}" if stack_high is not None else "-"
+        print(f"  stack_base : {base_text}  stack_limit: {limit_text}")
+        print(f"  stack_low  : {low_text}  stack_high : {high_text}")
+    if initial_sp is not None or initial_fp is not None:
+        sp_text = f"0x{int(initial_sp) & 0xFFFFFFFF:08X}" if initial_sp is not None else "-"
+        fp_text = f"0x{int(initial_fp) & 0xFFFFFFFF:08X}" if initial_fp is not None else "-"
+        print(f"  initial_sp : {sp_text}  initial_fp : {fp_text}")
+    if not frames:
+        print("  (no frames)")
+    for idx, frame in enumerate(frames):
+        frame_idx = frame.get("index", idx)
+        pc = frame.get("pc", 0) or 0
+        sp = frame.get("sp")
+        fp = frame.get("fp")
+        line = f"[{frame_idx:02}] pc=0x{pc:08X}"
+        if sp is not None:
+            line += f" sp=0x{int(sp) & 0xFFFFFFFF:08X}"
+        if fp is not None:
+            line += f" fp=0x{int(fp) & 0xFFFFFFFF:08X}"
+        symbol = frame.get("symbol")
+        if isinstance(symbol, dict):
+            name = symbol.get("name")
+            offset = symbol.get("offset")
+            if name:
+                if offset:
+                    try:
+                        off_int = int(offset)
+                        line += f" {name}+0x{off_int:X}"
+                    except (TypeError, ValueError):
+                        line += f" {name}"
+                else:
+                    line += f" {name}"
+        print(line)
+        line_info = frame.get("line")
+        if isinstance(line_info, dict):
+            src = line_info.get("file")
+            lineno = line_info.get("line")
+            if src or lineno is not None:
+                print(f"       {src or '<unknown>'}:{lineno}")
+        ret_pc = frame.get("return_pc")
+        if isinstance(ret_pc, int):
+            print(f"       return -> 0x{ret_pc & 0xFFFFFFFF:08X}")
+    if truncated:
+        print("  ... truncated ...")
+    if errors:
+        print("  errors:")
+        for item in errors:
+            print(f"    - {item}")
 
 
 def _pretty_ps(payload: dict) -> None:
@@ -993,7 +1052,7 @@ PRETTY_HANDLERS = {
     'attach': _pretty_info,
     'bp': _pretty_bp,
     'sym': _pretty_sym,
-    'sym': None,
+    'stack': _pretty_stack,
     'ps': _pretty_ps,
     'list': _pretty_list,
     'reload': _pretty_reload,
@@ -1061,7 +1120,7 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
     payload_cmd = cmd
     payload: dict[str, object] = {"cmd": payload_cmd}
 
-    if cmd in {"attach", "detach", "ps", "clock", "shutdown", "pause", "resume", "kill", "load", "exec", "reload", "list", "step", "listen", "send", "sched", "info", "peek", "poke", "dumpregs", "stdio", "mbox", "mailboxes", "mailbox_snapshot", "mailbox_open", "mailbox_close", "mailbox_bind", "mailbox_send", "mailbox_recv", "mailbox_peek", "mailbox_tap", "dbg"}:
+    if cmd in {"attach", "detach", "ps", "clock", "shutdown", "pause", "resume", "kill", "load", "exec", "reload", "list", "step", "listen", "send", "sched", "info", "peek", "poke", "dumpregs", "stdio", "mbox", "mailboxes", "mailbox_snapshot", "mailbox_open", "mailbox_close", "mailbox_bind", "mailbox_send", "mailbox_recv", "mailbox_peek", "mailbox_tap", "dbg", "stack"}:
         pass
 
     if cmd == "info":
@@ -1071,6 +1130,15 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
 
     if cmd == "bp":
         return _build_bp_payload(args)
+    if cmd == "sym":
+        return _build_sym_payload(args)
+    if cmd == "stack":
+        if not args:
+            raise ValueError("stack requires <pid> [frames]")
+        payload["pid"] = int(args[0], 0)
+        if len(args) > 1:
+            payload["max"] = int(args[1], 0)
+        return payload
 
     if cmd == "dbg":
         if not args:

@@ -110,7 +110,7 @@ Design specifies .sym JSON file loading and caching at task load time (section 5
 - [x] Add symbol lookup by address (for stack frames)
 - [x] Add symbol lookup by name (for watch expressions)
 - [x] Add symbol file path configuration (default: same dir as HXE + .sym extension)
-- [ ] Handle missing symbol files gracefully (no crash, just no symbols)
+- [x] Handle missing symbol files gracefully (no crash, just no symbols)
 - [x] Add symbol loading tests (valid/invalid format, lookup tests)
 - [x] Document .sym file format in `docs/` directory
 
@@ -126,16 +126,16 @@ Design specifies .sym JSON file loading and caching at task load time (section 5
 Design specifies stack.info API with frame pointer walking and symbol lookup (section 5.3). Critical for debugger stack traces.
 
 **Todo:**
-- [ ] Implement `stack.info(pid, max_frames)` RPC command
-- [ ] Design stack frame structure (pc, sp, fp, func_name, func_addr, line_num)
-- [ ] Implement frame pointer walking algorithm
-- [ ] Use VM register access APIs to read SP, FP, PC
-- [ ] Read memory to walk frame chain
-- [ ] Map addresses to function names using symbol table
-- [ ] Handle stack walk termination (null FP, max frames, invalid address)
-- [ ] Add error handling for corrupted stacks
-- [ ] Add stack reconstruction tests (normal calls, deep stacks, no symbols)
-- [ ] Update `docs/executive_protocol.md` with stack.info API
+- [x] Implement `stack.info(pid, max_frames)` RPC command
+- [x] Design stack frame structure (pc, sp, fp, func_name, func_addr, line_num)
+- [x] Implement frame pointer walking algorithm
+- [x] Use VM register access APIs to read SP, FP, PC
+- [x] Read memory to walk frame chain
+- [x] Map addresses to function names using symbol table
+- [x] Handle stack walk termination (null FP, max frames, invalid address)
+- [x] Add error handling for corrupted stacks
+- [x] Add stack reconstruction tests (normal calls, deep stacks, no symbols)
+- [x] Update `docs/executive_protocol.md` with stack.info API
 
 ---
 

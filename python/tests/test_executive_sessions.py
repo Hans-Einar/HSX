@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Dict, List
 
 import pytest
 
@@ -173,9 +174,14 @@ class DebugVM:
         self.requests: list[dict] = []
         self.attach_calls = 0
         self.pc = 0
+        self.sp = 0x2000
+        self.fp = 0
         self.step_delta = 0x10
         self.step_calls = 0
         self.paused = False
+        self.regs_list: List[int] = [0] * 16
+        self.regs_list[7] = self.fp
+        self.memory: Dict[int, int] = {}
 
     def request(self, payload: dict) -> dict:
         self.requests.append(payload)
@@ -208,14 +214,24 @@ class DebugVM:
 
     def ps(self) -> dict:
         state = "paused" if self.paused else "running"
-        return {"tasks": [{"pid": 1, "state": state}], "current_pid": 1}
+        return {"tasks": {"tasks": [{"pid": 1, "state": state, "program": ""}], "current_pid": 1}}
 
     def info(self, pid: int | None = None) -> dict:
         state = "paused" if self.paused else "running"
-        return {"tasks": {"tasks": [{"pid": 1, "state": state}], "current_pid": 1}}
+        return {"tasks": {"tasks": [{"pid": 1, "state": state, "stack_base": 0, "stack_limit": 0}], "current_pid": 1}}
 
     def read_regs(self, pid: int | None = None) -> dict:
-        return {"pc": self.pc}
+        return {
+            "pc": self.pc,
+            "regs": list(self.regs_list),
+            "sp": self.sp,
+            "fp": self.fp,
+            "stack_base": 0x8000,
+            "stack_size": 0x1000,
+            "stack_limit": 0x8000,
+            "sp_effective": self.sp,
+            "context": {"state": "paused" if self.paused else "running"},
+        }
 
     def pause(self, pid: int | None = None) -> None:
         self.paused = True
@@ -227,13 +243,23 @@ class DebugVM:
         self.step_calls += 1
         self.paused = False
         self.pc = (self.pc + self.step_delta) & 0xFFFF
+        self.regs_list[7] = self.fp & 0xFFFFFFFF
         return {"executed": 1 if steps is not None else 0, "running": True, "current_pid": pid, "paused": False}
+
+    def read_mem(self, addr: int, length: int, pid: int | None = None) -> bytes:
+        return bytes(self.memory.get((addr + i) & 0xFFFFFFFF, 0) for i in range(length))
 
 
 def make_debug_state() -> tuple[ExecutiveState, DebugVM]:
     vm = DebugVM()
     state = ExecutiveState(vm)
-    state.tasks[1] = {'pid': 1}
+    state.tasks[1] = {
+        'pid': 1,
+        'state': 'running',
+        'stack_base': 0x8000,
+        'stack_size': 0x1000,
+        'stack_limit': 0x8000,
+    }
     return state, vm
 
 
@@ -317,4 +343,105 @@ def test_step_hits_breakpoint_post_phase():
     assert any(evt['data'].get('phase') == 'post' for evt in events)
     assert result['paused'] is True
     assert result['running'] is False
+
+
+def _write_word(vm: DebugVM, addr: int, value: int) -> None:
+    for i in range(4):
+        vm.memory[(addr + i) & 0xFFFFFFFF] = (value >> (8 * i)) & 0xFF
+
+
+def _seed_symbol_table(state: ExecutiveState, pid: int, entries: list[tuple[str, int, int]]) -> None:
+    symbols = [{"name": name, "address": addr, "size": size, "type": "function"} for name, addr, size in entries]
+    addresses = [{"name": item["name"], "address": item["address"], "size": item["size"], "type": item["type"]} for item in symbols]
+    lines = [{"address": addr, "file": "prog.c", "line": 10 + idx * 5} for idx, (_, addr, _) in enumerate(entries)]
+    table = {
+        "path": "test.sym",
+        "symbols": symbols,
+        "addresses": addresses,
+        "by_name": {item["name"]: item for item in symbols},
+        "lines": lines,
+    }
+    with state.symbol_cache_lock:
+        state.symbol_tables[pid] = table
+
+
+def test_stack_info_two_frames_with_symbols():
+    state, vm = make_debug_state()
+    vm.pc = 0x1000
+    vm.sp = 0x8FE8
+    vm.fp = 0x8FF0
+    vm.regs_list[7] = vm.fp
+    _write_word(vm, 0x8FF0, 0x8FE0)
+    _write_word(vm, 0x8FF4, 0x1100)
+    _write_word(vm, 0x8FE0, 0x0000)
+    _write_word(vm, 0x8FE4, 0x0000)
+    _seed_symbol_table(state, 1, [("func_main", 0x1000, 16), ("func_caller", 0x1100, 32)])
+
+    stack = state.stack_info(1, max_frames=4)
+    frames = stack["frames"]
+    assert stack["truncated"] is False
+    assert stack["errors"] == []
+    assert stack["initial_sp"] == 0x8FE8
+    assert stack["initial_fp"] == 0x8FF0
+    assert len(frames) == 2
+
+    frame0 = frames[0]
+    assert frame0["pc"] == 0x1000
+    assert frame0["sp"] == 0x8FE8
+    assert frame0["fp"] == 0x8FF0
+    assert frame0["return_pc"] == 0x1100
+    assert frame0.get("func_name") == "func_main"
+    assert frame0.get("func_addr") == 0x1000
+    assert frame0.get("func_offset") == 0
+    assert frame0.get("line_num") == 10
+
+    frame1 = frames[1]
+    assert frame1["pc"] == 0x1100
+    assert frame1["fp"] == 0x8FE0
+    assert frame1.get("func_name") == "func_caller"
+    assert frame1.get("return_pc") == 0
+
+
+def test_stack_info_detects_fp_cycle():
+    state, vm = make_debug_state()
+    vm.pc = 0x2000
+    vm.sp = 0x8FD0
+    vm.fp = 0x8FE0
+    vm.regs_list[7] = vm.fp
+    _write_word(vm, 0x8FE0, 0x8FE0)
+    _write_word(vm, 0x8FE4, 0x2100)
+
+    stack = state.stack_info(1, max_frames=4)
+    assert stack["truncated"] is True
+    assert any(err.startswith("fp_cycle") for err in stack["errors"])
+    frames = stack["frames"]
+    assert frames[0]["pc"] == 0x2000
+    assert "return_pc" in frames[0]
+
+
+def test_stack_info_reports_read_error():
+    state, vm = make_debug_state()
+    vm.pc = 0x3000
+    vm.sp = 0x8FC0
+    vm.fp = 0x8FD0
+    vm.regs_list[7] = vm.fp
+    _write_word(vm, 0x8FD0, 0x8FC0)
+    _write_word(vm, 0x8FD4, 0x3100)
+
+    original_read = vm.read_mem
+
+    def failing_read(addr: int, length: int, pid: int | None = None) -> bytes:
+        if addr == 0x8FC0:
+            raise RuntimeError("boom")
+        return original_read(addr, length, pid)
+
+    vm.read_mem = failing_read  # type: ignore[assignment]
+
+    stack = state.stack_info(1, max_frames=4)
+    assert stack["truncated"] is True
+    assert any(err.startswith("stack_read_failed") for err in stack["errors"])
+    frames = stack["frames"]
+    assert len(frames) == 2
+    assert frames[0]["return_pc"] == 0x3100
+    assert frames[1]["return_pc"] is None
 

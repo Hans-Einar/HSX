@@ -120,3 +120,22 @@ Start new sections chronologically. Keep notes concise but actionable so the nex
   - `python -m pytest python/tests/test_executive_sessions.py` → PASS
 - Follow-up actions / hand-off notes.
   - Integrate symbol lookups into future TUI/IDE debugger features (stack traces, watch panes).
+
+## 2025-11-01 - Codex (Session 6)
+
+### Focus
+- Task(s) tackled: Phase 1.5 stack reconstruction (`stack.info` RPC, CLI wiring, docs) plus auto-load warnings for missing symbols.
+- Dependencies touched: `python/execd.py`, `python/shell_client.py`, `python/tests/test_executive_sessions.py`, `docs/executive_protocol.md`, `docs/asm.md`, `help/stack.txt`.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions.
+  - Hardened `ExecutiveState.stack_info` with ABI-aware frame walking, error diagnostics, and metadata (func/line/return_pc) while surfacing warnings when symbol auto-load fails.
+  - Added stack RPC/CLI plumbing (`stack <pid> [frames]`), pretty-printer updates, and a dedicated help topic; stack prerequisites called out in `docs/asm.md` plus protocol documentation.
+  - Expanded test coverage for stack reconstruction (multi-frame walk, FP cycle detection, read failures) under `python/tests/test_executive_sessions.py`.
+- Tests run (commands + result).
+  - `/mnt/c/Windows/py.exe -3.14 -m pytest python/tests/test_executive_sessions.py` → PASS
+- Follow-up actions / hand-off notes.
+  - Expose stack helper via higher-level client APIs (ExecutiveSession consumers) and feed frames into downstream debugger UIs once available.

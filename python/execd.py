@@ -119,6 +119,7 @@ class ExecutiveState:
         self.event_retention_ms = 5000
         self.symbol_tables: Dict[int, Dict[str, Any]] = {}
         self.symbol_cache_lock = threading.RLock()
+        self.default_stack_frames = 16
 
     def _normalise_pid_list(self, pid_lock: Any) -> List[int]:
         if pid_lock is None:
@@ -444,6 +445,27 @@ class ExecutiveState:
             return self._handle_breakpoint_hit(target_pid, pc, phase="post")
         return None
 
+    def _read_stack_words(self, pid: int, address: int, count: int) -> Optional[List[int]]:
+        length = max(0, count) * 4
+        if length == 0:
+            return []
+        try:
+            with self.lock:
+                raw = self.vm.read_mem(address, length, pid=pid)
+        except Exception as exc:
+            self.log("error", "stack_read_failed", pid=pid, address=address, error=str(exc))
+            return None
+        if isinstance(raw, str):
+            try:
+                raw = bytes.fromhex(raw)
+            except ValueError:
+                raw = raw.encode("utf-8", errors="ignore")
+        if not isinstance(raw, (bytes, bytearray)):
+            return None
+        if len(raw) < length:
+            raw = raw.ljust(length, b"\x00")
+        return [int.from_bytes(raw[i * 4:(i + 1) * 4], "little") for i in range(count)]
+
     def _resolve_symbol_path(self, pid: int, *, program: Optional[str], override: Optional[str]) -> Optional[Path]:
         if override:
             candidate = Path(override)
@@ -643,6 +665,163 @@ class ExecutiveState:
             if idx < 0:
                 return None
             return dict(lines[idx])
+
+    def stack_info(self, pid: int, *, max_frames: Optional[int] = None) -> Dict[str, Any]:
+        self.get_task(pid)
+        regs = self.request_dump_regs(pid)
+        frames: List[Dict[str, Any]] = []
+        max_frames = max_frames or self.default_stack_frames
+        try:
+            max_frames = max(1, min(int(max_frames), 64))
+        except (TypeError, ValueError):
+            max_frames = self.default_stack_frames
+
+        errors: List[str] = []
+
+        def _coerce_ptr(name: str, value: Any) -> Optional[int]:
+            if value is None:
+                return None
+            try:
+                return int(value) & 0xFFFFFFFF
+            except (TypeError, ValueError):
+                errors.append(f"invalid_{name}")
+                return None
+
+        stack_base = _coerce_ptr("stack_base", regs.get("stack_base")) or 0
+        stack_size_raw = regs.get("stack_size", 0) or 0
+        try:
+            stack_size = int(stack_size_raw)
+        except (TypeError, ValueError):
+            errors.append("invalid_stack_size")
+            stack_size = 0
+        stack_limit = _coerce_ptr("stack_limit", regs.get("stack_limit")) or stack_base
+        stack_low = min(stack_base, stack_limit)
+        if stack_size > 0:
+            stack_high = stack_base + stack_size
+        else:
+            stack_high = stack_low + 0x10000
+
+        def _in_stack_range(ptr: Optional[int], *, allow_high: bool = False) -> bool:
+            if ptr is None:
+                return False
+            if stack_low <= ptr < stack_high:
+                return True
+            if allow_high and ptr == stack_high:
+                return True
+            return False
+
+        current_pc = _coerce_ptr("pc", regs.get("pc")) or 0
+        sp_effective = _coerce_ptr("sp_effective", regs.get("sp_effective"))
+        if sp_effective is None:
+            sp_raw = _coerce_ptr("sp", regs.get("sp")) or 0
+            if stack_base:
+                sp_effective = (stack_base + (sp_raw & 0xFFFF)) & 0xFFFFFFFF
+            else:
+                sp_effective = sp_raw
+        current_sp = sp_effective or 0
+        start_sp = current_sp
+        if not _in_stack_range(current_sp, allow_high=True):
+            errors.append(f"sp_out_of_range:0x{current_sp:08X}")
+
+        fp_candidates = [
+            ("fp", regs.get("fp")),
+            ("frame_pointer", regs.get("frame_pointer")),
+            ("r7", regs.get("r7")),
+            ("R7", regs.get("R7")),
+        ]
+        regs_block = regs.get("regs")
+        if isinstance(regs_block, list) and len(regs_block) > 7:
+            fp_candidates.append(("regs7", regs_block[7]))
+        fp: Optional[int] = None
+        for name, value in fp_candidates:
+            fp = _coerce_ptr(name, value)
+            if fp is not None:
+                break
+
+        initial_fp = fp
+        if fp is not None and not _in_stack_range(fp):
+            errors.append(f"fp_out_of_range:0x{fp:08X}")
+
+        truncated = False
+        seen_fps: set[int] = set()
+
+        for depth in range(max_frames):
+            frame_entry: Dict[str, Any] = {
+                "index": depth,
+                "pc": current_pc,
+                "sp": current_sp,
+                "fp": fp,
+                "return_pc": None,
+            }
+            symbol = self.symbol_lookup_addr(pid, current_pc)
+            if symbol:
+                frame_entry["symbol"] = symbol
+                frame_entry["func_name"] = symbol.get("name")
+                frame_entry["func_addr"] = symbol.get("address")
+                if symbol.get("offset") is not None:
+                    frame_entry["func_offset"] = symbol.get("offset")
+            line = self.symbol_lookup_line(pid, current_pc)
+            if line:
+                frame_entry["line"] = line
+                if line.get("line") is not None:
+                    frame_entry["line_num"] = line.get("line")
+            frames.append(frame_entry)
+
+            if fp is None or fp == 0:
+                break
+            if fp in seen_fps:
+                errors.append(f"fp_cycle:0x{fp:08X}")
+                truncated = True
+                break
+            seen_fps.add(fp)
+            if fp % 4 != 0:
+                errors.append(f"fp_unaligned:0x{fp:08X}")
+                truncated = True
+                break
+            if not _in_stack_range(fp, allow_high=False):
+                errors.append(f"fp_out_of_range:0x{fp:08X}")
+                truncated = True
+                break
+            if fp + 8 > stack_high:
+                errors.append(f"fp_frame_overflow:0x{fp:08X}")
+                truncated = True
+                break
+
+            words = self._read_stack_words(pid, fp, 2)
+            if not words or len(words) < 2:
+                errors.append(f"stack_read_failed:0x{fp:08X}")
+                truncated = True
+                break
+            prev_fp, return_pc = words
+            prev_fp &= 0xFFFFFFFF
+            return_pc &= 0xFFFFFFFF
+            frame_entry["return_pc"] = return_pc
+            if prev_fp == 0 and return_pc == 0:
+                break
+            current_sp = (fp + 8) & 0xFFFFFFFF
+            current_pc = return_pc
+            fp = prev_fp if prev_fp != 0 else None
+            if fp is not None and not _in_stack_range(fp, allow_high=False):
+                errors.append(f"fp_out_of_range:0x{fp:08X}")
+                fp = None
+                truncated = True
+                break
+        else:
+            truncated = True
+            errors.append("frame_limit_reached")
+
+        return {
+            "pid": pid,
+            "frames": frames,
+            "truncated": truncated,
+            "errors": errors,
+            "stack_base": stack_base,
+            "stack_limit": stack_limit,
+            "stack_low": stack_low,
+            "stack_high": stack_high,
+            "initial_sp": start_sp,
+            "initial_fp": initial_fp,
+        }
 
     def _next_event_seq(self) -> int:
         with self.event_lock:
@@ -943,10 +1122,23 @@ class ExecutiveState:
         info = self.vm.load(str(program_path), verbose=verbose)
         self._refresh_tasks()
         pid = info.get("pid")
+        symbol_status: Optional[Dict[str, Any]] = None
         if pid is not None:
             task = self.tasks.get(pid, {})
             program = task.get("program") or info.get("program") or str(program_path)
-            self.load_symbols_for_pid(pid, program=program, override=symbols)
+            symbol_status = self.load_symbols_for_pid(pid, program=program, override=symbols)
+        if symbol_status is not None:
+            info["symbols"] = symbol_status
+            if not symbol_status.get("loaded"):
+                warnings = info.setdefault("warnings", [])
+                error_text = symbol_status.get("error")
+                path_text = symbol_status.get("path")
+                if error_text:
+                    warnings.append(f"symbols_failed:{error_text}")
+                elif path_text:
+                    warnings.append(f"symbols_missing:{path_text}")
+                else:
+                    warnings.append("symbols_unavailable")
         return info
 
     def step(self, steps: Optional[int] = None, *, pid: Optional[int] = None, source: str = "manual") -> Dict[str, Any]:
@@ -1842,6 +2034,24 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                     info = self.state.breakpoint_clear_all(pid_int)
                     return {"version": 1, "status": "ok", "pid": pid_int, "breakpoints": info.get("breakpoints", [])}
                 raise ValueError(f"unknown bp op '{op}'")
+            if cmd == "stack":
+                op_value = request.get("op")
+                op = str(op_value or "info").lower()
+                pid_value = request.get("pid")
+                if pid_value is None:
+                    raise ValueError("stack requires 'pid'")
+                pid_int = int(pid_value)
+                max_value = request.get("max") or request.get("limit") or request.get("frames")
+                max_frames = None
+                if max_value is not None:
+                    try:
+                        max_frames = int(max_value)
+                    except (TypeError, ValueError) as exc:
+                        raise ValueError("stack max must be integer") from exc
+                if op in {"info", "list"}:
+                    info = self.state.stack_info(pid_int, max_frames=max_frames)
+                    return {"version": 1, "status": "ok", "stack": info}
+                raise ValueError(f"unknown stack op '{op}'")
             if cmd == "sym":
                 op = str(request.get("op") or "info").lower()
                 pid_value = request.get("pid")

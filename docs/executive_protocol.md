@@ -41,6 +41,7 @@ Core Commands
 | `trace` | `{ "version": 1, "cmd": "trace", "pid": 1, "mode": "on" }` | `{ "version": 1, "status": "ok", "trace": { "pid": 1, "enabled": true } }` | Enable or disable instruction tracing for a task (`mode` optional to toggle). |
 | `bp` | `{ "version": 1, "cmd": "bp", "op": "set", "pid": 1, "addr": 4096 }` | `{ "version": 1, "status": "ok", "pid": 1, "breakpoints": [4096] }` | Manage per-task breakpoints (`op`: `list`/`set`/`clear`/`clear_all`). |
 | `sym` | `{ "version": 1, "cmd": "sym", "op": "addr", "pid": 1, "address": 4096 }` | `{ "version": 1, "status": "ok", "symbol": { ... } }` | Symbol table helpers (`op`: `info`/`addr`/`name`/`line`/`load`). |
+| `stack` | `{ "version": 1, "cmd": "stack", "pid": 1 [, "max": 8] }` | `{ "version": 1, "status": "ok", "stack": { ... } }` | Reconstructs the PID stack (`max` frames; defaults to executive limit). |
 | `pause` | `{ "version": 1, "cmd": "pause", "pid": 1 }` | `{ "version": 1, "status": "ok", "task": { ... } }` | Pauses the specified task (global pause if `pid` omitted). |
 | `resume` | `{ "version": 1, "cmd": "resume", "pid": 1 }` | `{ "version": 1, "status": "ok", "task": { ... } }` | Resumes the specified task (global resume if `pid` omitted). |
 | `kill` | `{ "version": 1, "cmd": "kill", "pid": 1 }` | `{ "version": 1, "status": "ok", "task": { ... } }` | Stops auto loop, resets VM, removes task. |
@@ -219,6 +220,44 @@ Symbol lookup
 - `sym name <pid> <symbol>` returns symbol metadata by name; `sym line` maps addresses to source lines (when present).
 - `sym load <pid> <path>` reloads symbols from an explicit file. By default the executive loads `<program>.sym` from the same directory as the HXE image after `load/exec`.
 - Symbol operations are read-only for observers; `sym load` requires PID ownership so that debugger sessions do not clobber each other's settings.
+
+Stack reconstruction
+~~~~~~~~~~~~~~~~~~~~
+
+- `stack info <pid> [frames]` walks the saved frame pointers for the task and returns the frames still resident on the stack. The optional `frames` (RPC field `max`) clamps the number of frames to decode; the executive enforces an upper bound of 64 frames.
+- Each response contains:
+  ```json
+  {
+    "pid": 1,
+    "frames": [
+      {
+        "index": 0,
+        "pc": 4096,
+        "sp": 32752,
+        "fp": 32760,
+        "return_pc": 4176,
+        "func_name": "main",
+        "func_addr": 4096,
+        "func_offset": 0,
+        "line_num": 42,
+        "symbol": { "...": "..." },
+        "line": { "...": "..." }
+      }
+    ],
+    "truncated": false,
+    "errors": [],
+    "stack_base": 32768,
+    "stack_limit": 32768,
+    "stack_low": 32768,
+    "stack_high": 36864,
+    "initial_sp": 32752,
+    "initial_fp": 32760
+  }
+  ```
+- `frames[*].symbol` echoes the resolved symbol entry (when a `.sym` table is available). `func_name`, `func_addr`, and `func_offset` are promoted from this entry for convenience, and `line` / `line_num` are filled when line mappings exist.
+- `return_pc` is the caller instruction pointer recovered from the stack. Leaf frames with no saved return PC leave this field `null`.
+- `errors` accumulates diagnostics when the executive aborts a walk early (e.g. unaligned frame pointer, out-of-range stack address, failed memory read, or a detected FP cycle). `truncated: true` indicates the walk terminated prematurely due to these errors or because the frame limit was reached.
+- The current implementation assumes tasks follow the HSX ABI convention that uses R7 as the frame pointer and stores `[prev_fp, return_pc]` at `fp`. Tasks compiled without frame pointers may report a single frame containing the current program counter.
 
 ### Event object schema
 
