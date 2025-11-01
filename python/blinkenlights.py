@@ -178,6 +178,7 @@ class BlinkenlightsApp:
         self.task_regs: Dict[int, Dict[str, object]] = {}
         self.task_stacks: Dict[int, Dict[str, object]] = {}
         self.stack_state: Dict[int, Dict[str, object]] = {}
+        self._stack_click_targets: List[Tuple[pygame.Rect, int, int]] = []
         self.global_buttons: List[Button] = []
         self.sidebar_surface = pygame.Surface((self.SIDEBAR_WIDTH, self.screen.get_height()))
         self.status_message: str = ""
@@ -290,11 +291,12 @@ class BlinkenlightsApp:
         return "Refresh queued"
 
     def toggle_stack(self, pid: int) -> str:
-        state = self.stack_state.setdefault(pid, {"expanded": False, "offset": 0})
+        state = self.stack_state.setdefault(pid, {"expanded": False, "offset": 0, "selected": 0})
         expanded = bool(state.get("expanded"))
         if expanded:
             state["expanded"] = False
             state["offset"] = 0
+            state["selected"] = 0
             self.last_poll = 0
             return f"Stack collapsed for pid {pid}"
         try:
@@ -305,6 +307,7 @@ class BlinkenlightsApp:
             self.task_stacks[pid] = info
         state["expanded"] = True
         state["offset"] = 0
+        state["selected"] = 0
         self.last_poll = 0
         return f"Stack expanded for pid {pid}"
 
@@ -327,9 +330,38 @@ class BlinkenlightsApp:
                 return "End of captured stack"
             return "Stack unchanged"
         state["offset"] = target
+        selected = int(state.get("selected", 0))
+        if selected < target:
+            state["selected"] = target
+        elif selected >= target + self.STACK_DETAIL_COUNT:
+            state["selected"] = min(target + self.STACK_DETAIL_COUNT - 1, len(frames) - 1)
         self.last_poll = 0
         direction = "up" if delta < 0 else "down"
         return f"Stack scrolled {direction} (offset {target})"
+
+    def select_stack_frame(self, pid: int, frame_idx: int) -> str:
+        state = self.stack_state.setdefault(pid, {"expanded": False, "offset": 0, "selected": 0})
+        frames = self.task_stacks.get(pid, {}).get("frames") or []
+        if not state.get("expanded"):
+            message = self.toggle_stack(pid)
+            if not state.get("expanded"):
+                return message or "Stack unavailable"
+            frames = self.task_stacks.get(pid, {}).get("frames") or []
+            if not frames:
+                return "Stack unavailable"
+        if not frames:
+            return "Stack unavailable"
+        frame_idx = max(0, min(int(frame_idx), len(frames) - 1))
+        state["selected"] = frame_idx
+        offset = int(state.get("offset", 0))
+        if frame_idx < offset:
+            offset = frame_idx
+        elif frame_idx >= offset + self.STACK_DETAIL_COUNT:
+            offset = max(0, frame_idx - self.STACK_DETAIL_COUNT + 1)
+        max_offset = max(0, len(frames) - self.STACK_DETAIL_COUNT)
+        state["offset"] = max(0, min(offset, max_offset))
+        self.last_poll = 0
+        return f"Stack frame {frame_idx} selected"
 
     def fetch_state(self) -> None:
         try:
@@ -342,7 +374,7 @@ class BlinkenlightsApp:
                 if pid < 0:
                     continue
                 visible_pids.add(pid)
-                state = self.stack_state.setdefault(pid, {"expanded": False, "offset": 0})
+                state = self.stack_state.setdefault(pid, {"expanded": False, "offset": 0, "selected": 0})
                 try:
                     regs_map[pid] = self.rpc.dumpregs(pid)
                 except RuntimeError:
@@ -360,11 +392,17 @@ class BlinkenlightsApp:
                     if frames:
                         max_offset = max(0, len(frames) - self.STACK_DETAIL_COUNT)
                         state["offset"] = max(0, min(int(state.get("offset", 0)), max_offset))
+                        selected = int(state.get("selected", 0))
+                        if selected >= len(frames):
+                            selected = len(frames) - 1
+                        state["selected"] = max(0, selected)
                     else:
                         state["offset"] = 0
+                        state["selected"] = 0
                 elif pid in self.task_stacks:
                     stacks_map[pid] = self.task_stacks[pid]
                     state["offset"] = 0
+                    state["selected"] = 0
             self.tasks = tasks
             self.task_regs = regs_map
             self.task_stacks = stacks_map
@@ -412,7 +450,7 @@ class BlinkenlightsApp:
                     self.draw_register(task_area, box.x + 12, box.y + 60 + idx * 10, idx, int(value))
             self.draw_stack(task_area, box, pid)
 
-            state = self.stack_state.get(pid, {"expanded": False, "offset": 0})
+            state = self.stack_state.get(pid, {"expanded": False, "offset": 0, "selected": 0})
             expanded = bool(state.get("expanded"))
             stack_frames = self.task_stacks.get(pid, {}).get("frames") or []
             stack_button_label = "Stack+" if not expanded else "Stack-"
@@ -460,7 +498,7 @@ class BlinkenlightsApp:
         self._task_buttons.append((rect.move(self.SIDEBAR_WIDTH, 0), label, action))
 
     def draw_stack(self, surface: pygame.Surface, box: pygame.Rect, pid: int) -> None:
-        state = self.stack_state.setdefault(pid, {"expanded": False, "offset": 0})
+        state = self.stack_state.setdefault(pid, {"expanded": False, "offset": 0, "selected": 0})
         stack = self.task_stacks.get(pid)
         stack_x = box.x + 210
         stack_y = box.y + 60
@@ -489,6 +527,10 @@ class BlinkenlightsApp:
             state["offset"] = offset
         frames_slice = frames[offset: offset + max_visible]
         y_cursor = stack_y
+        selected_idx = int(state.get("selected", 0))
+        if selected_idx < 0 or selected_idx >= len(frames):
+            selected_idx = 0
+            state["selected"] = selected_idx
 
         for local_idx, frame in enumerate(frames_slice):
             actual_idx = offset + local_idx
@@ -505,10 +547,15 @@ class BlinkenlightsApp:
                 func_label = f"{func}+0x{offset_val:X}"
             else:
                 func_label = func
+            line_top = y_cursor
             primary_line = f"[{actual_idx:02}] {func_label} @ 0x{pc & 0xFFFF:04X}"
-            primary_color = (255, 220, 160) if actual_idx == 0 else (210, 210, 220)
+            highlight = actual_idx == selected_idx
+            primary_color = (255, 240, 200) if highlight else ((255, 220, 160) if actual_idx == 0 else (210, 210, 220))
             primary_render = self.small_font.render(primary_line, True, primary_color)
             surface.blit(primary_render, (stack_x, y_cursor))
+            clickable_width = max(120, box.right - stack_x - 12)
+            line_rect = pygame.Rect(stack_x, line_top, clickable_width, line_height)
+            self._stack_click_targets.append((line_rect, pid, actual_idx))
             y_cursor += line_height
 
             if expanded:
@@ -549,6 +596,22 @@ class BlinkenlightsApp:
             range_text = f"Showing {offset + 1}-{offset + len(frames_slice)} of {len(frames)}"
             range_render = self.small_font.render(range_text, True, (190, 200, 215))
             surface.blit(range_render, (stack_x, y_cursor))
+            y_cursor += line_height
+        if expanded and frames:
+            selected_frame = frames[selected_idx]
+            summary_parts = []
+            sp_val = selected_frame.get("sp")
+            fp_val = selected_frame.get("fp")
+            if isinstance(sp_val, int):
+                summary_parts.append(f"sp=0x{sp_val & 0xFFFFFFFF:08X}")
+            if isinstance(fp_val, int):
+                summary_parts.append(f"fp=0x{fp_val & 0xFFFFFFFF:08X}")
+            ret_pc = selected_frame.get("return_pc")
+            if isinstance(ret_pc, int) and ret_pc:
+                summary_parts.append(f"ret=0x{ret_pc & 0xFFFF:04X}")
+            if summary_parts:
+                selected_render = self.small_font.render(f"Selected frame: {'; '.join(summary_parts)}", True, (215, 225, 200))
+                surface.blit(selected_render, (stack_x, y_cursor))
 
     def run(self) -> None:
         while self.running:
@@ -559,6 +622,7 @@ class BlinkenlightsApp:
             if self.status_message and now - self.status_timestamp > 5.0:
                 self.status_message = ""
             self._task_buttons: List[Tuple[pygame.Rect, str, object]] = []
+            self._stack_click_targets = []
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
@@ -583,6 +647,7 @@ class BlinkenlightsApp:
                 if button.handle(pos):
                     break
         else:
+            handled = False
             for rect, label, cb in self._task_buttons:
                 if rect.collidepoint(pos):
                     try:
@@ -594,7 +659,16 @@ class BlinkenlightsApp:
                     except RuntimeError as exc:
                         self.set_status(f"{label} failed: {exc}")
                     self.manual_refresh()
+                    handled = True
                     break
+            if not handled:
+                for rect, pid, frame_idx in self._stack_click_targets:
+                    if rect.collidepoint(pos):
+                        message = self.select_stack_frame(pid, frame_idx)
+                        if message:
+                            self.set_status(message)
+                        self.manual_refresh()
+                        break
 
     def set_status(self, message: str) -> None:
         self.status_message = str(message)
