@@ -289,24 +289,44 @@ Executive must provide scheduler primitives for blocking/unblocking PIDs and eve
 ### 08--HAL
 
 **Status:** 🔴 Not Started  
-**Priority:** P1 (High - hardware abstraction)  
-**Implementation Plan:** [08--HAL/02--ImplementationPlan.md](./08--HAL/02--ImplementationPlan.md) *(To be created)*
+**Priority:** P1 (High - hardware abstraction foundation, blocks Provisioning)  
+**Implementation Plan:** [08--HAL/02--ImplementationPlan.md](./08--HAL/02--ImplementationPlan.md)
 
 **Dependencies:**
-- **Requires:** VM Phase 2 (C port)
-- **Requires:** Executive (event system)
+- **Requires:** VM Phase 1.2 (syscall dispatching infrastructure)
+- **Requires:** Executive Phase 2 (event streaming, mailbox emission)
+- **Requires:** Executive Phase 4 (scheduler for sleep/wake integration)
+- **Requires:** Toolchain Phase 2 (C library build support for `libhsx_hal.a`)
+- **Requires:** VM Phase 2 (C port) - for embedded drivers in Phase 8
+- **Requires:** Executive Phase 6 (C port) - for embedded drivers in Phase 8
 
 **Provides To:**
-- Embedded targets: Hardware abstraction layer
-- VM: Platform-specific primitives
+- Provisioning: Transport layer (CAN, UART, FS) for firmware loading
+- ValCmd: FRAM persistence for value storage
+- All modules: Hardware abstraction (UART stdio, timers, persistent storage)
+- Executive: Stdio redirection, hardware event emission
+- Standalone VM: Lightweight HAL shim for single-program deployments
 
-**Current Phase:** Not Started
+**Blocks:**
+- Provisioning Phase 5 (HAL transport bindings - requires CAN, UART, FS HAL)
+- ValCmd Phase 6 (Persistence - requires FRAM HAL)
+- Executive stdio redirection (requires UART HAL)
+
+**Current Phase:** Phase 1 (Executive-Space Foundation - UART Module)
 
 **Completion Criteria:**
-- [ ] HAL interface defined
-- [ ] Platform implementations (STM32, etc.)
-- [ ] Integration with C port
-- [ ] HAL tests on target hardware
+- [ ] Python mock drivers for all 6 peripherals (UART, CAN, Timer, FRAM, FS, GPIO)
+- [ ] Executive-space syscall dispatching for modules 0x10-0x15
+- [ ] Mailbox event emission for async events (UART RX, CAN RX, GPIO interrupts, Timer expiry)
+- [ ] User-space library `libhsx_hal.a` with callback mechanisms
+- [ ] HAL capability discovery via `HAL_GET_CAPS` syscall
+- [ ] Standalone VM HAL shim for deployments without executive
+- [ ] C embedded drivers for AVR/STM32/ARM targets
+- [ ] ISR-driven event handling with <100µs latency
+- [ ] Executive integration (provisioning transports, persistence, stdio)
+- [ ] Advanced features (flow control, wear leveling, PWM)
+- [ ] Comprehensive documentation (porting guide, library guide, integration guide)
+- [ ] Hardware-in-loop validation on target hardware
 
 ---
 
@@ -434,20 +454,24 @@ Executive must provide scheduler primitives for blocking/unblocking PIDs and eve
    - Depends on: VM trace APIs, Executive event stream
    - Enables: TUI/VSCode debuggers
 
-9. **HAL** (P1)
-   - Depends on: VM C port
-   - Enables: Hardware deployment
+9. **HAL Python Mock Drivers** (P1)
+   - Depends on: VM Phase 1.2, Executive Phase 2
+   - Enables: Provisioning transports, ValCmd persistence, Executive stdio
 
 ### Long-Term Priorities (2+ Months)
 
 10. **VM Phase 3: Advanced Features** (P2)
     - Heap, paging, value/command services
 
-11. **Provisioning** (P2)
-    - Depends on: VM streaming loader, C port
-    - Enables: Deployment workflows
+11. **HAL C Port** (P1)
+    - Depends on: VM Phase 2, Executive Phase 6, HAL Phases 1-7
+    - Enables: Embedded hardware deployment
 
-12. **TUI/VSCode Debuggers** (P2)
+12. **Provisioning** (P2)
+    - Depends on: VM streaming loader, HAL transports (CAN, UART, FS)
+    - Enables: Firmware deployment workflows
+
+13. **TUI/VSCode Debuggers** (P2)
     - Depends on: Debugger core
     - Enhances: Developer experience
 
@@ -488,6 +512,7 @@ Executive must provide scheduler primitives for blocking/unblocking PIDs and eve
 | 2025-10-31 | TUI_Debugger | 🔴 Not Started | Implementation Plan created with 7 phases for Textual-based full-screen debugger |
 | 2025-10-31 | vscode_debugger | 🔴 Not Started | Implementation Plan created with 7 phases for DAP adapter and VS Code extension |
 | 2025-10-31 | DependencyTree | 🟢 Complete | Initial dependency tree created |
+| 2025-11-01 | HAL | 🔴 Not Started | Implementation Plan created with 11 phases (481 tasks) for executive-space drivers, user-space library, C port, and integration |
 
 ---
 
@@ -512,6 +537,6 @@ Executive must provide scheduler primitives for blocking/unblocking PIDs and eve
 
 ---
 
-**Last Updated:** 2025-10-31  
+**Last Updated:** 2025-11-01  
 **Maintained By:** Implementation Coordination Team  
 **Review Cadence:** Weekly
