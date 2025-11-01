@@ -1,5 +1,19 @@
 # Executive Implementation Plan
 
+## Planned Implementation Order (Grand Plan)
+
+1. Phase 1 - Core debugger infrastructure (sessions, PID locks, keepalive).
+2. Phase 2 - Event streaming and scheduler integration.
+3. Phase 3 - RPC/controller extensions for the streaming loader.
+4. Phase 4 - Clock and task orchestration polish.
+5. Phase 5 - Python TUI integration hooks.
+6. Phase 6 - C port (deferred until Python milestones land).
+7. Phase 7 - Documentation and validation pass.
+
+## Sprint Scope
+
+This sprint delivers the Python phases (1 through 5) and the associated validation work, while explicitly deferring the Phase 6 C port. Capture any C-specific discoveries as TODOs for the deferred phase and keep the plan focused on Python execution.
+
 ## Overview
 
 This implementation plan addresses the gaps identified in the Executive Study document ([01--Study.md](./01--Study.md)) and aligns with the implementation notes in the System document ([../../system/Executive.md](../../system/Executive.md)). The plan is organized chronologically with clear dependencies tracked in [DependencyTree.md](../DependencyTree.md).

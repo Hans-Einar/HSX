@@ -1,5 +1,17 @@
 # TUI Debugger Implementation Plan
 
+## Planned Implementation Order (Grand Plan)
+
+1. Phase 1 - Foundation work after the CLI debugger stabilizes (shared services, layout).
+2. Phase 2 - Core TUI views for tasks, registers, breakpoints, and mailboxes.
+3. Phase 3 - Live update plumbing using executive event streaming.
+4. Phase 4 - UX polish, documentation, and regression coverage.
+5. Phase 5 - Packaging and distribution planning (deferred until Python flows settle).
+
+## Sprint Scope
+
+Deliver the Python-focused work in Phases 1 through 4. Keep Phase 5 packaging (and any future native ports) out of scope for this sprint while capturing discoveries for later scheduling.
+
 ## Overview
 
 This implementation plan addresses the gaps identified in the TUI Debugger Study document ([01--Study.md](./01--Study.md)). The plan is organized chronologically with clear dependencies tracked in [DependencyTree.md](../DependencyTree.md).

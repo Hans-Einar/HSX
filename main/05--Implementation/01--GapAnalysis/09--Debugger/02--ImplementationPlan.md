@@ -1,5 +1,18 @@
 # CLI Debugger Implementation Plan
 
+## Planned Implementation Order (Grand Plan)
+
+1. Phase 1 - Python CLI debugger core built on the executive RPC layer.
+2. Phase 2 - Event and trace integration once executive streaming is available.
+3. Phase 3 - Advanced debugger features (breakpoints, watch, scripting).
+4. Phase 4 - Documentation, UX polish, and regression coverage.
+5. Phase 5 - C integration and packaging (deferred).
+6. Phase 6 - Extended distribution targets (deferred).
+
+## Sprint Scope
+
+Deliver the Python-first work in Phases 1 through 4 this sprint. Keep the Phase 5 and 6 C/distribution items out of scope and log discoveries for the deferred backlog.
+
 ## Overview
 
 This implementation plan addresses the gaps identified in the CLI Debugger Study document ([01--Study.md](./01--Study.md)). The plan is organized chronologically with clear dependencies tracked in [DependencyTree.md](../DependencyTree.md).

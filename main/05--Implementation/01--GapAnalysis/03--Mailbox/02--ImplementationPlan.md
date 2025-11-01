@@ -1,5 +1,18 @@
 # Mailbox Implementation Plan
 
+## Planned Implementation Order (Grand Plan)
+
+1. Phase 1 - Python mailbox manager parity (sessions, send/recv foundation).
+2. Phase 2 - Wait/timeout handling, fan-out, and tracing hooks.
+3. Phase 3 - Provisioning hooks aligned with streaming coordination.
+4. Phase 4 - Stability and stress testing once features land.
+5. Phase 5 - C port (deferred until the Python layers stabilize).
+6. Phase 6 - Documentation and sample refresh.
+
+## Sprint Scope
+
+Drive Phases 1 through 4 (plus documentation updates in Phase 6) on the Python side. Keep Phase 5, the C port, parked for a post-Python sprint and record any C-specific findings as future follow-ups.
+
 ## Overview
 
 This implementation plan addresses the gaps identified in the Mailbox Study document ([01--Study.md](./01--Study.md)) and aligns with the implementation notes in the System document ([../../system/Mailbox.md](../../system/Mailbox.md)). The plan is organized chronologically with clear dependencies tracked in [DependencyTree.md](../DependencyTree.md).

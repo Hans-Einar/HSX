@@ -1,5 +1,16 @@
 # Toolkit Implementation Plan
 
+## Planned Implementation Order (Grand Plan)
+
+1. Phase 1 - Python CLI and monitor enhancements (manager logging/configuration).
+2. Phase 2 - Shared debugger toolkit services aligned with executive/mailbox event APIs.
+3. Phase 3 - Health monitoring and diagnostics polish for the manager stack.
+4. Phase 4 - Packaging and TUI deliverables (deferred until Python workflows settle).
+
+## Sprint Scope
+
+Concentrate on the Python-oriented work in Phases 1 through 3. Leave the Phase 4 packaging/TUI backlog for a later sprint and simply record requirements that surface while executing the Python milestones.
+
 ## Overview
 
 This implementation plan addresses the gaps identified in the Toolkit Study document ([01--Study.md](./01--Study.md)). The plan is organized chronologically with clear dependencies tracked in [DependencyTree.md](../DependencyTree.md).

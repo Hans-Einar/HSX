@@ -7,6 +7,19 @@
 
 ---
 
+## Planned Implementation Order (Grand Plan)
+
+1. Phase 1 - Python HAL mocks to support provisioning/executive workflows.
+2. Phase 2 - Python device shims for mailbox/value/command integrations.
+3. Phase 3 - Hardware simulation and host-side testing scaffolds.
+4. Phase 4 - C driver implementations (deferred).
+5. Phase 5 - Embedded integration tests and validation (deferred).
+6. Phase 6 - Documentation updates once features stabilize.
+
+## Sprint Scope
+
+Complete the Python mock and simulation work in Phases 1 through 3 (plus any documentation updates) during this sprint. Leave the Phase 4 and 5 C deliverables for the post-Python phase and record related findings as future tasks.
+
 ## Overview
 
 The HAL module provides a two-layer hardware abstraction architecture:

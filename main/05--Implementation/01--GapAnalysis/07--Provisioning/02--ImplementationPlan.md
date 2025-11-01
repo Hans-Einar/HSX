@@ -1,5 +1,19 @@
 # Provisioning & Persistence Implementation Plan
 
+## Planned Implementation Order (Grand Plan)
+
+1. Phase 1 - Monolithic HXE loader integration.
+2. Phase 2 - Streaming loader RPC workflows tied into the executive.
+3. Phase 3 - Progress reporting and event streaming.
+4. Phase 4 - Transport adapters and persistence plumbing (Python).
+5. Phase 5 - Extended transports, security, and recovery workflows (Python).
+6. Phase 6 - Documentation and validation coverage.
+7. Phase 7 - C port and embedded provisioning (deferred).
+
+## Sprint Scope
+
+Deliver Phases 1 through 6 on the Python stack so provisioning aligns with the executive and mailbox milestones. The Phase 7 C port remains out of scope for this sprint; log discoveries that impact it as future TODOs.
+
 ## Overview
 
 This implementation plan addresses the gaps identified in the Provisioning Study document ([01--Study.md](./01--Study.md)). The plan is organized chronologically with clear dependencies tracked in [DependencyTree.md](../DependencyTree.md).

@@ -1,5 +1,19 @@
 # Toolchain Implementation Plan
 
+## Planned Implementation Order (Grand Plan)
+
+1. Phase 1 - ISA updates across the Python toolchain.
+2. Phase 2 - Debug metadata generation.
+3. Phase 3 - Trace integration aligned with VM events.
+4. Phase 4 - Streaming loader support in assembler/linker.
+5. Phase 5 - Test matrix expansion.
+6. Phase 6 - Packaging improvements.
+7. Phase 7 - C toolchain components (deferred).
+
+## Sprint Scope
+
+Execute Phases 1 through 6 using the Python toolchain stack. The Phase 7 C deliverables stay deferred; capture any blockers or requirements for that work as TODOs without implementing C-side changes in this sprint.
+
 ## Overview
 
 This implementation plan addresses the gaps identified in the Toolchain Study document ([01--Study.md](./01--Study.md)). The plan is organized chronologically with clear dependencies tracked in [DependencyTree.md](../DependencyTree.md).

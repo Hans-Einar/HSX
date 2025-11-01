@@ -1,5 +1,16 @@
 # VM Implementation Plan
 
+## Planned Implementation Order (Grand Plan)
+
+1. Phase 1 - Python reference implementation (shifts, PSW, DIV, ADC/SBC, trace, streaming loader).
+2. Phase 2 - C port (deferred until the Python stack stabilizes).
+3. Phase 3 - Advanced features (heap, paging, value/command services).
+4. Phase 4 - Documentation and validation pass.
+
+## Sprint Scope
+
+Focus on the Python milestones and follow-up feature work before touching the Phase 2 C port. Capture C-related notes as future TODOs so the current sprint remains Python-only.
+
 ## Overview
 
 This implementation plan addresses the gaps identified in the VM Study document ([01--Study.md](./01--Study.md)) and aligns with the implementation notes in the System document ([../../system/MiniVM.md](../../system/MiniVM.md)). The plan is organized chronologically with clear dependencies tracked in [DependencyTree.md](../DependencyTree.md).

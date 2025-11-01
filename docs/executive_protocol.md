@@ -139,6 +139,8 @@ Debugger Sessions & Event Streaming
    ```
    - `pid_lock` is optional; omit or set to `null` for passive (read-only) monitoring.
    - Unsupported capabilities are returned in `session.warnings` (e.g., `unsupported_feature:watch`).
+   - Out-of-range requests are clamped; warnings such as `heartbeat_clamped:<value>` or `max_events_clamped:<value>` accompany the negotiated values.
+   - The response echoes the negotiated `max_events` depth for the event queue.
 
 2. **Subscribe to events**
    ```json
@@ -188,6 +190,13 @@ Debugger Sessions & Event Streaming
    ```json
    { "version": 1, "cmd": "session.close", "session": "<id>" }
    ```
+
+Session ownership and PID locks
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Include the `session` identifier with commands that mutate task state (pause/resume/kill, PID-scoped `clock`/`step`, `trace`, `reload`, `poke`, `sched`, mailbox operations, `send`, etc.).
+- When a PID is locked by another session the executive replies with `{"status":"error","error":"pid_locked:<pid>"}`. Sessionless callers receive the same error.
+- Missing or expired sessions return `{"status":"error","error":"session_required"}`. Use `session.keepalive` to refresh active sessions; timed-out sessions release their locks automatically.
 
 ### Event object schema
 

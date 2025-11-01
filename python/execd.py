@@ -22,9 +22,28 @@ import socketserver
 import threading
 import time
 import sys
+import uuid
 from collections import deque
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Iterable
+
+
+class SessionError(RuntimeError):
+    """Raised when session validation or locking fails."""
+
+
+@dataclass
+class SessionRecord:
+    session_id: str
+    client: str
+    features: List[str]
+    max_events: int
+    pid_locks: List[int]
+    heartbeat_s: int
+    warnings: List[str] = field(default_factory=list)
+    created_at: float = field(default_factory=time.time)
+    last_seen: float = field(default_factory=time.time)
 
 
 
@@ -53,6 +72,189 @@ class ExecutiveState:
         self.clock_mode: str = "stopped"
         self._clock_last_wait: float = 0.0
         self._clock_throttle_reason: Optional[str] = None
+        self.sessions: Dict[str, SessionRecord] = {}
+        self.pid_locks: Dict[int, str] = {}
+        self.session_lock = threading.RLock()
+        self.session_heartbeat_default = 30
+        self.session_heartbeat_min = 5
+        self.session_heartbeat_max = 300
+        self.session_events_default = 256
+        self.session_events_max = 2048
+        self._last_session_prune = 0.0
+        self._session_prune_interval = 5.0
+        self.session_supported_features = {"events", "stack"}
+
+    def _normalise_pid_list(self, pid_lock: Any) -> List[int]:
+        if pid_lock is None:
+            return []
+        values: Iterable[Any]
+        if isinstance(pid_lock, (list, tuple, set)):
+            values = pid_lock
+        else:
+            values = (pid_lock,)
+        pids: List[int] = []
+        for value in values:
+            if value is None:
+                continue
+            try:
+                pid_int = int(value)
+            except (TypeError, ValueError):
+                raise ValueError("pid_lock must be an integer or sequence of integers")
+            if pid_int < 0:
+                raise ValueError("pid_lock values must be non-negative")
+            pids.append(pid_int)
+        # ensure deterministic order and uniqueness
+        return sorted(set(pids))
+
+    def _session_payload(self, session: SessionRecord) -> Dict[str, Any]:
+        if not session.pid_locks:
+            pid_lock_repr: Optional[Any] = None
+        elif len(session.pid_locks) == 1:
+            pid_lock_repr = session.pid_locks[0]
+        else:
+            pid_lock_repr = list(session.pid_locks)
+        payload = {
+            "id": session.session_id,
+            "client": session.client,
+            "heartbeat_s": session.heartbeat_s,
+            "features": list(session.features),
+            "max_events": session.max_events,
+            "pid_lock": pid_lock_repr,
+        }
+        if session.warnings:
+            payload["warnings"] = list(session.warnings)
+        return payload
+
+    def session_open(
+        self,
+        *,
+        client: Optional[str] = None,
+        capabilities: Optional[Dict[str, Any]] = None,
+        pid_lock: Any = None,
+        heartbeat_s: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        now = time.time()
+        lock_targets = self._normalise_pid_list(pid_lock)
+        caps = capabilities or {}
+        requested_features = caps.get("features") or []
+        if not isinstance(requested_features, (list, tuple)):
+            raise ValueError("capabilities.features must be a list when provided")
+        features: List[str] = []
+        warnings: List[str] = []
+        for feature in requested_features:
+            feature_name = str(feature)
+            if feature_name in self.session_supported_features:
+                features.append(feature_name)
+            else:
+                warnings.append(f"unsupported_feature:{feature_name}")
+        max_events_raw = caps.get("max_events")
+        if max_events_raw is None:
+            max_events = self.session_events_default
+        else:
+            try:
+                max_events = int(max_events_raw)
+            except (TypeError, ValueError):
+                raise ValueError("capabilities.max_events must be an integer when provided")
+            if max_events <= 0:
+                raise ValueError("capabilities.max_events must be positive")
+            if max_events > self.session_events_max:
+                warnings.append(f"max_events_clamped:{self.session_events_max}")
+                max_events = self.session_events_max
+        if heartbeat_s is None:
+            heartbeat = self.session_heartbeat_default
+        else:
+            try:
+                heartbeat = int(heartbeat_s)
+            except (TypeError, ValueError):
+                raise ValueError("heartbeat_s must be an integer when provided")
+            if heartbeat < self.session_heartbeat_min:
+                warnings.append(f"heartbeat_clamped:{self.session_heartbeat_min}")
+                heartbeat = self.session_heartbeat_min
+            elif heartbeat > self.session_heartbeat_max:
+                warnings.append(f"heartbeat_clamped:{self.session_heartbeat_max}")
+                heartbeat = self.session_heartbeat_max
+        session_id = str(uuid.uuid4())
+        with self.session_lock:
+            for pid in lock_targets:
+                owner = self.pid_locks.get(pid)
+                if owner is not None:
+                    raise SessionError(f"pid_locked:{pid}")
+            record = SessionRecord(
+                session_id=session_id,
+                client=str(client or ""),
+                features=features,
+                max_events=max_events,
+                pid_locks=list(lock_targets),
+                heartbeat_s=heartbeat,
+                warnings=list(warnings),
+                created_at=now,
+                last_seen=now,
+            )
+            self.sessions[session_id] = record
+            for pid in lock_targets:
+                self.pid_locks[pid] = session_id
+        self.log("info", "session opened", session_id=session_id, client=client or "", pid_locks=lock_targets)
+        return self._session_payload(record)
+
+    def _get_session(self, session_id: str) -> SessionRecord:
+        with self.session_lock:
+            record = self.sessions.get(session_id)
+            if record is None:
+                raise SessionError("session_required")
+            return record
+
+    def touch_session(self, session_id: str) -> SessionRecord:
+        with self.session_lock:
+            record = self.sessions.get(session_id)
+            if record is None:
+                raise SessionError("session_required")
+            record.last_seen = time.time()
+            return record
+
+    def session_keepalive(self, session_id: str) -> None:
+        record = self.touch_session(session_id)
+        self.log("debug", "session keepalive", session_id=record.session_id)
+
+    def _release_session_locks(self, session: SessionRecord) -> None:
+        with self.session_lock:
+            for pid in list(session.pid_locks):
+                owner = self.pid_locks.get(pid)
+                if owner == session.session_id:
+                    self.pid_locks.pop(pid, None)
+
+    def _close_session(self, session_id: str, reason: str) -> bool:
+        with self.session_lock:
+            record = self.sessions.pop(session_id, None)
+            if record is None:
+                return False
+        self._release_session_locks(record)
+        self.log("info", "session closed", session_id=session_id, reason=reason, pid_locks=list(record.pid_locks))
+        return True
+
+    def session_close(self, session_id: str) -> None:
+        if not self._close_session(session_id, reason="client_close"):
+            raise SessionError("session_required")
+
+    def prune_sessions(self) -> None:
+        now = time.time()
+        if (now - self._last_session_prune) < self._session_prune_interval:
+            return
+        self._last_session_prune = now
+        expired: List[str] = []
+        with self.session_lock:
+            for session_id, record in list(self.sessions.items()):
+                if (now - record.last_seen) > record.heartbeat_s:
+                    expired.append(session_id)
+        for session_id in expired:
+            self._close_session(session_id, reason="timeout")
+
+    def ensure_pid_access(self, pid: int, session_id: Optional[str]) -> None:
+        with self.session_lock:
+            owner = self.pid_locks.get(pid)
+        if owner is None:
+            return
+        if session_id is None or owner != session_id:
+            raise SessionError(f"pid_locked:{pid}")
 
     def _refresh_tasks(self) -> None:
         try:
@@ -788,6 +990,31 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
         if version != 1:
             return {"version": 1, "status": "error", "error": f"unsupported_version:{version}"}
         try:
+            self.state.prune_sessions()
+            session_raw = request.get("session")
+            session_id = None
+            if isinstance(session_raw, str):
+                session_id = session_raw.strip() or None
+            if cmd == "session.open":
+                session_payload = self.state.session_open(
+                    client=request.get("client"),
+                    capabilities=request.get("capabilities"),
+                    pid_lock=request.get("pid_lock"),
+                    heartbeat_s=request.get("heartbeat_s"),
+                )
+                return {"version": 1, "status": "ok", "session": session_payload}
+            if cmd == "session.keepalive":
+                if session_id is None:
+                    raise SessionError("session_required")
+                self.state.session_keepalive(session_id)
+                return {"version": 1, "status": "ok"}
+            if cmd == "session.close":
+                if session_id is None:
+                    raise SessionError("session_required")
+                self.state.session_close(session_id)
+                return {"version": 1, "status": "ok"}
+            if session_id is not None:
+                self.state.touch_session(session_id)
             if cmd == "ping":
                 return {"version": 1, "status": "ok", "reply": "pong"}
             if cmd == "info":
@@ -839,6 +1066,8 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                             raise ValueError("clock step steps must be positive")
                     pid_value = request.get("pid")
                     pid_int = int(pid_value) if pid_value is not None else None
+                    if pid_int is not None:
+                        self.state.ensure_pid_access(pid_int, session_id)
                     result = self.state.clock_step(steps, pid=pid_int)
                     status = self.state.get_clock_status()
                     return {"version": 1, "status": "ok", "result": result, "clock": status}
@@ -854,6 +1083,8 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 pid_value = request.get("pid")
                 steps_int = int(steps_value) if steps_value is not None else None
                 pid_int = int(pid_value) if pid_value is not None else None
+                if pid_int is not None:
+                    self.state.ensure_pid_access(pid_int, session_id)
                 result = self.state.step(steps_int, pid=pid_int, source="manual")
                 status = self.state.get_clock_status()
                 return {"version": 1, "status": "ok", "result": result, "clock": status}
@@ -861,6 +1092,8 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 pid_value = request.get("pid")
                 if pid_value is None:
                     raise ValueError("trace requires 'pid'")
+                pid_int = int(pid_value)
+                self.state.ensure_pid_access(pid_int, session_id)
                 mode_value = request.get("mode")
                 if isinstance(mode_value, bool):
                     enable = mode_value
@@ -874,14 +1107,16 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                         enable = False
                     else:
                         raise ValueError("trace mode must be 'on' or 'off'")
-                trace_info = self.state.trace_task(int(pid_value), enable)
+                trace_info = self.state.trace_task(pid_int, enable)
                 return {"version": 1, "status": "ok", "trace": trace_info}
             if cmd == "reload":
                 pid_value = request.get("pid")
                 if pid_value is None:
                     raise ValueError("reload requires 'pid'")
+                pid_int = int(pid_value)
+                self.state.ensure_pid_access(pid_int, session_id)
                 verbose = bool(request.get("verbose"))
-                reload_info = self.state.reload_task(int(pid_value), verbose=verbose)
+                reload_info = self.state.reload_task(pid_int, verbose=verbose)
                 return {"version": 1, "status": "ok", "reload": reload_info}
             if cmd == "peek":
                 pid = int(request.get("pid"))
@@ -891,6 +1126,7 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 return {"version": 1, "status": "ok", "data": data}
             if cmd == "poke":
                 pid = int(request.get("pid"))
+                self.state.ensure_pid_access(pid, session_id)
                 addr = int(request.get("addr"))
                 data_hex = request.get("data")
                 if not isinstance(data_hex, str):
@@ -905,19 +1141,25 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 pid_value = request.get("pid")
                 if pid_value is None:
                     raise ValueError("pause requires 'pid'")
-                task = self.state.pause_task(int(pid_value))
+                pid_int = int(pid_value)
+                self.state.ensure_pid_access(pid_int, session_id)
+                task = self.state.pause_task(pid_int)
                 return {"version": 1, "status": "ok", "task": task}
             if cmd == "resume":
                 pid_value = request.get("pid")
                 if pid_value is None:
                     raise ValueError("resume requires 'pid'")
-                task = self.state.resume_task(int(pid_value))
+                pid_int = int(pid_value)
+                self.state.ensure_pid_access(pid_int, session_id)
+                task = self.state.resume_task(pid_int)
                 return {"version": 1, "status": "ok", "task": task}
             if cmd == "kill":
                 pid_value = request.get("pid")
                 if pid_value is None:
                     raise ValueError("kill requires 'pid'")
-                task = self.state.kill_task(int(pid_value))
+                pid_int = int(pid_value)
+                self.state.ensure_pid_access(pid_int, session_id)
+                task = self.state.kill_task(pid_int)
                 return {"version": 1, "status": "ok", "task": task}
             if cmd == "ps":
                 return {"version": 1, "status": "ok", "tasks": self.state.task_list()}
@@ -966,17 +1208,21 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 pid_value = request.get("pid")
                 if pid_value is None:
                     raise ValueError("send requires 'pid'")
+                pid_int = int(pid_value)
+                self.state.ensure_pid_access(pid_int, session_id)
                 data = request.get("data")
                 data_hex = request.get("data_hex")
                 channel = request.get("channel")
                 if data_hex is None and not isinstance(data, str):
                     raise ValueError("send requires 'data' or 'data_hex'")
-                result = self.state.send_stdin(int(pid_value), data=data if isinstance(data, str) else None, data_hex=data_hex if isinstance(data_hex, str) else None, channel=channel)
+                result = self.state.send_stdin(pid_int, data=data if isinstance(data, str) else None, data_hex=data_hex if isinstance(data_hex, str) else None, channel=channel)
                 return {"version": 1, "status": "ok", **result}
             if cmd == "sched":
                 pid_value = request.get("pid")
                 if pid_value is not None:
-                    task = self.state.set_task_attrs(int(pid_value), priority=request.get("priority"), quantum=request.get("quantum"))
+                    pid_int = int(pid_value)
+                    self.state.ensure_pid_access(pid_int, session_id)
+                    task = self.state.set_task_attrs(pid_int, priority=request.get("priority"), quantum=request.get("quantum"))
                     return {"version": 1, "status": "ok", "task": task}
                 stats = self.state.scheduler_stats()
                 trace_limit = request.get("limit")

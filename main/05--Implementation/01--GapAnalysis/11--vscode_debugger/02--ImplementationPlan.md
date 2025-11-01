@@ -1,5 +1,18 @@
 # VS Code Debugger Implementation Plan
 
+## Planned Implementation Order (Grand Plan)
+
+1. Phase 1 - Python Debug Adapter Protocol (DAP) foundation leveraging CLI/TUI services.
+2. Phase 2 - Feature parity with CLI/TUI debuggers (breakpoints, tasks, mailboxes).
+3. Phase 3 - VS Code UI polish (views, commands, launch configurations).
+4. Phase 4 - Documentation, samples, and regression automation.
+5. Phase 5 - Marketplace packaging and release automation.
+6. Phase 6 - C/native integrations (deferred until Python flows are complete).
+
+## Sprint Scope
+
+Focus on the Python adapter and VS Code experience in Phases 1 through 5. Keep Phase 6 native/C extensions out of scope for this sprint and log emerging requirements for the deferred backlog.
+
 ## Overview
 
 This implementation plan addresses the gaps identified in the VS Code Debugger Study document ([01--Study.md](./01--Study.md)). The plan is organized chronologically with clear dependencies tracked in [DependencyTree.md](../DependencyTree.md).

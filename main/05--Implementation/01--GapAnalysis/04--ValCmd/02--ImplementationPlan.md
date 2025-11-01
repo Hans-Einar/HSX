@@ -1,5 +1,19 @@
 # ValCmd Implementation Plan
 
+## Planned Implementation Order (Grand Plan)
+
+1. Phase 1 - Value service scaffolding (Python).
+2. Phase 2 - Command service core flows (Python).
+3. Phase 3 - Telemetry and mailbox bindings (Python).
+4. Phase 4 - Shell adapters and interactive workflows (Python).
+5. Phase 5 - Extended scenarios and regression coverage (Python).
+6. Phase 6 - Documentation and examples refresh.
+7. Phase 7 - C port (deferred until Python validation completes).
+
+## Sprint Scope
+
+Advance Phases 1 through 6 on the Python side and hold the Phase 7 C port for a later sprint. Note any C considerations as future tasks while keeping the current execution Python-only.
+
 ## Overview
 
 This implementation plan addresses the gaps identified in the ValCmd Study document ([01--Study.md](./01--Study.md)) and aligns with the implementation notes in the System document ([../../system/ValCmd.md](../../system/ValCmd.md)). The plan is organized chronologically with clear dependencies tracked in [DependencyTree.md](../DependencyTree.md).
