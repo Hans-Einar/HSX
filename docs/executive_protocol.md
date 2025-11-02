@@ -404,6 +404,19 @@ Typical payloads:
 - `mailbox_overrun`: `{ "descriptor": <int>, "pid": <int>, "dropped_seq": <int>, "dropped_length": <int>, "dropped_flags": <uint16>, "channel": <uint16>, "reason": <string>, "queue_depth": <int> }`
 - `mailbox_error`: `{ "fn": <int>, "error": <string>, "status": <uint16?> }`
 - `watch_update`: `{ "watch_id": <string>, "value": <string>, "formatted": <string?> }`
+
+**Mailbox Wake Priority Semantics:**
+
+When a message is sent to a mailbox descriptor, the executive wakes blocked receivers according to the descriptor's delivery mode:
+
+- **Single-reader mode**: Wakes one waiter at a time in FIFO order. Each message is delivered to exactly one receiver, maintaining strict ordering to prevent starvation.
+- **Fan-out mode**: Attempts to wake ALL blocked readers who have pending data, processing the waiter queue in FIFO order. All readers receive independent copies of the message simultaneously.
+- **Tap isolation**: Tap observers never block on receive operations and are excluded from the waiter queue. Taps receive best-effort copies without affecting wake priority for regular readers or owners.
+
+These semantics ensure:
+1. **FIFO fairness**: Waiters are processed in arrival order within their descriptor
+2. **No starvation**: Regular readers and owners are never starved by slow taps or fan-out consumers
+3. **Deterministic delivery**: Wake order is predictable and consistent across implementations
 - `stdout` / `stderr`: `{ "text": <string> }`
 - `warning`: `{ "message": <string>, "category": <string> }`
 
