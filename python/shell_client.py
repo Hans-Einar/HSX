@@ -1252,6 +1252,7 @@ def _pretty_sched(payload: dict) -> None:
         return
     sched = payload.get("scheduler", {})
     counters = sched.get("counters", {})
+    mailbox_counters = sched.get("mailbox_counters", {})
     trace = sched.get("trace", [])
     print("sched stats:")
     if counters:
@@ -1262,6 +1263,14 @@ def _pretty_sched(payload: dict) -> None:
                 print(f"      {event:<8} : {value}")
     else:
         print("  counters: (none)")
+    if mailbox_counters:
+        print("  mailbox counters:")
+        for pid, entries in sorted(mailbox_counters.items()):
+            print(f"    pid {pid}:")
+            for event, value in sorted(entries.items()):
+                print(f"      {event:<14}: {value}")
+    else:
+        print("  mailbox counters: (none)")
     if trace:
         print("  trace (most recent first):")
         for entry in reversed(trace):

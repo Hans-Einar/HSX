@@ -86,6 +86,7 @@ HEADER = HEADER_V1
 HEADER_FIELDS = HEADER_V1_FIELDS
 
 RECV_INFO_STRUCT = struct.Struct("<iiIII")
+MAILBOX_COUNTER_FIELDS = ("MAILBOX_STEP", "MAILBOX_WAKE", "MAILBOX_TIMEOUT")
 
 
 @dataclass
@@ -2016,6 +2017,7 @@ class VMController:
         self._task_memory: Dict[int, Dict[str, int]] = {}
         self.scheduler_trace: deque[Dict[str, Any]] = deque(maxlen=256)
         self.scheduler_counters: Dict[int, Dict[str, int]] = defaultdict(dict)
+        self.mailbox_counters: Dict[int, Dict[str, int]] = defaultdict(dict)
         self.streaming_sessions: Dict[int, Dict[str, Any]] = {}
         self.metadata_by_pid: Dict[int, HXEMetadata] = {}
 
@@ -2194,6 +2196,7 @@ class VMController:
         self._task_memory.clear()
         self.scheduler_trace.clear()
         self.scheduler_counters.clear()
+        self.mailbox_counters.clear()
         self.streaming_sessions.clear()
         self.metadata_by_pid.clear()
         return {"status": "ok"}
@@ -2396,6 +2399,18 @@ class VMController:
             counters = self.scheduler_counters.setdefault(pid, {})
             counters[event] = counters.get(event, 0) + 1
 
+    def _mailbox_counters_for_pid(self, pid: int) -> Dict[str, int]:
+        counters = self.mailbox_counters.setdefault(pid, {})
+        for field in MAILBOX_COUNTER_FIELDS:
+            counters.setdefault(field, 0)
+        return counters
+
+    def _increment_mailbox_counter(self, pid: Optional[int], name: str) -> None:
+        if pid is None or name not in MAILBOX_COUNTER_FIELDS:
+            return
+        counters = self._mailbox_counters_for_pid(int(pid))
+        counters[name] = counters.get(name, 0) + 1
+
     def scheduler_trace_snapshot(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         trace = list(self.scheduler_trace)
         if limit is not None:
@@ -2404,6 +2419,17 @@ class VMController:
 
     def scheduler_stats(self) -> Dict[int, Dict[str, int]]:
         return {pid: dict(counts) for pid, counts in self.scheduler_counters.items()}
+
+    def mailbox_stats(self) -> Dict[int, Dict[str, int]]:
+        for pid in list(self.tasks.keys()):
+            try:
+                self._mailbox_counters_for_pid(int(pid))
+            except (TypeError, ValueError):
+                continue
+        return {
+            pid: {field: counts.get(field, 0) for field in MAILBOX_COUNTER_FIELDS}
+            for pid, counts in self.mailbox_counters.items()
+        }
 
     def mailbox_send(
         self,
@@ -2585,6 +2611,7 @@ class VMController:
                 length = vm.regs[3] & 0xFFFF
                 flags = vm.regs[4] & 0xFFFF
                 channel = vm.regs[5] & 0xFFFF
+                self._increment_mailbox_counter(pid, "MAILBOX_STEP")
                 self._trace_mailbox_regs(
                     "svc_send_pre",
                     vm,
@@ -2623,6 +2650,7 @@ class VMController:
                 max_len = vm.regs[3] & 0xFFFF
                 timeout = vm.regs[4] & 0xFFFF
                 info_ptr = vm.regs[5] & 0xFFFF
+                self._increment_mailbox_counter(pid, "MAILBOX_STEP")
                 self._trace_mailbox_regs(
                     "svc_recv_pre",
                     vm,
@@ -2863,6 +2891,8 @@ class VMController:
         record_kwargs: Dict[str, Any] = {"descriptor": descriptor_id}
         if not timed_out:
             record_kwargs["length"] = length
+        counter_name = "MAILBOX_TIMEOUT" if timed_out else "MAILBOX_WAKE"
+        self._increment_mailbox_counter(pid, counter_name)
         self._record_scheduler_event(event_name, pid, **record_kwargs)
         if info_ptr:
             self._write_mailbox_recv_info(
@@ -3226,6 +3256,7 @@ class VMController:
         info["scheduler"] = {
             "trace": self.scheduler_trace_snapshot(limit=32),
             "counters": self.scheduler_stats(),
+            "mailbox_counters": self.mailbox_stats(),
         }
         return info
 

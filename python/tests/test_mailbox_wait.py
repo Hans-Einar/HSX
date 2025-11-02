@@ -38,6 +38,28 @@ def _open_shell_handle(controller: VMController, pid: int) -> int:
     return controller.mailboxes.open(pid=0, target=f"pid:{pid}")
 
 
+def test_mailbox_send_increments_step_counter():
+    controller, vm, send_handle = _setup_controller()
+    buffer_ptr = 0x0400
+    payload = b"hi"
+    vm.mem[buffer_ptr : buffer_ptr + len(payload)] = payload
+    vm.regs[1] = send_handle
+    vm.regs[2] = buffer_ptr
+    vm.regs[3] = len(payload)
+    vm.regs[4] = 0
+    vm.regs[5] = 0
+
+    controller._svc_mailbox_controller(vm, mbx_const.HSX_MBX_FN_SEND)
+
+    assert vm.regs[0] == mbx_const.HSX_MBX_STATUS_OK
+    assert vm.regs[1] == len(payload)
+
+    counters = controller.mailbox_stats().get(1, {})
+    assert counters.get("MAILBOX_STEP") == 1
+    assert counters.get("MAILBOX_WAKE") == 0
+    assert counters.get("MAILBOX_TIMEOUT") == 0
+
+
 def test_mailbox_recv_blocks_and_wakes_on_send():
     controller, vm, recv_handle = _setup_controller()
     buffer_ptr = 0x0200
@@ -68,6 +90,11 @@ def test_mailbox_recv_blocks_and_wakes_on_send():
     assert vm.running is True
     assert bytes(vm.mem[buffer_ptr : buffer_ptr + 5]) == b"hello"
 
+    counters = controller.mailbox_stats().get(1, {})
+    assert counters.get("MAILBOX_STEP") == 1
+    assert counters.get("MAILBOX_WAKE") == 1
+    assert counters.get("MAILBOX_TIMEOUT") == 0
+
 
 def test_mailbox_recv_timeout_marks_task_ready():
     controller, vm, recv_handle = _setup_controller()
@@ -90,3 +117,7 @@ def test_mailbox_recv_timeout_marks_task_ready():
     regs = controller.task_states[1]["context"]["regs"]
     assert regs[0] == mbx_const.HSX_MBX_STATUS_TIMEOUT
     assert regs[1] == 0
+    counters = controller.mailbox_stats().get(1, {})
+    assert counters.get("MAILBOX_STEP") == 1
+    assert counters.get("MAILBOX_WAKE") == 0
+    assert counters.get("MAILBOX_TIMEOUT") == 1

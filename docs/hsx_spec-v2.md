@@ -155,7 +155,7 @@ typedef struct {
 - **Priority weights:** `time_slice_steps` can increase the number of consecutive instructions a task receives before rotating. The default host configuration sets this to `1` for strict fairness.
 - **Tick vs tickless:** the host executive optionally runs in a soft tick (auto step N instructions repeatedly). Hardware ports can use a timer interrupt to request reschedule when a quantum expires or the next event fires.
 - **Accounting:** the executive accumulates `accounted_steps` per task to report instruction usage / load averages to shell clients.
-- **Instrumentation:** the Python executive records a bounded trace of scheduler events (`step`, `rotate`, `block`, `wake`) and per-task counters. `info` replies include the most recent entries; the shell `sched stats [limit]` command renders the same data for operators.
+- **Instrumentation:** the Python executive records a bounded trace of scheduler events (`step`, `rotate`, `block`, `wake`) and per-task counters. `info` replies include the most recent entries; the shell `sched stats [limit]` command renders the same data for operators. Scheduler stats now also surface per-task mailbox counters (`MAILBOX_STEP`, `MAILBOX_WAKE`, `MAILBOX_TIMEOUT`) under the `mailbox_counters` key for fairness diagnostics.
 - Tasks may `yield`, `sleep_ms`, `wait`, `exec_exit`, or block on mailbox receive; the executive moves them between READY/RUN/SLEEP queues accordingly.
 
 #### Executive stepping controls
@@ -373,6 +373,5 @@ C source ? clang -emit-llvm ? hsx-llc.py ? .mvasm ? asm.py ? .hxe ? host_vm.py
 - [ ] Doxygen / docs automation.
 
 ---
-
 
 

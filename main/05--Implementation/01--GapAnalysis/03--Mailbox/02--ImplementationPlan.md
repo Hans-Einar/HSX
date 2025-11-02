@@ -372,18 +372,18 @@ Toolchain needs to generate .mailbox sections from application code. Enables dec
 **Design Updates Needed:** _TBD_
 
 **Pre-Implementation Checklist**
-- [ ] Confirm which counters are mandated by the design (MAILBOX_STEP, MAILBOX_WAKE, MAILBOX_TIMEOUT).
-- [ ] Validate how counters should surface via executive diagnostics (compare with 04.02).
+- [x] Confirm which counters are mandated by the design (MAILBOX_STEP, MAILBOX_WAKE, MAILBOX_TIMEOUT).
+- [x] Validate how counters should surface via executive diagnostics (compare with 04.02).
 
 **Implementation Tasks**
-- [ ] Implement counters in the executive scheduler and expose via stats API.
-- [ ] Ensure counters increment for all relevant paths (send, recv, timeout).
-- [ ] Add regression tests validating counter increments.
-- [ ] Document counter semantics and usage.
+- [x] Implement counters in the executive scheduler and expose via stats API.
+- [x] Ensure counters increment for all relevant paths (send, recv, timeout).
+- [x] Add regression tests validating counter increments.
+- [x] Document counter semantics and usage.
 
 **Post-Implementation Checklist**
-- [ ] Verify design alignment (values, granularity, reset behaviour).
-- [ ] Update design doc with any additional observability notes.
+- [x] Verify design alignment (values, granularity, reset behaviour).
+- [x] Update design doc with any additional observability notes.
 - [ ] Log results/tests/follow-ups in `03--ImplementationNotes.md`.
 - [ ] Record completion at the applicable review gate.
 
