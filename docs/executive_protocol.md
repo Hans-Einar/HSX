@@ -29,7 +29,7 @@ Core Commands
 | `info` | `{ "version": 1, "cmd": "info" [, "pid": n] }` | `{ "version": 1, "status": "ok", "info": { ... } }` | Omitting `pid` returns global state/task list; specifying `pid` adds `selected_registers`. |
 | `attach` | `{ "version": 1, "cmd": "attach" }` | `{ "version": 1, "status": "ok", "info": { ... } }` | Pauses VM and marks tasks as attached. |
 | `detach` | `{ "version": 1, "cmd": "detach" }` | `{ "version": 1, "status": "ok", "info": { ... } }` | Releases VM control. |
-| `load` | `{ "version": 1, "cmd": "load", "path": "/abs/app.hxe" }` | `{ "version": 1, "status": "ok", "image": { "pid": <int>, ... } }` | Loads `.hxe` into VM (works while attached). |
+| `load` | `{ "version": 1, "cmd": "load", "path": "/abs/app.hxe" }` | `{ "version": 1, "status": "ok", "image": { "pid": <int>, "app_name": "...", "allow_multiple_instances": true, "metadata": { ... } } }` | Loads `.hxe` into VM (works while attached). Metadata is summarised for v2 images. |
 | `exec` | Same as `load` | Same as `load` | Alias used by shell clients. |
 | `ps` | `{ "version": 1, "cmd": "ps" }` | `{ "version": 1, "status": "ok", "tasks": {"tasks": [...], "current_pid": n} }` | Returns scheduler snapshot (task list + active pid). |
 | `clock` | `{ "version": 1, "cmd": "clock" }` | `{ "version": 1, "status": "ok", "clock": { ... } }` | Reports clock status (state, mode, throttle metadata, rate, auto/manual counters). |
@@ -102,10 +102,10 @@ Example Session
 < {"version":1,"status":"ok","info":{"program":"/path/main.hxe",...}}
 
 > {"version":1,"cmd":"load","path":"/tmp/demo.hxe"}
-< {"version":1,"status":"ok","image":{"pid":1,"entry":0,"code_len":96,...}}
+< {"version":1,"status":"ok","image":{"pid":1,"entry":0,"code_len":96,"app_name":"demo","allow_multiple_instances":false,"metadata":{"sections":3,"values":2,"commands":1,"mailboxes":1}}}
 
 > {"version":1,"cmd":"ps"}
-< {"version":1,"status":"ok","tasks":{"tasks":[{"pid":0,"state":"running"},{"pid":1,"state":"running"}],"current_pid":0}}
+< {"version":1,"status":"ok","tasks":{"tasks":[{"pid":0,"state":"running","app_name":"vm"},{"pid":1,"state":"running","app_name":"demo","metadata":{"values":2,"commands":1,"mailboxes":1}}],"current_pid":0}}
 
 > {"cmd":"pause","pid":1}
 < {"status":"ok","task":{"pid":1,"state":"paused",...}}
@@ -113,6 +113,12 @@ Example Session
 
 Clients are encouraged to reuse TCP connections and throttle polling (`info`,
 `ps`, `dumpregs`) to avoid hammering the executive.
+
+### Metadata summary (HXE v2)
+
+- The `load` response contains an `image.metadata` object for v2 images. The executive currently reports the number of sections and pre-registered resources (`values`, `commands`, `mailboxes`).
+- `ps`/`info` task entries echo the resolved `app_name` and include a lightweight `metadata` summary when declarative resources were present. These counts reflect the registries active inside the executive after preprocessing and can be used by debugger clients to decide whether to query additional detail.
+- Declarative mailboxes are bound during load via the existing mailbox manager, so subsequent mailbox RPCs (`mailbox_snapshot`, `mailbox_bind`, etc.) treat metadata-driven mailboxes exactly like runtime-created instances.
 
 Debugger Sessions & Event Streaming
 -----------------------------------

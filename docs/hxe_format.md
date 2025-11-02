@@ -34,6 +34,11 @@ All multi-byte fields use big-endian unless stated otherwise.
 
 **Total header size: 96 bytes (0x60)**
 
+**Version 0x0002 additions**
+- `app_name` carries the canonical program name reported via `ps`/`info`. Whitespace is stripped and the executive truncates longer names to 31 bytes.
+- `flags` bit 1 (`FLAG_ALLOW_MULTIPLE`) controls instance policy. When the bit is cleared, the executive rejects additional loads with the same `app_name`. When set, the executive auto-suffixes `_#N` to create unique instance names.
+- `meta_offset` / `meta_count` enable the metadata section table described below. Loaders must reject tables that overlap the code or rodata segments.
+
 Immediately following the header:
 1. `code` section (`code_len` bytes) – executable VM code.
 2. `rodata` section (`ro_len` bytes) – read-only data.
@@ -92,6 +97,9 @@ Defines values to be registered by executive before VM execution. Each entry:
 
 **Entry size: 20 bytes**
 
+- **Executive handling:** Each `(group_id,value_id)` pair must be unique. The loader rejects values outside `0..255`. Absent strings resolve to `None`. The executive stores the raw f16 values (`init_raw`, `epsilon_raw`, `min_raw`, `max_raw`) while also exposing the decoded float fields. When `persist_key` is non-zero the runtime flags the value for FRAM persistence via `val.persist`.
+- **Validation:** Duplicate IDs or malformed string offsets cause the load to fail. The executive ignores entries when the section is omitted.
+
 ### `.cmd` Section (type=2)
 Defines commands to be registered. Each entry:
 
@@ -108,6 +116,8 @@ Defines commands to be registered. Each entry:
 
 **Entry size: 16 bytes**
 
+- **Executive handling:** Commands share the same `(group_id,value_id)` namespace as values. The `handler_offset` points to the VM entry point (relative to the code section). The executive enforces uniqueness and records the supplied names/help strings for debugger shells. Flags/auth levels map directly to the command SVC policy (`HSX_CMD_FL_PIN`, etc.).
+
 ### `.mailbox` Section (type=3)
 Defines mailboxes to be created. Each entry:
 
@@ -119,6 +129,8 @@ Defines mailboxes to be created. Each entry:
 | 0x08   | 8    | `reserved` | Reserved for future use. |
 
 **Entry size: 16 bytes**
+
+- **Executive handling:** `name_offset` resolves to a UTF-8 string that must include a recognised namespace prefix (`svc:`, `pid:`, `app:`, `shared:`). The executive binds the mailbox via `mailbox_bind`, applying `queue_depth` as the ring capacity (defaults to `HSX_MBX_DEFAULT_RING_CAPACITY` when `0`) and interpreting the flag bits as an access mode mask. Duplicate mailbox names within the same image abort the load.
 
 ### String Table
 Each section may reference a string table located at the end of that section. String offsets are relative to the section start. Strings are null-terminated UTF-8.
@@ -193,6 +205,7 @@ The toolchain processes preprocessor directives in HXE source code to generate m
 ## Executive/Provisioning Responsibilities
 - Validate magic/version/CRC before loading.
 - **Preprocess metadata sections**: Parse `.value`, `.cmd`, `.mailbox` sections and register entries with app's PID.
+- The Python executive rejects duplicate values/commands/mailboxes, ensures all IDs are byte-sized, and binds mailboxes before exposing the app to the VM. Mailbox binds reuse the existing mailbox manager so metadata-driven resources appear identical to runtime-created bindings.
 - **Strip metadata sections** before loading code/rodata/bss to VM (or VM ignores them).
 - Allocate code/rodata/bss based on header fields for VM execution.
 - Apply capability checks (`req_caps`) against hardware/executive features.

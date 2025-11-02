@@ -3009,10 +3009,24 @@ class VMController:
         task = self._get_task(pid)
         state = self.task_states.get(pid, {})
         ctx = state.get("context", {})
+        metadata_obj = self.metadata_by_pid.get(pid)
+        metadata_summary: Optional[Dict[str, int]] = None
+        if metadata_obj is not None:
+            try:
+                metadata_summary = {
+                    "sections": len(metadata_obj.sections),
+                    "values": len(metadata_obj.values),
+                    "commands": len(metadata_obj.commands),
+                    "mailboxes": len(metadata_obj.mailboxes),
+                }
+            except AttributeError:
+                pass
         return {
             "pid": pid,
             "program": task.get("program"),
             "state": task.get("state"),
+            "app_name": task.get("app_name"),
+            "app_name_base": task.get("app_name_base"),
             "pc": ctx.get("pc", task.get("pc")),
             "priority": task.get("priority"),
             "quantum": task.get("quantum"),
@@ -3021,6 +3035,7 @@ class VMController:
             "sleep_pending": task.get("sleep_pending", False),
             "exit_status": task.get("exit_status"),
             "trace": task.get("trace"),
+            "metadata": metadata_summary if metadata_summary else None,
         }
 
     def trace_task(self, pid: int, enable: Optional[bool]) -> Dict[str, Any]:

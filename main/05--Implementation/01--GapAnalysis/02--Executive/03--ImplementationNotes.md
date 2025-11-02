@@ -314,5 +314,23 @@ Start new sections chronologically. Keep notes concise but actionable so the nex
 - `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_metadata_preprocess.py`
 
 ### Follow-up actions / hand-off notes
-- Update `docs/hxe_format.md` and related protocol notes to reflect v2 header semantics and metadata availability.
-- Integrate metadata-driven value/command behaviour with the runtime services (e.g. SVC handlers, persistence) and add duplicate-instance regression coverage when metadata-driven loads land.
+- Wire the declarative value/command registries into the SVC backends (authorisation, persistence, async publication) so runtime behaviour mirrors the metadata.
+- Consider adding RPC/helpers for clients to query full metadata descriptors (names, units, ranges) when richer UI support is required.
+## 2025-11-02 - Codex (Session 16)
+
+### Focus
+- Task(s) tackled: Phase 3.3 app naming (instance policy, task snapshots, regression tests).
+- Dependencies touched: `platforms/python/host_vm.py`, `python/tests/test_app_names.py`, `main/05--Implementation/01--GapAnalysis/02--Executive/02--ImplementationPlan.md`.
+
+### Status
+- DONE
+
+### Details
+- Ensured MiniVM loader keeps the declarative `app_name` from v2 headers, added suffix management for multi-instance loads, and wired the resolved names + metadata summaries into task snapshots returned by `task_list()` / `ps`.
+- Added regression coverage verifying single/multiple instance flows and conflict handling; confirmed the executive raises an explicit `app_exists:<name>` error when policies forbid duplicates.
+
+### Tests run (commands + result)
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_app_names.py`
+
+### Follow-up actions / hand-off notes
+- Propagate the app-name metadata through higher-level tooling (CLI/TUI) where helpful (e.g., list commands) during later debugger milestones.

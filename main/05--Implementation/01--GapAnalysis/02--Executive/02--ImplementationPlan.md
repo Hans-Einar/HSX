@@ -337,7 +337,7 @@ Design specifies parsing .value/.cmd/.mailbox sections and registering resources
 - [x] Register mailbox bindings from .mailbox section
 - [x] Validate metadata before VM execution (check for conflicts)
 - [x] Add metadata preprocessing tests
-- [ ] Document metadata section formats
+- [x] Document metadata section formats
 
 ---
 
@@ -352,11 +352,11 @@ Design specifies extracting app_name from HXE header with multiple instance trac
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
-- [ ] Extract app_name from HXE header (v2 format)
-- [ ] Track app instances with _#0, _#1 suffixes
-- [ ] Return EEXIST error if multiple instances not allowed
-- [ ] Add app name to task state and ps output
-- [ ] Add app name tests (single instance, multiple instances, conflicts)
+- [x] Extract app_name from HXE header (v2 format)
+- [x] Track app instances with _#0, _#1 suffixes
+- [x] Return EEXIST error if multiple instances not allowed
+- [x] Add app name to task state and ps output
+- [x] Add app name tests (single instance, multiple instances, conflicts)
 - [ ] Document app naming conventions
 
 ---
