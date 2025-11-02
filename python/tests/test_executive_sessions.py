@@ -109,6 +109,7 @@ class TaskStateVM:
 def make_task_state_env() -> tuple[ExecutiveState, TaskStateVM]:
     vm = TaskStateVM()
     state = ExecutiveState(vm, step_batch=1)
+    state.enforce_context_isolation = False
     return state, vm
 
 
@@ -375,6 +376,73 @@ def test_trace_step_changed_regs_toggle_respected():
     assert "PC" not in changed
 
 
+def test_trace_buffer_captures_records():
+    state = make_state()
+    state.set_trace_buffer_size(4)
+    state._process_vm_events(
+        [
+            {
+                "type": "trace_step",
+                "pid": 1,
+                "pc": 0x140,
+                "regs": list(range(16)),
+                "flags": 0x5,
+                "opcode": 0xDEADBEEF,
+            }
+        ]
+    )
+    info = state.trace_records(1)
+    assert info["count"] == 1
+    record = info["records"][0]
+    assert record["pc"] == 0x140
+    assert record["opcode"] == 0xDEADBEEF
+    assert "changed_regs" in record
+
+
+def test_trace_buffer_capacity_trim():
+    state = make_state()
+    state.set_trace_buffer_size(2)
+    for offset in range(3):
+        pc = 0x100 + offset * 2
+        state._process_vm_events(
+            [
+                {
+                    "type": "trace_step",
+                    "pid": 1,
+                    "pc": pc,
+                    "regs": [pc] * 16,
+                    "flags": 0,
+                    "opcode": pc,
+                }
+            ]
+        )
+    info = state.trace_records(1)
+    assert info["count"] == 2
+    pcs = [rec["pc"] for rec in info["records"]]
+    assert pcs == [0x102, 0x104]
+
+
+def test_trace_buffer_disable_clears_records():
+    state = make_state()
+    state._process_vm_events(
+        [
+            {
+                "type": "trace_step",
+                "pid": 1,
+                "pc": 0x200,
+                "regs": [0] * 16,
+                "flags": 0,
+                "opcode": 0x1,
+            }
+        ]
+    )
+    assert state.trace_records(1)["count"] == 1
+    state.set_trace_buffer_size(0)
+    info = state.trace_records(1)
+    assert info["capacity"] == 0
+    assert info["count"] == 0
+
+
 def _task_state_events(state: ExecutiveState) -> List[dict]:
     return [evt for evt in state.event_history if evt.get("type") == "task_state"]
 
@@ -575,6 +643,7 @@ class DebugVM:
 def make_debug_state() -> tuple[ExecutiveState, DebugVM]:
     vm = DebugVM()
     state = ExecutiveState(vm)
+    state.enforce_context_isolation = False
     state.tasks[1] = {
         'pid': 1,
         'state': 'running',

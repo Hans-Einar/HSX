@@ -447,6 +447,8 @@ Design specifies executive never directly manipulates PC/SP/registers (sections 
 
 ## Phase 5: Trace Infrastructure
 
+> Status checkpoint 2025-11-03: Phases 1–4 are complete and event streaming is stable (ExecutiveSession fixes verified via shell and Blinkenlights). Begin Phase 5 with focus on 5.1 ring buffer implementation while keeping VM trace APIs reference handy (`platforms/python/host_vm.py::MiniVM.trace_last_*`).
+
 ### 5.1 Executive-Side Trace Storage
 
 **Priority:** MEDIUM  
@@ -458,13 +460,13 @@ Design specifies configurable trace buffers with variant-specific sizes (section
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
-- [ ] Implement trace record ring buffer (configurable size: 0, 100, 1000+ records)
-- [ ] Define trace record structure (seq, ts, pid, pc, opcode, regs, flags)
-- [ ] Add trace capture on each step (poll VM trace APIs)
-- [ ] Implement trace query API (get recent N records for PID)
-- [ ] Add trace buffer configuration (minimal: 0, development: 100, full: 1000+)
-- [ ] Add trace buffer tests (capture, query, overflow)
-- [ ] Document trace buffer configuration
+- [x] Implement trace record ring buffer (configurable size: 0, 100, 1000+ records)
+- [x] Define trace record structure (seq, ts, pid, pc, opcode, regs, flags)
+- [x] Add trace capture on each step (poll VM trace APIs)
+- [x] Implement trace query API (get recent N records for PID)
+- [x] Add trace buffer configuration (minimal: 0, development: 100, full: 1000+)
+- [x] Add trace buffer tests (capture, query, overflow)
+- [x] Document trace buffer configuration
 
 ---
 

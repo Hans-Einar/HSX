@@ -11,6 +11,8 @@
 ## Commit Log
 | Date | Commit hash | Message | Author | Notes |
 | --- | --- | --- | --- | --- |
+| 2025-11-02 | b768e7c | Event stream handshake fixes & Blinkenlights bring-up | Hans Einar | Manual validation: shell event stream, `python python/blinkenlights.py --debug` |
+| 2025-11-03 | pending | Phase 5.1 trace ring buffer + CLI/docs | Codex | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py python/tests/test_shell_client.py` |
 | 2025-11-02 | 69df86f9a9cf | Mid-cycle review & trace config | Hans Einar | Follows code review: adds trace-config toggle, removes implicit PC deltas; tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py` |
 | 2025-11-01 | 75fc1873b0db | Trace step changed_regs diffing | Hans Einar | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py` |
 | 2025-11-01 | 8fec000f4dd9 | Task state events & docs | Hans Einar | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py` |

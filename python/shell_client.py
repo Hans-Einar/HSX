@@ -938,9 +938,73 @@ def _pretty_trace(payload: dict) -> None:
         print(json.dumps(payload, indent=2, sort_keys=True))
         return
     info = payload.get("trace", {})
+    if not isinstance(info, dict):
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    records = info.get("records")
+    if isinstance(records, list):
+        pid = info.get("pid")
+        count = info.get("count", len(records))
+        returned = info.get("returned", len(records))
+        capacity = info.get("capacity")
+        enabled = info.get("enabled")
+        print(f"trace records: pid={pid} returned={returned}/{count} capacity={capacity} enabled={enabled}")
+        if not records:
+            print("  (no trace records)")
+            return
+
+        def _fmt_hex(value: object, width: int = 4) -> str:
+            try:
+                intval = int(value) & ((1 << (width * 4)) - 1)
+                return f"0x{intval:0{width}X}"
+            except (TypeError, ValueError):
+                return str(value)
+
+        def _fmt_ts(value: object) -> str:
+            try:
+                return f"{float(value):.6f}"
+            except (TypeError, ValueError):
+                return str(value)
+
+        for rec in records:
+            if not isinstance(rec, dict):
+                print(f"  {rec}")
+                continue
+            seq = rec.get("seq")
+            ts = rec.get("ts")
+            pc = rec.get("pc")
+            opcode = rec.get("opcode")
+            next_pc = rec.get("next_pc")
+            flags = rec.get("flags")
+            steps = rec.get("steps")
+            changed = rec.get("changed_regs") or []
+            line = f"  seq={seq}"
+            if ts is not None:
+                line += f" ts={_fmt_ts(ts)}"
+            if pc is not None:
+                line += f" pc={_fmt_hex(pc, 4)}"
+            if opcode is not None:
+                line += f" opcode={_fmt_hex(opcode, 8)}"
+            if next_pc is not None:
+                line += f" next={_fmt_hex(next_pc, 4)}"
+            if flags is not None:
+                line += f" flags={_fmt_hex(flags, 2)}"
+            if steps is not None:
+                line += f" steps={steps}"
+            if changed:
+                line += f" changed={','.join(str(item) for item in changed)}"
+            print(line)
+        return
+
     print("trace:")
-    print(f"  pid     : {info.get('pid')}")
-    print(f"  enabled : {info.get('enabled')}")
+    if "pid" in info:
+        print(f"  pid     : {info.get('pid')}")
+    if "enabled" in info:
+        print(f"  enabled : {info.get('enabled')}")
+    if "buffer_size" in info:
+        print(f"  buffer  : {info.get('buffer_size')}")
+    if "changed_regs" in info and isinstance(info.get("changed_regs"), bool):
+        print(f"  changed_regs : {info.get('changed_regs')}")
 
 
 def _pretty_listen(payload: dict) -> None:
@@ -1543,15 +1607,38 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
 
     if cmd == "trace":
         if not args:
-            raise ValueError("trace requires <pid> [on|off] or 'config changed-regs <on|off>'")
+            raise ValueError("trace requires <pid> [on|off|records <limit>] or 'config <option>'")
         first = args[0].lower()
         if first == "config":
-            if len(args) < 3 or args[1].lower() != "changed-regs":
-                raise ValueError("trace config usage: trace config changed-regs <on|off>")
+            if len(args) < 3:
+                raise ValueError("trace config usage: trace config changed-regs <on|off> | buffer <size>")
             payload["op"] = "config"
-            payload["changed_regs"] = args[2]
+            setting = args[1].lower()
+            if setting == "changed-regs":
+                payload["changed_regs"] = args[2]
+            elif setting == "buffer":
+                try:
+                    payload["buffer_size"] = int(args[2], 0)
+                except ValueError as exc:
+                    raise ValueError("trace config buffer requires integer size") from exc
+            else:
+                raise ValueError("trace config usage: trace config changed-regs <on|off> | buffer <size>")
             return payload
-        payload["pid"] = args[0]
+        try:
+            payload["pid"] = int(args[0], 0)
+        except ValueError as exc:
+            raise ValueError("trace requires integer pid") from exc
+        if len(args) == 1:
+            return payload
+        subcmd = args[1].lower()
+        if subcmd in {"records", "history"}:
+            payload["op"] = "records"
+            if len(args) > 2:
+                try:
+                    payload["limit"] = int(args[2], 0)
+                except ValueError as exc:
+                    raise ValueError("trace records limit must be integer") from exc
+            return payload
         if len(args) > 1:
             payload["mode"] = args[1]
         return payload

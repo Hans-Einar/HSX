@@ -268,6 +268,11 @@ class ExecutiveState:
         self.task_state_pending: Dict[int, Dict[str, Any]] = {}
         self.trace_last_regs: Dict[int, Dict[str, Any]] = {}
         self.trace_track_changed_regs = True
+        self.trace_lock = threading.RLock()
+        self.trace_buffer_capacity = 256
+        self.trace_buffer_max = 4096
+        self.trace_buffers: Dict[int, Deque[Dict[str, Any]]] = {}
+        self._trace_seq = 1
         self.symbol_cache_lock = threading.RLock()
         self.default_stack_frames = 16
         self.last_state_transition: Dict[int, Dict[str, Any]] = {}
@@ -2150,6 +2155,71 @@ class ExecutiveState:
         if self.trace_track_changed_regs and changed:
             payload["changed_regs"] = changed
         self.trace_last_regs[pid] = {"regs": clean_regs, "pc": pc_value, "flags": flags_value}
+        self._append_trace_record(pid, payload, clean_regs, pc_value, flags_value)
+
+    def _next_trace_seq_locked(self) -> int:
+        seq = self._trace_seq
+        self._trace_seq += 1
+        if self._trace_seq > 1_000_000_000:
+            self._trace_seq = 1
+        return seq
+
+    def _append_trace_record(
+        self,
+        pid: int,
+        payload: Dict[str, Any],
+        regs: List[int],
+        pc: Optional[int],
+        flags: Optional[int],
+    ) -> None:
+        if self.trace_buffer_capacity <= 0:
+            return
+        timestamp = time.time()
+        opcode = self._optional_int(payload.get("opcode"))
+        next_pc = self._optional_int(payload.get("next_pc"))
+        steps = self._optional_int(payload.get("steps"))
+        changed = payload.get("changed_regs")
+        with self.trace_lock:
+            if self.trace_buffer_capacity <= 0:
+                return
+            buffer = self.trace_buffers.get(pid)
+            if buffer is None or buffer.maxlen != self.trace_buffer_capacity:
+                buffer = deque(maxlen=self.trace_buffer_capacity)
+                self.trace_buffers[pid] = buffer
+            record: Dict[str, Any] = {
+                "seq": self._next_trace_seq_locked(),
+                "ts": timestamp,
+                "pid": pid,
+                "pc": pc if pc is not None else self._optional_int(payload.get("pc")),
+                "opcode": opcode,
+                "flags": flags,
+                "regs": tuple(regs),
+            }
+            if isinstance(changed, (list, tuple)):
+                record["changed_regs"] = tuple(str(item) for item in changed)
+            if next_pc is not None:
+                record["next_pc"] = next_pc
+            if steps is not None:
+                record["steps"] = steps
+            source = payload.get("source")
+            if source is not None:
+                record["source"] = source
+            buffer.append(record)
+
+    @staticmethod
+    def _clone_trace_record(record: Dict[str, Any]) -> Dict[str, Any]:
+        clone = dict(record)
+        regs = clone.get("regs")
+        if isinstance(regs, tuple):
+            clone["regs"] = [int(value) & 0xFFFFFFFF for value in regs]
+        elif isinstance(regs, list):
+            clone["regs"] = [int(value) & 0xFFFFFFFF for value in regs]
+        changed = clone.get("changed_regs")
+        if isinstance(changed, tuple):
+            clone["changed_regs"] = list(changed)
+        elif isinstance(changed, list):
+            clone["changed_regs"] = list(changed)
+        return clone
 
     def _parse_event_filters(self, filters: Optional[Dict[str, Any]]) -> Tuple[Optional[Set[int]], Optional[Set[str]], Optional[int]]:
         if not isinstance(filters, dict):
@@ -2554,6 +2624,8 @@ class ExecutiveState:
         stale_trace = set(self.trace_last_regs.keys()) - current_pids
         for pid in stale_trace:
             self.trace_last_regs.pop(pid, None)
+            with self.trace_lock:
+                self.trace_buffers.pop(pid, None)
 
     def log(self, level: str, message: str, **fields: Any) -> None:
         entry = {
@@ -2793,7 +2865,7 @@ class ExecutiveState:
         return {"changed_regs": self.trace_track_changed_regs}
 
     def trace_task(self, pid: int, enable: Optional[bool]) -> Dict[str, Any]:
-        result = self.vm.trace(pid, enable)
+        result = dict(self.vm.trace(pid, enable) or {})
         pid_val = int(result.get("pid", pid))
         state_entry = self.task_states.get(pid_val, {})
         context = state_entry.get("context", {})
@@ -2802,7 +2874,58 @@ class ExecutiveState:
         self.task_states[pid_val] = state_entry
         if pid_val in self.tasks:
             self.tasks[pid_val]["trace"] = result.get("enabled")
+        result["buffer_size"] = self.trace_buffer_capacity
         return result
+
+    def set_trace_buffer_size(self, size: int) -> Dict[str, Any]:
+        try:
+            new_size = int(size)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("trace buffer size must be integer") from exc
+        if new_size < 0:
+            raise ValueError("trace buffer size must be non-negative")
+        if new_size > self.trace_buffer_max:
+            new_size = self.trace_buffer_max
+        with self.trace_lock:
+            self.trace_buffer_capacity = new_size
+            if new_size == 0:
+                self.trace_buffers.clear()
+            else:
+                for pid, buffer in list(self.trace_buffers.items()):
+                    if buffer.maxlen != new_size:
+                        recent = list(buffer)[-new_size:]
+                        self.trace_buffers[pid] = deque(recent, maxlen=new_size)
+        return {"buffer_size": self.trace_buffer_capacity}
+
+    def trace_records(self, pid: int, limit: Optional[int] = None) -> Dict[str, Any]:
+        capacity = self.trace_buffer_capacity
+        with self.trace_lock:
+            buffer = self.trace_buffers.get(pid)
+            count = len(buffer) if buffer is not None else 0
+            if limit is not None:
+                try:
+                    limit_int = int(limit)
+                except (TypeError, ValueError) as exc:
+                    raise ValueError("trace records limit must be integer-compatible") from exc
+                if limit_int <= 0:
+                    records: List[Dict[str, Any]] = []
+                else:
+                    records = list(buffer)[-limit_int:] if buffer is not None else []
+            else:
+                records = list(buffer) if buffer is not None else []
+            cloned = [self._clone_trace_record(item) for item in records]
+        enabled = None
+        task = self.tasks.get(pid)
+        if isinstance(task, dict):
+            enabled = bool(task.get("trace"))
+        return {
+            "pid": pid,
+            "capacity": capacity,
+            "count": count,
+            "returned": len(cloned),
+            "enabled": enabled,
+            "records": cloned,
+        }
 
     def task_list(self) -> Dict[str, Any]:
         self._refresh_tasks()
@@ -3771,22 +3894,39 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 raise ValueError(f"unknown sym op '{op}'")
             if cmd == "trace":
                 op_raw = request.get("op")
-                if op_raw is not None and str(op_raw).strip().lower() == "config":
-                    changed_value = request.get("changed_regs")
-                    if changed_value is None:
-                        raise ValueError("trace.config requires 'changed_regs'")
-                    if isinstance(changed_value, bool):
-                        enabled = changed_value
-                    else:
-                        mode_str = str(changed_value).strip().lower()
-                        if mode_str in {"on", "true", "1"}:
-                            enabled = True
-                        elif mode_str in {"off", "false", "0"}:
-                            enabled = False
-                        else:
-                            raise ValueError("trace.config changed_regs must be 'on' or 'off'")
-                    info = self.state.set_trace_changed_regs(enabled)
-                    return {"version": 1, "status": "ok", "trace": info}
+                if op_raw is not None:
+                    op = str(op_raw).strip().lower()
+                    if op == "config":
+                        if "changed_regs" in request:
+                            changed_value = request.get("changed_regs")
+                            if isinstance(changed_value, bool):
+                                enabled = changed_value
+                            else:
+                                if changed_value is None:
+                                    raise ValueError("trace.config requires 'changed-regs <on|off>' or 'buffer <size>'")
+                                mode_str = str(changed_value).strip().lower()
+                                if mode_str in {"on", "true", "1"}:
+                                    enabled = True
+                                elif mode_str in {"off", "false", "0"}:
+                                    enabled = False
+                                else:
+                                    raise ValueError("trace.config changed_regs must be 'on' or 'off'")
+                            info = self.state.set_trace_changed_regs(enabled)
+                            return {"version": 1, "status": "ok", "trace": info}
+                        if "buffer_size" in request:
+                            info = self.state.set_trace_buffer_size(request.get("buffer_size"))
+                            return {"version": 1, "status": "ok", "trace": info}
+                        raise ValueError("trace.config requires 'changed-regs <on|off>' or 'buffer <size>'")
+                    if op in {"records", "history"}:
+                        pid_value = request.get("pid")
+                        if pid_value is None:
+                            raise ValueError("trace records requires 'pid'")
+                        pid_int = int(pid_value)
+                        self.state.ensure_pid_access(pid_int, session_id)
+                        limit_value = request.get("limit")
+                        info = self.state.trace_records(pid_int, limit=limit_value)
+                        return {"version": 1, "status": "ok", "trace": info}
+                    raise ValueError(f"unknown trace op '{op}'")
                 pid_value = request.get("pid")
                 if pid_value is None:
                     raise ValueError("trace requires 'pid'")

@@ -412,3 +412,46 @@ Start new sections chronologically. Keep notes concise but actionable so the nex
 
 ### Follow-up actions / hand-off notes
 - When the TUI/IDE debugger milestones land, ensure they consume the new register APIs instead of relying on full `dumpregs` snapshots, and keep the context isolation flag enabled in CI.
+
+## 2025-11-03 - Codex (Session 21)
+
+### Focus
+- Task(s) tackled: Event-stream handshake regression (Blinkenlights hang) and runtime validation.
+- Dependencies touched: `python/executive_session.py`, `python/tests/test_executive_session_helpers.py`, `python/blinkenlights.py`, runtime smoke setup.
+
+### Status
+- DONE
+
+### Details
+- Identified lock re-entrancy deadlock in `ExecutiveSession.start_event_stream`; moved session negotiation outside the held mutex and added socket timeout reset to unblock subscribers.
+- Hardened `_event_stream_worker` to tolerate socket timeouts so long-polling readers stay alive.
+- Added regression coverage ensuring `_open_event_stream` is invoked once per session and records filter/ack parameters.
+- Validated shell and Blinkenlights clients establish event streams and receive updates without hanging.
+
+### Tests run (commands + result)
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_session_helpers.py` ✅
+- Manual: `python python/shell_client.py --host 127.0.0.1 --port 9998` (events command), `python python/blinkenlights.py --debug`
+
+### Follow-up actions / hand-off notes
+- Add an integration test harness that runs executive + VM to exercise event streaming under load once infrastructure permits.
+
+## 2025-11-03 - Codex (Session 22)
+
+### Focus
+- Task(s) tackled: Phase 5.1 trace storage (ring buffer, query/config plumbing, CLI/docs/tests).
+- Dependencies touched: `python/execd.py`, `python/shell_client.py`, `python/executive_session.py`, `python/tests/test_executive_sessions.py`, `python/tests/test_shell_client.py`, `docs/executive_protocol.md`, `help/trace.txt`.
+
+### Status
+- DONE
+
+### Details
+- Added per-task trace ring buffers with configurable capacity, sequence counters, and capture hooks wired into `trace_step` processing.
+- Exposed `trace.records` RPC plus CLI plumbing (`trace <pid> records [limit]`) and `trace config buffer <size>`; updated pretty-printers, help text, and protocol docs.
+- Extended unit coverage for trace buffering (capture, trimming, disable path) and CLI payload builders/output formatting.
+- Hardened ExecutiveSession stream worker to reset socket timeouts after the subscribe handshake (regression from prior session) and updated tests accordingly.
+
+### Tests run (commands + result)
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py python/tests/test_shell_client.py` ✅
+
+### Follow-up actions / hand-off notes
+- Build on the stored trace records for downstream debugger visualisations (Phase 5.2/5.3); consider adding integration coverage once the VM-side trace APIs grow beyond polling events.
