@@ -326,7 +326,7 @@ def test_mailbox_svc_recv_timeout_populates_info_struct():
 
     state = controller.task_states[1]
     regs = state["context"]["regs"]
-    assert regs[0] == mbx_const.HSX_MBX_STATUS_NO_DATA
+    assert regs[0] == mbx_const.HSX_MBX_STATUS_TIMEOUT
     assert regs[1] == 0
     assert regs[2] == 0
     assert regs[3] == 0
@@ -335,7 +335,7 @@ def test_mailbox_svc_recv_timeout_populates_info_struct():
         vm.mem[info_ptr : info_ptr + RECV_INFO_STRUCT.size]
     )
     assert info_values == (
-        mbx_const.HSX_MBX_STATUS_NO_DATA,
+        mbx_const.HSX_MBX_STATUS_TIMEOUT,
         0,
         0,
         0,

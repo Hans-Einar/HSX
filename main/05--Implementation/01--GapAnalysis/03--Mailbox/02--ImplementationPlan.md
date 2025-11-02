@@ -34,13 +34,13 @@ Design specifies `HSX_MBX_STATUS_TIMEOUT` (0x07) for timeout expiry (section 5.1
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.03--Mailbox](../../../04--Design/04.03--Mailbox.md)
-- [ ] Add `HSX_MBX_STATUS_TIMEOUT` (0x07) to `include/hsx_mailbox.h`
-- [ ] Add `HSX_MBX_STATUS_TIMEOUT` to `python/hsx_mailbox_constants.py`
-- [ ] Update mailbox manager to return TIMEOUT status on expiry
-- [ ] Update SVC handler to map TIMEOUT status correctly
-- [ ] Add timeout status tests (finite timeout expiry scenarios)
-- [ ] Update `docs/abi_syscalls.md` with TIMEOUT status code
-- [ ] Verify constant synchronization tests pass
+- [x] Add `HSX_MBX_STATUS_TIMEOUT` (0x07) to `include/hsx_mailbox.h`
+- [x] Add `HSX_MBX_STATUS_TIMEOUT` to `python/hsx_mailbox_constants.py`
+- [x] Update mailbox manager to return TIMEOUT status on expiry
+- [x] Update SVC handler to map TIMEOUT status correctly
+- [x] Add timeout status tests (finite timeout expiry scenarios)
+- [x] Update `docs/abi_syscalls.md` with TIMEOUT status code
+- [x] Verify constant synchronization tests pass
 
 ---
 

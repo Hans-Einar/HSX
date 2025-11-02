@@ -88,5 +88,5 @@ def test_mailbox_recv_timeout_marks_task_ready():
     assert not controller.waiting_tasks
     assert controller.tasks[1]["state"] in {"ready", "running", "returned"}
     regs = controller.task_states[1]["context"]["regs"]
-    assert regs[0] == mbx_const.HSX_MBX_STATUS_NO_DATA
+    assert regs[0] == mbx_const.HSX_MBX_STATUS_TIMEOUT
     assert regs[1] == 0

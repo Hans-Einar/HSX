@@ -2691,7 +2691,7 @@ class VMController:
             descriptor_id = info.get("descriptor_id")
             self._complete_mailbox_wait(
                 pid,
-                status=mbx_const.HSX_MBX_STATUS_NO_DATA,
+                status=mbx_const.HSX_MBX_STATUS_TIMEOUT,
                 descriptor_id=descriptor_id,
                 message=None,
                 timed_out=True,

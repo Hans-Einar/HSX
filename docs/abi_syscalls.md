@@ -15,7 +15,7 @@ Sources:
 - `R0` carries the return value. Some calls (for example `TASK_EXIT`) pass input arguments through `R0` before the handler overwrites it on return.
 - `R1`..`R5` carry positional arguments as documented below. Registers above `R5` are caller saved.
 - Unknown module or function pairs set `R0 = HSX_ERR_ENOSYS` (0xFFFF_FF01). Fatal VM faults raise the other `HSX_ERR_*` codes defined in `platforms/python/host_vm.py`.
-- Mailbox calls return status codes defined in `include/hsx_mailbox.h`. Success is `HSX_MBX_STATUS_OK` (0).
+- Mailbox calls return status codes defined in `include/hsx_mailbox.h`. Success is `HSX_MBX_STATUS_OK` (0), non-blocking polls return `HSX_MBX_STATUS_NO_DATA`, and blocking receives that expire now return `HSX_MBX_STATUS_TIMEOUT` (0x0007).
 - All return values are 32 bit. The low 16 bits carry f16 payloads where noted.
 
 ## VM ISA notes
@@ -77,7 +77,7 @@ Sources:
 | 0x00 | MAILBOX_OPEN | target_ptr | flags | - | - | - | Status; R1 = handle | Implemented | Flags use `HSX_MBX_MODE_*`. Empty target selects the PID namespace (`include/hsx_mailbox.h`, `platforms/python/host_vm.py:1341`). |
 | 0x01 | MAILBOX_BIND | target_ptr | capacity | mode_mask | - | - | Status; R1 = descriptor_id | Implemented | Capacity 0 uses the default ring (`platforms/python/host_vm.py:1347`). |
 | 0x02 | MAILBOX_SEND | handle | payload_ptr | length | flags | channel | Status; R1 = bytes sent | Implemented | Non blocking; returns `HSX_MBX_STATUS_WOULDBLOCK` if the ring is full (`platforms/python/host_vm.py:1354`). |
-| 0x03 | MAILBOX_RECV | handle | buffer_ptr | max_len | timeout | info_ptr | Status; R1 = bytes, R2 = flags, R3 = channel, R4 = src_pid | Implemented | Python handler ignores timeout and info_ptr and behaves like poll (`platforms/python/host_vm.py:1364`). |
+| 0x03 | MAILBOX_RECV | handle | buffer_ptr | max_len | timeout | info_ptr | Status; R1 = bytes, R2 = flags, R3 = channel, R4 = src_pid | Implemented | Python handler honours finite/infinite timeouts, populates the optional info struct, and returns `HSX_MBX_STATUS_TIMEOUT` when waits expire (`platforms/python/host_vm.py:2330`). |
 | 0x04 | MAILBOX_PEEK | handle | - | - | - | - | Status; R1 = depth, R2 = bytes_used, R3 = next_len | Implemented | Provides ring statistics (`platforms/python/host_vm.py:1377`). |
 | 0x05 | MAILBOX_TAP | handle | enable (0 or 1) | - | - | - | Status | Implemented | Toggles tap copy (`platforms/python/host_vm.py:1384`). |
 | 0x06 | MAILBOX_CLOSE | handle | - | - | - | - | Status | Implemented | Releases handle (`platforms/python/host_vm.py:1335`). |
@@ -130,4 +130,3 @@ Planned per [docs/hsx_value_interface.md](hsx_value_interface.md). Calls current
 - Complete the rollout by updating all payloads/tooling to issue executive control traps through module 0x06, then remove the legacy module 0x07 alias once the value and command services are available ([main/03--Architecture/03.04--ValCmd.md](../main/03--Architecture/03.04--ValCmd.md)).
 - Define a canonical "module version" query (candidate: `EXEC_GET_VERSION`, module 0x06) so payloads can negotiate required capabilities with the host executive. The call should accept a module ID in `R1` and return a structured version/feature bitmap in `R0`/`R1`.
 - Implement the value and command services as specified in [docs/hsx_value_interface.md](hsx_value_interface.md), wiring persistence and mailbox bindings through the executive.
-- Extend the mailbox handler to honour the timeout and info pointer parameters for `MAILBOX_RECV` so blocking semantics match [main/03--Architecture/03.03--Mailbox.md](../main/03--Architecture/03.03--Mailbox.md).
