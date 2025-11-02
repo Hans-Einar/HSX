@@ -21,7 +21,7 @@
 | 2025-11-02 | 7fd0dae | Phase 3.3 app naming + metadata surfacing | Codex | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_app_names.py` |
 | 2025-11-02 | pending | Phase 4.1/4.2 state machine + wait/wake | Codex | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest` (237) |
 | 2025-11-02 | pending | Phase 4.3 scheduler events | Codex | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_scheduler_state_machine.py` |
-| 2025-11-02 | pending | Phase 4.4 context isolation groundwork | Codex | Notes: auditing executive for direct context access; introducing dedicated VM register APIs per issue #2_scheduler. Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_scheduler_state_machine.py python/tests/test_vmclient_reg_api.py` |
+| 2025-11-03 | e503785 | Phase 4.4 context isolation | Codex | Adds VM register RPCs + executive guards; Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_scheduler_state_machine.py python/tests/test_vmclient_reg_api.py` |
 | 2025-11-01 | 20c4782e99a8 | Disassembly RPC & CLI | Codex | Tests: `/mnt/c/Windows/py.exe -3.14 -m pytest python/tests/test_executive_session_helpers.py python/tests/test_executive_sessions.py` |
 | 2025-11-01 | f1eefc19062a | Stack UI drill-down & summaries | Codex | Tests: `/mnt/c/Windows/py.exe -3.14 -m pytest python/tests/test_executive_session_helpers.py python/tests/test_executive_sessions.py` |
 | 2025-11-01 | 8bd0c21e460a | Stack helpers & client plumbing | Codex | Tests: `/mnt/c/Windows/py.exe -3.14 -m pytest python/tests/test_executive_session_helpers.py python/tests/test_executive_sessions.py` |

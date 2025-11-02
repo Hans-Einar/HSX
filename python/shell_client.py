@@ -95,6 +95,8 @@ _DEFAULT_EVENT_FILTER = {
 
 _SESSION_MANAGER: Optional[ExecutiveSession] = None
 _SESSION_LOCK = threading.Lock()
+_EVENT_STREAM_STARTED = False
+_EVENT_STREAM_LOCK = threading.Lock()
 
 
 def _ensure_session(host: str, port: int, *, auto_events: bool = False) -> ExecutiveSession:
@@ -117,12 +119,39 @@ def _ensure_session(host: str, port: int, *, auto_events: bool = False) -> Execu
     return session
 
 
+def _ensure_event_stream(session: ExecutiveSession) -> None:
+    global _EVENT_STREAM_STARTED
+    with _EVENT_STREAM_LOCK:
+        if _EVENT_STREAM_STARTED:
+            return
+        _EVENT_STREAM_STARTED = True
+
+    def _runner() -> None:
+        global _EVENT_STREAM_STARTED
+        try:
+            ok = session.start_event_stream(filters=_DEFAULT_EVENT_FILTER, callback=None, ack_interval=5)
+        except Exception as exc:  # pragma: no cover - diagnostic helper
+            print(f"[events] failed to subscribe: {exc}")
+            with _EVENT_STREAM_LOCK:
+                _EVENT_STREAM_STARTED = False
+        else:
+            if not ok:
+                print("[events] streaming unavailable (executive declined feature)")
+                with _EVENT_STREAM_LOCK:
+                    _EVENT_STREAM_STARTED = False
+
+    threading.Thread(target=_runner, name="hsx-shell-events-init", daemon=True).start()
+
+
 def _close_session() -> None:
     global _SESSION_MANAGER
+    global _EVENT_STREAM_STARTED
     with _SESSION_LOCK:
         if _SESSION_MANAGER is not None:
             _SESSION_MANAGER.close()
             _SESSION_MANAGER = None
+    with _EVENT_STREAM_LOCK:
+        _EVENT_STREAM_STARTED = False
 
 
 atexit.register(_close_session)
@@ -1968,11 +1997,16 @@ def _build_sym_payload(args: list[str]) -> dict:
         payload["path"] = tokens[1]
         return payload
     raise ValueError(f"sym unknown subcommand '{subcmd}'")
+
+
 def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: bool = False) -> None:
     _init_history()
     current_dir = (cwd or Path.cwd()).resolve()
-    _ensure_session(host, port, auto_events=True)
-    print(f"Connected to executive at {host}:{port}. Type 'help' for commands or 'help <command>' for details.")
+    print(f"Connecting to executive at {host}:{port} ...", end="", flush=True)
+    session = _ensure_session(host, port, auto_events=False)
+    print(" connected.")
+    print("Type 'help' for commands or 'help <command>' for details.")
+    _ensure_event_stream(session)
     while True:
         try:
             line = input('hsx> ')
@@ -2005,7 +2039,7 @@ def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: boo
             else:
                 args.append(token)
 
-        session = _ensure_session(host, port, auto_events=True)
+        session = _ensure_session(host, port, auto_events=False)
 
         if cmd == 'help':
             if args:
