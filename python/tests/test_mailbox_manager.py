@@ -184,6 +184,29 @@ def test_descriptor_pool_exhaustion_raises_with_status():
     assert exc.value.code == mbx_const.HSX_MBX_STATUS_NO_DESCRIPTOR
 
 
+def test_resource_stats_initial_state():
+    mgr = MailboxManager(max_descriptors=32)
+    stats = mgr.resource_stats()
+    assert stats["max_descriptors"] == 32
+    assert stats["active_descriptors"] == 0
+    assert stats["handles_total"] == 0
+    assert stats["handles_per_pid"] == {}
+
+
+def test_resource_stats_with_handles_and_messages():
+    mgr = MailboxManager(max_descriptors=8)
+    mgr.register_task(1)
+    handle = mgr.open(pid=1, target="svc:stdio.out")
+    ok, _ = mgr.send(pid=1, handle=handle, payload=b"ping")
+    assert ok is True
+    stats = mgr.resource_stats()
+    assert stats["active_descriptors"] >= 1
+    assert stats["handles_total"] >= 1
+    assert stats["handles_per_pid"].get(1) >= 1
+    assert stats["bytes_used"] >= len("ping")
+    assert stats["queue_depth"] >= 1
+
+
 def test_app_namespace_reused_across_pids():
     mgr = MailboxManager()
     consumer_handle = mgr.open(pid=1, target="app:demo")

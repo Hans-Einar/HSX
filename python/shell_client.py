@@ -1344,6 +1344,7 @@ def _pretty_mbox(payload: dict) -> None:
         print(json.dumps(payload, indent=2, sort_keys=True))
         return
     descriptors = payload.get("descriptors") or []
+    stats = payload.get("stats") or {}
     filter_pid = payload.get("_filter_pid")
     filter_namespace = payload.get("_filter_namespace")
     filtered: list[dict] = []
@@ -1358,6 +1359,31 @@ def _pretty_mbox(payload: dict) -> None:
             continue
         filtered.append(desc)
     print("mbox:")
+    if stats:
+        max_desc = stats.get("max_descriptors")
+        active_desc = stats.get("active_descriptors")
+        free_desc = stats.get("free_descriptors")
+        bytes_used = stats.get("bytes_used")
+        bytes_available = stats.get("bytes_available")
+        queue_depth = stats.get("queue_depth")
+        total_handles = stats.get("handles_total")
+        print("  summary:")
+        if max_desc is not None and active_desc is not None:
+            free_repr = f", free {free_desc}" if free_desc is not None else ""
+            print(f"    descriptors : {active_desc}/{max_desc}{free_repr}")
+        if bytes_used is not None:
+            detail = f"{bytes_used} B"
+            if bytes_available is not None:
+                detail += f" used, {bytes_available} B free"
+            print(f"    capacity    : {detail}")
+        if queue_depth is not None:
+            print(f"    queue depth : {queue_depth}")
+        if total_handles is not None:
+            print(f"    handles     : {total_handles}")
+        handles_per_pid = stats.get("handles_per_pid") or {}
+        if handles_per_pid:
+            formatted = ", ".join(f"{pid}:{count}" for pid, count in sorted(handles_per_pid.items()))
+            print(f"    handles/pid : {formatted}")
     if filter_namespace is not None:
         print(f"  namespace : {filter_namespace}")
     if filter_pid is not None:

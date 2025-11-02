@@ -101,14 +101,14 @@ Design specifies tracking descriptor usage, queue depth, memory footprint (secti
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.03--Mailbox](../../../04--Design/04.03--Mailbox.md)
-- [ ] Add descriptor usage tracking (active descriptors, max pool size)
-- [ ] Add per-descriptor queue depth tracking (current/max messages)
-- [ ] Add memory footprint calculation (descriptor overhead + message data)
-- [ ] Implement `mailbox_stats()` API to query resource usage
-- [ ] Add RPC command `mailbox_snapshot` enhancement for resource stats
-- [ ] Add per-task handle count tracking
-- [ ] Add resource monitoring tests
-- [ ] Document resource monitoring APIs
+- [x] Add descriptor usage tracking (active descriptors, max pool size)
+- [x] Add per-descriptor queue depth tracking (current/max messages)
+- [x] Add memory footprint calculation (descriptor overhead + message data)
+- [x] Implement `mailbox_stats()` API to query resource usage
+- [x] Add RPC command `mailbox_snapshot` enhancement for resource stats
+- [x] Add per-task handle count tracking
+- [x] Add resource monitoring tests
+- [x] Document resource monitoring APIs
 
 ---
 

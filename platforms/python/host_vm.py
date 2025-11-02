@@ -1935,8 +1935,11 @@ class VMController:
         self.metadata_by_pid.clear()
         return {"status": "ok"}
 
-    def mailbox_snapshot(self) -> List[Dict[str, Any]]:
-        return self.mailboxes.descriptor_snapshot()
+    def mailbox_snapshot(self) -> Dict[str, Any]:
+        return {
+            "descriptors": self.mailboxes.descriptor_snapshot(),
+            "stats": self.mailboxes.resource_stats(),
+        }
 
     def mailbox_open(self, pid: int, target: str, flags: int = 0) -> Dict[str, Any]:
         try:
@@ -3886,7 +3889,13 @@ class VMController:
                 task = self.set_task_attrs(pid, priority=priority, quantum=quantum)
                 return {"status": "ok", "task": task}
             if cmd == "mailbox_snapshot":
-                return {"status": "ok", "descriptors": self.mailbox_snapshot()}
+                snapshot = self.mailbox_snapshot()
+                payload = {"status": "ok"}
+                if isinstance(snapshot, dict):
+                    payload.update(snapshot)
+                else:
+                    payload["descriptors"] = snapshot
+                return payload
             if cmd == "mailbox_stdio_summary":
                 pid_value = request.get("pid")
                 stream_value = request.get("stream")

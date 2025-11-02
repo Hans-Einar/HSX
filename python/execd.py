@@ -3043,8 +3043,11 @@ class ExecutiveState:
         self._refresh_tasks()
         return attrs
 
-    def mailbox_snapshot(self) -> List[Dict[str, Any]]:
-        return self.vm.mailbox_snapshot()
+    def mailbox_snapshot(self) -> Dict[str, Any]:
+        snapshot = self.vm.mailbox_snapshot()
+        if isinstance(snapshot, dict):
+            return snapshot
+        return {"descriptors": snapshot, "stats": {}}
 
     def mailbox_open(self, pid: int, target: str, flags: int = 0) -> dict:
         return self.vm.mailbox_open(pid, target, flags)
@@ -3068,7 +3071,8 @@ class ExecutiveState:
         return self.vm.mailbox_tap(pid, handle, enable=enable)
 
     def list_channels(self, pid: int) -> Dict[str, Any]:
-        descriptors = self.mailbox_snapshot()
+        snapshot = self.mailbox_snapshot()
+        descriptors = snapshot.get("descriptors", []) if isinstance(snapshot, dict) else snapshot
         channels: List[Dict[str, Any]] = []
         for desc in descriptors:
             owner = desc.get("owner_pid")
@@ -3408,7 +3412,8 @@ class ExecutiveState:
         return trace
 
     def listen_stdout(self, pid: Optional[int], *, limit: int = 1, max_len: int = 512) -> Dict[str, Any]:
-        descriptors = self.mailbox_snapshot()
+        snapshot = self.mailbox_snapshot()
+        descriptors = snapshot.get("descriptors", []) if isinstance(snapshot, dict) else snapshot
         if pid is not None:
             targets = [f"svc:stdio.out@{pid}"]
         else:
@@ -4091,8 +4096,13 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 channels = self.state.list_channels(int(pid_value))
                 return {"version": 1, "status": "ok", "channels": channels}
             if cmd == "mailbox_snapshot":
-                descriptors = self.state.mailbox_snapshot()
-                return {"version": 1, "status": "ok", "descriptors": descriptors}
+                snapshot = self.state.mailbox_snapshot()
+                payload: Dict[str, Any] = {"version": 1, "status": "ok"}
+                if isinstance(snapshot, dict):
+                    payload.update(snapshot)
+                else:
+                    payload["descriptors"] = snapshot
+                return payload
             if cmd == "dmesg":
                 limit = request.get("limit")
                 limit_int = int(limit) if limit is not None else None

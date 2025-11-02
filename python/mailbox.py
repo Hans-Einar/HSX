@@ -97,6 +97,7 @@ class MailboxManager:
             HSX_MBX_STDIO_ERR: HSX_MBX_MODE_RDWR,
         }
         self._stdio_handles: Dict[int, Dict[str, int]] = {}
+        self._message_overhead = 8  # header size used in _message_cost
         self._event_hook: Optional[Callable[[Dict[str, Any]], None]] = event_hook
 
     # ------------------------------------------------------------------
@@ -455,6 +456,32 @@ class MailboxManager:
                 }
             )
         return sorted(out, key=lambda item: item["descriptor_id"])
+
+    def resource_stats(self) -> Dict[str, object]:
+        descriptors = list(self._descriptors.values())
+        active_descriptors = len(descriptors)
+        total_capacity = sum(desc.capacity for desc in descriptors)
+        bytes_used = sum(desc.bytes_used for desc in descriptors)
+        queue_depth = sum(len(desc.queue) for desc in descriptors)
+        handles_per_pid = {pid: len(handles) for pid, handles in self._handles.items()}
+        total_handles = sum(handles_per_pid.values())
+        tap_total = sum(len(desc.taps) for desc in descriptors)
+        wait_total = sum(len(desc.waiters) for desc in descriptors)
+        fanout_descriptors = sum(1 for desc in descriptors if desc.mode_mask & HSX_MBX_MODE_FANOUT)
+        return {
+            "max_descriptors": self._max_descriptors,
+            "active_descriptors": active_descriptors,
+            "free_descriptors": max(self._max_descriptors - active_descriptors, 0),
+            "total_capacity": total_capacity,
+            "bytes_used": bytes_used,
+            "bytes_available": max(total_capacity - bytes_used, 0),
+            "queue_depth": queue_depth,
+            "handles_total": total_handles,
+            "handles_per_pid": handles_per_pid,
+            "tap_count": tap_total,
+            "waiter_count": wait_total,
+            "fanout_descriptors": fanout_descriptors,
+        }
 
     # ------------------------------------------------------------------
     # Internal helpers

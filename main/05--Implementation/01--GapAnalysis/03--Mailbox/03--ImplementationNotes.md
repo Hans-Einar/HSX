@@ -78,3 +78,23 @@ Start new sections chronologically. Keep notes concise but actionable so the nex
   - `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_mailbox_constants.py python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_mailbox_wait.py` (pass).
 - Follow-up actions / hand-off notes:
   - Next step: Phase 1.4 resource monitoring APIs (descriptor/queue metrics exposed via snapshot/RPC).
+
+## 2025-11-04 - Codex (Session 4)
+
+### Focus
+- Task(s) tackled: Phase 1.4 resource monitoring APIs (descriptor/handle stats, RPC reporting, CLI summary).
+- Dependencies touched: python/mailbox.py, platforms/python/host_vm.py, python/execd.py, python/shell_client.py, docs/tests.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions:
+  - Added esource_stats() on the mailbox manager and exposed aggregated metrics (capacity, handles, queue depth) through VM/Executive RPC and shell output.
+  - Extended mailbox snapshots with stats, updated shell formatting, and refreshed protocol docs.
+  - Added pytest coverage for stats reporting across manager/unit/integration layers.
+- Tests run (commands + result):
+  - C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_exec_mailbox.py python/tests/test_shell_client.py (pass).
+- Follow-up actions / hand-off notes:
+  - Ready to begin Phase 1.5 fan-out reclamation validation.
+

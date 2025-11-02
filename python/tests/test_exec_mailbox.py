@@ -11,7 +11,27 @@ class FakeVM:
 
     # Mailbox RPC facades -------------------------------------------------
     def mailbox_snapshot(self):
-        return [{"name": "stdio.out", "owner_pid": 5}]
+        return {
+            "descriptors": [
+                {
+                    "name": "stdio.out",
+                    "owner_pid": 5,
+                    "queue_depth": 0,
+                    "bytes_used": 0,
+                    "mode_mask": 0,
+                }
+            ],
+            "stats": {
+                "max_descriptors": 16,
+                "active_descriptors": 1,
+                "free_descriptors": 15,
+                "bytes_used": 0,
+                "bytes_available": 0,
+                "queue_depth": 0,
+                "handles_total": 0,
+                "handles_per_pid": {},
+            },
+        }
 
     def mailbox_open(self, pid, target, flags=0):
         self.calls.append(("open", pid, target, flags))
