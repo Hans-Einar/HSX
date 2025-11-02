@@ -98,3 +98,20 @@ Start new sections chronologically. Keep notes concise but actionable so the nex
 - Follow-up actions / hand-off notes:
   - Ready to begin Phase 1.5 fan-out reclamation validation.
 
+## 2025-11-04 - Codex (Session 5)
+
+### Focus
+- Task(s) tackled: Phase 1.5 fan-out reclamation validation (ack cleanup, overrun signalling).
+- Dependencies touched: `python/mailbox.py`, unit tests.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions:
+  - Added targeted mailbox manager tests to verify fan-out queues reclaim once all readers acknowledge and drops raise overrun flags/events.
+  - Leveraged existing event hook to assert `mailbox_overrun` emission during drop scenarios.
+- Tests run (commands + result):
+  - `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_exec_mailbox.py python/tests/test_shell_client.py` (pass).
+- Follow-up actions / hand-off notes:
+  - Proceed to next plan item (Phase 1.6) once ready.

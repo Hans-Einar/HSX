@@ -1,5 +1,6 @@
 import importlib.util
 from pathlib import Path
+from typing import Any, Dict, List
 
 import pytest
 
@@ -205,6 +206,73 @@ def test_resource_stats_with_handles_and_messages():
     assert stats["handles_per_pid"].get(1) >= 1
     assert stats["bytes_used"] >= len("ping")
     assert stats["queue_depth"] >= 1
+
+
+
+def test_fanout_reclaims_after_all_consumers_ack():
+    mgr = MailboxManager()
+    desc = mgr.bind(
+        namespace=mbx_const.HSX_MBX_NAMESPACE_SHARED,
+        name="fan_reclaim",
+        capacity=64,
+        mode_mask=(
+            mbx_const.HSX_MBX_MODE_RDWR
+            | mbx_const.HSX_MBX_MODE_FANOUT
+            | mbx_const.HSX_MBX_MODE_FANOUT_BLOCK
+        ),
+    )
+    producer = mgr.open(pid=1, target="shared:fan_reclaim")
+    consumer_a = mgr.open(pid=2, target="shared:fan_reclaim")
+    consumer_b = mgr.open(pid=3, target="shared:fan_reclaim")
+
+    ok, descriptor_id = mgr.send(pid=1, handle=producer, payload=b"data", flags=0)
+    assert ok is True
+    desc_obj = mgr.descriptor_by_id(descriptor_id)
+    assert len(desc_obj.queue) == 1
+
+    msg_a = mgr.recv(pid=2, handle=consumer_a)
+    assert msg_a is not None and msg_a.payload == b"data"
+    desc_obj = mgr.descriptor_by_id(descriptor_id)
+    assert len(desc_obj.queue) == 1
+
+    msg_b = mgr.recv(pid=3, handle=consumer_b)
+    assert msg_b is not None and msg_b.payload == b"data"
+    desc_obj = mgr.descriptor_by_id(descriptor_id)
+    assert len(desc_obj.queue) == 0
+
+
+def test_fanout_overrun_sets_flag_and_triggers_event():
+    events: List[Dict[str, Any]] = []
+    mgr = MailboxManager()
+    mgr.set_event_hook(events.append)
+    desc = mgr.bind(
+        namespace=mbx_const.HSX_MBX_NAMESPACE_SHARED,
+        name="fan_overrun",
+        capacity=16,
+        mode_mask=(
+            mbx_const.HSX_MBX_MODE_RDWR
+            | mbx_const.HSX_MBX_MODE_FANOUT
+            | mbx_const.HSX_MBX_MODE_FANOUT_DROP
+        ),
+    )
+    producer = mgr.open(pid=1, target="shared:fan_overrun")
+    consumer = mgr.open(pid=2, target="shared:fan_overrun")
+
+    ok, _ = mgr.send(pid=1, handle=producer, payload=b"msg1")
+    assert ok is True
+
+    ok, _ = mgr.send(pid=1, handle=producer, payload=b"msg2")
+    assert ok is True
+
+    overrun_events = [evt for evt in events if evt.get("type") == "mailbox_overrun"]
+    assert overrun_events, "expected mailbox_overrun event"
+    event = overrun_events[-1]
+    assert event["descriptor"] == desc.descriptor_id
+
+    msg = mgr.recv(pid=2, handle=consumer)
+    assert msg is not None
+    assert msg.payload == b"msg2"
+    assert msg.flags & mbx_const.HSX_MBX_FLAG_OVERRUN
 
 
 def test_app_namespace_reused_across_pids():
