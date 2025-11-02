@@ -401,21 +401,21 @@ Toolchain needs to generate .mailbox sections from application code. Enables dec
 **Design Updates Needed:** _TBD_
 
 **Pre-Implementation Checklist**
-- [ ] Review resource management guidance in Section 4.6 and existing `resource_budgets.md`.
-- [ ] Document required quota profiles (host vs embedded) in `03--ImplementationNotes.md`.
-- [ ] Confirm interaction with Executive resource reporting (04.02).
+- [x] Review resource management guidance in Section 4.6 and existing `resource_budgets.md`.
+- [x] Document required quota profiles (host vs embedded) in `03--ImplementationNotes.md`.
+- [x] Confirm interaction with Executive resource reporting (04.02).
 
 **Implementation Tasks**
-- [ ] Implement descriptor pool limit enforcement (configurable per profile).
-- [ ] Enforce per-task handle quotas at BIND/OPEN.
-- [ ] Return correct status codes (`NO_DESCRIPTOR`, `ENOSPC`, etc.) when limits exceeded.
-- [ ] Add regression tests covering quota breaches and recovery.
-- [ ] Update documentation (`resource_budgets.md`, design notes) with configuration guidance.
+- [x] Implement descriptor pool limit enforcement (configurable per profile).
+- [x] Enforce per-task handle quotas at BIND/OPEN.
+- [x] Return correct status codes (`NO_DESCRIPTOR`, `ENOSPC`, etc.) when limits exceeded.
+- [x] Add regression tests covering quota breaches and recovery.
+- [x] Update documentation (`resource_budgets.md`, design notes) with configuration guidance.
 
 **Post-Implementation Checklist**
-- [ ] Validate behaviour against design (limits, status codes, diagnostics).
-- [ ] Update design doc if additional constraints or configuration options introduced.
-- [ ] Record results/tests/follow-ups in `03--ImplementationNotes.md`.
+- [x] Validate behaviour against design (limits, status codes, diagnostics).
+- [x] Update design doc if additional constraints or configuration options introduced.
+- [x] Record results/tests/follow-ups in `03--ImplementationNotes.md`.
 - [ ] Ensure review gate(s) captured the change.
 
 ---

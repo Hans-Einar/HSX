@@ -1,3 +1,4 @@
+import errno
 import struct
 import time
 from typing import Any, Dict, List, Optional
@@ -375,6 +376,23 @@ def test_mailbox_bind_returns_no_descriptor_when_pool_full():
     assert vm.regs[0] == mbx_const.HSX_MBX_STATUS_NO_DESCRIPTOR
 
 
+def test_mailbox_open_returns_enospc_when_handle_quota_exhausted():
+    controller = VMController(mailbox_profile={"handle_limit_per_pid": 4})
+    controller.mailboxes.register_task(1)
+    controller.mailboxes.ensure_stdio_handles(1)
+    controller.mailboxes.open(pid=1, target="app:pre_fill")
+
+    vm = _attach_vm(controller, 1)
+    overflow_target = "app:quota_hit"
+    target_addr = 0x0A00
+    _write_c_string(vm, target_addr, overflow_target)
+    vm.regs[1] = target_addr
+    vm.regs[2] = 0
+
+    controller._svc_mailbox_controller(vm, mbx_const.HSX_MBX_FN_OPEN)
+    assert vm.regs[0] == errno.ENOSPC
+
+
 def test_mailbox_send_event_payload():
     controller = _make_controller_with_tasks(1)
     vm = _attach_vm(controller, 1)
@@ -549,5 +567,3 @@ def test_mailbox_overrun_event_payload():
     assert event["descriptor"] == desc.descriptor_id
     assert event["reason"] == "fanout_drop"
     assert event["dropped_length"] == len(first_payload)
-
-

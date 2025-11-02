@@ -3,6 +3,7 @@ from __future__ import annotations
 
 
 import collections
+import errno
 from dataclasses import dataclass, field
 from typing import Any, Callable, Deque, Dict, Iterable, Iterator, List, Optional, Tuple
 
@@ -93,8 +94,25 @@ class TapBuffer:
 class MailboxManager:
     """Tracks HSX mailboxes and per-task handle tables."""
 
-    def __init__(self, *, max_descriptors: int = 256, event_hook: Optional[Callable[[Dict[str, Any]], None]] = None) -> None:
+    def __init__(
+        self,
+        *,
+        max_descriptors: int = 256,
+        per_pid_handle_limit: Optional[int] = None,
+        default_capacity: Optional[int] = None,
+        event_hook: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ) -> None:
         self._max_descriptors = max(1, int(max_descriptors))
+        self._handle_limit = int(per_pid_handle_limit) if per_pid_handle_limit is not None else None
+        if self._handle_limit is not None and self._handle_limit <= 0:
+            raise ValueError("per_pid_handle_limit must be positive when provided")
+        if default_capacity is not None:
+            normalized_capacity = int(default_capacity)
+            if normalized_capacity <= 0:
+                raise ValueError("default_capacity must be positive when provided")
+            self._default_capacity = normalized_capacity
+        else:
+            self._default_capacity = HSX_MBX_DEFAULT_RING_CAPACITY
         self._next_descriptor_id = 1
         self._descriptors: Dict[int, MailboxDescriptor] = {}
         self._lookup: Dict[Tuple[int, str, Optional[int]], int] = {}
@@ -189,7 +207,7 @@ class MailboxManager:
                 namespace=namespace,
                 name=name,
                 owner_pid=owner_pid,
-                capacity=capacity or HSX_MBX_DEFAULT_RING_CAPACITY,
+                capacity=capacity or self._default_capacity,
                 mode_mask=mode_mask,
             )
             self._descriptors[descriptor_id] = desc
@@ -240,10 +258,16 @@ class MailboxManager:
     def open(self, *, pid: int, target: str, flags: int = 0) -> int:
         namespace, name, owner_pid = self._parse_target(pid, target)
         desc = self.bind(namespace=namespace, name=name, owner_pid=owner_pid)
+        handle_table = self._handles.setdefault(pid, {})
+        if self._handle_limit is not None and len(handle_table) >= self._handle_limit:
+            raise MailboxError(
+                "handle quota exceeded",
+                code=errno.ENOSPC,
+            )
         handle = self._allocate_handle(pid)
         state = HandleState(descriptor_id=desc.descriptor_id)
         self._initialize_handle_state(desc, state)
-        self._handles.setdefault(pid, {})[handle] = state
+        handle_table[handle] = state
         return handle
 
     def close(self, *, pid: int, handle: int) -> None:
@@ -504,6 +528,7 @@ class MailboxManager:
             "queue_depth": queue_depth,
             "handles_total": total_handles,
             "handles_per_pid": handles_per_pid,
+            "handle_limit_per_pid": self._handle_limit,
             "tap_count": tap_total,
             "tap_queue_depth": tap_queue_depth,
             "waiter_count": wait_total,

@@ -36,6 +36,7 @@
 ### Overheads & buffers
 
 - Mailbox descriptor pool: start with 16 descriptors × 64 B metadata ≈ 1 KiB SRAM. Each message buffer lives in caller-owned RAM; no global payload copies beyond staging.
+- Mailbox quotas: embedded profile enforces ≤16 descriptors and ≤8 handles per task; host prototype defaults to 256 descriptors and a 64 handle-per-task ceiling. Both limits are configurable via the Python `MailboxManager` profile knobs (`max_descriptors`, `handle_limit_per_pid`).
 - Event stream buffer: cap at 256 events × 16 B ≈ 4 KiB on desktop builds; shrink to 64 events × 12 B (~768 B) on AVR.
 - FS cache: reuse existing HEOS buffer (already counted in baseline). Avoid duplicate buffers inside the HSX port.
 

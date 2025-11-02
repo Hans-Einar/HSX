@@ -1376,6 +1376,7 @@ def _pretty_mbox(payload: dict) -> None:
         bytes_available = stats.get("bytes_available")
         queue_depth = stats.get("queue_depth")
         total_handles = stats.get("handles_total")
+        handle_limit = stats.get("handle_limit_per_pid")
         print("  summary:")
         if max_desc is not None and active_desc is not None:
             free_repr = f", free {free_desc}" if free_desc is not None else ""
@@ -1389,6 +1390,8 @@ def _pretty_mbox(payload: dict) -> None:
             print(f"    queue depth : {queue_depth}")
         if total_handles is not None:
             print(f"    handles     : {total_handles}")
+        if handle_limit:
+            print(f"    handle limit: {handle_limit} / pid")
         tap_count = stats.get("tap_count")
         if tap_count is not None:
             print(f"    taps        : {tap_count}")

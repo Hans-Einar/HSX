@@ -1987,7 +1987,14 @@ class MiniVM:
 
 
 class VMController:
-    def __init__(self, *, trace: bool = False, svc_trace: bool = False, dev_libm: bool = False):
+    def __init__(
+        self,
+        *,
+        trace: bool = False,
+        svc_trace: bool = False,
+        dev_libm: bool = False,
+        mailbox_profile: Optional[Dict[str, Any]] = None,
+    ):
         self.trace = trace
         self.svc_trace = svc_trace
         self.dev_libm = dev_libm
@@ -2004,6 +2011,7 @@ class VMController:
         self.restart_targets: Optional[List[str]] = None
         self.server: Optional["VMServer"] = None
         self._pending_mailbox_events: List[Dict[str, Any]] = []
+        self.mailbox_profile: Dict[str, Any] = dict(mailbox_profile or {})
         self.mailboxes = self._create_mailbox_manager()
         self.valcmd = self._create_valcmd_registry()
         self.waiting_tasks: Dict[int, Dict[str, Any]] = {}
@@ -2022,7 +2030,18 @@ class VMController:
         self.metadata_by_pid: Dict[int, HXEMetadata] = {}
 
     def _create_mailbox_manager(self) -> MailboxManager:
-        mgr = MailboxManager(event_hook=self._handle_mailbox_manager_event)
+        profile = getattr(self, "mailbox_profile", {}) or {}
+        kwargs: Dict[str, Any] = {"event_hook": self._handle_mailbox_manager_event}
+        max_descriptors = profile.get("max_descriptors")
+        if max_descriptors is not None:
+            kwargs["max_descriptors"] = int(max_descriptors)
+        handle_limit = profile.get("handle_limit_per_pid")
+        if handle_limit is not None:
+            kwargs["per_pid_handle_limit"] = int(handle_limit)
+        default_capacity = profile.get("default_capacity")
+        if default_capacity is not None:
+            kwargs["default_capacity"] = int(default_capacity)
+        mgr = MailboxManager(**kwargs)
         return mgr
 
     def _create_valcmd_registry(self) -> ValCmdRegistry:

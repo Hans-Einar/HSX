@@ -752,3 +752,22 @@ esource_stats() on the mailbox manager and exposed aggregated metrics (capacity,
   - Implementation review gate pending; schedule after Phase 3.4 if needed
   - No design document updates required; behavior aligns with existing design specifications
 
+
+## 2025-11-02 - Codex (Session 15)
+
+### Focus
+- Task(s) tackled: Phase 4.1 quota enforcement (descriptor/handle limits, diagnostics, documentation).
+- Dependencies touched: `python/mailbox.py`, `platforms/python/host_vm.py`, `python/shell_client.py`, `docs/resource_budgets.md`, mailbox unit/runtime tests.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions:
+  - Introduced configurable per-PID handle limits and default ring capacity overrides in `MailboxManager`; resource stats now surface `handle_limit_per_pid` so tooling can correlate usage vs quota.
+  - `VMController` accepts a `mailbox_profile` dict, enabling host vs embedded presets (desktop: 256 descriptors / 64 handles per PID; embedded reference: 16 descriptors / 8 handles per PID as noted in `resource_budgets.md`).
+  - Updated the `mbox` shell summary to print the per-PID handle ceiling and refreshed resource budget docs with explicit quota guidance.
+- Tests run (commands + result):
+  - `PYTHONPATH=. pytest python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_shell_client.py` (pass).
+- Follow-up actions / hand-off notes:
+  - Implementation review gate still outstanding; capture result in the plan once complete.

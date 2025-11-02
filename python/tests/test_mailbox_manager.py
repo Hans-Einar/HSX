@@ -1,3 +1,4 @@
+import errno
 import importlib.util
 from pathlib import Path
 from typing import Any, Dict, List
@@ -211,6 +212,24 @@ def test_resource_stats_with_handles_and_messages():
     assert stats["tap_count"] == 0
     assert stats["tap_queue_depth"] == 0
 
+
+
+def test_open_enforces_per_pid_handle_limit_and_recovers_after_close():
+    mgr = MailboxManager(per_pid_handle_limit=4)
+    mgr.register_task(1)
+
+    extra = mgr.open(pid=1, target="app:extra")
+    with pytest.raises(MailboxError) as exc:
+        mgr.open(pid=1, target="app:overflow")
+    assert exc.value.code == errno.ENOSPC
+
+    mgr.close(pid=1, handle=extra)
+    reopened = mgr.open(pid=1, target="app:reopen")
+    assert reopened > 0
+
+    # Other PIDs should have independent quotas
+    other = mgr.open(pid=2, target="svc:stdio.out")
+    assert other == 1
 
 
 def test_fanout_reclaims_after_all_consumers_ack():
