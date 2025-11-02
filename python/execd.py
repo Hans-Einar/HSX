@@ -150,6 +150,9 @@ class ExecutiveState:
         self.disasm_cache: Dict[int, Dict[Tuple[int, int], Dict[str, Any]]] = {}
         self.memory_layouts: Dict[int, Dict[str, int]] = {}
         self.image_metadata: Dict[int, Dict[str, Any]] = {}
+        self.value_registry: Dict[int, Dict[Tuple[int, int], Dict[str, Any]]] = {}
+        self.command_registry: Dict[int, Dict[Tuple[int, int], Dict[str, Any]]] = {}
+        self.mailbox_registry: Dict[int, Dict[str, Dict[str, Any]]] = {}
         self.watchers: Dict[int, Dict[int, Dict[str, Any]]] = {}
         self._next_watch_id = 1
         self.task_state_pending: Dict[int, Dict[str, Any]] = {}
@@ -158,21 +161,149 @@ class ExecutiveState:
         self.symbol_cache_lock = threading.RLock()
         self.default_stack_frames = 16
 
-    def _stage_metadata(self, pid: int, metadata: Dict[str, Any]) -> None:
+    def _register_metadata(self, pid: int, metadata: Dict[str, Any]) -> None:
         if not metadata:
+            self.value_registry.pop(pid, None)
+            self.command_registry.pop(pid, None)
+            self.mailbox_registry.pop(pid, None)
             return
         if not isinstance(metadata, dict):
-            return
-        values = metadata.get("values")
-        commands = metadata.get("commands")
-        mailboxes = metadata.get("mailboxes")
+            raise ValueError("metadata_invalid")
+
+        values_block = metadata.get("values") or []
+        commands_block = metadata.get("commands") or []
+        mailboxes_block = metadata.get("mailboxes") or []
+
+        if not isinstance(values_block, list) or not isinstance(commands_block, list) or not isinstance(mailboxes_block, list):
+            raise ValueError("metadata_structure_invalid")
+
+        new_values: Dict[Tuple[int, int], Dict[str, Any]] = {}
+        new_commands: Dict[Tuple[int, int], Dict[str, Any]] = {}
+        new_mailboxes: Dict[str, Dict[str, Any]] = {}
+        mailbox_bind_requests: List[Tuple[str, Optional[int], int, Dict[str, Any]]] = []
+
+        for entry in values_block:
+            if not isinstance(entry, dict):
+                raise ValueError("metadata_value_invalid")
+            try:
+                group_id = int(entry.get("group_id"))
+                value_id = int(entry.get("value_id"))
+            except (TypeError, ValueError):
+                raise ValueError("metadata_value_invalid")
+            if not (0 <= group_id <= 0xFF) or not (0 <= value_id <= 0xFF):
+                raise ValueError("metadata_value_range")
+            key = (group_id, value_id)
+            if key in new_values:
+                raise ValueError(f"metadata_value_duplicate:{group_id}:{value_id}")
+            record = {
+                "group_id": group_id,
+                "value_id": value_id,
+                "flags": int(entry.get("flags", 0)) & 0xFF,
+                "auth_level": int(entry.get("auth_level", 0)) & 0xFF,
+                "init_raw": int(entry.get("init_raw", 0)) & 0xFFFF,
+                "init_value": entry.get("init_value"),
+                "name": entry.get("name"),
+                "unit": entry.get("unit"),
+                "epsilon_raw": int(entry.get("epsilon_raw", 0)) & 0xFFFF,
+                "epsilon": entry.get("epsilon"),
+                "min_raw": int(entry.get("min_raw", 0)) & 0xFFFF,
+                "min": entry.get("min"),
+                "max_raw": int(entry.get("max_raw", 0)) & 0xFFFF,
+                "max": entry.get("max"),
+                "persist_key": int(entry.get("persist_key", 0)) & 0xFFFF,
+                "reserved": int(entry.get("reserved", 0)) & 0xFFFF,
+            }
+            new_values[key] = record
+
+        for entry in commands_block:
+            if not isinstance(entry, dict):
+                raise ValueError("metadata_command_invalid")
+            try:
+                group_id = int(entry.get("group_id"))
+                cmd_id = int(entry.get("cmd_id"))
+            except (TypeError, ValueError):
+                raise ValueError("metadata_command_invalid")
+            if not (0 <= group_id <= 0xFF) or not (0 <= cmd_id <= 0xFF):
+                raise ValueError("metadata_command_range")
+            key = (group_id, cmd_id)
+            if key in new_commands:
+                raise ValueError(f"metadata_command_duplicate:{group_id}:{cmd_id}")
+            record = {
+                "group_id": group_id,
+                "cmd_id": cmd_id,
+                "flags": int(entry.get("flags", 0)) & 0xFF,
+                "auth_level": int(entry.get("auth_level", 0)) & 0xFF,
+                "handler_offset": int(entry.get("handler_offset", 0)) & 0xFFFFFFFF,
+                "name": entry.get("name"),
+                "help": entry.get("help"),
+                "reserved": int(entry.get("reserved", 0)) & 0xFFFFFFFF,
+            }
+            new_commands[key] = record
+
+        for entry in mailboxes_block:
+            if not isinstance(entry, dict):
+                raise ValueError("metadata_mailbox_invalid")
+            name = entry.get("name")
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError("metadata_mailbox_name")
+            target = name.strip()
+            if target in new_mailboxes:
+                raise ValueError(f"metadata_mailbox_duplicate:{target}")
+            queue_depth = entry.get("queue_depth")
+            capacity: Optional[int]
+            if queue_depth in (None, "", 0):
+                capacity = None
+            else:
+                try:
+                    capacity = int(queue_depth)
+                except (TypeError, ValueError):
+                    raise ValueError(f"metadata_mailbox_capacity:{target}")
+                if capacity <= 0:
+                    capacity = None
+            mode_mask = int(entry.get("flags", 0)) & 0xFFFF
+            if mode_mask == 0:
+                mode_mask = mbx_const.HSX_MBX_MODE_RDWR
+            record = {
+                "name": target,
+                "queue_depth": entry.get("queue_depth"),
+                "flags": entry.get("flags"),
+                "mode": mode_mask,
+                "reserved": entry.get("reserved"),
+            }
+            mailbox_bind_requests.append((target, capacity, mode_mask, record))
+
+        bound_mailboxes: List[Tuple[str, Dict[str, Any]]] = []
+        for target, capacity, mode_mask, record in mailbox_bind_requests:
+            response = self.vm.mailbox_bind(pid, target, capacity=capacity, mode=mode_mask)
+            if response.get("status") != "ok":
+                error_text = response.get("error", "mailbox_bind_failed")
+                raise RuntimeError(f"metadata_mailbox_bind_failed:{target}:{error_text}")
+            bound_record = dict(record)
+            bound_record["descriptor"] = response.get("descriptor")
+            bound_record["capacity"] = response.get("capacity", capacity)
+            bound_record["mode"] = response.get("mode", mode_mask)
+            bound_mailboxes.append((target, bound_record))
+
+        if new_values:
+            self.value_registry[pid] = new_values
+        else:
+            self.value_registry.pop(pid, None)
+        if new_commands:
+            self.command_registry[pid] = new_commands
+        else:
+            self.command_registry.pop(pid, None)
+        if bound_mailboxes:
+            self.mailbox_registry[pid] = {name: info for name, info in bound_mailboxes}
+        else:
+            self.mailbox_registry.pop(pid, None)
+
         self.log(
-            "debug",
-            "metadata_loaded",
+            "info",
+            "metadata_registered",
             pid=pid,
-            values=len(values) if isinstance(values, list) else 0,
-            commands=len(commands) if isinstance(commands, list) else 0,
-            mailboxes=len(mailboxes) if isinstance(mailboxes, list) else 0,
+            values=len(new_values),
+            commands=len(new_commands),
+            mailboxes=len(bound_mailboxes),
         )
 
     def _normalise_pid_list(self, pid_lock: Any) -> List[int]:
@@ -2015,6 +2146,15 @@ class ExecutiveState:
         stale_watchers = set(self.watchers.keys()) - current_pids
         for pid in stale_watchers:
             self.watchers.pop(pid, None)
+        stale_values = set(self.value_registry.keys()) - current_pids
+        for pid in stale_values:
+            self.value_registry.pop(pid, None)
+        stale_commands = set(self.command_registry.keys()) - current_pids
+        for pid in stale_commands:
+            self.command_registry.pop(pid, None)
+        stale_mailboxes = set(self.mailbox_registry.keys()) - current_pids
+        for pid in stale_mailboxes:
+            self.mailbox_registry.pop(pid, None)
         stale_layouts = set(self.memory_layouts.keys()) - current_pids
         for pid in stale_layouts:
             self.memory_layouts.pop(pid, None)
@@ -2077,8 +2217,15 @@ class ExecutiveState:
             program = task.get("program") or info.get("program") or str(program_path)
             symbol_status = self.load_symbols_for_pid(pid_int, program=program, override=symbols)
             metadata_summary = info.get("metadata") or {}
+            try:
+                self._register_metadata(pid_int, metadata_summary)
+            except Exception:
+                self.value_registry.pop(pid_int, None)
+                self.command_registry.pop(pid_int, None)
+                self.mailbox_registry.pop(pid_int, None)
+                self.image_metadata.pop(pid_int, None)
+                raise
             self.image_metadata[pid_int] = metadata_summary
-            self._stage_metadata(pid_int, metadata_summary)
             layout = {
                 "entry": self._coerce_int(info.get("entry")) if info.get("entry") is not None else None,
                 "code_len": self._coerce_int(info.get("code_len")) if info.get("code_len") is not None else None,
@@ -2291,6 +2438,9 @@ class ExecutiveState:
         self.disasm_cache.pop(pid, None)
         self.memory_layouts.pop(pid, None)
         self.watchers.pop(pid, None)
+        self.value_registry.pop(pid, None)
+        self.command_registry.pop(pid, None)
+        self.mailbox_registry.pop(pid, None)
         self.image_metadata.pop(pid, None)
         return {"pid": pid, "state": "terminated"}
 

@@ -17,6 +17,7 @@
 | 2025-11-01 | bb6969edb48b | Event back-pressure metrics & slow-consumer handling | Hans Einar | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py` |
 | 2025-11-02 | pending | Watch expressions RPC & CLI | Codex | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py python/tests/test_executive_session_helpers.py python/tests/test_shell_client.py` |
 | 2025-11-02 | pending | Symbol enumeration coverage & client helpers | Codex | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py python/tests/test_executive_session_helpers.py` |
+| 2025-11-02 | 1cb8253 | Phase 3.1 HXE v2 loader & metadata exposure | Codex | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_hxe_v2_metadata.py python/tests/test_vm_stream_loader.py python/tests/test_hxe_fuzz.py` |
 | 2025-11-01 | 20c4782e99a8 | Disassembly RPC & CLI | Codex | Tests: `/mnt/c/Windows/py.exe -3.14 -m pytest python/tests/test_executive_session_helpers.py python/tests/test_executive_sessions.py` |
 | 2025-11-01 | f1eefc19062a | Stack UI drill-down & summaries | Codex | Tests: `/mnt/c/Windows/py.exe -3.14 -m pytest python/tests/test_executive_session_helpers.py python/tests/test_executive_sessions.py` |
 | 2025-11-01 | 8bd0c21e460a | Stack helpers & client plumbing | Codex | Tests: `/mnt/c/Windows/py.exe -3.14 -m pytest python/tests/test_executive_session_helpers.py python/tests/test_executive_sessions.py` |

@@ -331,12 +331,12 @@ Design specifies parsing .value/.cmd/.mailbox sections and registering resources
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
-- [ ] Implement metadata preprocessing at task load time
-- [ ] Register value resources from .value section
-- [ ] Register command resources from .cmd section
-- [ ] Register mailbox bindings from .mailbox section
-- [ ] Validate metadata before VM execution (check for conflicts)
-- [ ] Add metadata preprocessing tests
+- [x] Implement metadata preprocessing at task load time
+- [x] Register value resources from .value section
+- [x] Register command resources from .cmd section
+- [x] Register mailbox bindings from .mailbox section
+- [x] Validate metadata before VM execution (check for conflicts)
+- [x] Add metadata preprocessing tests
 - [ ] Document metadata section formats
 
 ---
