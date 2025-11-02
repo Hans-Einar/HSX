@@ -455,3 +455,23 @@ Start new sections chronologically. Keep notes concise but actionable so the nex
 
 ### Follow-up actions / hand-off notes
 - Build on the stored trace records for downstream debugger visualisations (Phase 5.2/5.3); consider adding integration coverage once the VM-side trace APIs grow beyond polling events.
+
+## 2025-11-03 - Codex (Session 23)
+
+### Focus
+- Task(s) tackled: Phase 5.2 trace record format (standard schema, export/import, docs/tests).
+- Dependencies touched: `platforms/python/host_vm.py`, `python/execd.py`, `python/executive_session.py`, `python/shell_client.py`, `python/trace_format.py`, `python/tests/test_executive_sessions.py`, `python/tests/test_shell_client.py`, `python/tests/test_trace_format.py`, `docs/executive_protocol.md`, `help/trace.txt`.
+
+### Status
+- DONE
+
+### Details
+- Standardised trace record schema via `python/trace_format.py`, covering required/optional fields and sanitising register snapshots plus memory-access metadata.
+- Instrumented VM trace events with `mem_access` payloads; executive now captures/export/imports normalised trace bundles (`export`/`import` RPCs, CLI support) and exposes helpers in `ExecutiveSession`.
+- Updated docs/help to describe the `hsx.trace/1` format, new CLI subcommands, and the optional `mem_access` event data; added comprehensive unit tests for format encode/decode, CLI payloads, and executive import/export flows.
+
+### Tests run (commands + result)
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py python/tests/test_shell_client.py python/tests/test_trace_format.py` ✅
+
+### Follow-up actions / hand-off notes
+- Consider adding file-based export helpers (CLI convenience) and ensure future VM trace polling (Phase 5.3) reuses the normalised format to avoid schema drift.

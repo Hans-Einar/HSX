@@ -14,6 +14,11 @@ try:
 except ImportError:
     import disasm_util
 
+try:
+    from . import trace_format
+except ImportError:
+    import trace_format
+
 """HSX executive daemon.
 
 Connects to the HSX VM RPC server, takes over scheduling (attach/pause/resume),
@@ -34,7 +39,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Optional, List, Iterable, Deque, Set, Tuple
+from typing import Any, Dict, Optional, List, Iterable, Deque, Set, Tuple, Mapping
 
 
 class SessionError(RuntimeError):
@@ -2175,10 +2180,6 @@ class ExecutiveState:
         if self.trace_buffer_capacity <= 0:
             return
         timestamp = time.time()
-        opcode = self._optional_int(payload.get("opcode"))
-        next_pc = self._optional_int(payload.get("next_pc"))
-        steps = self._optional_int(payload.get("steps"))
-        changed = payload.get("changed_regs")
         with self.trace_lock:
             if self.trace_buffer_capacity <= 0:
                 return
@@ -2186,40 +2187,36 @@ class ExecutiveState:
             if buffer is None or buffer.maxlen != self.trace_buffer_capacity:
                 buffer = deque(maxlen=self.trace_buffer_capacity)
                 self.trace_buffers[pid] = buffer
-            record: Dict[str, Any] = {
+            record_dict: Dict[str, Any] = {
                 "seq": self._next_trace_seq_locked(),
                 "ts": timestamp,
                 "pid": pid,
                 "pc": pc if pc is not None else self._optional_int(payload.get("pc")),
-                "opcode": opcode,
-                "flags": flags,
-                "regs": tuple(regs),
+                "opcode": self._optional_int(payload.get("opcode")),
             }
-            if isinstance(changed, (list, tuple)):
-                record["changed_regs"] = tuple(str(item) for item in changed)
+            if flags is not None:
+                record_dict["flags"] = flags
+            if regs:
+                record_dict["regs"] = list(regs)
+            next_pc = self._optional_int(payload.get("next_pc"))
             if next_pc is not None:
-                record["next_pc"] = next_pc
+                record_dict["next_pc"] = next_pc
+            steps = self._optional_int(payload.get("steps"))
             if steps is not None:
-                record["steps"] = steps
+                record_dict["steps"] = steps
+            changed = payload.get("changed_regs")
+            if isinstance(changed, (list, tuple)):
+                record_dict["changed_regs"] = list(changed)
+            mem_access = payload.get("mem_access")
+            if isinstance(mem_access, dict):
+                record_dict["mem_access"] = dict(mem_access)
             source = payload.get("source")
             if source is not None:
-                record["source"] = source
-            buffer.append(record)
-
-    @staticmethod
-    def _clone_trace_record(record: Dict[str, Any]) -> Dict[str, Any]:
-        clone = dict(record)
-        regs = clone.get("regs")
-        if isinstance(regs, tuple):
-            clone["regs"] = [int(value) & 0xFFFFFFFF for value in regs]
-        elif isinstance(regs, list):
-            clone["regs"] = [int(value) & 0xFFFFFFFF for value in regs]
-        changed = clone.get("changed_regs")
-        if isinstance(changed, tuple):
-            clone["changed_regs"] = list(changed)
-        elif isinstance(changed, list):
-            clone["changed_regs"] = list(changed)
-        return clone
+                record_dict["source"] = source
+            normalized = trace_format.decode_trace_records(
+                [record_dict], default_pid=pid
+            )[0]
+            buffer.append(normalized)
 
     def _parse_event_filters(self, filters: Optional[Dict[str, Any]]) -> Tuple[Optional[Set[int]], Optional[Set[str]], Optional[int]]:
         if not isinstance(filters, dict):
@@ -2908,12 +2905,12 @@ class ExecutiveState:
                 except (TypeError, ValueError) as exc:
                     raise ValueError("trace records limit must be integer-compatible") from exc
                 if limit_int <= 0:
-                    records: List[Dict[str, Any]] = []
+                    raw_records: List[Dict[str, Any]] = []
                 else:
-                    records = list(buffer)[-limit_int:] if buffer is not None else []
+                    raw_records = list(buffer)[-limit_int:] if buffer is not None else []
             else:
-                records = list(buffer) if buffer is not None else []
-            cloned = [self._clone_trace_record(item) for item in records]
+                raw_records = list(buffer) if buffer is not None else []
+            encoded = trace_format.encode_trace_records(raw_records)
         enabled = None
         task = self.tasks.get(pid)
         if isinstance(task, dict):
@@ -2922,10 +2919,51 @@ class ExecutiveState:
             "pid": pid,
             "capacity": capacity,
             "count": count,
-            "returned": len(cloned),
+            "returned": len(encoded),
             "enabled": enabled,
-            "records": cloned,
+            "format": trace_format.TRACE_FORMAT_VERSION,
+            "records": encoded,
         }
+
+    def trace_export(self, pid: int, limit: Optional[int] = None) -> Dict[str, Any]:
+        info = self.trace_records(pid, limit=limit)
+        return {
+            "pid": info.get("pid"),
+            "capacity": info.get("capacity"),
+            "count": info.get("count"),
+            "returned": info.get("returned"),
+            "format": trace_format.TRACE_FORMAT_VERSION,
+            "records": list(info.get("records", [])),
+        }
+
+    def trace_import(
+        self,
+        pid: int,
+        records: Iterable[Mapping[str, Any]],
+        *,
+        replace: bool = False,
+    ) -> Dict[str, Any]:
+        if self.trace_buffer_capacity <= 0:
+            raise ValueError("trace buffer disabled")
+        decoded = trace_format.decode_trace_records(records, default_pid=pid)
+        with self.trace_lock:
+            buffer = self.trace_buffers.get(pid)
+            if replace or buffer is None or buffer.maxlen != self.trace_buffer_capacity:
+                buffer = deque(maxlen=self.trace_buffer_capacity)
+            else:
+                buffer = deque(buffer, maxlen=self.trace_buffer_capacity)
+            if decoded:
+                if len(decoded) > self.trace_buffer_capacity:
+                    decoded = decoded[-self.trace_buffer_capacity :]
+                for rec in decoded:
+                    buffer.append(rec)
+                max_seq = max(rec.get("seq", 0) for rec in decoded)
+                if isinstance(max_seq, int):
+                    self._trace_seq = max(self._trace_seq, max_seq + 1)
+            elif replace:
+                buffer.clear()
+            self.trace_buffers[pid] = buffer
+        return self.trace_records(pid)
 
     def task_list(self) -> Dict[str, Any]:
         self._refresh_tasks()
@@ -3917,14 +3955,25 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                             info = self.state.set_trace_buffer_size(request.get("buffer_size"))
                             return {"version": 1, "status": "ok", "trace": info}
                         raise ValueError("trace.config requires 'changed-regs <on|off>' or 'buffer <size>'")
-                    if op in {"records", "history"}:
+                    if op in {"records", "history", "export", "import"}:
                         pid_value = request.get("pid")
                         if pid_value is None:
-                            raise ValueError("trace records requires 'pid'")
+                            raise ValueError(f"trace {op} requires 'pid'")
                         pid_int = int(pid_value)
-                        self.state.ensure_pid_access(pid_int, session_id)
                         limit_value = request.get("limit")
-                        info = self.state.trace_records(pid_int, limit=limit_value)
+                        if op == "import":
+                            if session_id is None:
+                                raise SessionError("session_required")
+                            self.state.ensure_pid_access(pid_int, session_id)
+                            records_payload = request.get("records")
+                            if not isinstance(records_payload, (list, tuple)):
+                                raise ValueError("trace import requires 'records' list")
+                            replace_flag = bool(request.get("replace", True))
+                            info = self.state.trace_import(pid_int, records_payload, replace=replace_flag)
+                        elif op == "export":
+                            info = self.state.trace_export(pid_int, limit=limit_value)
+                        else:
+                            info = self.state.trace_records(pid_int, limit=limit_value)
                         return {"version": 1, "status": "ok", "trace": info}
                     raise ValueError(f"unknown trace op '{op}'")
                 pid_value = request.get("pid")

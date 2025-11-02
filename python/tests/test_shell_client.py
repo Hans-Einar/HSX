@@ -1,3 +1,4 @@
+import json
 import sys
 from pathlib import Path
 
@@ -204,3 +205,77 @@ def test_pretty_sched_task_update(capsys: pytest.CaptureFixture[str]) -> None:
     output = capsys.readouterr().out
     assert "sched task update" in output
     assert "pid" in output
+
+
+def test_trace_records_payload(tmp_path: Path) -> None:
+    payload = _build_payload("trace", ["7", "records", "12"], tmp_path)
+    assert payload["cmd"] == "trace"
+    assert payload["pid"] == 7
+    assert payload["op"] == "records"
+    assert payload["limit"] == 12
+
+
+def test_trace_export_payload(tmp_path: Path) -> None:
+    payload = _build_payload("trace", ["7", "export", "5"], tmp_path)
+    assert payload["cmd"] == "trace"
+    assert payload["op"] == "export"
+    assert payload["limit"] == 5
+
+
+def test_trace_import_payload(tmp_path: Path) -> None:
+    records = [{"seq": 1, "pid": 7, "pc": 0x100, "opcode": 0x200}]
+    data = {"format": "hsx.trace/1", "records": records}
+    trace_file = tmp_path / "trace.json"
+    trace_file.write_text(json.dumps(data), encoding="utf-8")
+    payload = _build_payload("trace", ["7", "import", str(trace_file)], tmp_path)
+    assert payload["cmd"] == "trace"
+    assert payload["op"] == "import"
+    assert payload["replace"] is True
+    assert payload["records"] == records
+
+
+def test_trace_import_append_payload(tmp_path: Path) -> None:
+    records = [{"seq": 2, "pid": 7, "pc": 0x102, "opcode": 0x201}]
+    trace_file = tmp_path / "trace.json"
+    trace_file.write_text(json.dumps(records), encoding="utf-8")
+    payload = _build_payload("trace", ["7", "import", str(trace_file), "--append"], tmp_path)
+    assert payload["op"] == "import"
+    assert payload["replace"] is False
+
+
+def test_pretty_trace_records(capsys: pytest.CaptureFixture[str]) -> None:
+    payload = {
+        "status": "ok",
+        "trace": {
+            "pid": 4,
+            "capacity": 256,
+            "count": 2,
+            "returned": 2,
+            "enabled": True,
+            "format": "hsx.trace/1",
+            "records": [
+                {
+                    "seq": 1,
+                    "ts": 123.456789,
+                    "pc": 0x1020,
+                    "opcode": 0xDEADBEEF,
+                    "flags": 0x3,
+                    "steps": 12,
+                    "changed_regs": ["R0", "R2"],
+                },
+                {
+                    "seq": 2,
+                    "pc": 0x1022,
+                    "opcode": 0x12345678,
+                    "flags": 0,
+                },
+            ],
+        },
+    }
+    _pretty_trace(payload)
+    output = capsys.readouterr().out
+    assert "trace records" in output
+    assert "seq=1" in output and "pc=0x1020" in output
+    assert "changed=R0,R2" in output
+    assert "seq=2" in output
+

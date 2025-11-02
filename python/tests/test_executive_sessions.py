@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 import pytest
 
 from python.execd import ExecutiveState, SessionError
+from python import trace_format
 
 
 class DummyVM:
@@ -313,6 +314,7 @@ def test_trace_step_changed_regs_tracks_diffs():
                 "pc": 0x100,
                 "regs": [0] * 16,
                 "flags": 0,
+                "opcode": 0,
             }
         ]
     )
@@ -331,6 +333,7 @@ def test_trace_step_changed_regs_tracks_diffs():
                 "pc": 0x104,
                 "regs": [0] * 16,
                 "flags": 0,
+                "opcode": 0,
             }
         ]
     )
@@ -350,6 +353,7 @@ def test_trace_step_changed_regs_toggle_respected():
                 "pc": 0x200,
                 "regs": [0] * 16,
                 "flags": 0,
+                "opcode": 0,
             }
         ]
     )
@@ -368,6 +372,7 @@ def test_trace_step_changed_regs_toggle_respected():
                 "pc": 0x204,
                 "regs": regs,
                 "flags": 0,
+                "opcode": 0,
             }
         ]
     )
@@ -387,6 +392,7 @@ def test_trace_buffer_captures_records():
                 "pc": 0x140,
                 "regs": list(range(16)),
                 "flags": 0x5,
+                "mem_access": {"op": "read", "address": 0x1234, "width": 4, "value": 0xDEADBEEF},
                 "opcode": 0xDEADBEEF,
             }
         ]
@@ -441,6 +447,55 @@ def test_trace_buffer_disable_clears_records():
     info = state.trace_records(1)
     assert info["capacity"] == 0
     assert info["count"] == 0
+
+
+def test_trace_export_returns_format():
+    state = make_state()
+    state.set_trace_buffer_size(4)
+    state._process_vm_events(
+        [
+            {
+                "type": "trace_step",
+                "pid": 1,
+                "pc": 0x310,
+                "regs": [0] * 16,
+                "flags": 0,
+                "opcode": 0xAAA,
+            }
+        ]
+    )
+    export = state.trace_export(1)
+    assert export["format"] == trace_format.TRACE_FORMAT_VERSION
+    assert export["records"]
+
+
+def test_trace_import_replace_overwrites_buffer():
+    state = make_state()
+    state.set_trace_buffer_size(4)
+    imported = state.trace_import(
+        1,
+        [
+            {"seq": 10, "pid": 1, "pc": 0x400, "opcode": 0xAAA},
+            {"seq": 11, "pid": 1, "pc": 0x404, "opcode": 0xAAB},
+        ],
+        replace=True,
+    )
+    assert imported["count"] == 2
+    assert imported["records"][0]["seq"] == 10
+    assert state.trace_records(1)["count"] == 2
+
+
+def test_trace_import_append_extends_buffer():
+    state = make_state()
+    state.set_trace_buffer_size(4)
+    state.trace_import(1, [{"seq": 20, "pid": 1, "pc": 0x500, "opcode": 0xABC}], replace=True)
+    appended = state.trace_import(
+        1,
+        [{"seq": 21, "pid": 1, "pc": 0x504, "opcode": 0xABD}],
+        replace=False,
+    )
+    assert appended["count"] == 2
+    assert appended["records"][-1]["seq"] == 21
 
 
 def _task_state_events(state: ExecutiveState) -> List[dict]:

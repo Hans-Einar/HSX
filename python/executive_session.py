@@ -15,6 +15,10 @@ import socket
 import threading
 import time
 from collections import deque
+try:
+    from . import trace_format
+except ImportError:
+    import trace_format
 from typing import Any, Callable, Deque, Dict, Iterable, List, Optional, Tuple
 
 
@@ -404,6 +408,72 @@ class ExecutiveSession:
         self._watch_supported = True
         return copy.deepcopy(block)
 
+    def trace(self, pid: int, mode: Optional[bool] = None) -> Optional[JsonDict]:
+        payload: JsonDict = {"cmd": "trace", "pid": int(pid)}
+        if mode is not None:
+            payload["mode"] = bool(mode)
+        response = self.request(payload)
+        if response.get("status") != "ok":
+            error = str(response.get("error", "trace error"))
+            if "unknown_cmd" in error or "unsupported" in error:
+                return None
+            raise ExecutiveSessionError(error)
+        block = response.get("trace")
+        if not isinstance(block, dict):
+            return None
+        return copy.deepcopy(block)
+
+    def trace_records(
+        self,
+        pid: int,
+        *,
+        limit: Optional[int] = None,
+        export: bool = False,
+    ) -> Optional[JsonDict]:
+        payload: JsonDict = {
+            "cmd": "trace",
+            "pid": int(pid),
+            "op": "export" if export else "records",
+        }
+        if limit is not None:
+            payload["limit"] = int(limit)
+        response = self.request(payload)
+        if response.get("status") != "ok":
+            error = str(response.get("error", "trace records error"))
+            if "unknown_cmd" in error or "unsupported" in error:
+                return None
+            raise ExecutiveSessionError(error)
+        block = response.get("trace")
+        if not isinstance(block, dict):
+            return None
+        return copy.deepcopy(block)
+
+    def trace_import(
+        self,
+        pid: int,
+        records: Iterable[Dict[str, Any]],
+        *,
+        replace: bool = True,
+    ) -> Optional[JsonDict]:
+        encoded = trace_format.encode_trace_records(records)
+        payload: JsonDict = {
+            "cmd": "trace",
+            "pid": int(pid),
+            "op": "import",
+            "records": encoded,
+            "replace": bool(replace),
+        }
+        response = self.request(payload)
+        if response.get("status") != "ok":
+            error = str(response.get("error", "trace import error"))
+            if "unknown_cmd" in error or "unsupported" in error:
+                return None
+            raise ExecutiveSessionError(error)
+        block = response.get("trace")
+        if not isinstance(block, dict):
+            return None
+        return copy.deepcopy(block)
+
     def disasm_read(
         self,
         pid: int,
@@ -663,3 +733,4 @@ class ExecutiveSession:
 
 
 __all__ = ["ExecutiveSession", "ExecutiveSessionError"]
+

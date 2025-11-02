@@ -1118,48 +1118,103 @@ class MiniVM:
         ctx = self.context
         if ctx and ctx.pid is not None:
             qb["pid"] = ctx.pid
+        mem_access = None
 
         adv = 4
         if op == 0x01:  # LDI
             self.regs[rd] = imm & 0xFFFFFFFF
         elif op == 0x02:  # LD
+            addr = (self.regs[rs1] + imm) & 0xFFFFFFFF
             try:
-                self.regs[rd] = ld32((self.regs[rs1] + imm) & 0xFFFFFFFF)
+                value = ld32(addr)
             except MemoryError:
                 trap_memory_fault()
                 return
+            else:
+                self.regs[rd] = value
+                mem_access = {
+                    "op": "read",
+                    "address": addr & 0xFFFFFFFF,
+                    "width": 4,
+                    "value": value & 0xFFFFFFFF,
+                }
         elif op == 0x03:  # ST
+            addr = (self.regs[rs1] + imm) & 0xFFFFFFFF
+            value = self.regs[rs2] & 0xFFFFFFFF
             try:
-                st32((self.regs[rs1] + imm) & 0xFFFFFFFF, self.regs[rs2])
+                st32(addr, value)
             except MemoryError:
                 trap_memory_fault()
                 return
+            else:
+                mem_access = {
+                    "op": "write",
+                    "address": addr & 0xFFFFFFFF,
+                    "width": 4,
+                    "value": value,
+                }
         elif op == 0x04:  # MOV
             self.regs[rd] = self.regs[rs1]
         elif op == 0x06:  # LDB
+            addr = (self.regs[rs1] + imm) & 0xFFFFFFFF
             try:
-                self.regs[rd] = ld8((self.regs[rs1] + imm) & 0xFFFFFFFF)
+                value = ld8(addr)
             except MemoryError:
                 trap_memory_fault()
                 return
+            else:
+                self.regs[rd] = value
+                mem_access = {
+                    "op": "read",
+                    "address": addr & 0xFFFFFFFF,
+                    "width": 1,
+                    "value": value & 0xFF,
+                }
         elif op == 0x07:  # LDH
+            addr = (self.regs[rs1] + imm) & 0xFFFFFFFF
             try:
-                self.regs[rd] = ld16((self.regs[rs1] + imm) & 0xFFFFFFFF)
+                value = ld16(addr)
             except MemoryError:
                 trap_memory_fault()
                 return
+            else:
+                self.regs[rd] = value & 0xFFFFFFFF
+                mem_access = {
+                    "op": "read",
+                    "address": addr & 0xFFFFFFFF,
+                    "width": 2,
+                    "value": value & 0xFFFF,
+                }
         elif op == 0x08:  # STB
+            addr = (self.regs[rs1] + imm) & 0xFFFFFFFF
+            value = self.regs[rs2] & 0xFF
             try:
-                st8((self.regs[rs1] + imm) & 0xFFFFFFFF, self.regs[rs2])
+                st8(addr, value)
             except MemoryError:
                 trap_memory_fault()
                 return
+            else:
+                mem_access = {
+                    "op": "write",
+                    "address": addr & 0xFFFFFFFF,
+                    "width": 1,
+                    "value": value,
+                }
         elif op == 0x09:  # STH
+            addr = (self.regs[rs1] + imm) & 0xFFFFFFFF
+            value = self.regs[rs2] & 0xFFFF
             try:
-                st16((self.regs[rs1] + imm) & 0xFFFFFFFF, self.regs[rs2])
+                st16(addr, value)
             except MemoryError:
                 trap_memory_fault()
                 return
+            else:
+                mem_access = {
+                    "op": "write",
+                    "address": addr & 0xFFFFFFFF,
+                    "width": 2,
+                    "value": value,
+                }
         elif op == 0x10:  # ADD
             result, carry, overflow = add_with_flags(self.regs[rs1], self.regs[rs2])
             self.regs[rd] = result
@@ -1483,6 +1538,8 @@ class MiniVM:
             ctx = self.context
             if ctx and ctx.pid is not None:
                 event["pid"] = ctx.pid
+            if mem_access:
+                event["mem_access"] = dict(mem_access)
             self.emit_event(event)
 
     def get_last_pc(self) -> int:

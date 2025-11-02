@@ -481,12 +481,12 @@ Design specifies standardizing trace record structure (section 6.4). Ensures con
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
-- [ ] Formalize trace record structure (seq, pid, pc, opcode, regs)
-- [ ] Add optional fields (flags, changed_regs, mem_access)
-- [ ] Implement trace record serialization (for export)
-- [ ] Add trace record deserialization (for import)
-- [ ] Document trace record format
-- [ ] Add trace format tests
+- [x] Formalize trace record structure (seq, pid, pc, opcode, regs)
+- [x] Add optional fields (flags, changed_regs, mem_access)
+- [x] Implement trace record serialization (for export)
+- [x] Add trace record deserialization (for import)
+- [x] Document trace record format
+- [x] Add trace format tests
 
 ---
 

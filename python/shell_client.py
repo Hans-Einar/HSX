@@ -1631,13 +1631,47 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
         if len(args) == 1:
             return payload
         subcmd = args[1].lower()
-        if subcmd in {"records", "history"}:
-            payload["op"] = "records"
+        if subcmd in {"records", "history", "export"}:
+            payload["op"] = "export" if subcmd == "export" else "records"
             if len(args) > 2:
                 try:
                     payload["limit"] = int(args[2], 0)
                 except ValueError as exc:
-                    raise ValueError("trace records limit must be integer") from exc
+                    raise ValueError("trace records/export limit must be integer") from exc
+            return payload
+        if subcmd == "import":
+            if len(args) < 3:
+                raise ValueError("trace import requires <file>")
+            replace = True
+            file_token = args[2]
+            option_tokens = args[3:]
+            if option_tokens and option_tokens[0] == "--append":
+                replace = False
+                option_tokens = option_tokens[1:]
+            if option_tokens:
+                raise ValueError("trace import usage: trace <pid> import <file> [--append]")
+            file_path = Path(file_token)
+            if current_dir is not None and not file_path.is_absolute():
+                file_path = (current_dir / file_path).resolve(strict=False)
+            else:
+                file_path = file_path.resolve(strict=False)
+            try:
+                data = json.loads(file_path.read_text(encoding="utf-8"))
+            except FileNotFoundError as exc:
+                raise ValueError(f"trace import file not found: {file_path}") from exc
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"trace import file is not valid JSON ({exc})") from exc
+            if isinstance(data, dict) and "records" in data:
+                records = data["records"]
+                if "format" in data:
+                    payload["format"] = data["format"]
+            else:
+                records = data
+            if not isinstance(records, list):
+                raise ValueError("trace import expects JSON list or object with 'records'")
+            payload["op"] = "import"
+            payload["records"] = records
+            payload["replace"] = replace
             return payload
         if len(args) > 1:
             payload["mode"] = args[1]
