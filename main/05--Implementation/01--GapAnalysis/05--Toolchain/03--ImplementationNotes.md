@@ -1,31 +1,35 @@
-# Executive Implementation Notes
+# Toolchain - Implementation Notes
 
-Use this file to record progress per session.
+Use this log to capture each session. Keep entries concise yet thorough so the next agent can resume without context loss.
 
-## Template
+## Session Template
 
 ```
 ## YYYY-MM-DD - Name/Initials (Session N)
 
-### Focus
-- Task(s) tackled: ...
-- Dependencies touched: ...
+### Scope
+- Plan item / phase addressed:
+- Design sections reviewed:
 
-### Status
-- TODO / IN PROGRESS / DONE / BLOCKED
+### Work Summary
+- Key decisions & code changes:
+- Design updates filed/applied:
 
-### Details
-- Summary of code changes / key decisions.
-- Tests run (commands + result).
-- Follow-up actions / hand-off notes.
+### Testing
+- Commands executed + results:
+- Issues encountered:
+
+### Next Steps
+- Follow-ups / blockers:
+- Reviews or coordination required:
 ```
 
-Start new sections chronologically. Keep notes concise but actionable so the next agent can resume quickly.
+Append sessions chronologically and ensure every entry references the relevant design material and documents the executed tests.
 
 ## 2025-11-05 - Codex (Session 1)
 
 ### Focus
-- Task(s) tackled: Phase 2.4 planning for `.mailbox` metadata emission across the toolchain (llvm→mvasm→hxo/hxe).
+- Task(s) tackled: Phase 2.4 planning for `.mailbox` metadata emission across the toolchain (llvm->mvasm->hxo/hxe).
 - Dependencies touched: Reviewed design doc 04.05--Toolchain.md, current `hsx-llc.py`, `asm.py`, and `hld.py`.
 
 ### Status
@@ -37,18 +41,18 @@ Start new sections chronologically. Keep notes concise but actionable so the nex
   - **MVASM directive syntax:** allow JSON payloads to minimise bespoke parsing. e.g. `.mailbox {"target":"app:telemetry","capacity":128,"mode_mask":"FANOUT|RDWR","owner_pid":2,"bindings":[{"pid":2,"flags":"STDOUT"}]}`.
   - **hsx-llc:** capture `#pragma hsx_mailbox(...)` and emit the directive with a normalised JSON object (mode strings expanded to constants).
   - **asm.py:** detect `.mailbox` lines, parse the trailing JSON via `json.loads`, validate required keys, and append structured entries to the HXO metadata blob (storing verbatim JSON for string tables when we add values/commands).
-  - **hld.py:** merge mailbox metadata arrays from all HXO inputs, deduplicate identical targets, and write a consolidated JSON payload into the HXE `.mailbox` section, aligning with the loader’s expectations (version=1 object with `"mailboxes": [...]`).
+  - **hld.py:** merge mailbox metadata arrays from all HXO inputs, deduplicate identical targets, and write a consolidated JSON payload into the HXE `.mailbox` section, aligning with the loader's expectations (version=1 object with `"mailboxes": [...]`).
 - Planned tests:
   1. Unit tests around assembler parsing (valid + malformed JSON, option combinations).
   2. Linker integration test: two HXO inputs each contributing mailboxes should merge cleanly and produce a single `.mailbox` section.
-  3. End-to-end build sample (C pragma → hsx-cc-build) asserting resulting HXE metadata matches loader schema and that `platforms/python/host_vm.py` pre-creates the mailboxes.
+  3. End-to-end build sample (C pragma -> hsx-cc-build) asserting resulting HXE metadata matches loader schema and that `platforms/python/host_vm.py` pre-creates the mailboxes.
 - Follow-up actions / hand-off notes:
   - Track implementation in Session 2 (below); additional work remains for pragma extraction in `hsx-llc` and value/command metadata.
 
 ## 2025-11-05 - Codex (Session 2)
 
 ### Focus
-- Task(s) tackled: Implement Phase 2.4 `.mailbox` metadata pipeline (assembler directives → HXO → linker → HXE) plus documentation/tests.
+- Task(s) tackled: Implement Phase 2.4 `.mailbox` metadata pipeline (assembler directives -> HXO -> linker -> HXE) plus documentation/tests.
 - Dependencies touched: `python/asm.py`, `python/hld.py`, `python/tests/test_vm_stream_loader.py`, `python/tests/test_linker*.py`, `docs/MVASM_SPEC.md`.
 
 ### Status

@@ -1,35 +1,58 @@
 # Executive Implementation - Agent Guide
 
-Welcome! This guide explains how to pick up work in the Executive module.
+## 1. Mandatory Reading (in order)
+1. **Design Spec** – `../../../04--Design/04.02--Executive.md` (authoritative behaviour, RPCs, scheduler contract).
+2. **Retrospective** – `../Retrospective.md` for current process adjustments.
+3. **Grand Plan** – `../GrandImplementationPlan.md` for sequencing and quality gates.
+4. **Module Plan** – `02--ImplementationPlan.md` (phase detail & checklists).
+5. **Implementation Notes** – `03--ImplementationNotes.md` for last-session context.
+6. **DependencyTree.md`** when coordinating with VM/Mailbox dependencies.
 
-## 1. Read First
-- `../GrandImplementationPlan.md` for overall sequencing.
-- `02--ImplementationPlan.md` for detailed phase tasks.
-- `../GrandImplementationNotes.md` (once populated) to see cross-module status.
+## 2. Design Alignment & Checklists
+### Design Document Review Checklist
+- [ ] Read the relevant section of 04.02 before coding.
+- [ ] Capture ambiguities in `03--ImplementationNotes.md`; resolve or escalate.
+- [ ] Update 04.02 when new behaviour or constraints emerge.
+- [ ] Ensure RPC tables, state diagrams, and event schemas remain accurate.
 
-## 2. Current Priority
-- Phase 1 (Python only):
-  1. Session management (`session.open/close/keepalive`, PID locks, timeouts).
-  2. Event streaming foundation (bounded buffers, subscribe/unsubscribe/ack, routing VM `trace_step` events).
-  3. Breakpoint RPCs (depends on #2).
+### Definition of Done
+- [ ] Implementation matches the referenced design section(s).
+- [ ] Tests added/updated and executed; results logged.
+- [ ] `02--ImplementationPlan.md` and `03--ImplementationNotes.md` updated.
+- [ ] Design document updated (or follow-up filed) when behaviour differs.
+- [ ] `04--git.md` entry added after changes land.
+- [ ] Incremental reviews (design/implementation/integration) completed or scheduled.
 
 ## 3. Workflow
-1. Pick an open item from the plan (respect dependencies - session work before events, etc.).
-2. Update `ImplementationNotes.md` (see scaffold) with:
-   - Date, initials.
-   - Task summary.
-   - Status: TODO / IN PROGRESS / DONE / BLOCKED.
-   - Tests run + outcomes.
-3. Keep work Python-only unless the plan explicitly calls for a C port.
+### Pre-Implementation
+- [ ] Read design spec section(s) and note clarifications.
+- [ ] Review outstanding TODOs and dependencies in the module plan.
+- [ ] Log open questions/risks in `03--ImplementationNotes.md`.
+- [ ] Confirm which review gate (design/implementation/integration) applies and line it up.
+
+### Implementation
+- [ ] Follow the checklist for the active task in `02--ImplementationPlan.md`.
+- [ ] Keep design and plan synced with decisions.
+- [ ] Run targeted pytest suites (`python/tests/test_executive_*`, etc.) and capture results.
+- [ ] Draft design doc updates as behavioural decisions are made.
+
+### Post-Implementation
+- [ ] Complete the Definition of Done checklist.
+- [ ] Update design docs or create follow-up tasks for any changes.
+- [ ] Record session summary, tests, follow-ups in `03--ImplementationNotes.md`.
+- [ ] Update cross-module trackers (`../GrandImplementationNotes.md`) if priorities shift.
 
 ## 4. Testing
-- Use targeted pytest modules (e.g., `python/tests/test_executive_*` once they exist).
-- Document commands and results in `ImplementationNotes.md`.
-- If tests cannot run, note blockers and next actions.
+- Focus on relevant suites first (`python/tests/test_executive_*`, `python/tests/test_shell_client.py`, etc.).
+- Log commands/outcomes in session notes.
+- For integration scenarios, coordinate with VM/Mailbox tests as specified in the plan.
 
-## 5. Hand-off
-- Ensure `ImplementationNotes.md` reflects current state.
-- If a git entry is needed, update `../GrandImplementationNotes.md` or the stack-specific log after changes land.
-- Leave TODOs for follow-up agents if work is partial.
+## 5. Reviews & Hand-off
+- Respect the incremental review cadence:
+  - Design review before new capability work.
+  - Implementation review when a phase completes.
+  - Integration review before exposing new RPCs/events to downstream consumers.
+- Leave clear TODOs/blockers in the notes if work continues later.
+- Update `04--git.md` once commits are prepared and include any design updates.
 
-Happy hacking!
+Following this guide keeps executive development aligned with the design contract and provides smooth hand-offs between agents. Happy hacking!

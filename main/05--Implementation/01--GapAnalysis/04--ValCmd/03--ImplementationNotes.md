@@ -1,23 +1,27 @@
-# Executive Implementation Notes
+# ValCmd - Implementation Notes
 
-Use this file to record progress per session.
+Use this log to capture each session. Keep entries concise but thorough so the next agent can continue without rework.
 
-## Template
+## Session Template
 
 ```
 ## YYYY-MM-DD - Name/Initials (Session N)
 
-### Focus
-- Task(s) tackled: ...
-- Dependencies touched: ...
+### Scope
+- Plan item / phase addressed:
+- Design sections reviewed:
 
-### Status
-- TODO / IN PROGRESS / DONE / BLOCKED
+### Work Summary
+- Key decisions & code changes:
+- Design updates filed/applied:
 
-### Details
-- Summary of code changes / key decisions.
-- Tests run (commands + result).
-- Follow-up actions / hand-off notes.
+### Testing
+- Commands executed + results:
+- Issues encountered:
+
+### Next Steps
+- Follow-ups / blockers:
+- Reviews or coordination required:
 ```
 
-Start new sections chronologically. Keep notes concise but actionable so the next agent can resume quickly.
+Append sessions chronologically and ensure every entry references the relevant design material and documents executed tests.

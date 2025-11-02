@@ -2,23 +2,48 @@
 
 This directory orchestrates progress across all implementation tracks. Use this guide when working at the "grand plan" level.
 
-## Documents
-- `GrandImplementationPlan.md` - master schedule (python-first). Defines the order in which modules and phases should land.
-- `GrandImplementationNotes.md` - (create/update) quick status snapshot per module.
-- `DependencyTree.md` - historical dependency map; reference when sequencing work.
+## 1. Mandatory Reading (in order)
+1. `../04--Design/04.00--Design.md` – design governance and cross-module assumptions.
+2. `GrandImplementationPlan.md` – master schedule (python-first) and quality gates.
+3. `GrandImplementationNotes.md` – current module status / last updates.
+4. `DependencyTree.md` – historical dependency map; reference when sequencing work.
+5. Module-specific `AGENTS.md`, `02--ImplementationPlan.md`, `03--ImplementationNotes.md` before delegating or diving into a module.
 
-## How to Work Here
-1. Review the grand plan to confirm current priorities (e.g., finish Executive Phase 1 before moving to Mailbox Phase 2).
-2. Dive into the specific module folder (e.g., `01--VM`, `02--Executive`) and follow that module's `AGENTS.md` / `ImplementationNotes.md`.
-3. After finishing work, update:
-   - Module-specific notes/logs.
-   - `GrandImplementationNotes.md` with a short summary of what changed.
-   - `GrandImplementationPlan.md` only if priorities or sequencing need adjustment.
+## 2. Coordination Workflow
+### Pre-Planning
+- [ ] Confirm design documents exist and cover the upcoming work.
+- [ ] Identify upcoming review gates (design, implementation, integration).
+- [ ] Ensure module plans reference the correct design section(s).
 
-## General Rules
+### During Planning / Execution
+- [ ] Validate that each module is following the design-first checklist (see module `AGENTS.md`).
+- [ ] Schedule incremental reviews (design → implementation → integration → comprehensive) and record them in the plan.
+- [ ] Track Definition of Done compliance across modules.
+
+### Post-Execution
+- [ ] Update module notes/logs and `GrandImplementationNotes.md` with outcomes.
+- [ ] Flag any design document updates that were required and ensure the design owner closes the loop.
+- [ ] Adjust `GrandImplementationPlan.md` if sequencing or dependencies change.
+
+## 3. Process Expectations
+- **Design-first**: every module task must cite the authoritative design section and feed back clarifications.
+- **Bidirectional traceability**: if implementation changes behaviour, update the design document and note it in the plan.
+- **Quality gates**:
+  1. Design review (before implementation starts).
+  2. Implementation review (phase completion).
+  3. Integration review (before cross-module usage).
+  4. Comprehensive review (before stress / release).
+- **Definition of Done (global)**:
+  - Implementation matches the referenced design section.
+  - Tests updated/executed; results logged.
+  - Implementation notes updated with outcomes and follow-ups.
+  - Design documents amended if reality diverges.
+  - Git log / progress trackers refreshed.
+
+## 4. General Rules
 - Stay python-first; defer C ports until the plan explicitly calls for them.
-- Keep documentation in sync (module plans, executive protocol, etc.).
-- Use pytest for regression coverage and log commands/results.
+- Keep documentation in sync (design ↔ plan ↔ notes ↔ code).
+- Use pytest or targeted scripts for regression coverage and log commands/results.
 - If pausing work, leave clear TODOs in both module notes and the grand notes.
 
-Thanks for coordinating! This layer keeps the whole implementation effort aligned.
+Thanks for coordinating! This layer keeps the whole implementation effort aligned with the design contract.

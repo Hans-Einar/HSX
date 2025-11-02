@@ -531,8 +531,17 @@ def test_task_state_mailbox_wait_and_wake_events():
 
     wait_event = {"descriptor": 7, "handle": 2, "timeout": 50}
     state._mark_task_wait_mailbox(1, wait_event)
+    task_before = state.tasks[1]
+    assert task_before["wait_mailbox"] == 7
+    assert task_before["wait_handle"] == 2
+    assert task_before["wait_timeout"] == 50
     vm.state = "waiting_mbx"
     state._refresh_tasks()
+    task_after = state.tasks[1]
+    assert task_after["state"] == "waiting_mbx"
+    assert task_after["wait_mailbox"] == 7
+    assert task_after["wait_handle"] == 2
+    assert task_after["wait_timeout"] == 50
     events = _task_state_events(state)
     assert events, "expected mailbox wait event"
     data = events[-1]["data"]
@@ -544,6 +553,10 @@ def test_task_state_mailbox_wait_and_wake_events():
     vm.state = "ready"
     state._mark_task_ready(1, {"descriptor": 7}, reason="mailbox_wake")
     state._refresh_tasks()
+    task_ready = state.tasks[1]
+    assert "wait_mailbox" not in task_ready
+    assert "wait_handle" not in task_ready
+    assert "wait_timeout" not in task_ready
     wake_events = _task_state_events(state)
     assert wake_events, "expected mailbox wake event"
     wake_data = wake_events[-1]["data"]

@@ -24,6 +24,36 @@ This implementation plan addresses the gaps identified in the ValCmd Study docum
 
 ---
 
+## Process Expectations
+
+### Design-First Workflow
+- Read the relevant sections of `04.04--ValCmd.md` **before** starting implementation work.
+- Capture ambiguities or clarifications in `03--ImplementationNotes.md` and resolve or escalate prior to coding.
+- Update the design document whenever implementation clarifies or changes behaviour or APIs.
+
+### Definition of Done (applies to every task/phase)
+- [ ] Implementation matches the referenced design section(s).
+- [ ] Tests updated/executed; commands and results captured in `03--ImplementationNotes.md`.
+- [ ] `02--ImplementationPlan.md` checkboxes refreshed.
+- [ ] `03--ImplementationNotes.md` entry recorded (focus, status, tests, follow-ups).
+- [ ] Design document updated (or follow-up filed) if behaviour diverges.
+- [ ] `04--git.md` log updated once changes land.
+- [ ] Required review gate(s) completed (design → implementation → integration).
+
+### Review Gates
+1. **Design Review** – Confirm referenced design sections and clarifications before coding a phase.
+2. **Implementation Review** – Run after completing each phase to validate against the design.
+3. **Integration Review** – Required before exposing ValCmd APIs to mailbox/executive/tooling consumers.
+4. **Comprehensive Review** – Before stress testing or packaging milestones.
+
+### Design Document Review Checklist
+- [ ] Value/command tables, opcodes, and structures remain accurate.
+- [ ] Execution diagrams/state descriptions align with implementation.
+- [ ] Security/auth constraints documented and enforced.
+- [ ] Newly discovered constraints captured in the design.
+
+---
+
 ## Phase 1: Core Data Structures and Registry
 
 ### 1.1 Create C Header Files

@@ -1,35 +1,55 @@
-# Executive Implementation - Agent Guide
+# Toolkit Implementation - Agent Guide
 
-Welcome! This guide explains how to pick up work in the Executive module.
+## 1. Mandatory Reading (in order)
+1. **Design Spec** – `../../../04--Design/04.06--Toolkit.md` (CLI/TUI utilities, helper scripts).
+2. **Retrospective** – `../Retrospective.md` for process improvements.
+3. **Grand Plan** – `../GrandImplementationPlan.md` (sequencing, review gates).
+4. **Module Plan** – `02--ImplementationPlan.md` (phase breakdown, checklists).
+5. **Implementation Notes** – `03--ImplementationNotes.md` (latest work).
+6. **DependencyTree.md** when coordinating with Executive/Toolchain deliverables.
 
-## 1. Read First
-- `../GrandImplementationPlan.md` for overall sequencing.
-- `02--ImplementationPlan.md` for detailed phase tasks.
-- `../GrandImplementationNotes.md` (once populated) to see cross-module status.
+## 2. Design Alignment & Checklists
+### Design Document Review Checklist
+- [ ] Read relevant sections of 04.06 before coding (CLI behaviour, UX expectations, telemetry tools).
+- [ ] Log ambiguities/questions in `03--ImplementationNotes.md` and resolve them.
+- [ ] Update 04.06 when workflows/UI change.
+- [ ] Ensure user stories/command references remain accurate.
 
-## 2. Current Priority
-- Phase 1 (Python only):
-  1. Session management (`session.open/close/keepalive`, PID locks, timeouts).
-  2. Event streaming foundation (bounded buffers, subscribe/unsubscribe/ack, routing VM `trace_step` events).
-  3. Breakpoint RPCs (depends on #2).
+### Definition of Done
+- [ ] Implementation matches the referenced design section(s).
+- [ ] Tests/CLI scripts executed; results documented in notes.
+- [ ] `02--ImplementationPlan.md` and `03--ImplementationNotes.md` updated.
+- [ ] Design doc amended (or follow-up filed) if behaviour changed.
+- [ ] `04--git.md` log entry added once changes land.
+- [ ] Review gates satisfied (design → implementation → integration).
 
 ## 3. Workflow
-1. Pick an open item from the plan (respect dependencies - session work before events, etc.).
-2. Update `ImplementationNotes.md` (see scaffold) with:
-   - Date, initials.
-   - Task summary.
-   - Status: TODO / IN PROGRESS / DONE / BLOCKED.
-   - Tests run + outcomes.
-3. Keep work Python-only unless the plan explicitly calls for a C port.
+### Pre-Implementation
+- [ ] Read the design section covering the tool/workflow being updated.
+- [ ] Review outstanding tasks/dependencies in the plan.
+- [ ] Capture open design questions in the notes.
+- [ ] Confirm the next review gate is scheduled.
+
+### Implementation
+- [ ] Follow the task checklist in `02--ImplementationPlan.md`.
+- [ ] Keep design documentation and plan aligned with decisions.
+- [ ] Run relevant tests/scripts (`python/tests/test_toolkit_*`, smoke tests, CLI demos) and capture results.
+- [ ] Draft design doc updates for UI/CLI changes while context is fresh.
+
+### Post-Implementation
+- [ ] Complete the Definition of Done checklist.
+- [ ] Update design doc or log follow-up tasks for outstanding changes.
+- [ ] Record session summary, tests, and follow-ups in `03--ImplementationNotes.md`.
+- [ ] Update cross-module trackers (`../GrandImplementationNotes.md`) if status changes.
 
 ## 4. Testing
-- Use targeted pytest modules (e.g., `python/tests/test_executive_*` once they exist).
-- Document commands and results in `ImplementationNotes.md`.
-- If tests cannot run, note blockers and next actions.
+- Use targeted suites (`python/tests/test_toolkit_*`, CLI smoke tests, integration demos).
+- Log commands/outcomes in the notes.
+- When coordinating with Executive/Toolchain, run end-to-end flows indicated in the plan.
 
-## 5. Hand-off
-- Ensure `ImplementationNotes.md` reflects current state.
-- If a git entry is needed, update `../GrandImplementationNotes.md` or the stack-specific log after changes land.
-- Leave TODOs for follow-up agents if work is partial.
+## 5. Reviews & Hand-off
+- Observe incremental reviews (design/implementation/integration).
+- Leave explicit TODOs/blockers in the notes if pausing work.
+- Update `04--git.md` after preparing commits, referencing design sections where updated.
 
-Happy hacking!
+Follow this guide to keep Toolkit development aligned with the design contract and maintain smooth hand-offs. Happy hacking!

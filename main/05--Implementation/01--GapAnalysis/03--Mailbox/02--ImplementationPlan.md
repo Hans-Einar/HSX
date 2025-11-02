@@ -21,6 +21,37 @@ This implementation plan addresses the gaps identified in the Mailbox Study docu
 
 ---
 
+## Process Expectations
+
+### Design-First Workflow
+- Always read the relevant sections of `04.03--Mailbox.md` **before** starting implementation work.
+- Document ambiguities or clarifications in `03--ImplementationNotes.md` and resolve or escalate prior to coding.
+- Update the design document whenever implementation reveals new behaviour, constraints, or API adjustments.
+
+### Definition of Done (applies to every task/phase)
+- [ ] Implementation matches the referenced design section(s).
+- [ ] Tests updated/executed; commands and results captured in `03--ImplementationNotes.md`.
+- [ ] `02--ImplementationPlan.md` checkboxes refreshed.
+- [ ] `03--ImplementationNotes.md` entry recorded (focus, status, tests, follow-ups).
+- [ ] Design document updated (or follow-up filed) if behaviour diverges.
+- [ ] `04--git.md` log updated once changes land.
+- [ ] Required review gate(s) completed (design → implementation → integration).
+
+### Review Gates
+1. **Design Review** – Confirm referenced design sections and clarifications before coding a phase.
+2. **Implementation Review** – Run after completing each phase to validate against the design.
+3. **Integration Review** – Required before exposing new mailboxes/events to Executive/Provisioning/Tooling consumers.
+4. **Comprehensive Review** – Before stress testing or packaging milestones.
+
+### Design Document Review Checklist
+- [ ] Status/opcode tables in 04.03 remain accurate.
+- [ ] Wait/wake diagrams align with implementation.
+- [ ] Resource limits, namespace rules, and timeout semantics are current.
+- [ ] Observability/event semantics match the design.
+- [ ] Newly discovered constraints captured in the design.
+
+---
+
 ## Phase 1: Complete Python Implementation
 
 ### 1.1 Add Timeout Status Code
@@ -246,20 +277,29 @@ Toolchain needs to generate .mailbox sections from application code. Enables dec
 
 **Priority:** HIGH  
 **Dependencies:** Executive Phase 4.1 (Formal state machine)  
-**Estimated Effort:** 2-3 days
+**Estimated Effort:** 2-3 days  
+**Design Reference:** [04.03--Mailbox.md](../../../04--Design/04.03--Mailbox.md) Sections 4.3, 4.4.4, 4.7, 5.2  
+**Design Questions Resolved:** _(record clarifications in 03--ImplementationNotes.md prior to coding)_  
+**Design Updates Needed:** _(capture required spec edits here and action them post-implementation)_
 
-**Rationale:**  
-Design specifies explicit `WAIT_MBX` state transition (section 4.3). System/Mailbox.md notes: "Provide hooks for tracing (mailbox_wait/wake) to scheduler." Related to issue #2_scheduler.
+**Pre-Implementation Checklist**
+- [ ] Read design Sections 4.3 (Execution Model) and 4.7 (State Transitions).
+- [ ] Confirm scheduler expectations in 04.02--Executive.md align with Mailbox WAIT_MBX semantics.
+- [ ] Document open design questions / assumptions in `03--ImplementationNotes.md`.
 
-**Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.03--Mailbox](../../../04--Design/04.03--Mailbox.md)
-- [ ] Ensure mailbox blocking transitions task to WAIT_MBX state
-- [ ] Verify executive state machine recognizes WAIT_MBX
-- [ ] Add WAIT_MBX state to task state tracking
-- [ ] Implement mailbox wait callback to executive scheduler
-- [ ] Add WAIT_MBX state tests
-- [ ] Document WAIT_MBX state semantics
-- [ ] Cross-reference with issue #2_scheduler
+**Implementation Tasks**
+- [ ] Ensure mailbox blocking transitions tasks to `WAIT_MBX` (executive + VM controller state).
+- [ ] Verify the executive state machine recognises and preserves `WAIT_MBX`.
+- [ ] Update task tracking to store wait metadata (descriptor, handle, timeout, deadline).
+- [ ] Implement mailbox wait callbacks / pending state bookkeeping for scheduler integration.
+- [ ] Add targeted tests (unit + integration) covering wait → wake → timeout flows.
+- [ ] Update documentation (`docs/executive_protocol.md`, design notes) to describe semantics.
+
+**Post-Implementation Checklist**
+- [ ] Validate behaviour against design sections (state diagrams, wait/wake flow).
+- [ ] Update 04.03 and 04.02 design docs if behaviour changed or clarifications were required.
+- [ ] Record outcomes, tests, and follow-ups in `03--ImplementationNotes.md`.
+- [ ] Confirm review gate (implementation review) has been completed/logged.
 
 ---
 
@@ -267,20 +307,29 @@ Design specifies explicit `WAIT_MBX` state transition (section 4.3). System/Mail
 
 **Priority:** HIGH  
 **Dependencies:** Executive Phase 4.2 (Wait/wake improvements with timer heap)  
-**Estimated Effort:** 2-3 days
+**Estimated Effort:** 2-3 days  
+**Design Reference:** [04.03--Mailbox.md](../../../04--Design/04.03--Mailbox.md) Section 4.4.4 & 5.1.2  
+**Design Questions Resolved:** _TBD_  
+**Design Updates Needed:** _TBD_
 
-**Rationale:**  
-Design specifies timer heap for blocked mailbox operations (section 4.4.4). Ensures accurate timeout handling.
+**Pre-Implementation Checklist**
+- [ ] Review timeout semantics in Sections 4.4.4 and 5.1.2.
+- [ ] Cross-check Executive scheduler expectations in 04.02 (timer heap integration).
+- [ ] Capture edge cases (poll, finite, infinite) in `03--ImplementationNotes.md`.
 
-**Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.03--Mailbox](../../../04--Design/04.03--Mailbox.md)
-- [ ] Integrate mailbox timeouts with executive timer heap
-- [ ] Add timeout deadline calculation for blocking recv
-- [ ] Implement timeout expiry callback (wake task, return TIMEOUT)
-- [ ] Verify timeout heap integration for finite timeouts
-- [ ] Verify infinite timeout doesn't add to timer heap
-- [ ] Add timeout heap tests (various timeout values)
-- [ ] Document timeout heap integration
+**Implementation Tasks**
+- [ ] Integrate mailbox waits with the executive timer heap (finite timeout path).
+- [ ] Ensure infinite timeouts skip heap registration.
+- [ ] Implement timeout expiry callbacks (wake task, return TIMEOUT status, emit events).
+- [ ] Add instrumentation/counters for timeouts as per design.
+- [ ] Extend tests to cover finite/infinite/poll timeout scenarios.
+- [ ] Update documentation to describe timeout scheduling behaviour.
+
+**Post-Implementation Checklist**
+- [ ] Reconcile implementation with design (deadline calculations, event payloads).
+- [ ] Update design doc if new constraints (e.g., heap capacity) are identified.
+- [ ] Record tests/results/follow-ups in `03--ImplementationNotes.md`.
+- [ ] Close out the corresponding review gate.
 
 ---
 
@@ -288,19 +337,28 @@ Design specifies timer heap for blocked mailbox operations (section 4.4.4). Ensu
 
 **Priority:** MEDIUM  
 **Dependencies:** 3.1 (Formal WAIT_MBX state)  
-**Estimated Effort:** 1-2 days
+**Estimated Effort:** 1-2 days  
+**Design Reference:** [04.03--Mailbox.md](../../../04--Design/04.03--Mailbox.md) Sections 4.4.2, 4.6, 6  
+**Design Questions Resolved:** _TBD_  
+**Design Updates Needed:** _TBD_
 
-**Rationale:**  
-Design specifies FIFO wake order and tap priority (sections 4.6, 6). Ensures fair wakeup behavior.
+**Pre-Implementation Checklist**
+- [ ] Review wake ordering requirements (owner vs taps vs fan-out) in Sections 4.4.2 and 4.6.
+- [ ] Document any design ambiguities about starvation avoidance or fairness.
+- [ ] Confirm executive scheduler expectations for wake order.
 
-**Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.03--Mailbox](../../../04--Design/04.03--Mailbox.md)
-- [ ] Verify waiter list maintains FIFO order
-- [ ] Implement wake priority: owner before taps
-- [ ] Add wake order tests (multiple waiters on same descriptor)
-- [ ] Add tap priority tests (verify taps don't preempt owner)
-- [ ] Document wake priority semantics
-- [ ] Verify no starvation scenarios
+**Implementation Tasks**
+- [ ] Ensure waiter queues preserve FIFO order per descriptor.
+- [ ] Enforce wake priority (owner → fan-out subscribers → taps).
+- [ ] Add regression tests for multiple waiters, tap observers, and fairness.
+- [ ] Document wake priority and starvation guarantees.
+- [ ] Surface diagnostics (e.g., queue snapshots) to aid debugging.
+
+**Post-Implementation Checklist**
+- [ ] Validate behaviour against design (no starvation, deterministic wake order).
+- [ ] Update design doc if additional clarifications were necessary.
+- [ ] Log outcomes/tests/follow-ups in `03--ImplementationNotes.md`.
+- [ ] Confirm relevant review gate complete.
 
 ---
 
@@ -308,19 +366,26 @@ Design specifies FIFO wake order and tap priority (sections 4.6, 6). Ensures fai
 
 **Priority:** LOW  
 **Dependencies:** 3.1 (Formal WAIT_MBX state)  
-**Estimated Effort:** 1 day
+**Estimated Effort:** 1 day  
+**Design Reference:** [04.03--Mailbox.md](../../../04--Design/04.03--Mailbox.md) Section 4.6  
+**Design Questions Resolved:** _TBD_  
+**Design Updates Needed:** _TBD_
 
-**Rationale:**  
-Design specifies tracking `MAILBOX_STEP`, `MAILBOX_WAKE`, `MAILBOX_TIMEOUT` for diagnostics (section 4.6). Useful for performance analysis.
+**Pre-Implementation Checklist**
+- [ ] Confirm which counters are mandated by the design (MAILBOX_STEP, MAILBOX_WAKE, MAILBOX_TIMEOUT).
+- [ ] Validate how counters should surface via executive diagnostics (compare with 04.02).
 
-**Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.03--Mailbox](../../../04--Design/04.03--Mailbox.md)
-- [ ] Add MAILBOX_STEP counter (mailbox operations per step)
-- [ ] Add MAILBOX_WAKE counter (mailbox wake events)
-- [ ] Add MAILBOX_TIMEOUT counter (mailbox timeout events)
-- [ ] Expose counters in scheduler stats API
-- [ ] Add counter tests
-- [ ] Document scheduler counter semantics
+**Implementation Tasks**
+- [ ] Implement counters in the executive scheduler and expose via stats API.
+- [ ] Ensure counters increment for all relevant paths (send, recv, timeout).
+- [ ] Add regression tests validating counter increments.
+- [ ] Document counter semantics and usage.
+
+**Post-Implementation Checklist**
+- [ ] Verify design alignment (values, granularity, reset behaviour).
+- [ ] Update design doc with any additional observability notes.
+- [ ] Log results/tests/follow-ups in `03--ImplementationNotes.md`.
+- [ ] Record completion at the applicable review gate.
 
 ---
 
@@ -330,20 +395,28 @@ Design specifies tracking `MAILBOX_STEP`, `MAILBOX_WAKE`, `MAILBOX_TIMEOUT` for 
 
 **Priority:** MEDIUM  
 **Dependencies:** 1.4 (Resource monitoring APIs)  
-**Estimated Effort:** 2-3 days
+**Estimated Effort:** 2-3 days  
+**Design Reference:** [04.03--Mailbox.md](../../../04--Design/04.03--Mailbox.md) Sections 4.6, 6; `docs/resource_budgets.md`  
+**Design Questions Resolved:** _TBD_  
+**Design Updates Needed:** _TBD_
 
-**Rationale:**  
-Design specifies descriptor pool limits and per-task handle limits (section 4.6). System/Mailbox.md notes: "Resource budgets for descriptor pools configured per shared/resource_budgets.md."
+**Pre-Implementation Checklist**
+- [ ] Review resource management guidance in Section 4.6 and existing `resource_budgets.md`.
+- [ ] Document required quota profiles (host vs embedded) in `03--ImplementationNotes.md`.
+- [ ] Confirm interaction with Executive resource reporting (04.02).
 
-**Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.03--Mailbox](../../../04--Design/04.03--Mailbox.md)
-- [ ] Implement descriptor pool size limit (configurable)
-- [ ] Implement per-task handle count limit
-- [ ] Enforce limits at BIND and OPEN operations
-- [ ] Return appropriate error codes on quota exceeded
-- [ ] Add quota enforcement tests
-- [ ] Document quota configuration
-- [ ] Coordinate with resource budgets documentation
+**Implementation Tasks**
+- [ ] Implement descriptor pool limit enforcement (configurable per profile).
+- [ ] Enforce per-task handle quotas at BIND/OPEN.
+- [ ] Return correct status codes (`NO_DESCRIPTOR`, `ENOSPC`, etc.) when limits exceeded.
+- [ ] Add regression tests covering quota breaches and recovery.
+- [ ] Update documentation (`resource_budgets.md`, design notes) with configuration guidance.
+
+**Post-Implementation Checklist**
+- [ ] Validate behaviour against design (limits, status codes, diagnostics).
+- [ ] Update design doc if additional constraints or configuration options introduced.
+- [ ] Record results/tests/follow-ups in `03--ImplementationNotes.md`.
+- [ ] Ensure review gate(s) captured the change.
 
 ---
 
@@ -351,19 +424,26 @@ Design specifies descriptor pool limits and per-task handle limits (section 4.6)
 
 **Priority:** MEDIUM  
 **Dependencies:** 4.1 (Quota enforcement)  
-**Estimated Effort:** 1-2 days
+**Estimated Effort:** 1-2 days  
+**Design Reference:** [04.03--Mailbox.md](../../../04--Design/04.03--Mailbox.md) Section 4.6; `docs/resource_budgets.md`  
+**Design Questions Resolved:** _TBD_  
+**Design Updates Needed:** _TBD_
 
-**Rationale:**  
-Design requires finalizing descriptor pool sizes and capacity defaults (section 4.6). Provides platform-specific resource profiles.
+**Pre-Implementation Checklist**
+- [ ] Gather current platform constraints (host + embedded) and log in notes.
+- [ ] Review existing budget guidance to ensure mailbox additions integrate cleanly.
 
-**Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.03--Mailbox](../../../04--Design/04.03--Mailbox.md)
-- [ ] Define descriptor pool sizes for host platform (e.g., 256 descriptors)
-- [ ] Define descriptor pool sizes for embedded platforms (e.g., 16-32 descriptors)
-- [ ] Define default message capacities per profile
-- [ ] Update `docs/resource_budgets.md` with mailbox quotas
-- [ ] Document rationale for chosen limits
-- [ ] Provide guidance for tuning limits
+**Implementation Tasks**
+- [ ] Define descriptor pool sizes and default capacities per platform profile.
+- [ ] Update `docs/resource_budgets.md` with mailbox entries and rationale.
+- [ ] Provide guidance for tuning quotas (dev vs production vs constrained targets).
+- [ ] Cross-link configuration knobs in design + plan.
+
+**Post-Implementation Checklist**
+- [ ] Ensure resource budget documentation aligns with implementation defaults.
+- [ ] Update design doc if new configuration considerations exist.
+- [ ] Record outcomes/tests/follow-ups in `03--ImplementationNotes.md`.
+- [ ] Confirm review gate completion.
 
 ---
 
@@ -371,20 +451,27 @@ Design requires finalizing descriptor pool sizes and capacity defaults (section 
 
 **Priority:** MEDIUM  
 **Dependencies:** 4.1 (Quota enforcement)  
-**Estimated Effort:** 1-2 days
+**Estimated Effort:** 1-2 days  
+**Design Reference:** [04.03--Mailbox.md](../../../04--Design/04.03--Mailbox.md) Sections 4.6, 6; 5.1.1  
+**Design Questions Resolved:** _TBD_  
+**Design Updates Needed:** _TBD_
 
-**Rationale:**  
-Design specifies graceful degradation when descriptor pool exhausted (section 6). Prevents system instability.
+**Pre-Implementation Checklist**
+- [ ] Review design guidance on exhaustion scenarios (descriptor pool, queue overrun).
+- [ ] Identify required observability (events, CLI output, counters).
 
-**Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.03--Mailbox](../../../04--Design/04.03--Mailbox.md)
-- [ ] Test behavior when descriptor pool exhausted
-- [ ] Verify existing descriptors continue functioning
-- [ ] Verify BIND returns NO_DESCRIPTOR error
-- [ ] Add logging for descriptor exhaustion events
-- [ ] Add exhaustion recovery tests (close descriptors, create new ones)
-- [ ] Document exhaustion handling behavior
-- [ ] Provide guidelines for detecting and mitigating exhaustion
+**Implementation Tasks**
+- [ ] Implement detection and logging for descriptor exhaustion / queue overruns.
+- [ ] Ensure existing descriptors continue functioning when pool is exhausted.
+- [ ] Return correct status codes (`NO_DESCRIPTOR`, etc.) on BIND/OPEN failure.
+- [ ] Add recovery tests (close descriptors, allocate new ones).
+- [ ] Update operator documentation with mitigation guidance.
+
+**Post-Implementation Checklist**
+- [ ] Validate behaviour against design (events, recovery, status codes).
+- [ ] Update design doc if additional diagnostics or behaviours were added.
+- [ ] Record tests/results/follow-ups in `03--ImplementationNotes.md`.
+- [ ] Confirm review gate completion.
 
 ---
 

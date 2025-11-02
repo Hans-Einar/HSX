@@ -167,3 +167,35 @@ esource_stats() on the mailbox manager and exposed aggregated metrics (capacity,
   - `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_vm_stream_loader.py python/tests/test_metadata_preprocess.py python/tests/test_hxe_v2_metadata.py` (pass).
 - Follow-up actions / hand-off notes:
   - Coordinate with executive Phase 2.3 to consume `_mailbox_creation` summaries (auto-handle bindings) and begin planning toolchain emission work (Phase 2.4).
+
+## 2025-11-05 - Codex (Session 9)
+
+### Focus
+- Task(s) tackled: Phase 3 planning – audit current WAIT_MBX handling before scheduler integration work.
+- Dependencies touched: `python/execd.py`, `platforms/python/host_vm.py`, mailbox implementation plan.
+
+### Status
+- IN PROGRESS
+
+### Details
+- Summary of activities: reviewed `TaskState` usage, `_mark_task_wait_mailbox`, scheduler throttling, and VM controller wait tracking to understand how WAIT_MBX is currently surfaced. Identified remaining needs for Phase 3 (ensuring scheduler respects WAIT_MBX, pending wake bookkeeping, task events).
+- Follow-up: implement WAIT_MBX state enforcement in executive scheduler and expand tests to cover wait/wake semantics.
+
+## 2025-11-05 - Codex (Session 10)
+
+### Focus
+- Task(s) tackled: Phase 3.1 WAIT_MBX integration – retain wait metadata across refresh, propagate deadline/timeout info, and enrich task state events.
+- Dependencies touched: `platforms/python/host_vm.py`, `python/execd.py`, `python/tests/test_executive_sessions.py`.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions:
+  - `VMController` now includes wait deadlines in `mailbox_wait` events so the executive can surface richer diagnostics.
+  - `ExecutiveState` preserves wait metadata (`wait_mailbox`, `wait_handle`, `wait_timeout`, `wait_deadline`) through task refreshes, records it in contexts, and clears it on wake; task state events now include deadline information.
+  - Expanded unit tests verify wait metadata propagation and clean-up across wait→wake transitions.
+- Tests run (commands + result):
+  - `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py::test_task_state_mailbox_wait_and_wake_events python/tests/test_hsx_llc_mailbox.py python/tests/test_vm_stream_loader.py`
+- Follow-up actions / hand-off notes:
+  - Continue Phase 3 by ensuring scheduler throttling respects WAIT_MBX (auto loop) and update plan checkboxes once remaining bullets are complete.

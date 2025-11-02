@@ -24,6 +24,36 @@ This implementation plan addresses the gaps identified in the Toolchain Study do
 
 ---
 
+## Process Expectations
+
+### Design-First Workflow
+- Read the relevant sections of `04.05--Toolchain.md` **before** starting implementation work.
+- Capture ambiguities or clarifications in `03--ImplementationNotes.md` and resolve them prior to coding.
+- Update the design document whenever directive/format/tool behaviour changes.
+
+### Definition of Done (applies to every task/phase)
+- [ ] Implementation matches the referenced design section(s).
+- [ ] Tests updated/executed; commands and results captured in `03--ImplementationNotes.md`.
+- [ ] `02--ImplementationPlan.md` checkboxes refreshed.
+- [ ] `03--ImplementationNotes.md` entry recorded (focus, status, tests, follow-ups).
+- [ ] Design document updated (or follow-up filed) if behaviour diverges.
+- [ ] `04--git.md` log updated once changes land.
+- [ ] Required review gate(s) completed (design → implementation → integration).
+
+### Review Gates
+1. **Design Review** – Confirm referenced design sections and clarifications before coding a phase.
+2. **Implementation Review** – Run after completing each phase to validate against the design.
+3. **Integration Review** – Required before downstream consumers rely on new toolchain features.
+4. **Comprehensive Review** – Before packaging or release milestones.
+
+### Design Document Review Checklist
+- [ ] MVASM directive tables and syntax remain accurate.
+- [ ] HXO/HXE format sections reflect current implementation.
+- [ ] hsx-cc-build workflow documented and aligned.
+- [ ] New diagnostics/configuration options captured in design.
+
+---
+
 ## Phase 1: HXE v2 Format Support
 
 ### 1.1 Update HXE Header Format

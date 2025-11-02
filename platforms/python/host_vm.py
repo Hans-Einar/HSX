@@ -2733,6 +2733,7 @@ class VMController:
                 "descriptor": descriptor_id,
                 "handle": handle,
                 "timeout": timeout,
+                "deadline": deadline,
             }
         )
         return True

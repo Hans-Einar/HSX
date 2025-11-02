@@ -2496,6 +2496,10 @@ class ExecutiveState:
             context = state_entry.get("context")
             if not isinstance(context, dict):
                 context = {}
+            prev_wait_mailbox_value = context.get("wait_mailbox")
+            prev_wait_handle_value = context.get("wait_handle")
+            prev_wait_timeout_value = context.get("wait_timeout")
+            prev_wait_deadline_value = context.get("wait_deadline")
             context.pop("regs", None)
             context["state"] = task.get("state")
             if "exit_status" in task:
@@ -2515,6 +2519,34 @@ class ExecutiveState:
             _propagate_field("stack_base")
             _propagate_field("stack_limit")
             _propagate_field("stack_size")
+            wait_mailbox_value = task.get("wait_mailbox")
+            wait_handle_value = task.get("wait_handle")
+            wait_timeout_value = task.get("wait_timeout")
+            wait_deadline_value = task.get("wait_deadline")
+            if wait_mailbox_value is None:
+                wait_mailbox_value = prev_wait_mailbox_value
+            if wait_handle_value is None:
+                wait_handle_value = prev_wait_handle_value
+            if wait_timeout_value is None:
+                wait_timeout_value = prev_wait_timeout_value
+            if wait_deadline_value is None:
+                wait_deadline_value = prev_wait_deadline_value
+            if wait_mailbox_value is not None:
+                context["wait_mailbox"] = wait_mailbox_value
+            elif "wait_mailbox" in context:
+                context.pop("wait_mailbox", None)
+            if wait_handle_value is not None:
+                context["wait_handle"] = wait_handle_value
+            elif "wait_handle" in context:
+                context.pop("wait_handle", None)
+            if wait_timeout_value is not None:
+                context["wait_timeout"] = wait_timeout_value
+            elif "wait_timeout" in context:
+                context.pop("wait_timeout", None)
+            if wait_deadline_value is not None:
+                context["wait_deadline"] = wait_deadline_value
+            elif "wait_deadline" in context:
+                context.pop("wait_deadline", None)
             prev_state = state_entry.get("state")
             prev_state_enum = state_entry.get("state_enum")
             if not isinstance(prev_state_enum, TaskState):
@@ -2549,6 +2581,20 @@ class ExecutiveState:
             if self.enforce_context_isolation:
                 self._assert_context_isolation(pid, context, new_state_enum)
             task["state"] = new_state
+            if new_state_enum == TaskState.WAIT_MBX:
+                if "wait_mailbox" in context:
+                    task["wait_mailbox"] = context.get("wait_mailbox")
+                if "wait_handle" in context:
+                    task["wait_handle"] = context.get("wait_handle")
+                if "wait_timeout" in context:
+                    task["wait_timeout"] = context.get("wait_timeout")
+                if "wait_deadline" in context:
+                    task["wait_deadline"] = context.get("wait_deadline")
+            else:
+                task.pop("wait_mailbox", None)
+                task.pop("wait_handle", None)
+                task.pop("wait_timeout", None)
+                task.pop("wait_deadline", None)
             new_states[pid] = state_entry
             current_pids.add(pid)
             bp_set = self.breakpoints.get(pid)
@@ -3367,14 +3413,26 @@ class ExecutiveState:
                 self.log("debug", "vm event", event=event)
 
     def _mark_task_wait_mailbox(self, pid: int, event: Dict[str, Any]) -> None:
-        descriptor = event.get('descriptor')
-        handle = event.get('handle')
+        descriptor = event.get("descriptor")
+        handle = event.get("handle")
+        timeout = event.get("timeout")
+        deadline = event.get("deadline")
         task = self.tasks.get(pid)
         if task is not None:
             task['state'] = 'waiting_mbx'
             task['wait_mailbox'] = descriptor
             if handle is not None:
                 task['wait_handle'] = handle
+            else:
+                task.pop('wait_handle', None)
+            if timeout is not None:
+                task['wait_timeout'] = timeout
+            else:
+                task.pop('wait_timeout', None)
+            if deadline is not None:
+                task['wait_deadline'] = deadline
+            else:
+                task.pop('wait_deadline', None)
         state = self.task_states.get(pid)
         if state is not None:
             state['running'] = False
@@ -3384,12 +3442,23 @@ class ExecutiveState:
             ctx['wait_mailbox'] = descriptor
             if handle is not None:
                 ctx['wait_handle'] = handle
+            else:
+                ctx.pop('wait_handle', None)
+            if timeout is not None:
+                ctx['wait_timeout'] = timeout
+            else:
+                ctx.pop('wait_timeout', None)
+            if deadline is not None:
+                ctx['wait_deadline'] = deadline
+            else:
+                ctx.pop('wait_deadline', None)
         details = {
             k: v
             for k, v in {
                 "descriptor": descriptor,
                 "handle": handle,
                 "timeout": event.get("timeout"),
+                "deadline": deadline,
             }.items()
             if v is not None
         }
@@ -3407,6 +3476,8 @@ class ExecutiveState:
             task['state'] = 'ready'
             task.pop('wait_mailbox', None)
             task.pop('wait_handle', None)
+            task.pop('wait_timeout', None)
+            task.pop('wait_deadline', None)
         state = self.task_states.get(pid)
         if state is not None:
             ctx = state.setdefault('context', {})
@@ -3415,6 +3486,7 @@ class ExecutiveState:
             ctx['wait_mailbox'] = None
             ctx['wait_deadline'] = None
             ctx['wait_handle'] = None
+            ctx['wait_timeout'] = None
             state['running'] = True
         details = {
             k: v

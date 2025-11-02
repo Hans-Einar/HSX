@@ -1,35 +1,56 @@
-# Executive Implementation - Agent Guide
+# TUI Debugger Implementation - Agent Guide
 
-Welcome! This guide explains how to pick up work in the Executive module.
+## 1. Mandatory Reading (in order)
+1. **Design Spec** - `../../../04--Design/04.10--TUI_Debugger.md` (interface layout, navigation flows, event wiring). Authoritative reference.
+2. **Retrospective** - `../Retrospective.md` for current process expectations.
+3. **Grand Plan** - `../GrandImplementationPlan.md` (cross-module sequencing, review gates).
+4. **Module Plan** - `02--ImplementationPlan.md` (phase tasks, dependencies, acceptance criteria).
+5. **Implementation Notes** - `03--ImplementationNotes.md` (session history, open issues).
+6. **DependencyTree.md** when coordinating with Executive, CLI Debugger, or Toolkit deliverables.
 
-## 1. Read First
-- `../GrandImplementationPlan.md` for overall sequencing.
-- `02--ImplementationPlan.md` for detailed phase tasks.
-- `../GrandImplementationNotes.md` (once populated) to see cross-module status.
+## 2. Design Alignment & Checklists
+### Design Review Checklist
+- [ ] Read the relevant sections of 04.10 before coding (UI layout, key bindings, event subscriptions).
+- [ ] Log ambiguities in `03--ImplementationNotes.md` and resolve quickly.
+- [ ] Update 04.10 whenever UI/UX, shortcuts, or data bindings change.
+- [ ] Keep mock-ups, screen flows, and feature tables aligned with implementation.
 
-## 2. Current Priority
-- Phase 1 (Python only):
-  1. Session management (`session.open/close/keepalive`, PID locks, timeouts).
-  2. Event streaming foundation (bounded buffers, subscribe/unsubscribe/ack, routing VM `trace_step` events).
-  3. Breakpoint RPCs (depends on #2).
+### Definition of Done
+- [ ] Implementation conforms to the referenced design sections.
+- [ ] Tests/demos executed; commands/results logged in the notes.
+- [ ] `02--ImplementationPlan.md` status updated as tasks progress; blockers surfaced.
+- [ ] Design doc amended (or follow-up filed) for any UX/behaviour drift.
+- [ ] `04--git.md` entry added once changes land, citing design sections touched.
+- [ ] Review gates (design -> implementation -> integration) completed.
 
 ## 3. Workflow
-1. Pick an open item from the plan (respect dependencies - session work before events, etc.).
-2. Update `ImplementationNotes.md` (see scaffold) with:
-   - Date, initials.
-   - Task summary.
-   - Status: TODO / IN PROGRESS / DONE / BLOCKED.
-   - Tests run + outcomes.
-3. Keep work Python-only unless the plan explicitly calls for a C port.
+### Pre-Implementation
+- [ ] Review the design section for the UI panel or workflow being implemented.
+- [ ] Confirm dependencies (Executive events, CLI debugger APIs, Toolkit helpers) are ready.
+- [ ] Log planned demos/tests and coordination needs in the notes.
+- [ ] Sync with CLI/VSCode debugger owners when shared components evolve.
+
+### Implementation
+- [ ] Execute tasks as outlined in `02--ImplementationPlan.md`.
+- [ ] Keep design and plan docs synchronized as decisions occur.
+- [ ] Run targeted tests (`python/tests/test_tui_debugger.py`, UI smoke tests) and record outcomes.
+- [ ] Capture design updates and screenshots while context is fresh.
+
+### Post-Implementation
+- [ ] Complete the Definition of Done checklist.
+- [ ] Document session summary, design references, tests, and next steps in `03--ImplementationNotes.md`.
+- [ ] Update cross-module trackers (`../GrandImplementationNotes.md`) when status changes.
+- [ ] Prepare materials for upcoming review gates (demos, screenshots).
 
 ## 4. Testing
-- Use targeted pytest modules (e.g., `python/tests/test_executive_*` once they exist).
-- Document commands and results in `ImplementationNotes.md`.
-- If tests cannot run, note blockers and next actions.
+- Exercise TUI smoke tests and automated suites where available.
+- Run end-to-end debugger workflows with the Executive once events are wired.
+- Log every command/demo result in the notes for traceability.
 
-## 5. Hand-off
-- Ensure `ImplementationNotes.md` reflects current state.
-- If a git entry is needed, update `../GrandImplementationNotes.md` or the stack-specific log after changes land.
-- Leave TODOs for follow-up agents if work is partial.
+## 5. Reviews & Hand-off
+- Schedule design reviews before altering UX flows or visual design.
+- Seek implementation review at phase completion; integration review before releasing to users.
+- Leave explicit TODOs/blockers in the notes when pausing work.
+- Update `04--git.md` after preparing commits, referencing design changes and assets updated.
 
-Happy hacking!
+Follow this guide to keep the TUI debugger aligned with design expectations and maintain smooth hand-offs between agents.

@@ -1,23 +1,27 @@
-# Executive Implementation Notes
+# Provisioning & Persistence - Implementation Notes
 
-Use this file to record progress per session.
+Use this log to capture each working session. Keep entries concise but thorough enough for the next agent to resume seamlessly.
 
-## Template
+## Session Template
 
 ```
 ## YYYY-MM-DD - Name/Initials (Session N)
 
-### Focus
-- Task(s) tackled: ...
-- Dependencies touched: ...
+### Scope
+- Plan item / phase tackled:
+- Design sections reviewed:
 
-### Status
-- TODO / IN PROGRESS / DONE / BLOCKED
+### Work Summary
+- Key decisions & code changes:
+- Design updates filed/applied:
 
-### Details
-- Summary of code changes / key decisions.
-- Tests run (commands + result).
-- Follow-up actions / hand-off notes.
+### Testing
+- Commands run + results:
+- Issues or anomalies:
+
+### Next Steps
+- Follow-ups / blockers:
+- Review or coordination needed:
 ```
 
-Start new sections chronologically. Keep notes concise but actionable so the next agent can resume quickly.
+Append new sessions chronologically. Ensure every entry references the relevant design sections and records the tests executed.

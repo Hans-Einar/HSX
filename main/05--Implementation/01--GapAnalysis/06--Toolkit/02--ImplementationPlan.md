@@ -21,6 +21,36 @@ This implementation plan addresses the gaps identified in the Toolkit Study docu
 
 ---
 
+## Process Expectations
+
+### Design-First Workflow
+- Read the relevant sections of `04.06--Toolkit.md` **before** starting implementation work.
+- Capture ambiguities or clarifications in `03--ImplementationNotes.md` and resolve or escalate prior to coding.
+- Update the design document whenever toolkit workflows or CLI/TUI expectations change.
+
+### Definition of Done (applies to every task/phase)
+- [ ] Implementation matches the referenced design section(s).
+- [ ] Tests/CLI demos executed; commands and results recorded in `03--ImplementationNotes.md`.
+- [ ] `02--ImplementationPlan.md` checkboxes refreshed.
+- [ ] `03--ImplementationNotes.md` entry recorded (focus, status, tests, follow-ups).
+- [ ] Design document updated (or follow-up filed) if behaviour diverges.
+- [ ] `04--git.md` log updated once changes land.
+- [ ] Required review gate(s) completed (design → implementation → integration).
+
+### Review Gates
+1. **Design Review** – Confirm referenced design sections and clarifications before coding a phase.
+2. **Implementation Review** – Run after completing each phase to validate against the design.
+3. **Integration Review** – Required before toolkit features are consumed by debugger front-ends.
+4. **Comprehensive Review** – Before packaging/TUI deliverables ship.
+
+### Design Document Review Checklist
+- [ ] `hsxdbg` architecture and module structure align with design.
+- [ ] Manager logging/configuration behaviour matches documented expectations.
+- [ ] CLI/TUI interoperability considerations captured in design.
+- [ ] Newly discovered constraints documented.
+
+---
+
 ## Phase 1: Debugger Core Infrastructure
 
 ### 1.1 Create hsxdbg Package Structure

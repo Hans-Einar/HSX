@@ -10,6 +10,21 @@
 
 ---
 
+## Process Guardrails
+- **Design-first**: every phase references and validates against the authoritative design document(s). Update design docs whenever implementation diverges or clarifies behaviour.
+- **Review gates**:
+  1. Design review before implementation starts.
+  2. Implementation review after each phase completes.
+  3. Integration review before exposing new behaviours cross-module.
+  4. Comprehensive review prior to stress / packaging milestones.
+- **Definition of Done** (global):
+  - Implementation matches design specification.
+  - Tests executed with results logged in module notes.
+  - Module plan/notes/git logs updated.
+  - Design documentation updated (or follow-up filed) for any changes.
+
+---
+
 ## 01 - VM
 | Phase | Description | Status | Notes |
 |-------|-------------|--------|-------|

@@ -1,35 +1,55 @@
-# Executive Implementation - Agent Guide
+# VM Implementation - Agent Guide
 
-Welcome! This guide explains how to pick up work in the Executive module.
+## 1. Mandatory Reading (in order)
+1. **Design Spec** – `../../../04--Design/04.01--VM.md` (ISA, PSW, loader, etc.). This is the authoritative contract.
+2. **Retrospective** – `../Retrospective.md` for current process adjustments.
+3. **Grand Plan** – `../GrandImplementationPlan.md` (module sequencing, quality gates).
+4. **Module Plan** – `02--ImplementationPlan.md` (phase detail & checklists).
+5. **Implementation Notes** – `03--ImplementationNotes.md` (what the last session accomplished).
+6. **DependencyTree.md** when VM work impacts other modules.
 
-## 1. Read First
-- `../GrandImplementationPlan.md` for overall sequencing.
-- `02--ImplementationPlan.md` for detailed phase tasks.
-- `../GrandImplementationNotes.md` (once populated) to see cross-module status.
+## 2. Design Alignment & Checklists
+### Design Document Review Checklist
+- [ ] Read the relevant portion of 04.01 before coding.
+- [ ] Log ambiguities/questions in `03--ImplementationNotes.md`.
+- [ ] Update 04.01 when opcode/behaviour diverges from the spec.
+- [ ] Confirm tables (opcode map, PSW flags, memory layout) remain accurate.
 
-## 2. Current Priority
-- Phase 1 (Python only):
-  1. Session management (`session.open/close/keepalive`, PID locks, timeouts).
-  2. Event streaming foundation (bounded buffers, subscribe/unsubscribe/ack, routing VM `trace_step` events).
-  3. Breakpoint RPCs (depends on #2).
+### Definition of Done
+- [ ] Implementation conforms to the referenced design section(s).
+- [ ] Tests added/updated and executed (unit + integration); results recorded.
+- [ ] `02--ImplementationPlan.md` and `03--ImplementationNotes.md` updated.
+- [ ] Design document amended or follow-up filed for any changes.
+- [ ] `04--git.md` entry updated once changes land.
+- [ ] Review gates (design/implementation/integration) satisfied.
 
 ## 3. Workflow
-1. Pick an open item from the plan (respect dependencies - session work before events, etc.).
-2. Update `ImplementationNotes.md` (see scaffold) with:
-   - Date, initials.
-   - Task summary.
-   - Status: TODO / IN PROGRESS / DONE / BLOCKED.
-   - Tests run + outcomes.
-3. Keep work Python-only unless the plan explicitly calls for a C port.
+### Pre-Implementation
+- [ ] Read design section(s), note clarifications.
+- [ ] Review plan dependencies and outstanding TODOs.
+- [ ] Capture open design questions in `03--ImplementationNotes.md`.
+- [ ] Confirm upcoming review gate is scheduled.
+
+### Implementation
+- [ ] Follow the task checklist in `02--ImplementationPlan.md`.
+- [ ] Keep design and plan in sync as decisions are made.
+- [ ] Run targeted pytest suites (`python/tests/test_vm_*`, `python/tests/test_ir_*`, etc.) and capture results.
+- [ ] Draft design updates (opcode table, PSW notes, etc.) as needed.
+
+### Post-Implementation
+- [ ] Complete Definition of Done checklist.
+- [ ] Update design doc or log a follow-up issue.
+- [ ] Record session summary/tests/follow-ups in `03--ImplementationNotes.md`.
+- [ ] Update `../GrandImplementationNotes.md` if schedule/phase status changes.
 
 ## 4. Testing
-- Use targeted pytest modules (e.g., `python/tests/test_executive_*` once they exist).
-- Document commands and results in `ImplementationNotes.md`.
-- If tests cannot run, note blockers and next actions.
+- Prefer focused suites first (`python/tests/test_vm_*`, `python/tests/test_ir_*`, `python/tests/test_linker.py`, etc.).
+- Log command lines and outcomes in the session notes.
+- Coordinate cross-module tests when plan specifies (e.g., loader + executive interactions).
 
-## 5. Hand-off
-- Ensure `ImplementationNotes.md` reflects current state.
-- If a git entry is needed, update `../GrandImplementationNotes.md` or the stack-specific log after changes land.
-- Leave TODOs for follow-up agents if work is partial.
+## 5. Reviews & Hand-off
+- Honour incremental reviews (design → implementation → integration).
+- Leave explicit TODOs/blockers in the notes for the next agent.
+- Update `04--git.md` once commits are prepared, including design doc references if updated.
 
-Happy hacking!
+Adhering to this guide keeps VM development aligned with the design contract and ensures seamless agent hand-offs. Happy hacking!

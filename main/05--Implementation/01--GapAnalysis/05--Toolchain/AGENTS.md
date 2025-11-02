@@ -1,35 +1,58 @@
-# Executive Implementation - Agent Guide
+# Toolchain Implementation - Agent Guide
 
-Welcome! This guide explains how to pick up work in the Executive module.
+## 1. Mandatory Reading (in order)
+1. **Design Spec** – `../../../04--Design/04.05--Toolchain.md` (assembler, linker, build scripts).
+2. **Retrospective** – `../Retrospective.md` for latest process improvements.
+3. **Grand Plan** – `../GrandImplementationPlan.md` (sequencing, review gates).
+4. **Module Plan** – `02--ImplementationPlan.md` (phase breakdown, checklists).
+5. **Implementation Notes** – `03--ImplementationNotes.md` (recent activity).
+6. **DependencyTree.md** when coordinating with VM/Executive/Mailbox deliverables.
 
-## 1. Read First
-- `../GrandImplementationPlan.md` for overall sequencing.
-- `02--ImplementationPlan.md` for detailed phase tasks.
-- `../GrandImplementationNotes.md` (once populated) to see cross-module status.
+## 2. Design Alignment & Checklists
+### Design Document Review Checklist
+- [ ] Read relevant parts of 04.05 before coding (MVASM syntax, HXO/HXE format, pragma handling).
+- [ ] Log ambiguities/questions in `03--ImplementationNotes.md` and resolve them.
+- [ ] Update 04.05 when new directives/flags/formats are introduced.
+- [ ] Ensure tables (opcode metadata, section formats) remain accurate.
 
-## 2. Current Priority
-- Phase 1 (Python only):
-  1. Session management (`session.open/close/keepalive`, PID locks, timeouts).
-  2. Event streaming foundation (bounded buffers, subscribe/unsubscribe/ack, routing VM `trace_step` events).
-  3. Breakpoint RPCs (depends on #2).
+### Definition of Done
+- [ ] Implementation matches design specification.
+- [ ] Tests updated/executed (`python/tests/test_hsx_cc_build.py`, `python/tests/test_linker*.py`, etc.); results logged.
+- [ ] `02--ImplementationPlan.md` and `03--ImplementationNotes.md` updated.
+- [ ] Design documentation amended (or follow-up filed) if behaviour changed.
+- [ ] `04--git.md` log entry recorded when changes land.
+- [ ] Review gates satisfied (design → implementation → integration).
 
 ## 3. Workflow
-1. Pick an open item from the plan (respect dependencies - session work before events, etc.).
-2. Update `ImplementationNotes.md` (see scaffold) with:
-   - Date, initials.
-   - Task summary.
-   - Status: TODO / IN PROGRESS / DONE / BLOCKED.
-   - Tests run + outcomes.
-3. Keep work Python-only unless the plan explicitly calls for a C port.
+### Pre-Implementation
+- [ ] Read the design section covering the target feature (pragma handling, metadata, packaging, etc.).
+- [ ] Review outstanding tasks/dependencies in the plan.
+- [ ] Capture open design questions in the notes.
+- [ ] Confirm upcoming review gate is arranged.
+
+### Implementation
+- [ ] Follow the checklist in `02--ImplementationPlan.md`.
+- [ ] Keep design doc and plan aligned with decisions.
+- [ ] Run targeted pytest suites (`python/tests/test_hsx_cc_build.py`, `python/tests/test_linker*.py`, `python/tests/test_vm_stream_loader.py`, etc.).
+- [ ] Draft design doc updates for new directives/formats while context is fresh.
+
+### Post-Implementation
+- [ ] Complete the Definition of Done checklist.
+- [ ] Update design doc or log follow-up tasks as needed.
+- [ ] Record session summary, tests, and follow-ups in `03--ImplementationNotes.md`.
+- [ ] Update cross-module trackers (`../GrandImplementationNotes.md`) if schedule/status changes.
 
 ## 4. Testing
-- Use targeted pytest modules (e.g., `python/tests/test_executive_*` once they exist).
-- Document commands and results in `ImplementationNotes.md`.
-- If tests cannot run, note blockers and next actions.
+- Focus on relevant suites first (`python/tests/test_hsx_cc_build.py`, `python/tests/test_linker*.py`, `python/tests/test_hxe_v2_metadata.py`, etc.).
+- Log command lines and results in the notes.
+- Execute end-to-end flows (hsx-cc-build, assembler+linker) when phases require integration validation.
 
-## 5. Hand-off
-- Ensure `ImplementationNotes.md` reflects current state.
-- If a git entry is needed, update `../GrandImplementationNotes.md` or the stack-specific log after changes land.
-- Leave TODOs for follow-up agents if work is partial.
+## 5. Reviews & Hand-off
+- Honour incremental reviews:
+  - Design review before changing formats/directives.
+  - Implementation review at phase completion.
+  - Integration review before consumers rely on new toolchain features.
+- Leave explicit TODOs/blockers in the notes when pausing work.
+- Update `04--git.md` after preparing commits, including design references where applicable.
 
-Happy hacking!
+Use this guide to keep toolchain development aligned with the design contract and maintain smooth hand-offs between agents. Happy hacking!
