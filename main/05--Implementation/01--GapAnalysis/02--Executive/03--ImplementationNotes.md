@@ -391,3 +391,24 @@ Start new sections chronologically. Keep notes concise but actionable so the nex
 
 ### Follow-up actions / hand-off notes
 - Surface the new scheduler event data in CLI/TUI tooling when those milestones begin (e.g., highlight reason + quantum remainder alongside task timelines).
+
+## 2025-11-02 - Codex (Session 20)
+
+### Focus
+- Task(s) tackled: Phase 4.4 context isolation (register RPCs, executive guards, tests/docs).
+- Dependencies touched: `python/execd.py`, `platforms/python/host_vm.py`, `python/vmclient.py`, `python/tests/test_scheduler_state_machine.py`, `python/tests/test_vmclient_reg_api.py`, `docs/executive_protocol.md`, `main/04--Design/04.02--Executive.md`.
+
+### Status
+- DONE
+
+### Details
+- Added `vm_reg_get` / `vm_reg_set` (and `*_for`) RPCs to the VM controller + client so debuggers operate via explicit APIs rather than cached task snapshots; responses are exposed to shell tooling with consistent payloads.
+- Hardened `_refresh_tasks` to drop cached register arrays, normalise base/limit fields, and enforce context invariants (`reg_base`, `stack_base`, `stack_limit`/`stack_size`) via a new `_assert_context_isolation` guard that logs and raises on violation (toggle via `enforce_context_isolation`).
+- Extended scheduler-state tests with default base/limit fixtures plus new coverage for context assertions (including an opt-out path) and introduced unit tests covering the new VM client helpers.
+- Documented the runtime guard and new RPCs in the Executive design + protocol references, explicitly cross-linking the scheduler remediation in `issues/#2_scheduler`.
+
+### Tests run (commands + result)
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_scheduler_state_machine.py python/tests/test_vmclient_reg_api.py`
+
+### Follow-up actions / hand-off notes
+- When the TUI/IDE debugger milestones land, ensure they consume the new register APIs instead of relying on full `dumpregs` snapshots, and keep the context isolation flag enabled in CI.

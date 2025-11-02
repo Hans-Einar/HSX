@@ -25,7 +25,19 @@ class StubVM:
 
 
 def make_task(pid, state, **extra):
-    payload = {"pid": pid, "state": state}
+    reg_base = extra.pop("reg_base", 0x1000 + (pid * 0x40))
+    stack_size = extra.pop("stack_size", 0x100)
+    stack_base = extra.pop("stack_base", 0x8000 + (pid * 0x100))
+    default_limit = stack_base - stack_size if stack_size is not None else stack_base - 0x100
+    stack_limit = extra.pop("stack_limit", default_limit)
+    payload = {
+        "pid": pid,
+        "state": state,
+        "reg_base": reg_base,
+        "stack_base": stack_base,
+        "stack_limit": stack_limit,
+        "stack_size": stack_size,
+    }
     payload.update(extra)
     return payload
 
@@ -82,6 +94,21 @@ def test_sleep_tracking_and_wake(monkeypatch):
     assert 3 not in state.sleeping_deadlines
     assert state.tasks[3]["state"] == "ready"
     assert state.task_state_pending[3]["reason"] == "sleep_wake"
+
+
+def test_context_isolation_violation_raises():
+    vm = StubVM([make_task(10, "running", reg_base=0)])
+    state = ExecutiveState(vm, step_batch=1)
+    with pytest.raises(AssertionError):
+        state._refresh_tasks()
+
+
+def test_context_isolation_can_be_disabled():
+    vm = StubVM([make_task(11, "running", reg_base=0)])
+    state = ExecutiveState(vm, step_batch=1)
+    state.enforce_context_isolation = False
+    state._refresh_tasks()
+    assert state.tasks[11]["reg_base"] == 0
 
 
 def test_scheduler_event_quantum_expired():

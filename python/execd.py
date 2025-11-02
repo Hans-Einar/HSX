@@ -274,6 +274,7 @@ class ExecutiveState:
         self.sleeping_heap: List[Tuple[float, int]] = []
         self.sleeping_deadlines: Dict[int, float] = {}
         self._pending_scheduler_context: Optional[Dict[str, Any]] = None
+        self.enforce_context_isolation: bool = True
 
     def _register_metadata(self, pid: int, metadata: Dict[str, Any]) -> None:
         if not metadata:
@@ -524,6 +525,35 @@ class ExecutiveState:
                 continue
             context[key] = value
         self._pending_scheduler_context = context or None
+
+    def _assert_context_isolation(self, pid: int, context: Dict[str, Any], state: TaskState) -> None:
+        if state not in {TaskState.READY, TaskState.RUNNING, TaskState.WAIT_MBX, TaskState.SLEEPING}:
+            return
+        if "regs" in context:
+            self.log("error", "context_isolation_violation", pid=pid, field="regs_present")
+            raise AssertionError(f"context_isolation:pid={pid}:context_regs_present")
+        reg_base = self._optional_int(context.get("reg_base"))
+        stack_base = self._optional_int(context.get("stack_base"))
+        stack_limit = self._optional_int(context.get("stack_limit"))
+        stack_size = self._optional_int(context.get("stack_size"))
+        if not reg_base:
+            self.log("error", "context_isolation_violation", pid=pid, field="reg_base", state=state.value)
+            raise AssertionError(f"context_isolation:pid={pid}:reg_base_missing")
+        if not stack_base:
+            self.log("error", "context_isolation_violation", pid=pid, field="stack_base", state=state.value)
+            raise AssertionError(f"context_isolation:pid={pid}:stack_base_missing")
+        if stack_limit is None and stack_size is None:
+            self.log(
+                "error",
+                "context_isolation_violation",
+                pid=pid,
+                field="stack_limit",
+                stack_base=stack_base,
+                stack_limit=stack_limit,
+                stack_size=stack_size,
+                state=state.value,
+            )
+            raise AssertionError(f"context_isolation:pid={pid}:stack_limit_invalid")
 
     def _session_payload(self, session: SessionRecord) -> Dict[str, Any]:
         if not session.pid_locks:
@@ -2331,6 +2361,7 @@ class ExecutiveState:
             context = state_entry.get("context")
             if not isinstance(context, dict):
                 context = {}
+            context.pop("regs", None)
             context["state"] = task.get("state")
             if "exit_status" in task:
                 context["exit_status"] = task.get("exit_status")
@@ -2338,6 +2369,17 @@ class ExecutiveState:
                 context.pop("exit_status", None)
             if "trace" in task:
                 context["trace"] = task.get("trace")
+            def _propagate_field(name: str) -> None:
+                val = self._optional_int(task.get(name))
+                if val is not None:
+                    context[name] = val
+                    task[name] = val
+                elif name in context:
+                    context.pop(name, None)
+            _propagate_field("reg_base")
+            _propagate_field("stack_base")
+            _propagate_field("stack_limit")
+            _propagate_field("stack_size")
             prev_state = state_entry.get("state")
             prev_state_enum = state_entry.get("state_enum")
             if not isinstance(prev_state_enum, TaskState):
@@ -2369,6 +2411,8 @@ class ExecutiveState:
             state_entry["sleep_pending"] = sleep_flag
             state_entry["context"] = context
             context["state"] = new_state
+            if self.enforce_context_isolation:
+                self._assert_context_isolation(pid, context, new_state_enum)
             task["state"] = new_state
             new_states[pid] = state_entry
             current_pids.add(pid)

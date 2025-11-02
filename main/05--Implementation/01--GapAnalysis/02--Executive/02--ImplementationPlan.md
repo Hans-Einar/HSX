@@ -435,13 +435,13 @@ Design specifies executive never directly manipulates PC/SP/registers (sections 
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
-- [ ] Audit existing executive code for direct context manipulation
-- [ ] Replace direct context access with VM API calls
-- [ ] Ensure executive only uses VM APIs: vm_reg_get, vm_reg_set, vm_reg_get_for, vm_reg_set_for
-- [ ] Add assertions to detect context isolation violations
-- [ ] Add context isolation tests (verify executive doesn't touch VM internals)
-- [ ] Document context isolation principle
-- [ ] Cross-reference with issue #2_scheduler
+- [x] Audit existing executive code for direct context manipulation
+- [x] Replace direct context access with VM API calls
+- [x] Ensure executive only uses VM APIs: vm_reg_get, vm_reg_set, vm_reg_get_for, vm_reg_set_for
+- [x] Add assertions to detect context isolation violations
+- [x] Add context isolation tests (verify executive doesn't touch VM internals)
+- [x] Document context isolation principle
+- [x] Cross-reference with issue #2_scheduler
 
 ---
 

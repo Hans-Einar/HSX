@@ -3229,6 +3229,49 @@ class VMController:
             "context": context_dict,
         }
 
+    def reg_get(self, reg_id: int, pid: Optional[int] = None) -> Dict[str, Any]:
+        idx = int(reg_id)
+        if idx < 0 or idx >= 16:
+            raise ValueError("reg_id must be between 0 and 15")
+        regs_snapshot = self.read_regs(pid)
+        regs_list = list(regs_snapshot.get("regs") or [])
+        if len(regs_list) < 16:
+            regs_list.extend([0] * (16 - len(regs_list)))
+        value = int(regs_list[idx]) & 0xFFFFFFFF
+        context = regs_snapshot.get("context", {})
+        resolved_pid = pid
+        if resolved_pid is None:
+            if isinstance(context, dict) and context.get("pid") is not None:
+                try:
+                    resolved_pid = int(context.get("pid"))
+                except (TypeError, ValueError):
+                    resolved_pid = self.current_pid
+            else:
+                resolved_pid = self.current_pid
+        return {"pid": resolved_pid, "reg": idx, "value": value}
+
+    def reg_set(self, reg_id: int, value: int, pid: Optional[int] = None) -> Dict[str, Any]:
+        idx = int(reg_id)
+        if idx < 0 or idx >= 16:
+            raise ValueError("reg_id must be between 0 and 15")
+        regs_snapshot = self.read_regs(pid)
+        regs_list = list(regs_snapshot.get("regs") or [])
+        if len(regs_list) < 16:
+            regs_list.extend([0] * (16 - len(regs_list)))
+        regs_list[idx] = int(value) & 0xFFFFFFFF
+        self.write_regs({"regs": regs_list}, pid)
+        context = regs_snapshot.get("context", {})
+        resolved_pid = pid
+        if resolved_pid is None:
+            if isinstance(context, dict) and context.get("pid") is not None:
+                try:
+                    resolved_pid = int(context.get("pid"))
+                except (TypeError, ValueError):
+                    resolved_pid = self.current_pid
+            else:
+                resolved_pid = self.current_pid
+        return {"pid": resolved_pid, "reg": idx, "value": int(value) & 0xFFFFFFFF}
+
     def write_regs(self, payload: Dict[str, Any], pid: Optional[int] = None) -> Dict[str, Any]:
         pid = self.current_pid if pid is None else pid
         if pid is None:
@@ -3617,6 +3660,23 @@ class VMController:
                 pid_value = request.get("pid")
                 pid = int(pid_value) if pid_value is not None else None
                 return {"status": "ok", "registers": self.read_regs(pid)}
+            if cmd == "vm_reg_get":
+                reg_value = request.get("reg")
+                if reg_value is None:
+                    raise ValueError("vm_reg_get requires 'reg'")
+                pid_value = request.get("pid")
+                pid = int(pid_value) if pid_value is not None else None
+                info = self.reg_get(int(reg_value), pid)
+                return {"status": "ok", **info}
+            if cmd == "vm_reg_set":
+                reg_value = request.get("reg")
+                val_value = request.get("value")
+                if reg_value is None or val_value is None:
+                    raise ValueError("vm_reg_set requires 'reg' and 'value'")
+                pid_value = request.get("pid")
+                pid = int(pid_value) if pid_value is not None else None
+                info = self.reg_set(int(reg_value), int(val_value), pid)
+                return {"status": "ok", **info}
             if cmd == "write_regs":
                 payload = request.get("registers") or {}
                 if not isinstance(payload, dict):

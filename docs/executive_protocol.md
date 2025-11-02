@@ -49,6 +49,8 @@ Core Commands
 | `resume` | `{ "version": 1, "cmd": "resume", "pid": 1 }` | `{ "version": 1, "status": "ok", "task": { ... } }` | Resumes the specified task (global resume if `pid` omitted). |
 | `kill` | `{ "version": 1, "cmd": "kill", "pid": 1 }` | `{ "version": 1, "status": "ok", "task": { ... } }` | Stops auto loop, resets VM, removes task. |
 | `dumpregs` | `{ "version": 1, "cmd": "dumpregs", "pid": 1 }` | `{ "version": 1, "status": "ok", "registers": { ... } }` | Includes core regs plus optional `context` metadata (base pointers, quantum, priority). |
+| `vm_reg_get` | `{ "version": 1, "cmd": "vm_reg_get", "reg": 7 [, "pid": 1] }` | `{ "version": 1, "status": "ok", "pid": 1, "reg": 7, "value": 305419896 }` | Reads a single register (defaults to the currently active PID when `pid` omitted). |
+| `vm_reg_set` | `{ "version": 1, "cmd": "vm_reg_set", "reg": 7, "value": 305419896 [, "pid": 1] }` | `{ "version": 1, "status": "ok", "pid": 1, "reg": 7, "value": 305419896 }` | Writes a single register via the VM controller; honours PID argument like `vm_reg_get`. |
 | `peek` | `{ "version": 1, "cmd": "peek", "pid": 1, "addr": 0x200, "length": 32 }` | `{ "version": 1, "status": "ok", "data": "...hex..." }` | Reads memory from task snapshot (hex string). |
 | `poke` | `{ "version": 1, "cmd": "poke", "pid": 1, "addr": 0x200, "data": "0011" }` | `{ "version": 1, "status": "ok" }` | Writes memory into task snapshot. |
 | `sched` | `{ "version": 1, "cmd": "sched", "pid": 1, "priority": 5, "quantum": 2000 }` | `{ "version": 1, "status": "ok", "task": { ... } }` | Updates per-task priority and/or quantum slice. |
