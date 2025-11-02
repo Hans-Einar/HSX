@@ -890,12 +890,16 @@ class MiniVM:
         ms = max(int(ms), 0)
         if ms <= 0:
             self.sleep_pending_ms = None
+            self.sleep_until = None
+            self.context.state = "ready"
+            self.running = True
             return
         self.sleep_pending_ms = ms
-        self.emit_event({"type": "sleep_request", "ms": ms})
-        if self.attached:
-            return
         self.sleep_until = time.monotonic() + (ms / 1000.0)
+        self.context.state = "sleeping"
+        self.emit_event({"type": "sleep_request", "ms": ms, "deadline": self.sleep_until})
+        self.running = False
+        self.save_context()
 
     def read_mem(self, addr: int, length: int) -> bytes:
         if length <= 0:
@@ -930,11 +934,14 @@ class MiniVM:
         if self.sleep_until is not None:
             remaining = self.sleep_until - time.monotonic()
             if remaining > 0:
-                time.sleep(min(remaining, 0.005))
+                self.running = False
+                self.context.state = "sleeping"
                 self.save_context()
                 return
             self.sleep_until = None
             self.sleep_pending_ms = None
+            self.context.state = "ready"
+            self.running = True
             self.emit_event({"type": "sleep_complete"})
 
         prev_pc = self.pc
@@ -2912,6 +2919,14 @@ class VMController:
             task["vm_state"] = state
             task["pc"] = ctx.get("pc", task.get("pc"))
             task["sleep_pending"] = bool(self.vm.sleep_until or self.vm.sleep_pending_ms)
+            if self.vm.sleep_pending_ms is not None:
+                task["sleep_pending_ms"] = int(self.vm.sleep_pending_ms)
+            else:
+                task.pop("sleep_pending_ms", None)
+            if self.vm.sleep_until is not None:
+                task["sleep_deadline"] = float(self.vm.sleep_until)
+            else:
+                task.pop("sleep_deadline", None)
             exit_status = ctx.get("exit_status")
             if exit_status is not None:
                 task["exit_status"] = exit_status
@@ -2926,6 +2941,8 @@ class VMController:
                 new_state = "paused"
             elif exit_status is not None and ctx.get("state") in {"returned", "exited"}:
                 new_state = "returned"
+            elif self.vm.sleep_until is not None or self.vm.sleep_pending_ms is not None:
+                new_state = "sleeping"
             elif waiting:
                 new_state = "waiting_mbx"
             elif self.vm.running:
@@ -2940,15 +2957,23 @@ class VMController:
                     new_state = "stopped"
             task["state"] = new_state
             ctx["state"] = new_state
-        wait_info = self.waiting_tasks.get(self.current_pid)
-        if wait_info is not None:
-            state["wait_info"] = wait_info
-            ctx = state["context"]
-            ctx["wait_kind"] = "mailbox"
-            ctx["wait_mailbox"] = wait_info.get("descriptor_id")
-            ctx["wait_handle"] = wait_info.get("handle")
-            ctx["wait_deadline"] = wait_info.get("deadline")
-            state["context"] = ctx
+            if self.vm.sleep_pending_ms is not None:
+                ctx["sleep_pending_ms"] = int(self.vm.sleep_pending_ms)
+            else:
+                ctx.pop("sleep_pending_ms", None)
+            if self.vm.sleep_until is not None:
+                ctx["sleep_deadline"] = float(self.vm.sleep_until)
+            else:
+                ctx.pop("sleep_deadline", None)
+            wait_info = self.waiting_tasks.get(self.current_pid)
+            if wait_info is not None:
+                state["wait_info"] = wait_info
+                ctx = state["context"]
+                ctx["wait_kind"] = "mailbox"
+                ctx["wait_mailbox"] = wait_info.get("descriptor_id")
+                ctx["wait_handle"] = wait_info.get("handle")
+                ctx["wait_deadline"] = wait_info.get("deadline")
+                state["context"] = ctx
         else:
             state.pop("wait_info", None)
 
@@ -3033,6 +3058,8 @@ class VMController:
             "accounted_steps": ctx.get("accounted_steps", 0),
             "accounted_cycles": ctx.get("accounted_steps", 0),
             "sleep_pending": task.get("sleep_pending", False),
+             "sleep_pending_ms": task.get("sleep_pending_ms"),
+             "sleep_deadline": task.get("sleep_deadline"),
             "exit_status": task.get("exit_status"),
             "trace": task.get("trace"),
             "metadata": metadata_summary if metadata_summary else None,

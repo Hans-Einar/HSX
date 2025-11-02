@@ -1,5 +1,8 @@
+import time
+
 import pytest
 
+import python.execd as execd
 from python.execd import ExecutiveState, TaskState
 
 
@@ -46,3 +49,28 @@ def test_invalid_transition_raises():
     vm.set_tasks([make_task(2, "running")])
     with pytest.raises(ValueError):
         state._refresh_tasks()
+
+
+def test_sleep_tracking_and_wake(monkeypatch):
+    now = time.monotonic()
+    vm = StubVM(
+        [
+            make_task(
+                3,
+                "sleeping",
+                sleep_deadline=now + 0.05,
+                sleep_pending_ms=50,
+                sleep_pending=True,
+            )
+        ]
+    )
+    state = ExecutiveState(vm, step_batch=1)
+    state._refresh_tasks()
+    assert 3 in state.sleeping_deadlines
+
+    monkeypatch.setattr(execd.time, "monotonic", lambda: now + 0.1)
+    state._advance_sleeping_tasks()
+
+    assert 3 not in state.sleeping_deadlines
+    assert state.tasks[3]["state"] == "ready"
+    assert state.task_state_pending[3]["reason"] == "sleep_wake"

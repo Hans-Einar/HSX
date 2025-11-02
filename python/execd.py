@@ -22,6 +22,7 @@ future work will add task tables, stdout routing, and richer scheduling.
 """
 import argparse
 import bisect
+import heapq
 import json
 import os
 import socketserver
@@ -89,6 +90,8 @@ _ALLOWED_STATE_TRANSITIONS: Dict[Optional[TaskState], Set[TaskState]] = {
         TaskState.RETURNED,
         TaskState.TERMINATED,
         TaskState.PAUSED,
+        TaskState.SLEEPING,
+        TaskState.WAIT_MBX,
     },
     TaskState.READY: {
         TaskState.READY,
@@ -268,6 +271,8 @@ class ExecutiveState:
         self.symbol_cache_lock = threading.RLock()
         self.default_stack_frames = 16
         self.last_state_transition: Dict[int, Dict[str, Any]] = {}
+        self.sleeping_heap: List[Tuple[float, int]] = []
+        self.sleeping_deadlines: Dict[int, float] = {}
 
     def _register_metadata(self, pid: int, metadata: Dict[str, Any]) -> None:
         if not metadata:
@@ -452,6 +457,62 @@ class ExecutiveState:
             "to": new.value,
             "ts": time.time(),
         }
+
+    def _track_sleep(self, pid: int, deadline: Optional[Any]) -> None:
+        if deadline is None:
+            self._untrack_sleep(pid)
+            return
+        try:
+            deadline_f = float(deadline)
+        except (TypeError, ValueError):
+            self._untrack_sleep(pid)
+            return
+        self.sleeping_deadlines[pid] = deadline_f
+        heapq.heappush(self.sleeping_heap, (deadline_f, pid))
+
+    def _untrack_sleep(self, pid: int) -> None:
+        self.sleeping_deadlines.pop(pid, None)
+
+    def _advance_sleeping_tasks(self) -> None:
+        now = time.monotonic()
+        changed = False
+        while self.sleeping_heap:
+            deadline, pid = self.sleeping_heap[0]
+            if deadline > now:
+                break
+            heapq.heappop(self.sleeping_heap)
+            current = self.sleeping_deadlines.get(pid)
+            if current is None or current != deadline:
+                continue
+            self.sleeping_deadlines.pop(pid, None)
+            task = self.tasks.get(pid)
+            if task is not None:
+                task["state"] = "ready"
+                task["sleep_pending"] = False
+                task.pop("sleep_pending_ms", None)
+                task.pop("sleep_deadline", None)
+            state_entry = self.task_states.get(pid)
+            if isinstance(state_entry, dict):
+                ctx = state_entry.get("context", {})
+                if isinstance(ctx, dict):
+                    ctx["state"] = "ready"
+                    ctx.pop("sleep_pending_ms", None)
+                    ctx.pop("sleep_deadline", None)
+                    state_entry["context"] = ctx
+            self._set_task_state_pending(pid, "sleep_wake", target_state="ready", ts=time.time(), force=True)
+            changed = True
+        if changed:
+            self.auto_event.set()
+
+    def _next_sleep_deadline(self) -> Optional[float]:
+        while self.sleeping_heap:
+            deadline, pid = self.sleeping_heap[0]
+            current = self.sleeping_deadlines.get(pid)
+            if current is None or current != deadline:
+                heapq.heappop(self.sleeping_heap)
+                continue
+            return deadline
+        return None
 
     def _session_payload(self, session: SessionRecord) -> Dict[str, Any]:
         if not session.pid_locks:
@@ -2163,6 +2224,10 @@ class ExecutiveState:
             if new_state_enum != prev_state_enum:
                 self._record_state_transition(pid, prev_state_enum, new_state_enum)
             new_state = new_state_enum.value
+            if new_state_enum == TaskState.SLEEPING:
+                self._track_sleep(pid, task.get("sleep_deadline"))
+            else:
+                self._untrack_sleep(pid)
             state_entry["state"] = new_state
             state_entry["state_enum"] = new_state_enum
             sleep_flag = bool(task.get("sleep_pending"))
@@ -2273,6 +2338,7 @@ class ExecutiveState:
                 state_entry=prev_entry,
             )
             self.trace_last_regs.pop(pid, None)
+            self._untrack_sleep(pid)
 
         self.task_states = new_states
         stale = set(self.breakpoints.keys()) - current_pids
@@ -2395,6 +2461,7 @@ class ExecutiveState:
         return info
 
     def step(self, steps: Optional[int] = None, *, pid: Optional[int] = None, source: str = "manual") -> Dict[str, Any]:
+        self._advance_sleeping_tasks()
         budget = steps if steps is not None else self.step_batch
         pre_event = self._check_breakpoint_before_step(pid)
         if pre_event is not None:
@@ -2493,7 +2560,9 @@ class ExecutiveState:
         return any(task.get("state") in {"running", "ready"} for task in self.tasks.values())
 
     def _has_waiting_tasks(self) -> bool:
-        return any(task.get("state") in {"waiting", "waiting_mbx", "waiting_io"} for task in self.tasks.values())
+        if self.sleeping_deadlines:
+            return True
+        return any(task.get("state") in {"waiting", "waiting_mbx", "waiting_io", "sleeping"} for task in self.tasks.values())
 
     def set_clock_rate(self, hz: float) -> Dict[str, Any]:
         if hz < 0:
@@ -3038,6 +3107,13 @@ class ExecutiveState:
                     wait_time = 0.05
                 else:
                     wait_time = 0.001
+
+            next_deadline = self._next_sleep_deadline()
+            if next_deadline is not None:
+                remaining = max(0.0, next_deadline - time.monotonic())
+                if wait_time == 0.0 or remaining < wait_time:
+                    wait_time = remaining
+                    throttle_reason = throttle_reason or "sleep"
 
             if not any_tasks:
                 throttle_reason = throttle_reason or "idle"

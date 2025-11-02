@@ -19,7 +19,7 @@
 | 2025-11-02 | pending | Symbol enumeration coverage & client helpers | Codex | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py python/tests/test_executive_session_helpers.py` |
 | 2025-11-02 | 1cb8253 | Phase 3.1 HXE v2 loader & metadata exposure | Codex | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_hxe_v2_metadata.py python/tests/test_vm_stream_loader.py python/tests/test_hxe_fuzz.py` |
 | 2025-11-02 | 7fd0dae | Phase 3.3 app naming + metadata surfacing | Codex | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_app_names.py` |
-| 2025-11-02 | pending | Phase 4.1 scheduler state machine | Codex | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest` |
+| 2025-11-02 | pending | Phase 4.1 scheduler state machine | Codex | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest` (236) |
 | 2025-11-01 | 20c4782e99a8 | Disassembly RPC & CLI | Codex | Tests: `/mnt/c/Windows/py.exe -3.14 -m pytest python/tests/test_executive_session_helpers.py python/tests/test_executive_sessions.py` |
 | 2025-11-01 | f1eefc19062a | Stack UI drill-down & summaries | Codex | Tests: `/mnt/c/Windows/py.exe -3.14 -m pytest python/tests/test_executive_session_helpers.py python/tests/test_executive_sessions.py` |
 | 2025-11-01 | 8bd0c21e460a | Stack helpers & client plumbing | Codex | Tests: `/mnt/c/Windows/py.exe -3.14 -m pytest python/tests/test_executive_session_helpers.py python/tests/test_executive_sessions.py` |

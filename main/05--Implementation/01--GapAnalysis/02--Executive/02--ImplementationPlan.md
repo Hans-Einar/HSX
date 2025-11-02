@@ -395,13 +395,13 @@ Design specifies timer heap for sleep deadlines and complete mailbox wait list i
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
-- [ ] Implement timer heap for SLEEPING task deadlines
-- [ ] Add timer expiration checking on each scheduler tick
-- [ ] Integrate mailbox wait lists with WAIT_MBX state
-- [ ] Add mailbox wake callback to transition WAIT_MBX -> READY
-- [ ] Add timeout support for mailbox operations
-- [ ] Add wait/wake tests (sleep timeouts, mailbox wakes)
-- [ ] Document wait/wake semantics
+- [x] Implement timer heap for SLEEPING task deadlines
+- [x] Add timer expiration checking on each scheduler tick
+- [x] Integrate mailbox wait lists with WAIT_MBX state
+- [x] Add mailbox wake callback to transition WAIT_MBX -> READY
+- [x] Add timeout support for mailbox operations
+- [x] Add wait/wake tests (sleep timeouts, mailbox wakes)
+- [x] Document wait/wake semantics
 
 ---
 

@@ -353,3 +353,22 @@ Start new sections chronologically. Keep notes concise but actionable so the nex
 
 ### Follow-up actions / hand-off notes
 - Leverage the recorded transition metadata in future debugger tooling (CLI/TUI) to display why tasks moved between states.
+## 2025-11-02 - Codex (Session 18)
+
+### Focus
+- Task(s) tackled: Phase 4.2 wait/wake improvements (sleep timer heap, scheduler integration, docs/tests).
+- Dependencies touched: `platforms/python/host_vm.py`, `python/execd.py`, `python/tests/test_scheduler_state_machine.py`, `docs/04--Design/04.02--Executive.md`, `main/05--Implementation/01--GapAnalysis/02--Executive/02--ImplementationPlan.md`.
+
+### Status
+- DONE
+
+### Details
+- Reworked MiniVM sleep handling to be non-blocking: sleep requests now set deadlines and yield control, allowing the executive to manage wake timing.
+- Added timer-heap tracking in `ExecutiveState`, with deadline-driven wake-ups, scheduler throttle adjustments, and recorded state transitions; sleeping tasks now participate in the formal state machine.
+- Extended tests to cover sleep tracking/wake behaviour and refreshed design docs to describe executive-managed wait/wake semantics.
+
+### Tests run (commands + result)
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest`
+
+### Follow-up actions / hand-off notes
+- Consider richer mailbox wait instrumentation (per-descriptor backlog metrics) during later scheduler upgrades.
