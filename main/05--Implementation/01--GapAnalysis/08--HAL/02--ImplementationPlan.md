@@ -49,7 +49,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 5-7 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Create `python/hal/uart_hal.py` module structure
 - [ ] Implement `UartDriver` class with loopback mode for testing
 - [ ] Implement `uart_init(port, baud, parity, stop_bits)` configuration
@@ -73,7 +73,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 3-4 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Add UART module (0x10) to VM syscall dispatcher in `platforms/python/host_vm.py`
 - [ ] Implement `SVC_UART_WRITE` (0x10, 0x01) syscall handler
 - [ ] Implement `SVC_UART_READ_POLL` (0x10, 0x02) syscall handler
@@ -93,7 +93,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 4-5 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Implement async RX handler thread in `UartDriver`
 - [ ] Emit RX data to mailbox `hal:uart:<port>:rx` on byte arrival
 - [ ] Implement mailbox message format: `{"port": 0, "data": [0x41, 0x42], "timestamp": 123456}`
@@ -112,7 +112,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 4-5 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Create `python/tests/test_uart_hal.py` test module
 - [ ] Test loopback mode: write → read verification
 - [ ] Test configuration: baud rate, parity, stop bits settings
@@ -148,7 +148,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 4-5 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Create `python/hal/timer_hal.py` module structure
 - [ ] Implement `TimerDriver` class with monotonic counter
 - [ ] Implement `timer_get_tick()` returning 64-bit microsecond counter
@@ -172,7 +172,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 2-3 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Add Timer module (0x12) to VM syscall dispatcher
 - [ ] Implement `SVC_TIMER_GET_TICK` (0x12, 0x01) syscall handler
 - [ ] Implement `SVC_TIMER_GET_TICK_FREQ` (0x12, 0x02) syscall handler
@@ -191,7 +191,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 3-4 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Emit timer expiry event to mailbox `hal:timer:<id>` on timer fire
 - [ ] Implement mailbox message format: `{"timer_id": 5, "timestamp": 123456, "fired_count": 10}`
 - [ ] Add periodic timer auto-rearm after mailbox emission
@@ -209,7 +209,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 3-4 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Implement `timer_sleep_us(duration)` suspending VM execution
 - [ ] Integrate with Executive scheduler for context switching during sleep
 - [ ] Add wake-up event emission to scheduler on sleep expiry
@@ -226,7 +226,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 3-4 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Create `python/tests/test_timer_hal.py` test module
 - [ ] Test monotonic tick accuracy (±100µs over 1 second)
 - [ ] Test tick frequency reporting matches implementation
@@ -261,7 +261,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 4-5 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Create `python/hal/fram_hal.py` module structure
 - [ ] Implement `FramDriver` class with memory-backed storage
 - [ ] Implement `fram_read(address, buffer, length)` for block reads
@@ -285,7 +285,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 2-3 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Add FRAM module (0x13) to VM syscall dispatcher
 - [ ] Implement `SVC_FRAM_READ` (0x13, 0x01) syscall handler
 - [ ] Implement `SVC_FRAM_WRITE` (0x13, 0x02) syscall handler
@@ -304,7 +304,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 4-5 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Integrate FRAM HAL with ValCmd persistence layer
 - [ ] Implement value serialization to FRAM storage
 - [ ] Add value restoration on boot from FRAM
@@ -323,7 +323,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 3-4 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Create `python/tests/test_fram_hal.py` test module
 - [ ] Test read/write with various data patterns
 - [ ] Test persistence across driver restarts (JSON file survives)
@@ -358,7 +358,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 5-6 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Create `lib/hsx_uart.c` implementing user-space UART API
 - [ ] Implement `hsx_uart_write(port, data, length)` wrapping `SVC_UART_WRITE`
 - [ ] Implement `hsx_uart_read_poll(port, buffer, length)` wrapping `SVC_UART_READ_POLL`
@@ -382,7 +382,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 4-5 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Create `lib/hsx_timer.c` implementing user-space Timer API
 - [ ] Implement `hsx_timer_get_tick()` wrapping `SVC_TIMER_GET_TICK`
 - [ ] Implement `hsx_timer_get_tick_freq()` wrapping `SVC_TIMER_GET_TICK_FREQ`
@@ -405,7 +405,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 3-4 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Create `lib/hsx_fram.c` implementing user-space FRAM API
 - [ ] Implement `hsx_fram_read(address, buffer, length)` wrapping `SVC_FRAM_READ`
 - [ ] Implement `hsx_fram_write(address, data, length)` wrapping `SVC_FRAM_WRITE`
@@ -428,7 +428,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 3-4 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Add `libhsx_hal.a` build target to `python/hsx-cc-build.py`
 - [ ] Compile `lib/hsx_uart.c`, `lib/hsx_timer.c`, `lib/hsx_fram.c` to object files
 - [ ] Archive object files into `libhsx_hal.a` static library
@@ -447,7 +447,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 4-5 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Create example app `examples/hal_uart_echo.c` using `hsx_uart_printf`
 - [ ] Create example app `examples/hal_timer_blink.c` using periodic timer
 - [ ] Create example app `examples/hal_fram_persist.c` using key-value storage
@@ -481,7 +481,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 6-7 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Create `python/hal/can_hal.py` module structure
 - [ ] Implement `CanDriver` class with simulated CAN bus
 - [ ] Implement `can_tx(frame)` for sending CAN frames
@@ -505,7 +505,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 3-4 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Add CAN module (0x11) to VM syscall dispatcher
 - [ ] Implement `SVC_CAN_TX` (0x11, 0x01) syscall handler
 - [ ] Implement `SVC_CAN_CONFIG` (0x11, 0x02) syscall handler
@@ -524,7 +524,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 4-5 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Emit CAN RX frame to mailbox `hal:can:rx` on frame arrival
 - [ ] Implement mailbox message format: `{"id": 0x123, "dlc": 8, "data": [...], "timestamp": 123456}`
 - [ ] Add RX filter matching before mailbox emission
@@ -541,7 +541,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 5-6 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Create `lib/hsx_can.c` implementing user-space CAN API
 - [ ] Implement `hsx_can_tx(frame)` wrapping `SVC_CAN_TX`
 - [ ] Implement `hsx_can_config(bitrate, mode)` wrapping `SVC_CAN_CONFIG`
@@ -563,7 +563,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 6-7 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Create `python/hal/fs_hal.py` module structure
 - [ ] Implement `FsDriver` class with host filesystem mapping
 - [ ] Implement `fs_open(path, mode)` returning file descriptor
@@ -587,7 +587,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 3-4 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Add FS module (0x14) to VM syscall dispatcher
 - [ ] Implement `SVC_FS_OPEN` (0x14, 0x01) syscall handler
 - [ ] Implement `SVC_FS_READ` (0x14, 0x02) syscall handler
@@ -608,7 +608,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 5-6 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Create `lib/hsx_fs.c` implementing user-space FS API
 - [ ] Implement `hsx_fs_open(path, mode)` wrapping `SVC_FS_OPEN`
 - [ ] Implement `hsx_fs_read(fd, buffer, length)` wrapping `SVC_FS_READ`
@@ -631,7 +631,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 4-5 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Create `python/hal/gpio_hal.py` module structure
 - [ ] Implement `GpioDriver` class with virtual pin state
 - [ ] Implement `gpio_read(pin)` returning pin state (0/1)
@@ -652,7 +652,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 4-5 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Add GPIO module (0x15) to VM syscall dispatcher
 - [ ] Implement `SVC_GPIO_READ`, `SVC_GPIO_WRITE`, `SVC_GPIO_CONFIG`, `SVC_GPIO_SET_INTERRUPT`
 - [ ] Emit GPIO interrupt events to mailbox `hal:gpio:<pin>`
@@ -669,7 +669,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 5-6 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Create `python/tests/test_can_hal.py` test module
 - [ ] Test CAN TX/RX with loopback mode
 - [ ] Test CAN filter matching with various IDs and masks
@@ -703,7 +703,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 2-3 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Define `hal_caps_t` structure in `include/hsx_hal_types.h`
 - [ ] Add bitfield for enabled modules (UART, CAN, Timer, FRAM, FS, GPIO)
 - [ ] Add buffer size fields (UART RX, CAN RX, max open files)
@@ -721,7 +721,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 3-4 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Implement `SVC_HAL_GET_CAPS` (0x10, 0x00) syscall handler
 - [ ] Populate `hal_caps_t` from active driver capabilities
 - [ ] Return capabilities structure in VM memory region
@@ -737,7 +737,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 3-4 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Implement `hsx_hal_get_caps()` in `lib/hsx_hal.c`
 - [ ] Implement per-module capability queries: `hsx_uart_get_caps()`, etc.
 - [ ] Add capability check helpers: `hsx_hal_has_module(module_id)`
@@ -753,7 +753,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 2-3 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Test capability query returns correct Python mock driver capabilities
 - [ ] Test per-module capability queries match driver state
 - [ ] Test capability caching avoids redundant syscalls
@@ -779,7 +779,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 5-6 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Implement `hal_dispatch(module, function, args)` in VM
 - [ ] Route HAL syscalls directly to mock drivers without executive forwarding
 - [ ] Add standalone mode detection (no executive connection)
@@ -796,7 +796,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 4-5 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Create standalone VM test cases without executive
 - [ ] Test stdout redirection via UART HAL in standalone mode
 - [ ] Test sleep delays via Timer HAL in standalone mode
@@ -826,7 +826,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 5-6 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Create `c/exec/hal/` directory structure
 - [ ] Define C HAL interface in `c/exec/hal/hal.h`
 - [ ] Implement `hal_init()` initialization sequence
@@ -844,7 +844,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 7-8 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Implement `c/exec/hal/uart_hal.c` for AVR targets
 - [ ] Configure UART registers (UBRR, UCSRA, UCSRB, UCSRC) for baud rate, parity
 - [ ] Implement `hal_uart_write()` with polling TX
@@ -865,7 +865,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 6-7 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Implement `c/exec/hal/timer_hal.c` for AVR targets
 - [ ] Configure Timer1 for 16-bit high-resolution counter
 - [ ] Implement `hal_timer_get_tick()` reading TCNT1 with overflow counter
@@ -885,7 +885,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 6-7 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Implement `c/exec/hal/fram_hal.c` for AVR targets
 - [ ] Integrate I2C/SPI driver for FRAM access (e.g., FM24CL64B)
 - [ ] Implement `hal_fram_read()` with I2C read transaction
@@ -904,7 +904,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 4-5 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Add C HAL drivers to `c/exec/Makefile`
 - [ ] Create HAL profile selection (desktop mock, AVR, STM32, ARM)
 - [ ] Add module enable/disable flags (`-DHAL_ENABLE_UART`, etc.)
@@ -921,7 +921,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 5-6 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Create AVR hardware test rig with UART loopback
 - [ ] Test UART TX/RX with physical loopback cable
 - [ ] Measure UART RX ISR latency (<100µs target)
@@ -953,7 +953,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 3-4 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Add `hal_init()` call to executive startup in `python/execd.py`
 - [ ] Initialize all HAL drivers (UART, CAN, Timer, FRAM, FS, GPIO)
 - [ ] Register HAL ISR callbacks with executive event system
@@ -970,7 +970,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 6-7 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Integrate CAN HAL with Provisioning CAN transport binding
 - [ ] Implement CAN broadcast protocol for HXE image loading
 - [ ] Integrate UART HAL with Provisioning UART streaming transport
@@ -988,7 +988,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 5-6 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Integrate FRAM HAL with ValCmd persistence layer
 - [ ] Implement value serialization to FRAM storage
 - [ ] Add value restoration on boot from FRAM
@@ -1005,7 +1005,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 3-4 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Redirect executive stdout/stderr to UART HAL
 - [ ] Implement console I/O via UART port 0
 - [ ] Add line buffering for console output
@@ -1022,7 +1022,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 5-6 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Test provisioning workflow via CAN broadcast
 - [ ] Test provisioning workflow via UART streaming
 - [ ] Test provisioning workflow via SD filesystem
@@ -1050,7 +1050,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 4-5 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Implement RTS/CTS hardware handshaking in Python mock driver
 - [ ] Implement RTS/CTS in C UART driver for AVR
 - [ ] Add flow control configuration API: `uart_config(port, {flow_control: true})`
@@ -1066,7 +1066,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 5-6 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Implement CAN bus error counters (TX, RX)
 - [ ] Implement bus-off recovery with automatic restart
 - [ ] Add advanced filter chaining (multiple filter rules)
@@ -1082,7 +1082,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 5-6 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Implement advanced wear leveling with block rotation
 - [ ] Add dynamic bad block remapping
 - [ ] Implement wear histogram tracking
@@ -1098,7 +1098,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 3-4 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Implement PWM output mode for GPIO pins
 - [ ] Add PWM configuration: frequency, duty cycle
 - [ ] Implement hardware PWM using AVR Timer0/Timer2
@@ -1113,7 +1113,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 6-7 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Add driver mutexes for concurrent HAL access
 - [ ] Implement thread-safe UART TX/RX operations
 - [ ] Add thread-safe CAN TX/RX operations
@@ -1141,7 +1141,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 4-5 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Write HAL porting guide for adding new MCU platforms
 - [ ] Document driver interface contract for each module
 - [ ] Create platform driver template files
@@ -1158,7 +1158,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 3-4 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Write user-space library usage guide
 - [ ] Create example applications for each HAL module
 - [ ] Document callback registration and event handling patterns
@@ -1174,7 +1174,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 3-4 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Write executive integration guide for HAL driver invocation
 - [ ] Document HAL initialization sequence
 - [ ] Add event emission integration patterns
@@ -1189,7 +1189,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 2-3 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Document Python mock driver behavior and limitations
 - [ ] Add mock driver configuration guide
 - [ ] Document desktop simulation capabilities
@@ -1203,7 +1203,7 @@ The HAL module provides a two-layer hardware abstraction architecture:
 **Estimated Effort:** 6-7 days
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.08--HAL](../../../04--Design/04.08--HAL.md)
 - [ ] Create comprehensive unit test suite (all modules)
 - [ ] Add integration tests (cross-module interactions)
 - [ ] Create stress tests (high-load scenarios)

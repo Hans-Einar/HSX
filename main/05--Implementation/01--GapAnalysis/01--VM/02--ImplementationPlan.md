@@ -31,7 +31,7 @@ This implementation plan addresses the gaps identified in the VM Study document 
 Study document identifies shift operations as part of "minimal instruction set" needed for LLVM lowering and C compilation. Essential for bit manipulation, efficient multiply/divide by powers of 2, and C bitfield operations.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.01--VM](../../../04--Design/04.01--VM.md)
 - [ ] Define opcodes for LSL (logical shift left), LSR (logical shift right), ASR (arithmetic shift right)
 - [ ] Implement shift operations in `platforms/python/host_vm.py` MiniVM.step() dispatcher
 - [ ] Update PSW flags (N, Z) after shift operations
@@ -52,7 +52,7 @@ Study document identifies shift operations as part of "minimal instruction set" 
 Required for multi-precision arithmetic (e.g., 64-bit operations on 32-bit architecture). Essential for LLVM lowering of 64-bit types.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.01--VM](../../../04--Design/04.01--VM.md)
 - [ ] Define opcodes for ADC (add with carry) and SBC (subtract with borrow)
 - [ ] Implement ADC/SBC in `platforms/python/host_vm.py` with proper carry flag usage
 - [ ] Update PSW flags (C, N, Z, V) after ADC/SBC operations
@@ -73,7 +73,7 @@ Required for multi-precision arithmetic (e.g., 64-bit operations on 32-bit archi
 Design spec (section 4.3) defines processor status word with Z (zero), C (carry), N (negative), and V (overflow) flags. Current implementation only sets Z flag. Full PSW support is essential for conditional branches and multi-precision arithmetic.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.01--VM](../../../04--Design/04.01--VM.md)
 - [ ] Implement C (carry) flag computation in ADD, SUB operations
 - [ ] Implement N (negative) flag computation in all arithmetic/logic operations
 - [ ] Implement V (overflow) flag computation in ADD, SUB (signed overflow detection)
@@ -95,7 +95,7 @@ Design spec (section 4.3) defines processor status word with Z (zero), C (carry)
 Design spec includes DIV in opcode table, but implementation currently skips from MUL (0x12) to AND (0x14). Integer division is essential for complete ISA coverage.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.01--VM](../../../04--Design/04.01--VM.md)
 - [ ] Implement DIV opcode (0x13) in `platforms/python/host_vm.py`
 - [ ] Handle division by zero (should trigger fault/trap)
 - [ ] Update PSW flags after division (N, Z based on quotient)
@@ -116,7 +116,7 @@ Design spec includes DIV in opcode table, but implementation currently skips fro
 Design specifies `vm_get_last_pc()`, `vm_get_last_opcode()`, and `vm_get_last_regs()` for executive-side trace capture. System/MiniVM.md notes requirement to emit structured events (trace_step, debug_break) for executive stream.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.01--VM](../../../04--Design/04.01--VM.md)
 - [ ] Expose `vm_get_last_pc()` API in MiniVM class
 - [ ] Expose `vm_get_last_opcode()` API in MiniVM class
 - [ ] Expose `vm_get_last_regs()` API in MiniVM class (return register snapshot)
@@ -138,7 +138,7 @@ Design specifies `vm_get_last_pc()`, `vm_get_last_opcode()`, and `vm_get_last_re
 Design specifies `vm_load_{begin,write,end,abort}` for byte-granularity ingestion. Essential for CAN/UART provisioning on low-RAM targets.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.01--VM](../../../04--Design/04.01--VM.md)
 - [ ] Implement `vm_load_begin(mem_cfg, expected_size)` API
 - [ ] Implement `vm_load_write(chunk)` API with incremental parsing
 - [ ] Implement `vm_load_end()` API with CRC validation
@@ -161,7 +161,7 @@ Design specifies `vm_load_{begin,write,end,abort}` for byte-granularity ingestio
 Design section 6.1.1 specifies optional APIs for reading/writing registers of non-active PIDs. Useful for debugger and monitoring tools.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.01--VM](../../../04--Design/04.01--VM.md)
 - [ ] Implement `vm_reg_get_for(pid, reg_id)` API
 - [ ] Implement `vm_reg_set_for(pid, reg_id, value)` API
 - [ ] Validate PID exists and is in valid state for register access
@@ -181,7 +181,7 @@ Design section 6.1.1 specifies optional APIs for reading/writing registers of no
 System/MiniVM.md notes: "Ensure SVC table pulls module/function IDs from forthcoming shared header (ties into DR-2.5 once header lands)."
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.01--VM](../../../04--Design/04.01--VM.md)
 - [ ] Wait for shared syscall header to be generated (track in DependencyTree.md)
 - [ ] Integrate shared header into Python VM SVC dispatcher
 - [ ] Replace hardcoded module/function IDs with header constants
@@ -201,7 +201,7 @@ System/MiniVM.md notes: "Ensure SVC table pulls module/function IDs from forthco
 System/MiniVM.md notes: "Finalise microbench harness proving constant-time workspace swaps (tie into DR-2.1a acceptance)." Required to validate O(1) context switch guarantee.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.01--VM](../../../04--Design/04.01--VM.md)
 - [ ] Create microbenchmark harness in `python/tests/bench_workspace_swap.py`
 - [ ] Measure workspace pointer swap time with varying task counts (1, 10, 50, 100 tasks)
 - [ ] Verify O(1) behavior (time should not scale with task count)
@@ -223,7 +223,7 @@ System/MiniVM.md notes: "Finalise microbench harness proving constant-time works
 Design specifies Python reference **and** C port for embedded targets (DR-1.3, DG-1.4). Critical for deployment on MCU targets (STM32, etc.).
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.01--VM](../../../04--Design/04.01--VM.md)
 - [ ] Create `platforms/c/` directory structure
 - [ ] Set up build system (Makefile and/or CMake)
 - [ ] Define platform abstraction layer (memory allocation, I/O)
@@ -244,7 +244,7 @@ Design specifies Python reference **and** C port for embedded targets (DR-1.3, D
 Core VM functionality must be ported with identical semantics to Python reference. Design suggests jump table or computed goto for opcode dispatch (section 4.1).
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.01--VM](../../../04--Design/04.01--VM.md)
 - [ ] Translate MiniVM class to C struct and functions
 - [ ] Implement opcode dispatch (jump table or computed goto)
 - [ ] Port all instruction implementations (data movement, ALU, control flow)
@@ -269,7 +269,7 @@ Core VM functionality must be ported with identical semantics to Python referenc
 Workspace-pointer-based O(1) context switching is a core design requirement (DR-2.1, DG-2.1-2.2).
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.01--VM](../../../04--Design/04.01--VM.md)
 - [ ] Implement TaskContext struct in C
 - [ ] Implement RegisterFile with workspace pointer support
 - [ ] Port workspace pointer swapping logic
@@ -290,7 +290,7 @@ Workspace-pointer-based O(1) context switching is a core design requirement (DR-
 Both monolithic and streaming loaders must be available in C port for embedded deployment scenarios.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.01--VM](../../../04--Design/04.01--VM.md)
 - [ ] Port HXE header parsing and validation
 - [ ] Port CRC checking logic
 - [ ] Implement monolithic loader in C
@@ -311,7 +311,7 @@ Both monolithic and streaming loaders must be available in C port for embedded d
 Essential syscall modules must be available in C port for basic task functionality.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.01--VM](../../../04--Design/04.01--VM.md)
 - [ ] Port module 0x00 (Task/System services)
 - [ ] Port module 0x01 (Memory services)
 - [ ] Port module 0x02 (String services)
@@ -334,7 +334,7 @@ Essential syscall modules must be available in C port for basic task functionali
 Design goal DG-1.4 requires shared test vectors that run on both Python and C implementations.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.01--VM](../../../04--Design/04.01--VM.md)
 - [ ] Create shared test vector format (HXE binaries + expected results)
 - [ ] Port existing Python tests to shared vector format
 - [ ] Create test harness for C port
@@ -357,7 +357,7 @@ Design goal DG-1.4 requires shared test vectors that run on both Python and C im
 HXE header includes optional `heap_size_bytes` field, but VM does not currently allocate or manage heap regions.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.01--VM](../../../04--Design/04.01--VM.md)
 - [ ] Parse `heap_size_bytes` from HXE header
 - [ ] Allocate heap region during task initialization
 - [ ] Implement heap allocator (simple bump allocator or TLSF)
@@ -379,7 +379,7 @@ HXE header includes optional `heap_size_bytes` field, but VM does not currently 
 Design includes optional code cache and data TLB per sections 4.4 and 6.1.4. Deferred until C port is deployed on constrained MCU.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.01--VM](../../../04--Design/04.01--VM.md)
 - [ ] Design code cache architecture (256-512B line size)
 - [ ] Design data TLB (2-4 entries)
 - [ ] Implement code prefetch and cache management
@@ -402,7 +402,7 @@ Design includes optional code cache and data TLB per sections 4.4 and 6.1.4. Def
 Module 0x07 (Value service) and module 0x08 (Command service) are specified but marked "Planned" in syscall table.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.01--VM](../../../04--Design/04.01--VM.md)
 - [ ] Review `docs/hsx_value_interface.md` specification
 - [ ] Design Value service implementation
 - [ ] Design Command service implementation
@@ -424,7 +424,7 @@ Module 0x07 (Value service) and module 0x08 (Command service) are specified but 
 Design includes policy bitset for controlling `mem_write` in RUN state, `reg_set(PC)` in STOPPED state, etc. No policy enforcement framework exists.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.01--VM](../../../04--Design/04.01--VM.md)
 - [ ] Design policy flag bitset structure
 - [ ] Implement policy enforcement in mem_cfg
 - [ ] Add policy checks in memory access functions
@@ -448,7 +448,7 @@ Design includes policy bitset for controlling `mem_write` in RUN state, `reg_set
 Missing formal API documentation for VM's public interface (method signatures, return types, error codes).
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.01--VM](../../../04--Design/04.01--VM.md)
 - [ ] Document all public VM APIs with signatures
 - [ ] Document return types and error codes
 - [ ] Document API usage patterns and examples
@@ -469,7 +469,7 @@ Missing formal API documentation for VM's public interface (method signatures, r
 Design goal of 2-4M instructions/second on M4 @ 48MHz cannot be validated without C port and benchmarking methodology.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.01--VM](../../../04--Design/04.01--VM.md)
 - [ ] Create benchmark suite (instruction mix, memory patterns)
 - [ ] Establish benchmarking methodology
 - [ ] Measure C port on M4@48MHz target
@@ -491,7 +491,7 @@ Design goal of 2-4M instructions/second on M4 @ 48MHz cannot be validated withou
 Applications need guidance when moving between Python and C implementations.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.01--VM](../../../04--Design/04.01--VM.md)
 - [ ] Document behavioral equivalence between ports
 - [ ] Document platform-specific considerations
 - [ ] Document ABI compatibility requirements
@@ -511,7 +511,7 @@ Applications need guidance when moving between Python and C implementations.
 Additional test coverage needed for workspace swaps, ABI compliance, paging, shift operations, and carry flag behavior.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.01--VM](../../../04--Design/04.01--VM.md)
 - [ ] Add workspace swap timing tests
 - [ ] Add ABI compliance tests (DR-2.3)
 - [ ] Add paging edge case tests (if paging implemented)

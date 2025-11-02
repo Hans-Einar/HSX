@@ -33,7 +33,7 @@ This implementation plan addresses the gaps identified in the Toolkit Study docu
 Design specifies comprehensive Python `hsxdbg` package with 5 major components (section 4.2.1). Foundation for all debugger frontends (CLI, TUI, VS Code).
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
 - [ ] Create `python/hsxdbg/` package directory
 - [ ] Create `__init__.py` with package exports
 - [ ] Create module structure (transport, session, events, cache, commands)
@@ -53,7 +53,7 @@ Design specifies comprehensive Python `hsxdbg` package with 5 major components (
 Design specifies JSON-over-TCP RPC client with connection management (section 5). Core communication layer for debugger.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
 - [ ] Create `hsxdbg/transport.py` module
 - [ ] Implement TCP socket connection with timeout
 - [ ] Implement JSON message framing (length-prefixed or newline-delimited)
@@ -77,7 +77,7 @@ Design specifies JSON-over-TCP RPC client with connection management (section 5)
 Design specifies connection lifecycle and capability negotiation (section 5.1). Manages debugger sessions with executive.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
 - [ ] Create `hsxdbg/session.py` module
 - [ ] Implement session open (connect to executive)
 - [ ] Implement capability negotiation protocol
@@ -101,7 +101,7 @@ Design specifies connection lifecycle and capability negotiation (section 5.1). 
 Design specifies typed helpers for debugger operations (section 4.2.1). High-level API for debugger frontends.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
 - [ ] Create `hsxdbg/commands.py` module
 - [ ] Implement execution control commands (step, resume, pause)
 - [ ] Implement breakpoint commands (set_breakpoint, clear_breakpoint, list_breakpoints)
@@ -127,7 +127,7 @@ Design specifies typed helpers for debugger operations (section 4.2.1). High-lev
 Design requires formalized JSON schemas for debugger RPC messages (section 5). Ensures consistency and documentation.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
 - [ ] Document JSON schema for session messages
 - [ ] Document JSON schema for execution control messages
 - [ ] Document JSON schema for breakpoint messages
@@ -152,7 +152,7 @@ Design requires formalized JSON schemas for debugger RPC messages (section 5). E
 Design specifies async event dispatcher with bounded queues (section 5.2). Real-time updates for debugger frontends.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
 - [ ] Create `hsxdbg/events.py` module
 - [ ] Implement async event dispatcher (asyncio or threading)
 - [ ] Implement bounded event queues (configurable size)
@@ -175,7 +175,7 @@ Design specifies async event dispatcher with bounded queues (section 5.2). Real-
 Design requires event schemas for various event types (section 5.2). Structured event data for frontends.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
 - [ ] Define `trace_step` event schema (seq, ts, pid, pc, opcode, psw)
 - [ ] Define `debug_break` event schema (seq, ts, pid, reason, pc)
 - [ ] Define `mailbox_*` event schemas (message, send, receive)
@@ -198,7 +198,7 @@ Design requires event schemas for various event types (section 5.2). Structured 
 Design specifies queue overflow detection and slow-down requests (section 5.2.3). Prevents event loss.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
 - [ ] Implement queue size monitoring
 - [ ] Detect queue overflow conditions
 - [ ] Send slow-down request to executive
@@ -219,7 +219,7 @@ Design specifies queue overflow detection and slow-down requests (section 5.2.3)
 Selective subscription by event type and PID reduces unnecessary processing.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
 - [ ] Implement event type filtering
 - [ ] Implement PID filtering
 - [ ] Allow subscribers to specify filters
@@ -241,7 +241,7 @@ Selective subscription by event type and PID reduces unnecessary processing.
 Design specifies mirroring registers, memory, stacks, watches, mailboxes (section 4.2.1). Minimizes RPC round-trips.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
 - [ ] Create `hsxdbg/cache.py` module
 - [ ] Implement register cache (R0-R15, PC, SP, PSW)
 - [ ] Implement memory cache (address ranges)
@@ -264,7 +264,7 @@ Design specifies mirroring registers, memory, stacks, watches, mailboxes (sectio
 Update cache on events, invalidate on control operations. Ensures cache consistency.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
 - [ ] Update register cache on trace_step events
 - [ ] Update memory cache on memory_changed events
 - [ ] Update stack cache on debug_break events
@@ -286,7 +286,7 @@ Update cache on events, invalidate on control operations. Ensures cache consiste
 Efficient local queries without RPC round-trips. Improves frontend responsiveness.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
 - [ ] Implement register query from cache
 - [ ] Implement memory query from cache
 - [ ] Implement stack query from cache
@@ -309,7 +309,7 @@ Efficient local queries without RPC round-trips. Improves frontend responsivenes
 Design specifies capturing component stdout/stderr to log files (section 6.3). Essential for debugging and monitoring.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
 - [ ] Implement log file capture for VM component
 - [ ] Implement log file capture for Executive component
 - [ ] Implement log file capture for Shell component
@@ -332,7 +332,7 @@ Design specifies capturing component stdout/stderr to log files (section 6.3). E
 Design specifies config file support for ports, paths, options (section 6.3). Enables customization without code changes.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
 - [ ] Choose config format (YAML or TOML)
 - [ ] Define configuration schema (ports, paths, logging, etc.)
 - [ ] Implement config file loading
@@ -355,7 +355,7 @@ Design specifies config file support for ports, paths, options (section 6.3). En
 Design mentions periodic verification of component health (section 6.3). Detects component failures.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
 - [ ] Implement periodic health check thread/task
 - [ ] Check if component processes are running
 - [ ] Check if component ports are responsive
@@ -377,7 +377,7 @@ Design mentions periodic verification of component health (section 6.3). Detects
 Design mentions detecting crashes and restarting components (section 6.3). Improves system reliability.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
 - [ ] Detect component crashes via health checks
 - [ ] Implement automatic restart logic
 - [ ] Add restart delay and retry limit
@@ -401,7 +401,7 @@ Design mentions detecting crashes and restarting components (section 6.3). Impro
 Unit tests for all debugger core modules ensure quality. Currently minimal test coverage (221 lines).
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
 - [ ] Add transport layer unit tests (connection, framing, retry)
 - [ ] Add session manager unit tests (open, negotiate, close)
 - [ ] Add event bus unit tests (subscribe, dispatch, filter)
@@ -424,7 +424,7 @@ Unit tests for all debugger core modules ensure quality. Currently minimal test 
 End-to-end tests for manager lifecycle and debugger core integration.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
 - [ ] Create integration test suite
 - [ ] Test manager component lifecycle (start, stop, restart)
 - [ ] Test debugger core with mock executive
@@ -446,7 +446,7 @@ End-to-end tests for manager lifecycle and debugger core integration.
 Manager commands and configuration documentation. User-facing documentation.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
 - [ ] Write user guide in `docs/toolkit_manager.md`
 - [ ] Document all manager commands
 - [ ] Document configuration file format
@@ -467,7 +467,7 @@ Manager commands and configuration documentation. User-facing documentation.
 Design specifies cross-platform installers for Windows, macOS, Linux. Distribution packaging.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
 - [ ] Create Python package setup (setup.py or pyproject.toml)
 - [ ] Create entry points for hsx-manager, hsx-shell
 - [ ] Create Windows installer (MSI or NSIS)

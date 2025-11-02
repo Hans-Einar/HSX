@@ -35,7 +35,7 @@ This implementation plan addresses the gaps identified in the CLI Debugger Study
 Separate shell commands from debugger commands. Prepare for dedicated CLI debugger tool.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.09--Debugger](../../../04--Design/04.09--Debugger.md)
 - [ ] Review `python/shell_client.py` (1,574 lines)
 - [ ] Identify shell-specific vs debugger-specific commands
 - [ ] Extract debugger command logic into separate module
@@ -54,7 +54,7 @@ Separate shell commands from debugger commands. Prepare for dedicated CLI debugg
 New dedicated `hsx-dbg` command-line tool built on `hsxdbg` core package (from Toolkit module).
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.09--Debugger](../../../04--Design/04.09--Debugger.md)
 - [ ] Create `python/hsx_dbg.py` as main entry point
 - [ ] Integrate with `hsxdbg` core package
 - [ ] Implement basic REPL loop
@@ -92,7 +92,7 @@ Executive now surfaces app names and metadata counts; CLI debugger should displa
 - [ ] Update CLI help/docs to mention the new columns
 - [ ] Add regression tests once executive metadata summary is stable
 
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.09--Debugger](../../../04--Design/04.09--Debugger.md)
 - [ ] Install `prompt_toolkit` dependency
 - [ ] Implement command parser with subcommands
 - [ ] Add command validation and help system
@@ -114,7 +114,7 @@ Executive now surfaces app names and metadata counts; CLI debugger should displa
 Design specifies machine-readable output for CI/CD (section 6.2). Enables automation and scripting.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.09--Debugger](../../../04--Design/04.09--Debugger.md)
 - [ ] Add `--json` flag to CLI arguments
 - [ ] Implement JSON formatter for all command outputs
 - [ ] Ensure consistent JSON schema across commands
@@ -136,7 +136,7 @@ Design specifies machine-readable output for CI/CD (section 6.2). Enables automa
 Implement `attach <pid>`, `detach`, `observer <pid>` commands per session protocol 5.1. Core debugger functionality.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.09--Debugger](../../../04--Design/04.09--Debugger.md)
 - [ ] Implement `attach <pid>` command (exclusive session)
 - [ ] Implement `detach` command (release PID lock)
 - [ ] Implement `observer <pid>` command (read-only session)

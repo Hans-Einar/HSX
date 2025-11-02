@@ -36,7 +36,7 @@ This implementation plan addresses the gaps identified in the Provisioning Study
 Design specifies executive-owned provisioning orchestration (section 3). Foundation for all provisioning functionality.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Create `python/provisioning.py` module
 - [ ] Create `ProvisioningService` class
 - [ ] Add provisioning service to executive initialization
@@ -56,7 +56,7 @@ Design specifies executive-owned provisioning orchestration (section 3). Foundat
 Design requires state tracking for provisioning operations (section 3). Ensures proper workflow management.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Define states: IDLE, LOADING, VERIFY, READY, FAILED, ABORTING
 - [ ] Implement state transitions with validation
 - [ ] Add state change callbacks
@@ -77,7 +77,7 @@ Design requires state tracking for provisioning operations (section 3). Ensures 
 Design specifies parsing HXE v2 metadata sections (section 2.2). Required for declarative registration.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Parse HXE v2 header (`meta_offset`, `meta_count`)
 - [ ] Parse section table (name, offset, size for each metadata section)
 - [ ] Extract `.value` section data
@@ -99,7 +99,7 @@ Design specifies parsing HXE v2 metadata sections (section 2.2). Required for de
 Design specifies app name conflict detection with `allow_multiple_instances` flag (section 2.3). Prevents conflicts.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Parse `app_name` from HXE metadata
 - [ ] Parse `allow_multiple_instances` flag
 - [ ] Check existing tasks for `app_name` collision
@@ -120,7 +120,7 @@ Design specifies app name conflict detection with `allow_multiple_instances` fla
 Design requires registering metadata with value/command/mailbox subsystems before VM load (section 2.2).
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Parse value declarations from `.value` section
 - [ ] Register values with value subsystem
 - [ ] Parse command declarations from `.cmd` section
@@ -145,7 +145,7 @@ Design requires registering metadata with value/command/mailbox subsystems befor
 Design specifies streaming API for byte-by-byte loading (section 2.1). Starts streaming session.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Define `vm_load_begin` RPC interface
 - [ ] Allocate VM arenas for new task
 - [ ] Create PID in LOADING state
@@ -166,7 +166,7 @@ Design specifies streaming API for byte-by-byte loading (section 2.1). Starts st
 Design specifies chunked data transfer with sequence numbers (section 2.1). Core streaming functionality.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Define `vm_load_write` RPC interface
 - [ ] Accept payload chunks with sequence numbers
 - [ ] Validate sequence numbers (detect gaps, duplicates)
@@ -189,7 +189,7 @@ Design specifies chunked data transfer with sequence numbers (section 2.1). Core
 Design specifies final validation and PID state transition (section 2.1). Completes streaming session.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Define `vm_load_end` RPC interface
 - [ ] Perform final CRC validation
 - [ ] Verify complete HXE structure
@@ -211,7 +211,7 @@ Design specifies final validation and PID state transition (section 2.1). Comple
 Design requires cleanup on error or timeout (section 2.1). Resource management.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Define `vm_load_abort` RPC interface
 - [ ] Free allocated VM arenas
 - [ ] Clean up transfer session state
@@ -232,7 +232,7 @@ Design requires cleanup on error or timeout (section 2.1). Resource management.
 Track sequence numbers, CRC, timeouts for reliable transfer. Session management.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Track sequence numbers for each chunk
 - [ ] Maintain CRC accumulator
 - [ ] Implement timeout timers
@@ -255,7 +255,7 @@ Track sequence numbers, CRC, timeouts for reliable transfer. Session management.
 Design specifies structured events with back-pressure (section 4). Event definitions.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Define `provisioning.started` event schema
 - [ ] Define `provisioning.progress` event schema (bytes_written, total_bytes, percent)
 - [ ] Define `provisioning.complete` event schema
@@ -277,7 +277,7 @@ Design specifies structured events with back-pressure (section 4). Event definit
 Design requires event emission at provisioning milestones (section 4). Real-time progress updates.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Emit `started` event on provisioning start
 - [ ] Emit `progress` events during transfer
 - [ ] Emit `complete` event on successful load
@@ -298,7 +298,7 @@ Design requires event emission at provisioning milestones (section 4). Real-time
 Design specifies event coalescing and back-pressure (section 4.2). Prevents event flooding.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Implement event coalescing for progress updates
 - [ ] Add configurable rate limit (events per second)
 - [ ] Detect slow consumers
@@ -318,7 +318,7 @@ Design specifies event coalescing and back-pressure (section 4.2). Prevents even
 Design mentions client ACK for flow control (section 4.2). Optional flow control.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Define ACK protocol
 - [ ] Implement ACK reception
 - [ ] Pause event emission on missing ACKs
@@ -340,7 +340,7 @@ Design mentions client ACK for flow control (section 4.2). Optional flow control
 Design requires verification before VM load (section 2.4). Catch errors early.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Validate HXE header structure
 - [ ] Verify CRC checksums
 - [ ] Check section table integrity
@@ -362,7 +362,7 @@ Design requires verification before VM load (section 2.4). Catch errors early.
 Design requires tracking load source for `ps` command (section 2.5). Provenance tracking.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Record load source (filepath, CAN master, SD manifest)
 - [ ] Store in task metadata
 - [ ] Display in `ps` command output
@@ -381,7 +381,7 @@ Design requires tracking load source for `ps` command (section 2.5). Provenance 
 Design requires mapping VM errors to provisioning events (section 2.6). Error reporting.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Map `EBADMSG` (bad format) to provisioning.error
 - [ ] Map `ENOSPC` (insufficient memory) to provisioning.error
 - [ ] Map `ESRCH` (PID not found) to provisioning.error
@@ -402,7 +402,7 @@ Design requires mapping VM errors to provisioning events (section 2.6). Error re
 Design requires stripping metadata before VM load (section 2.2). VM receives clean HXE.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Extract metadata sections from HXE
 - [ ] Process metadata (register values/commands/mailboxes)
 - [ ] Strip metadata sections
@@ -425,7 +425,7 @@ Design requires stripping metadata before VM load (section 2.2). VM receives cle
 Design specifies HAL filesystem binding for host file loading (section 3.3). File transport.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Create `hal.fs.open(path)` binding
 - [ ] Create `hal.fs.read(fd, size)` binding
 - [ ] Create `hal.fs.close(fd)` binding
@@ -445,7 +445,7 @@ Design specifies HAL filesystem binding for host file loading (section 3.3). Fil
 Design specifies CAN broadcast provisioning (section 3.1). CAN transport.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Create `hal.can.recv()` binding
 - [ ] Create `hal.can.send()` binding
 - [ ] Implement CAN broadcast protocol
@@ -468,7 +468,7 @@ Design specifies CAN broadcast provisioning (section 3.1). CAN transport.
 Design specifies SD manifest parsing (section 3.2). SD card transport.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Parse TOML/JSON manifest files
 - [ ] Resolve image paths from manifest
 - [ ] Implement boot priority ordering
@@ -489,7 +489,7 @@ Design specifies SD manifest parsing (section 3.2). SD card transport.
 Design mentions UART streaming provisioning (section 3.4). Serial transport.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Create UART byte stream ingestion
 - [ ] Implement UART framing protocol
 - [ ] Handle flow control
@@ -508,7 +508,7 @@ Design mentions UART streaming provisioning (section 3.4). Serial transport.
 Common interface for all transport modes. Simplifies provisioning service.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Define transport abstraction interface
 - [ ] Implement common transport operations (open, read, close)
 - [ ] Abstract transport-specific details
@@ -530,7 +530,7 @@ Common interface for all transport modes. Simplifies provisioning service.
 Design specifies persistent storage for HXE blobs and calibration data (section 5). Storage format.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Define storage layout (partition table)
 - [ ] Define HXE blob format in storage
 - [ ] Define manifest format (boot config, task metadata)
@@ -551,7 +551,7 @@ Design specifies persistent storage for HXE blobs and calibration data (section 
 Design requires staging, CRC, atomic swap (section 5.2). Safe persistence.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Implement staging area for new HXE
 - [ ] Perform CRC verification in staging
 - [ ] Implement atomic pointer swap
@@ -571,7 +571,7 @@ Design requires staging, CRC, atomic swap (section 5.2). Safe persistence.
 Design requires revert to known-good configuration (section 5.3). Safety mechanism.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Track previous configuration (prior manifest)
 - [ ] Implement rollback command
 - [ ] Restore prior HXE blob
@@ -592,7 +592,7 @@ Design requires revert to known-good configuration (section 5.3). Safety mechani
 Design mentions write count tracking and partition rotation (section 5.4). Flash longevity.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Track write counts per partition
 - [ ] Implement partition rotation
 - [ ] Detect excessive wear
@@ -612,7 +612,7 @@ Design mentions write count tracking and partition rotation (section 5.4). Flash
 Design requires persisting calibration data via value subsystem (section 5.5). Value persistence.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Persist values marked with `val.persist` flag
 - [ ] Store value data in FRAM/flash
 - [ ] Restore persisted values after load
@@ -634,7 +634,7 @@ Design requires persisting calibration data via value subsystem (section 5.5). V
 Design mentions authorization checks for provisioning operations (section 6.1). Security.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Define provisioning permissions
 - [ ] Implement authorization checks
 - [ ] Restrict privileged operations
@@ -653,7 +653,7 @@ Design mentions authorization checks for provisioning operations (section 6.1). 
 Design specifies cryptographic validation of HXE images (section 6.2). Optional security.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Define signature format (RSA, Ed25519)
 - [ ] Implement signature verification
 - [ ] Store trusted public keys
@@ -673,7 +673,7 @@ Design specifies cryptographic validation of HXE images (section 6.2). Optional 
 Design requires verifying HXE capability flags match target (section 6.3). Compatibility.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Parse HXE capability flags (`requires_f16`, `needs_mailbox`)
 - [ ] Check target capabilities
 - [ ] Reject incompatible HXE files
@@ -692,7 +692,7 @@ Design requires verifying HXE capability flags match target (section 6.3). Compa
 Design requires pre-allocation checks for memory budgets (section 6.4). Resource management.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Parse code/data/stack size requirements
 - [ ] Check available memory
 - [ ] Reject if insufficient resources
@@ -714,7 +714,7 @@ Design requires pre-allocation checks for memory budgets (section 6.4). Resource
 Design specifies startup script with priority ordering (section 7.1). Boot automation.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Define boot configuration format
 - [ ] Parse boot configuration on startup
 - [ ] Implement priority ordering
@@ -735,7 +735,7 @@ Design specifies startup script with priority ordering (section 7.1). Boot autom
 Design specifies scanning host → SD → CAN for boot sources (section 7.2). Auto-provisioning.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Scan host filesystem for preload files
 - [ ] Scan SD card manifest
 - [ ] Listen for CAN master broadcasts
@@ -756,7 +756,7 @@ Design specifies scanning host → SD → CAN for boot sources (section 7.2). Au
 Design requires restoring persisted values after load (section 7.3). State restoration.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Restore persisted value data on boot
 - [ ] Restore after new HXE load
 - [ ] Handle missing/corrupted value data
@@ -776,7 +776,7 @@ Design requires restoring persisted values after load (section 7.3). State resto
 Design mentions detecting boot failures and rolling back (section 7.4). Boot safety.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Detect boot failures (exceptions, timeouts)
 - [ ] Attempt rollback to known-good image
 - [ ] Track boot failure count
@@ -798,7 +798,7 @@ Design mentions detecting boot failures and rolling back (section 7.4). Boot saf
 Comprehensive unit tests for all provisioning components. Quality assurance.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Test provisioning state machine
 - [ ] Test HXE v2 parser
 - [ ] Test metadata processing
@@ -821,7 +821,7 @@ Comprehensive unit tests for all provisioning components. Quality assurance.
 End-to-end provisioning workflows with mock transports. Integration validation.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Test monolithic load workflow
 - [ ] Test streaming load workflow
 - [ ] Test metadata registration flow
@@ -842,7 +842,7 @@ End-to-end provisioning workflows with mock transports. Integration validation.
 Power-fail simulation, rollback, wear management tests. Persistence validation.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Simulate power failures during commit
 - [ ] Test rollback on corruption
 - [ ] Test wear management
@@ -862,7 +862,7 @@ Power-fail simulation, rollback, wear management tests. Persistence validation.
 Full provisioning scenarios with protocol validation. Transport testing.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Test CAN broadcast protocol
 - [ ] Test SD manifest parsing
 - [ ] Test chunked transfers
@@ -882,7 +882,7 @@ Full provisioning scenarios with protocol validation. Transport testing.
 Complete HXE v2 format spec and provisioning API documentation. Documentation.
 
 **Todo:**
-> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.07--Provisioning](../../../04--Design/04.07--Provisioning.md)
 - [ ] Complete `docs/hxe_format.md` with metadata section table
 - [ ] Document provisioning API in `docs/executive_protocol.md`
 - [ ] Document all event schemas
