@@ -404,19 +404,6 @@ Typical payloads:
 - `mailbox_overrun`: `{ "descriptor": <int>, "pid": <int>, "dropped_seq": <int>, "dropped_length": <int>, "dropped_flags": <uint16>, "channel": <uint16>, "reason": <string>, "queue_depth": <int> }`
 - `mailbox_error`: `{ "fn": <int>, "error": <string>, "status": <uint16?> }`
 - `watch_update`: `{ "watch_id": <string>, "value": <string>, "formatted": <string?> }`
-
-**Mailbox Wake Priority Semantics:**
-
-When a message is sent to a mailbox descriptor, the executive wakes blocked receivers according to the descriptor's delivery mode:
-
-- **Single-reader mode**: Wakes one waiter at a time in FIFO order. Each message is delivered to exactly one receiver, maintaining strict ordering to prevent starvation.
-- **Fan-out mode**: Attempts to wake ALL blocked readers who have pending data, processing the waiter queue in FIFO order. All readers receive independent copies of the message simultaneously.
-- **Tap isolation**: Tap observers never block on receive operations and are excluded from the waiter queue. Taps receive best-effort copies without affecting wake priority for regular readers or owners.
-
-These semantics ensure:
-1. **FIFO fairness**: Waiters are processed in arrival order within their descriptor
-2. **No starvation**: Regular readers and owners are never starved by slow taps or fan-out consumers
-3. **Deterministic delivery**: Wake order is predictable and consistent across implementations
 - `stdout` / `stderr`: `{ "text": <string> }`
 - `warning`: `{ "message": <string>, "category": <string> }`
 
@@ -424,6 +411,14 @@ These semantics ensure:
 `trace_step.data.mem_access` (when present) captures the last memory transaction performed by the instruction, including the resolved address, width in bytes, and the value read or written.
 
 `scheduler` events fire whenever the executive hands control to a different PID (including transitions to `null` when the run queue empties). The `reason` field enumerates the cause: `quantum_expired` (round-robin rotation), `sleep` (task issued a sleep request), `wait_mbx` (blocking mailbox call), `paused` (user or debugger intervention), and `killed` (task exited or was forcibly removed). When a task shuts down cleanly the event still uses `killed`; `post_state` reports `terminated` or is omitted if the PID disappears entirely. `quantum_remaining` reflects the unused portion of the outgoing PID's configured quantum. `prev_state` mirrors the scheduler state before the switch, `post_state` captures the new state assigned to the outgoing PID, and `next_state` reports the incoming PID's state snapshot. `executed` records the instruction count the VM reported for the triggering step and `source` indicates whether the tick came from the auto-runner or a manual `step/clock`. Additional diagnostic fields may appear under `details`; clients must ignore keys they do not understand.
+
+**Mailbox wake priority semantics:**
+When a message is sent to a mailbox descriptor, the executive wakes blocked receivers according to the descriptor's delivery mode:
+- **Single-reader mode**: Wakes one waiter at a time in FIFO order. Each message is delivered to exactly one receiver, maintaining strict ordering to prevent starvation.
+- **Fan-out mode**: Attempts to wake ALL blocked readers who have pending data, processing the waiter queue in FIFO order. All readers receive independent copies of the message simultaneously.
+- **Tap isolation**: Tap observers never block on receive operations and are excluded from the waiter queue. Taps receive best-effort copies without affecting wake priority for regular readers or owners.
+
+These semantics ensure: (1) FIFO fairness - waiters are processed in arrival order within their descriptor; (2) No starvation - regular readers and owners are never starved by slow taps or fan-out consumers; (3) Deterministic delivery - wake order is predictable and consistent across implementations.
 
 ### Back-pressure & errors
 

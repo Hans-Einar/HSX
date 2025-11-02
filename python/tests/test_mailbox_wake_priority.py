@@ -6,7 +6,6 @@ These tests verify:
 2. All waiters woken in fan-out mode
 3. No starvation under various scenarios
 """
-import time
 from typing import Dict
 
 from python import hsx_mailbox_constants as mbx_const
