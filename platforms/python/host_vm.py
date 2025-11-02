@@ -2965,28 +2965,63 @@ class VMController:
             desc = self.mailboxes.descriptor_by_id(descriptor_id)
         except MailboxError:
             return
-        while desc.waiters:
-            waiter_pid = desc.waiters[0]
-            wait_info = self.waiting_tasks.get(waiter_pid)
-            if wait_info is None:
-                desc.waiters.pop(0)
-                continue
-            handle = wait_info.get("handle")
-            try:
-                message = self.mailboxes.recv(pid=waiter_pid, handle=handle, record_waiter=False)
-            except MailboxError:
-                desc.waiters.pop(0)
-                self.waiting_tasks.pop(waiter_pid, None)
-                continue
-            if message is None:
-                break
-            self._complete_mailbox_wait(
-                waiter_pid,
-                status=mbx_const.HSX_MBX_STATUS_OK,
-                descriptor_id=descriptor_id,
-                message=message,
-                timed_out=False,
-            )
+        
+        # Check if descriptor is in fan-out mode
+        is_fanout = bool(desc.mode_mask & mbx_const.HSX_MBX_MODE_FANOUT)
+        
+        if is_fanout:
+            # Fan-out mode: attempt to deliver to ALL waiters who have pending data
+            # Process waiters in FIFO order but don't stop after first delivery
+            delivered_pids = []
+            for waiter_pid in list(desc.waiters):  # Copy list to allow modification
+                wait_info = self.waiting_tasks.get(waiter_pid)
+                if wait_info is None:
+                    delivered_pids.append(waiter_pid)
+                    continue
+                handle = wait_info.get("handle")
+                try:
+                    message = self.mailboxes.recv(pid=waiter_pid, handle=handle, record_waiter=False)
+                except MailboxError:
+                    delivered_pids.append(waiter_pid)
+                    self.waiting_tasks.pop(waiter_pid, None)
+                    continue
+                if message is not None:
+                    self._complete_mailbox_wait(
+                        waiter_pid,
+                        status=mbx_const.HSX_MBX_STATUS_OK,
+                        descriptor_id=descriptor_id,
+                        message=message,
+                        timed_out=False,
+                    )
+                    delivered_pids.append(waiter_pid)
+            # Remove delivered PIDs from waiters list while preserving FIFO order
+            for pid in delivered_pids:
+                if pid in desc.waiters:
+                    desc.waiters.remove(pid)
+        else:
+            # Single-reader mode: wake one waiter at a time in FIFO order
+            while desc.waiters:
+                waiter_pid = desc.waiters[0]
+                wait_info = self.waiting_tasks.get(waiter_pid)
+                if wait_info is None:
+                    desc.waiters.pop(0)
+                    continue
+                handle = wait_info.get("handle")
+                try:
+                    message = self.mailboxes.recv(pid=waiter_pid, handle=handle, record_waiter=False)
+                except MailboxError:
+                    desc.waiters.pop(0)
+                    self.waiting_tasks.pop(waiter_pid, None)
+                    continue
+                if message is None:
+                    break
+                self._complete_mailbox_wait(
+                    waiter_pid,
+                    status=mbx_const.HSX_MBX_STATUS_OK,
+                    descriptor_id=descriptor_id,
+                    message=message,
+                    timed_out=False,
+                )
 
     def _check_mailbox_timeouts(self) -> None:
         if not self.waiting_tasks:

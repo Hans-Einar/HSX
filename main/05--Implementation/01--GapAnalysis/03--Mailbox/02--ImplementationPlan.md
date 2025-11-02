@@ -343,9 +343,9 @@ Toolchain needs to generate .mailbox sections from application code. Enables dec
 **Design Updates Needed:** _TBD_
 
 **Pre-Implementation Checklist**
-- [ ] Review wake ordering requirements (owner vs taps vs fan-out) in Sections 4.4.2 and 4.6.
-- [ ] Document any design ambiguities about starvation avoidance or fairness.
-- [ ] Confirm executive scheduler expectations for wake order.
+- [x] Review wake ordering requirements (owner vs taps vs fan-out) in Sections 4.4.2 and 4.6.
+- [x] Document any design ambiguities about starvation avoidance or fairness.
+- [x] Confirm executive scheduler expectations for wake order.
 
 **Implementation Tasks**
 - [ ] Ensure waiter queues preserve FIFO order per descriptor.
