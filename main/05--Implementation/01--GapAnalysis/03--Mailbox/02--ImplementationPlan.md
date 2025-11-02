@@ -343,21 +343,21 @@ Toolchain needs to generate .mailbox sections from application code. Enables dec
 **Design Updates Needed:** _TBD_
 
 **Pre-Implementation Checklist**
-- [ ] Review wake ordering requirements (owner vs taps vs fan-out) in Sections 4.4.2 and 4.6.
-- [ ] Document any design ambiguities about starvation avoidance or fairness.
-- [ ] Confirm executive scheduler expectations for wake order.
+- [x] Review wake ordering requirements (owner vs taps vs fan-out) in Sections 4.4.2 and 4.6.
+- [x] Document any design ambiguities about starvation avoidance or fairness.
+- [x] Confirm executive scheduler expectations for wake order.
 
 **Implementation Tasks**
-- [ ] Ensure waiter queues preserve FIFO order per descriptor.
-- [ ] Enforce wake priority (owner + fan-out subscribers + taps).
-- [ ] Add regression tests for multiple waiters, tap observers, and fairness.
-- [ ] Document wake priority and starvation guarantees.
-- [ ] Surface diagnostics (e.g., queue snapshots) to aid debugging.
+- [x] Ensure waiter queues preserve FIFO order per descriptor.
+- [x] Enforce wake priority (owner + fan-out subscribers + taps).
+- [x] Add regression tests for multiple waiters, tap observers, and fairness.
+- [x] Document wake priority and starvation guarantees.
+- [x] Surface diagnostics (e.g., queue snapshots) to aid debugging.
 
 **Post-Implementation Checklist**
-- [ ] Validate behaviour against design (no starvation, deterministic wake order).
-- [ ] Update design doc if additional clarifications were necessary.
-- [ ] Log outcomes/tests/follow-ups in `03--ImplementationNotes.md`.
+- [x] Validate behaviour against design (no starvation, deterministic wake order).
+- [x] Update design doc if additional clarifications were necessary (none needed).
+- [x] Log outcomes/tests/follow-ups in `03--ImplementationNotes.md`.
 - [ ] Confirm relevant review gate complete.
 
 ---

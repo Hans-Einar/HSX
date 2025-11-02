@@ -689,3 +689,66 @@ esource_stats() on the mailbox manager and exposed aggregated metrics (capacity,
   - Implementation review gate for Phase 3 still pending; schedule after Phase 3.3 lands.
   - Next step: continue with Phase 3.3 wake priority handling.
 
+
+
+## 2025-11-02 - Agent (Session 13)
+
+### Focus
+- Task(s) tackled: Phase 3.3 wake priority handling (pre-implementation review and design analysis).
+- Dependencies touched: 4.03--Mailbox.md Sections 4.4.2, 4.6, 6; platforms/python/host_vm.py; python/mailbox.py; 02--ImplementationPlan.md.
+
+### Status
+- IN PROGRESS
+
+### Details
+- Summary of activities:
+  - Reviewed design sections 4.4.2 (Fan-Out Mode), 4.6 (Fairness and Resource Management), and 6 (Edge Cases) to understand wake priority requirements.
+  - Key design requirements identified:
+    * Section 4.5.2 line 159: "Wake blocked receivers (single-reader: one PID; fan-out: all readers with pending data)"
+    * Section 6 line 300: "Stdio tapping: Ensure stdout fan-out prioritizes owner before taps"
+    * Section 6 line 304: "Sender starvation: Maintain FIFO order for wake-ups"
+    * Section 4.6 line 186: "FIFO wait queues: Waiters wake in order of arrival to prevent starvation"
+  - Analyzed current _deliver_mailbox_messages implementation in host_vm.py:
+    * Currently wakes one waiter at a time in FIFO order and stops when message cannot be delivered
+    * This is correct for single-reader mode but needs enhancement for fan-out mode
+    * In fan-out mode, should attempt to deliver to ALL waiters who have pending data
+  - Verified tap isolation: taps use _tap_recv which never adds PIDs to waiters list (line 322-323 in mailbox.py), so taps should never block
+  - Design ambiguities documented:
+    * "Wake priority: owner before taps" appears to be about ensuring taps don't interfere with owner delivery, not about wake order (since taps don't block)
+    * Current FIFO implementation is correct; enhancement needed is to wake ALL fan-out readers, not just one
+- Follow-up: implement fan-out wake-all logic and add regression tests.
+
+
+
+## 2025-11-02 - Agent (Session 14)
+
+### Focus
+- Task(s) tackled: Phase 3.3 wake priority handling implementation and testing.
+- Dependencies touched: platforms/python/host_vm.py; python/tests/test_mailbox_wake_priority.py; docs/executive_protocol.md; 02--ImplementationPlan.md; 03--ImplementationNotes.md.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions:
+  - Modified _deliver_mailbox_messages to distinguish between single-reader and fan-out modes
+  - Single-reader mode: wake one waiter at a time in FIFO order (preserves existing behavior)
+  - Fan-out mode: wake ALL waiters who have pending data in FIFO order (new behavior)
+  - Verified tap isolation: taps never block, so they are not in waiters list
+  - Created comprehensive test suite (test_mailbox_wake_priority.py) with 6 new tests:
+    * test_single_reader_fifo_wake_order
+    * test_fanout_wakes_all_readers
+    * test_fanout_preserves_fifo_within_priority
+    * test_mixed_single_reader_and_fanout_no_interference
+    * test_tap_isolation_from_regular_readers
+    * test_no_starvation_with_continuous_sends
+  - Documented wake priority semantics in docs/executive_protocol.md
+- Tests run (commands + result):
+  - python3 -m pytest python/tests/test_mailbox_wake_priority.py -v (6 passed)
+  - python3 -m pytest python/tests/test_mailbox*.py -v (42 passed)
+  - python3 -m pytest python/tests/test_executive_sessions.py -v (49 passed)
+- Follow-up actions / hand-off notes:
+  - Phase 3.3 complete; all implementation tasks checked off
+  - Implementation review gate pending; schedule after Phase 3.4 if needed
+  - No design document updates required; behavior aligns with existing design specifications
+

@@ -412,6 +412,14 @@ Typical payloads:
 
 `scheduler` events fire whenever the executive hands control to a different PID (including transitions to `null` when the run queue empties). The `reason` field enumerates the cause: `quantum_expired` (round-robin rotation), `sleep` (task issued a sleep request), `wait_mbx` (blocking mailbox call), `paused` (user or debugger intervention), and `killed` (task exited or was forcibly removed). When a task shuts down cleanly the event still uses `killed`; `post_state` reports `terminated` or is omitted if the PID disappears entirely. `quantum_remaining` reflects the unused portion of the outgoing PID's configured quantum. `prev_state` mirrors the scheduler state before the switch, `post_state` captures the new state assigned to the outgoing PID, and `next_state` reports the incoming PID's state snapshot. `executed` records the instruction count the VM reported for the triggering step and `source` indicates whether the tick came from the auto-runner or a manual `step/clock`. Additional diagnostic fields may appear under `details`; clients must ignore keys they do not understand.
 
+**Mailbox wake priority semantics:**
+When a message is sent to a mailbox descriptor, the executive wakes blocked receivers according to the descriptor's delivery mode:
+- **Single-reader mode**: Wakes one waiter at a time in FIFO order. Each message is delivered to exactly one receiver, maintaining strict ordering to prevent starvation.
+- **Fan-out mode**: Attempts to wake ALL blocked readers who have pending data, processing the waiter queue in FIFO order. All readers receive independent copies of the message simultaneously.
+- **Tap isolation**: Tap observers never block on receive operations and are excluded from the waiter queue. Taps receive best-effort copies without affecting wake priority for regular readers or owners.
+
+These semantics ensure: (1) FIFO fairness - waiters are processed in arrival order within their descriptor; (2) No starvation - regular readers and owners are never starved by slow taps or fan-out consumers; (3) Deterministic delivery - wake order is predictable and consistent across implementations.
+
 ### Back-pressure & errors
 
 - Each subscriber negotiates a buffer depth (`events.max`); default is 512 events with a 5 s retention window. The executive stores events once in a ring buffer and tracks per-subscriber cursors to avoid duplicating payloads.
