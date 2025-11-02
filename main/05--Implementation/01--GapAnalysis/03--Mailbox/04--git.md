@@ -11,6 +11,7 @@
 ## Commit Log
 | Date | Commit hash | Message | Author | Notes |
 | --- | --- | --- | --- | --- |
+| 2025-11-02 | `643bfa9` | `mailbox: persist wait metadata + deadlines through refresh` | Hans Einar | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py` |
 | 2025-11-03 | `6a3b9d2` | `mailbox: add timeout status constant` | Codex | Tests: `python -m pytest python/tests/test_mailbox_constants.py python/tests/test_mailbox_wait.py python/tests/test_mailbox_svc_runtime.py` |
 | 2025-11-03 | `b1d4f87` | `mailbox: enforce descriptor pool limit` | Codex | Tests: `python -m pytest python/tests/test_mailbox_constants.py python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_mailbox_wait.py` |
 | 2025-11-04 | `<pending>` | `mailbox: emit structured mailbox events` | Codex | Tests: `python -m pytest python/tests/test_mailbox_constants.py python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_mailbox_wait.py` |

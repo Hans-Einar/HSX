@@ -44,6 +44,9 @@ Core Commands
 | `bp` | `{ "version": 1, "cmd": "bp", "op": "set", "pid": 1, "addr": 4096 }` | `{ "version": 1, "status": "ok", "pid": 1, "breakpoints": [4096] }` | Manage per-task breakpoints (`op`: `list`/`set`/`clear`/`clear_all`). |
 | `vm_trace_last` | `{ "version": 1, "cmd": "vm_trace_last" [, "pid": 1] }` | `{ "version": 1, "status": "ok", "trace": { "pid": 1, "pc": 4096, "next_pc": 4100, "opcode": 57005, "flags": 3, "regs": [ ... ], "mem_access": { ... } } }` | Returns the last executed instruction snapshot (PC/opcode/flags/regs and optional memory-access metadata). |
 | `disasm` | `{ "version": 1, "cmd": "disasm", "pid": 1 [, "addr": 0x1000, "count": 8, "mode": "cached" ] }` | `{ "version": 1, "status": "ok", "disasm": { ... } }` | Disassemble a slice of task memory. |
+
+The `clock` status payload reports the current auto-run `mode`/`throttle_reason`. Typical values include `active`, `rate`, `sleep`, `wait_mbx`, `paused`, and `idle`. When every runnable task blocks on mailboxes with finite timeouts the executive aligns the auto-loop delay with the earliest mailbox deadline so timeout expiries occur promptly without tight polling loops.
+
 The `step`/`clock step` responses include an optional `trace_last` object mirroring the `vm_trace_last` payload so tools can poll trace data even when `trace_step` events are disabled.
 | `sym` | `{ "version": 1, "cmd": "sym", "op": "addr", "pid": 1, "address": 4096 }` | `{ "version": 1, "status": "ok", "symbol": { ... } }` | Symbol table helpers (`op`: `info`/`addr`/`name`/`line`/`load`). |
 | `symbols` | `{ "version": 1, "cmd": "symbols", "pid": 1 [, "type": "functions", "offset": 0, "limit": 20 ] }` | `{ "version": 1, "status": "ok", "symbols": { ... } }` | List symbols for a task with optional filtering/pagination. |
@@ -62,7 +65,7 @@ The `step`/`clock step` responses include an optional `trace_last` object mirror
 | `session.open` | `{ "version": 1, "cmd": "session.open", "client": "hsxdbg", "capabilities": {"features":["events","stack"], "max_events":256}, "pid_lock": 1 }` | `{ "version": 1, "status": "ok", "session": { "id": "<uuid>", "heartbeat_s": 30, "features": ["events","stack"], "pid_lock": 1 } }` | Negotiate capabilities, optional PID locks, and heartbeat interval. |
 | `session.keepalive` | `{ "version": 1, "cmd": "session.keepalive", "session": "<id>" }` | `{ "version": 1, "status": "ok" }` | Refresh idle timer; required at least once per heartbeat interval. |
 | `session.close` | `{ "version": 1, "cmd": "session.close", "session": "<id>" }` | `{ "version": 1, "status": "ok" }` | Release locks, cancel event subscriptions, and free session resources. |
-| `events.subscribe` | `{ "version": 1, "cmd": "events.subscribe", "session": "<id>", "filters": {"pid":[1,3], "categories":["trace_step","debug_break"]} }` | Stream of newline-delimited event objects; initial reply `{ "version":1, "status":"ok", "events":{"max":256} }`. | Opens long-lived event stream; see “Event Streaming” below. |
+| `events.subscribe` | `{ "version": 1, "cmd": "events.subscribe", "session": "<id>", "filters": {"pid":[1,3], "categories":["trace_step","debug_break"]} }` | Stream of newline-delimited event objects; initial reply `{ "version":1, "status":"ok", "events":{"max":256} }`. | Opens long-lived event stream; see "Event Streaming" below. |
 | `events.unsubscribe` | `{ "version": 1, "cmd": "events.unsubscribe", "session": "<id>" }` | `{ "version": 1, "status": "ok" }` | Stop event delivery for the session. |
 | `events.ack` | `{ "version": 1, "cmd": "events.ack", "session": "<id>", "seq": 2048 }` | `{ "version": 1, "status": "ok" }` | Inform executive that events <= `seq` have been processed (optional for eager reclamation). |
 
@@ -249,8 +252,8 @@ Task state events
   }
   ```
   - `prev_state` and `new_state` mirror the scheduler-level state strings reported by `ps`.
-  - `reason` captures why the transition occurred. The executive emits at least the following reasons: `loaded`, `debug_break`, `sleep`, `mailbox_wait`, `mailbox_wake`, `timeout`, `returned`, and `killed`. Additional reasons such as `resume`, `user_pause`, or other tooling-specific annotations may be added over time; clients must tolerate unknown values.
-  - `details` is optional metadata that may include mailbox descriptors/handles, timeout status codes, or exit status information for `returned` transitions.
+- `reason` captures why the transition occurred. The executive emits at least the following reasons: `loaded`, `debug_break`, `sleep`, `mailbox_wait`, `mailbox_wake`, `timeout`, `returned`, and `killed`. Additional reasons such as `resume`, `user_pause`, or other tooling-specific annotations may be added over time; clients must tolerate unknown values.
+- `details` is optional metadata that may include mailbox descriptors/handles, timeout status codes, deadlines, or exit status information for `returned` transitions.  For mailbox waits, `details` contains `descriptor`, `handle`, `timeout`, and the computed `deadline` (when applicable) so UIs can surface pending timeouts.
 - When a task disappears from the snapshot (e.g., after `kill` or normal exit) the executive emits a final `task_state` with `new_state: "terminated"` so observers can retire stale UI entries cleanly.
 
 Session ownership and PID locks
@@ -289,7 +292,7 @@ Memory layout
 ~~~~~~~~~~~~
 
 - `memory regions <pid>` reports the segments the executive knows about for a task. The response contains a `regions` array with entries describing each segment (`name`, `type`, `start`, `end`, `length`, `permissions`), along with optional `source` (e.g. `hxe` or `vm`) and `details` metadata (such as the current stack pointer).
-- The executive derives the load-time segments (code, rodata, bss) from the HXE header captured during `load/exec`, and augments them with runtime regions reported by the VM (register window, stack allocation). Regions are clamped to the HSX 64 KiB address space.
+- The executive derives the load-time segments (code, rodata, bss) from the HXE header captured during `load/exec`, and augments them with runtime regions reported by the VM (register window, stack allocation). Regions are clamped to the HSX 64 KiB address space.
 - Observers can invoke the command without holding the PID lock; the data is read-only.
 
 Watch expressions
@@ -353,7 +356,7 @@ Disassembly
     "cached": true,
     "truncated": false,
     "bytes_read": 28,
-    "data": "01100230…",
+    "data": "01100230...",
     "instructions": [
       {
         "index": 0,
@@ -395,7 +398,7 @@ Typical payloads:
 - `scheduler`: `{ "state": "switch", "prev_pid": <int>, "next_pid": <int?>, "reason": "quantum_expired|sleep|wait_mbx|paused|killed", "quantum_remaining": <int?>, "prev_state": <string?>, "post_state": <string?>, "next_state": <string?>, "executed": <int?>, "source": "auto|manual", "details": { ... }? }`
 - `mailbox_send`: `{ "descriptor": <int>, "handle": <int>, "length": <int>, "flags": <uint16>, "channel": <uint16>, "src_pid": <int> }`
 - `mailbox_recv`: `{ "descriptor": <int>, "handle": <int>, "length": <int>, "flags": <uint16>, "channel": <uint16>, "src_pid": <int> }`
-- `mailbox_wait`: `{ "descriptor": <int>, "handle": <int>, "timeout": <uint16> }`
+- `mailbox_wait`: `{ "descriptor": <int>, "handle": <int>, "timeout": <uint16>, "deadline": <float?> }`
 - `mailbox_wake`: `{ "descriptor": <int>, "handle": <int>, "status": <uint16>, "length": <int>, "flags": <uint16>, "channel": <uint16>, "src_pid": <int> }`
 - `mailbox_timeout`: `{ "descriptor": <int>, "handle": <int>, "status": <uint16>, "length": <int>, "flags": <uint16>, "channel": <uint16>, "src_pid": <int> }`
 - `mailbox_overrun`: `{ "descriptor": <int>, "pid": <int>, "dropped_seq": <int>, "dropped_length": <int>, "dropped_flags": <uint16>, "channel": <uint16>, "reason": <string>, "queue_depth": <int> }`

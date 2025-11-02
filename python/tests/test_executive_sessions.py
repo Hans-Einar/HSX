@@ -1,4 +1,5 @@
 import json
+import time
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -529,12 +530,13 @@ def test_task_state_mailbox_wait_and_wake_events():
     state._refresh_tasks()
     state.event_history.clear()
 
-    wait_event = {"descriptor": 7, "handle": 2, "timeout": 50}
+    wait_event = {"descriptor": 7, "handle": 2, "timeout": 50, "deadline": 123.456}
     state._mark_task_wait_mailbox(1, wait_event)
     task_before = state.tasks[1]
     assert task_before["wait_mailbox"] == 7
     assert task_before["wait_handle"] == 2
     assert task_before["wait_timeout"] == 50
+    assert task_before["wait_deadline"] == pytest.approx(123.456)
     vm.state = "waiting_mbx"
     state._refresh_tasks()
     task_after = state.tasks[1]
@@ -542,6 +544,7 @@ def test_task_state_mailbox_wait_and_wake_events():
     assert task_after["wait_mailbox"] == 7
     assert task_after["wait_handle"] == 2
     assert task_after["wait_timeout"] == 50
+    assert task_after["wait_deadline"] == pytest.approx(123.456)
     events = _task_state_events(state)
     assert events, "expected mailbox wait event"
     data = events[-1]["data"]
@@ -562,6 +565,40 @@ def test_task_state_mailbox_wait_and_wake_events():
     wake_data = wake_events[-1]["data"]
     assert wake_data["reason"] == "mailbox_wake"
     assert wake_data["new_state"] == "ready"
+
+
+def test_wait_mailbox_deadline_tracking():
+    state, vm = make_task_state_env()
+    state.wait_mbx_deadlines.clear()
+    state.wait_mbx_heap.clear()
+    state.auto_event.clear()
+
+    deadline = time.monotonic() + 1.0
+    wait_event = {"descriptor": 9, "handle": 1, "timeout": 100, "deadline": deadline}
+    state._mark_task_wait_mailbox(1, wait_event)
+
+    assert 1 in state.wait_mbx_deadlines
+    assert state.wait_mbx_deadlines[1] == pytest.approx(deadline)
+    next_deadline = state._next_wait_mailbox_deadline()
+    assert next_deadline == pytest.approx(deadline)
+    assert state.auto_event.is_set()
+
+    state.auto_event.clear()
+    state._mark_task_ready(1, {"descriptor": 9}, reason="mailbox_wake")
+    assert 1 not in state.wait_mbx_deadlines
+    assert state._next_wait_mailbox_deadline() is None
+
+
+def test_wait_mailbox_poll_not_tracked():
+    state, vm = make_task_state_env()
+    state.wait_mbx_deadlines.clear()
+    state.wait_mbx_heap.clear()
+
+    wait_event = {"descriptor": 3, "handle": 1, "timeout": 0, "deadline": None}
+    state._mark_task_wait_mailbox(1, wait_event)
+
+    assert 1 not in state.wait_mbx_deadlines
+    assert state._next_wait_mailbox_deadline() is None
 
 
 def test_task_state_mailbox_timeout_reason():

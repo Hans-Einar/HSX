@@ -283,6 +283,8 @@ class ExecutiveState:
         self.last_state_transition: Dict[int, Dict[str, Any]] = {}
         self.sleeping_heap: List[Tuple[float, int]] = []
         self.sleeping_deadlines: Dict[int, float] = {}
+        self.wait_mbx_heap: List[Tuple[float, int]] = []
+        self.wait_mbx_deadlines: Dict[int, float] = {}
         self._pending_scheduler_context: Optional[Dict[str, Any]] = None
         self.enforce_context_isolation: bool = True
 
@@ -530,6 +532,26 @@ class ExecutiveState:
     def _untrack_sleep(self, pid: int) -> None:
         self.sleeping_deadlines.pop(pid, None)
 
+    def _track_wait_mailbox(self, pid: int, deadline: Optional[Any]) -> None:
+        if deadline is None:
+            self._untrack_wait_mailbox(pid)
+            return
+        try:
+            deadline_f = float(deadline)
+        except (TypeError, ValueError):
+            self._untrack_wait_mailbox(pid)
+            return
+        previous = self.wait_mbx_deadlines.get(pid)
+        self.wait_mbx_deadlines[pid] = deadline_f
+        heapq.heappush(self.wait_mbx_heap, (deadline_f, pid))
+        if previous != deadline_f:
+            self.auto_event.set()
+
+    def _untrack_wait_mailbox(self, pid: int) -> None:
+        if pid in self.wait_mbx_deadlines:
+            self.wait_mbx_deadlines.pop(pid, None)
+            self.auto_event.set()
+
     def _advance_sleeping_tasks(self) -> None:
         now = time.monotonic()
         changed = False
@@ -567,6 +589,16 @@ class ExecutiveState:
             current = self.sleeping_deadlines.get(pid)
             if current is None or current != deadline:
                 heapq.heappop(self.sleeping_heap)
+                continue
+            return deadline
+        return None
+
+    def _next_wait_mailbox_deadline(self) -> Optional[float]:
+        while self.wait_mbx_heap:
+            deadline, pid = self.wait_mbx_heap[0]
+            current = self.wait_mbx_deadlines.get(pid)
+            if current is None or current != deadline:
+                heapq.heappop(self.wait_mbx_heap)
                 continue
             return deadline
         return None
@@ -2590,11 +2622,13 @@ class ExecutiveState:
                     task["wait_timeout"] = context.get("wait_timeout")
                 if "wait_deadline" in context:
                     task["wait_deadline"] = context.get("wait_deadline")
+                self._track_wait_mailbox(pid, context.get("wait_deadline"))
             else:
                 task.pop("wait_mailbox", None)
                 task.pop("wait_handle", None)
                 task.pop("wait_timeout", None)
                 task.pop("wait_deadline", None)
+                self._untrack_wait_mailbox(pid)
             new_states[pid] = state_entry
             current_pids.add(pid)
             bp_set = self.breakpoints.get(pid)
@@ -3452,6 +3486,7 @@ class ExecutiveState:
                 ctx['wait_deadline'] = deadline
             else:
                 ctx.pop('wait_deadline', None)
+        self._track_wait_mailbox(pid, deadline)
         details = {
             k: v
             for k, v in {
@@ -3488,6 +3523,7 @@ class ExecutiveState:
             ctx['wait_handle'] = None
             ctx['wait_timeout'] = None
             state['running'] = True
+        self._untrack_wait_mailbox(pid)
         details = {
             k: v
             for k, v in {
@@ -3619,6 +3655,12 @@ class ExecutiveState:
                 if wait_time == 0.0 or remaining < wait_time:
                     wait_time = remaining
                     throttle_reason = throttle_reason or "sleep"
+            next_mailbox_deadline = self._next_wait_mailbox_deadline()
+            if next_mailbox_deadline is not None:
+                remaining_mbx = max(0.0, next_mailbox_deadline - time.monotonic())
+                if wait_time == 0.0 or remaining_mbx < wait_time:
+                    wait_time = remaining_mbx
+                    throttle_reason = throttle_reason or "wait_mbx"
 
             if not any_tasks:
                 throttle_reason = throttle_reason or "idle"

@@ -407,7 +407,7 @@ def _parse_metadata_sections(data: bytes, header: Dict[str, Any], header_size: i
         bundle.sections.append(section_info)
     return bundle
 
-REGISTER_BANK_BYTES = 16 * 4  # 16 GPRs × 32-bit
+REGISTER_BANK_BYTES = 16 * 4  # 16 GPRs x 32-bit
 DEFAULT_STACK_BYTES = 0x1000  # 4 KiB per task (tunable)
 REGISTER_REGION_START = 0x1000  # leave lower memory for code/data
 VM_ADDRESS_SPACE_SIZE = 0x10000  # 64 KiB
@@ -2826,7 +2826,11 @@ class VMController:
             self.vm.context.wait_handle = None
             self.vm.context.wait_deadline = None
             self.vm.running = True
-        self._record_scheduler_event("wake", pid, descriptor=descriptor_id, length=length)
+        event_name = "timeout" if timed_out else "wake"
+        record_kwargs: Dict[str, Any] = {"descriptor": descriptor_id}
+        if not timed_out:
+            record_kwargs["length"] = length
+        self._record_scheduler_event(event_name, pid, **record_kwargs)
         if info_ptr:
             self._write_mailbox_recv_info(
                 pid,
@@ -4406,7 +4410,7 @@ def load_hxe(path, *, verbose: bool = False):
 
 def main():
     ap = argparse.ArgumentParser(description="HSX Python VM")
-    ap.add_argument("program", nargs="?", help=".hxe image produced by asm.py")
+    ap.add_argument("program", nargs="x", help=".hxe image produced by asm.py")
     ap.add_argument("--trace", action="store_true", help="print executed instructions")
     ap.add_argument("--trace-file", help="append trace output to a file")
     ap.add_argument("--svc-trace", action="store_true", help="log SVC invocations")

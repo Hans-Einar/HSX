@@ -35,13 +35,13 @@ This implementation plan addresses the gaps identified in the Mailbox Study docu
 - [ ] `03--ImplementationNotes.md` entry recorded (focus, status, tests, follow-ups).
 - [ ] Design document updated (or follow-up filed) if behaviour diverges.
 - [ ] `04--git.md` log updated once changes land.
-- [ ] Required review gate(s) completed (design → implementation → integration).
+- [ ] Required review gate(s) completed (design + implementation + integration).
 
 ### Review Gates
-1. **Design Review** – Confirm referenced design sections and clarifications before coding a phase.
-2. **Implementation Review** – Run after completing each phase to validate against the design.
-3. **Integration Review** – Required before exposing new mailboxes/events to Executive/Provisioning/Tooling consumers.
-4. **Comprehensive Review** – Before stress testing or packaging milestones.
+1. **Design Review** - Confirm referenced design sections and clarifications before coding a phase.
+2. **Implementation Review** - Run after completing each phase to validate against the design.
+3. **Integration Review** - Required before exposing new mailboxes/events to Executive/Provisioning/Tooling consumers.
+4. **Comprehensive Review** - Before stress testing or packaging milestones.
 
 ### Design Document Review Checklist
 - [ ] Status/opcode tables in 04.03 remain accurate.
@@ -283,22 +283,22 @@ Toolchain needs to generate .mailbox sections from application code. Enables dec
 **Design Updates Needed:** _(capture required spec edits here and action them post-implementation)_
 
 **Pre-Implementation Checklist**
-- [ ] Read design Sections 4.3 (Execution Model) and 4.7 (State Transitions).
-- [ ] Confirm scheduler expectations in 04.02--Executive.md align with Mailbox WAIT_MBX semantics.
-- [ ] Document open design questions / assumptions in `03--ImplementationNotes.md`.
+- [x] Read design Sections 4.3 (Execution Model) and 4.7 (State Transitions).
+- [x] Confirm scheduler expectations in 04.02--Executive.md align with Mailbox WAIT_MBX semantics.
+- [x] Document open design questions / assumptions in `03--ImplementationNotes.md`.
 
 **Implementation Tasks**
-- [ ] Ensure mailbox blocking transitions tasks to `WAIT_MBX` (executive + VM controller state).
-- [ ] Verify the executive state machine recognises and preserves `WAIT_MBX`.
-- [ ] Update task tracking to store wait metadata (descriptor, handle, timeout, deadline).
-- [ ] Implement mailbox wait callbacks / pending state bookkeeping for scheduler integration.
-- [ ] Add targeted tests (unit + integration) covering wait → wake → timeout flows.
-- [ ] Update documentation (`docs/executive_protocol.md`, design notes) to describe semantics.
+- [x] Ensure mailbox blocking transitions tasks to `WAIT_MBX` (executive + VM controller state).
+- [x] Verify the executive state machine recognises and preserves `WAIT_MBX`.
+- [x] Update task tracking to store wait metadata (descriptor, handle, timeout, deadline).
+- [x] Implement mailbox wait callbacks / pending state bookkeeping for scheduler integration.
+- [x] Add targeted tests (unit + integration) covering wait + wake + timeout flows.
+- [x] Update documentation (`docs/executive_protocol.md`, design notes) to describe semantics.
 
 **Post-Implementation Checklist**
-- [ ] Validate behaviour against design sections (state diagrams, wait/wake flow).
-- [ ] Update 04.03 and 04.02 design docs if behaviour changed or clarifications were required.
-- [ ] Record outcomes, tests, and follow-ups in `03--ImplementationNotes.md`.
+- [x] Validate behaviour against design sections (state diagrams, wait/wake flow).
+- [x] Update 04.03 and 04.02 design docs if behaviour changed or clarifications were required (validated: no edits needed).
+- [x] Record outcomes, tests, and follow-ups in `03--ImplementationNotes.md`.
 - [ ] Confirm review gate (implementation review) has been completed/logged.
 
 ---
@@ -313,22 +313,22 @@ Toolchain needs to generate .mailbox sections from application code. Enables dec
 **Design Updates Needed:** _TBD_
 
 **Pre-Implementation Checklist**
-- [ ] Review timeout semantics in Sections 4.4.4 and 5.1.2.
-- [ ] Cross-check Executive scheduler expectations in 04.02 (timer heap integration).
-- [ ] Capture edge cases (poll, finite, infinite) in `03--ImplementationNotes.md`.
+- [x] Review timeout semantics in Sections 4.4.4 and 5.1.2.
+- [x] Cross-check Executive scheduler expectations in 04.02 (timer heap integration).
+- [x] Capture edge cases (poll, finite, infinite) in `03--ImplementationNotes.md`.
 
 **Implementation Tasks**
-- [ ] Integrate mailbox waits with the executive timer heap (finite timeout path).
-- [ ] Ensure infinite timeouts skip heap registration.
-- [ ] Implement timeout expiry callbacks (wake task, return TIMEOUT status, emit events).
-- [ ] Add instrumentation/counters for timeouts as per design.
-- [ ] Extend tests to cover finite/infinite/poll timeout scenarios.
-- [ ] Update documentation to describe timeout scheduling behaviour.
+- [x] Integrate mailbox waits with the executive timer heap (finite timeout path).
+- [x] Ensure infinite timeouts skip heap registration.
+- [x] Implement timeout expiry callbacks (wake task, return TIMEOUT status, emit events).
+- [x] Add instrumentation/counters for timeouts as per design.
+- [x] Extend tests to cover finite/infinite/poll timeout scenarios.
+- [x] Update documentation to describe timeout scheduling behaviour.
 
 **Post-Implementation Checklist**
-- [ ] Reconcile implementation with design (deadline calculations, event payloads).
-- [ ] Update design doc if new constraints (e.g., heap capacity) are identified.
-- [ ] Record tests/results/follow-ups in `03--ImplementationNotes.md`.
+- [x] Reconcile implementation with design (deadline calculations, event payloads).
+- [x] Update design doc if new constraints (e.g., heap capacity) are identified (validated: none).
+- [x] Record tests/results/follow-ups in `03--ImplementationNotes.md`.
 - [ ] Close out the corresponding review gate.
 
 ---
@@ -349,7 +349,7 @@ Toolchain needs to generate .mailbox sections from application code. Enables dec
 
 **Implementation Tasks**
 - [ ] Ensure waiter queues preserve FIFO order per descriptor.
-- [ ] Enforce wake priority (owner → fan-out subscribers → taps).
+- [ ] Enforce wake priority (owner + fan-out subscribers + taps).
 - [ ] Add regression tests for multiple waiters, tap observers, and fairness.
 - [ ] Document wake priority and starvation guarantees.
 - [ ] Surface diagnostics (e.g., queue snapshots) to aid debugging.
@@ -470,7 +470,7 @@ Toolchain needs to generate .mailbox sections from application code. Enables dec
 **Post-Implementation Checklist**
 - [ ] Validate behaviour against design (events, recovery, status codes).
 - [ ] Update design doc if additional diagnostics or behaviours were added.
-- [ ] Record tests/results/follow-ups in `03--ImplementationNotes.md`.
+- [x] Record tests/results/follow-ups in `03--ImplementationNotes.md`.
 - [ ] Confirm review gate completion.
 
 ---
