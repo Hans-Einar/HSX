@@ -35,6 +35,17 @@ main:
 | `.half v1, …` / `.hword` | literals | Emits 16-bit values. |
 | `.word v1, …` | literals or symbol refs | Emits 32-bit values. Symbol operands may use `symbol`, `lo16(symbol)`, `hi16(symbol)`, or `off16(symbol)` to request relocations. |
 | `.asciz "text"` / `.string "text"` | string literal | Emits UTF-8 bytes followed by `0x00`. Supports standard `\n`, `\r`, `\t`, `\\`, `\0`, `\xNN` escapes. |
+| `.mailbox {…}` | JSON object/array | Declares mailbox metadata to embed in the `.mailbox` section of the final HXE. See below. |
+
+**`.mailbox` directive**
+
+The assembler accepts JSON payloads to keep the grammar compact. The payload may be a single object or an array of objects. Each object maps to one mailbox descriptor in the output metadata. Example:
+
+```mvasm
+.mailbox {"target":"app:telemetry","capacity":96,"mode_mask":15}
+```
+
+Supported keys mirror the loader schema (`target`, `capacity`, `mode_mask`, `owner_pid`, `bindings`, `reserved`). The assembler normalises `target`/`name` and otherwise preserves the payload verbatim so higher-level tooling can extend the schema without changing MVASM syntax.
 
 ## Registers and Operands
 - HSX exposes 16 general-purpose registers `R0`–`R15`.

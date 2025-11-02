@@ -23,6 +23,7 @@ def _write_object(source: str, path: Path) -> Path:
         relocs=relocs,
         exports=exports,
         local_symbols=local_symbols,
+        metadata=hsx_asm.LAST_METADATA,
     )
     return path
 

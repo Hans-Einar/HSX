@@ -36,6 +36,7 @@ def compile_to_hxo(ir: str, path: Path):
         relocs=relocs,
         exports=exports,
         local_symbols=local_symbols,
+        metadata=hsx_asm.LAST_METADATA,
     )
     return path
 

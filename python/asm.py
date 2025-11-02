@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import sys, re, struct, zlib, argparse, json, subprocess
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 MAGIC = 0x48535845  # 'HSXE'
 VERSION = 0x0001
@@ -22,6 +22,8 @@ SYMBOL_TOKEN_RE = re.compile(r"[A-Za-z_.][A-Za-z0-9_.$]*")
 EXPR_TOKEN_RE = re.compile(r"(lo16|hi16|off16)\(([^)]+)\)")
 SECTION_TEXT = "text"
 SECTION_DATA = "data"
+
+LAST_METADATA: Dict[str, Any] = {}
 
 
 def regnum(tok):
@@ -264,6 +266,7 @@ def assemble(lines, *, include_base: Path | None = None, for_object: bool = Fals
     labels = {}
     fixups = []
     relocs = []
+    metadata_mailboxes: List[Dict[str, Any]] = []
     entry_symbol = None
     externs = set()
     imports_decl = set()
@@ -359,6 +362,34 @@ def assemble(lines, *, include_base: Path | None = None, for_object: bool = Fals
             if len(parts) != 2:
                 raise ValueError(".import expects symbol")
             imports_decl.add(parts[1])
+            continue
+        if lower.startswith('.mailbox'):
+            parts = line.split(None, 1)
+            if len(parts) != 2:
+                raise ValueError(".mailbox expects JSON payload")
+            payload_str = parts[1].strip()
+            try:
+                payload = json.loads(payload_str)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"Invalid .mailbox payload: {exc}") from exc
+
+            def _normalize_mailbox(entry: Any) -> Dict[str, Any]:
+                if not isinstance(entry, dict):
+                    raise ValueError(".mailbox entry must be a JSON object")
+                normalized = dict(entry)
+                target = normalized.get("target") or normalized.get("name")
+                if not isinstance(target, str) or not target.strip():
+                    raise ValueError(".mailbox entry requires a non-empty 'target'")
+                normalized["target"] = target.strip()
+                return normalized
+
+            if isinstance(payload, list):
+                if not payload:
+                    raise ValueError(".mailbox JSON array must contain at least one entry")
+                for item in payload:
+                    metadata_mailboxes.append(_normalize_mailbox(item))
+            else:
+                metadata_mailboxes.append(_normalize_mailbox(payload))
             continue
         if lower.startswith('.entry'):
             if section != SECTION_TEXT:
@@ -691,6 +722,13 @@ def assemble(lines, *, include_base: Path | None = None, for_object: bool = Fals
         for name, info in symtab.items()
     }
 
+    metadata: Dict[str, Any] = {}
+    if metadata_mailboxes:
+        metadata["mailboxes"] = metadata_mailboxes
+
+    global LAST_METADATA
+    LAST_METADATA = json.loads(json.dumps(metadata)) if metadata else {}
+
     for sym in externs:
         if sym in labels:
             sec, offset = labels[sym]
@@ -717,7 +755,20 @@ def write_hxe(code_words, entry, out_path, rodata=b"", bss_size=0, req_caps=0, f
         f.write(rodata)
 
 
-def write_hxo_object(out_path, *, code_words, rodata, entry, entry_symbol, externs, imports_decl, relocs, exports, local_symbols):
+def write_hxo_object(
+    out_path,
+    *,
+    code_words,
+    rodata,
+    entry,
+    entry_symbol,
+    externs,
+    imports_decl,
+    relocs,
+    exports,
+    local_symbols,
+    metadata: Dict[str, Any] | None = None,
+):
     obj = {
         "version": 1,
         "entry": entry,
@@ -730,6 +781,8 @@ def write_hxo_object(out_path, *, code_words, rodata, entry, entry_symbol, exter
         "symbols": exports,
         "local_symbols": local_symbols,
     }
+    if metadata:
+        obj["metadata"] = metadata
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(obj, f, indent=2)
         f.write("\n")
@@ -755,7 +808,8 @@ def main():
         include_base=input_path.parent,
         for_object=True,
     )
-    
+    metadata = LAST_METADATA
+
     if args.emit_hxe:
         # Convenience mode: create temporary .hxo and invoke linker
         import tempfile
@@ -776,6 +830,7 @@ def main():
                 relocs=relocs,
                 exports=exports,
                 local_symbols=local_symbols,
+                metadata=metadata,
             )
             
             # Invoke linker to create .hxe from the temporary .hxo
@@ -810,6 +865,7 @@ def main():
             relocs=relocs,
             exports=exports,
             local_symbols=local_symbols,
+            metadata=metadata,
         )
     if args.verbose:
         print(f"entry=0x{(entry or 0):08X} words={len(code)} bytes={len(code)*4} rodata={len(rodata)}")

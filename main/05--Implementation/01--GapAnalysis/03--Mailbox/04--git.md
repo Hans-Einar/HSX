@@ -17,6 +17,7 @@
 | 2025-11-04 | `<pending>` | `mailbox: add resource monitoring stats` | Codex | Tests: `python -m pytest python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_exec_mailbox.py python/tests/test_shell_client.py` |
 | 2025-11-04 | `<pending>` | `mailbox: validate fan-out/tap isolation` | Codex | Tests: `python -m pytest python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_exec_mailbox.py python/tests/test_shell_client.py` |
 | 2025-11-05 | `17b643b` | `mailbox: parse .mailbox JSON metadata with legacy fallback` | Codex | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_hxe_v2_metadata.py python/tests/test_metadata_preprocess.py` |
+| 2025-11-05 | `5a47e6b` | `mailbox: precreate declarative mailboxes during load` | Codex | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_vm_stream_loader.py python/tests/test_metadata_preprocess.py python/tests/test_hxe_v2_metadata.py` |
 ## Pull Request
 - PR URL / ID: `<link or ID>`
 - Status: `<status>`

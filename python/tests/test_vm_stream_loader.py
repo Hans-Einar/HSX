@@ -1,75 +1,50 @@
 import json
-import struct
-import zlib
 from pathlib import Path
 
+from python import asm as hsx_asm
+from python import hld as hsx_linker
 from python import hsx_mailbox_constants as mbx_const
-from platforms.python.host_vm import (
-    CRC_FIELD_OFFSET,
-    HEADER_V2,
-    HSX_MAGIC,
-    HSX_VERSION_V2,
-    HXEMetadata,
-    META_ENTRY_STRUCT,
-    METADATA_SECTION_MAILBOX,
-    VMController,
-    load_hxe,
-)
+from platforms.python.host_vm import HXEMetadata, VMController, load_hxe
 
 
 SAMPLE_HXE = Path(__file__).resolve().parents[2] / "examples" / "tests" / "build" / "test_ir_half_main" / "main.hxe"
 
 
-def _pad_app_name(name: str) -> bytes:
-    raw = name.encode("ascii")
-    if len(raw) >= 32:
-        return raw[:31] + b"\x00"
-    return raw + b"\x00" + b"\x00" * (31 - len(raw))
-
-
-def _build_mailbox_hxe_bytes(mailboxes: list[dict[str, object]]) -> bytes:
-    code_bytes = bytes.fromhex("60000000")
-    rodata_bytes = b""
-    header_size = HEADER_V2.size
-    code_offset = header_size
-    ro_offset = code_offset + len(code_bytes)
-    table_offset = ro_offset + len(rodata_bytes)
-    meta_entries = len(mailboxes)
-    meta_table_size = META_ENTRY_STRUCT.size
-    section_offset = table_offset + meta_table_size
-    payload = json.dumps({"version": 1, "mailboxes": mailboxes}).encode("utf-8")
-    total_size = section_offset + len(payload)
-    image = bytearray(total_size)
-    header_tuple = (
-        HSX_MAGIC,
-        HSX_VERSION_V2,
-        0,  # flags
-        0,  # entry
-        len(code_bytes),
-        len(rodata_bytes),
-        0,  # bss_size
-        0,  # req_caps
-        0,  # crc placeholder
-        _pad_app_name("mailbox_demo"),
-        table_offset,
-        1 if meta_entries else 0,
-        b"\x00" * 24,
+def _build_mailbox_hxe_bytes(tmp_path: Path, mailbox_entry: dict[str, object]) -> bytes:
+    lines = [
+        ".text",
+        ".entry",
+        "BRK",
+        f".mailbox {json.dumps(mailbox_entry)}",
+    ]
+    (
+        code,
+        entry,
+        externs,
+        imports_decl,
+        rodata,
+        relocs,
+        exports,
+        entry_symbol,
+        local_symbols,
+    ) = hsx_asm.assemble(lines, for_object=True)
+    hxo_path = tmp_path / "mailbox.hxo"
+    hsx_asm.write_hxo_object(
+        hxo_path,
+        code_words=code,
+        rodata=rodata,
+        entry=entry or 0,
+        entry_symbol=entry_symbol,
+        externs=externs,
+        imports_decl=imports_decl,
+        relocs=relocs,
+        exports=exports,
+        local_symbols=local_symbols,
+        metadata=hsx_asm.LAST_METADATA,
     )
-    image[:header_size] = HEADER_V2.pack(*header_tuple)
-    image[code_offset:code_offset + len(code_bytes)] = code_bytes
-    if meta_entries:
-        meta_entry = META_ENTRY_STRUCT.pack(
-            METADATA_SECTION_MAILBOX,
-            section_offset,
-            len(payload),
-            meta_entries,
-        )
-        image[table_offset:table_offset + META_ENTRY_STRUCT.size] = meta_entry
-        image[section_offset:section_offset + len(payload)] = payload
-    crc_input = image[:CRC_FIELD_OFFSET] + image[header_size:]
-    crc = zlib.crc32(crc_input) & 0xFFFFFFFF
-    struct.pack_into(">I", image, CRC_FIELD_OFFSET, crc)
-    return bytes(image)
+    hxe_path = tmp_path / "mailbox.hxe"
+    hsx_linker.link_objects([hxo_path], hxe_path)
+    return hxe_path.read_bytes()
 
 
 def _stream_load(controller: VMController, data: bytes, *, label: str | None = None):
@@ -114,15 +89,14 @@ def test_streaming_loader_round_trip():
         controller.vm.step()
 
 
-def test_streaming_loader_precreates_mailboxes():
+def test_streaming_loader_precreates_mailboxes(tmp_path):
     image = _build_mailbox_hxe_bytes(
-        [
-            {
-                "target": "app:telemetry",
-                "capacity": 96,
-                "mode_mask": mbx_const.HSX_MBX_MODE_FANOUT | mbx_const.HSX_MBX_MODE_RDWR,
-            }
-        ]
+        tmp_path,
+        {
+            "target": "app:telemetry",
+            "capacity": 96,
+            "mode_mask": mbx_const.HSX_MBX_MODE_FANOUT | mbx_const.HSX_MBX_MODE_RDWR,
+        },
     )
     controller = VMController()
     pid, result = _stream_load(controller, image, label="mailbox_meta")
@@ -172,3 +146,4 @@ def test_streaming_loader_requires_complete_image():
     assert result["status"] == "error"
     controller.load_stream_abort(pid)
     assert pid not in controller.streaming_sessions
+
