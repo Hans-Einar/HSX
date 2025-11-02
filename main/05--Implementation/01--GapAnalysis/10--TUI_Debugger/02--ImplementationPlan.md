@@ -107,6 +107,23 @@ Integrate debugger core session and event subscription. Connects TUI to executiv
 
 ## Phase 2: Core Panel Implementation
 
+### 2.0 Task List Metadata
+
+**Priority:** MEDIUM  
+**Dependencies:** Executive Phase 3.3 (app naming), CLI Debugger Phase 1.x
+**Estimated Effort:** 2 days
+
+**Rationale:**  
+Mirror CLI capabilities by displaying app names and metadata presence in the TUI task list so users can quickly identify instances and declarative resources.
+
+**Todo:**
+> Reference: [Implementation Notes](../02--Executive/03--ImplementationNotes.md) | [Design 04.10--TUI_Debugger.md](../../../04--Design/04.10--TUI_Debugger.md)
+- [ ] Show app instance names in task list panel
+- [ ] Provide metadata badges (values/commands/mailboxes) when counts > 0
+- [ ] Add tooltip/details view for metadata summary
+- [ ] Update layout to accommodate metadata columns without overcrowding
+- [ ] Add tests once executive metadata summary stabilises and CLI behaviour anchors expectations
+
 ### 2.1 Registers Panel
 
 **Priority:** HIGH  

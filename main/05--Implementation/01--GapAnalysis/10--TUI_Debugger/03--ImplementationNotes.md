@@ -21,3 +21,5 @@ Use this file to record progress per session.
 ```
 
 Start new sections chronologically. Keep notes concise but actionable so the next agent can resume quickly.
+## 2025-11-02 - Codex Note
+- Align TUI task list with executive metadata (app names + summary counts) once Phase 2.0 Task List Metadata lands; reuse CLI formatting so panels highlight declarative resources consistently.

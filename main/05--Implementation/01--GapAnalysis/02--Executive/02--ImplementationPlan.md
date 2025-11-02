@@ -374,13 +374,13 @@ Design specifies explicit READY/RUNNING/WAIT_MBX/SLEEPING/PAUSED/RETURNED states
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
-- [ ] Define TaskState enum: READY, RUNNING, WAIT_MBX, SLEEPING, PAUSED, RETURNED, KILLED
-- [ ] Document state transition diagram
-- [ ] Refactor existing task state tracking to use TaskState enum
-- [ ] Implement state transition validation (only allow valid transitions)
-- [ ] Add state entry/exit hooks for debugging
-- [ ] Add state machine tests (all transitions, invalid transitions)
-- [ ] Document state machine in design docs
+- [x] Define TaskState enum: READY, RUNNING, WAIT_MBX, SLEEPING, PAUSED, RETURNED, KILLED
+- [x] Document state transition diagram
+- [x] Refactor existing task state tracking to use TaskState enum
+- [x] Implement state transition validation (only allow valid transitions)
+- [x] Add state entry/exit hooks for debugging
+- [x] Add state machine tests (all transitions, invalid transitions)
+- [x] Document state machine in design docs
 
 ---
 

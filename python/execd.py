@@ -31,12 +31,119 @@ import sys
 import uuid
 from collections import deque
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, Optional, List, Iterable, Deque, Set, Tuple
 
 
 class SessionError(RuntimeError):
     """Raised when session validation or locking fails."""
+
+
+class TaskState(Enum):
+    READY = "ready"
+    RUNNING = "running"
+    WAIT_MBX = "waiting_mbx"
+    SLEEPING = "sleeping"
+    PAUSED = "paused"
+    RETURNED = "returned"
+    TERMINATED = "terminated"
+    KILLED = "killed"
+
+    @classmethod
+    def from_any(cls, value: Any) -> "TaskState":
+        if isinstance(value, TaskState):
+            return value
+        if value is None:
+            raise ValueError("task_state_none")
+        if isinstance(value, str):
+            key = value.lower()
+            alias = _TASK_STATE_ALIASES.get(key)
+            if alias is not None:
+                return alias
+        raise ValueError(f"unknown_task_state:{value}")
+
+
+_TASK_STATE_ALIASES = {
+    state.value: state for state in TaskState
+}
+_TASK_STATE_ALIASES.update(
+    {
+        "wait_mbx": TaskState.WAIT_MBX,
+        "waiting": TaskState.WAIT_MBX,
+        "sleep": TaskState.SLEEPING,
+        "sleeping": TaskState.SLEEPING,
+        "returning": TaskState.RETURNED,
+        "returned": TaskState.RETURNED,
+        "exited": TaskState.RETURNED,
+        "exit": TaskState.RETURNED,
+        "stopped": TaskState.PAUSED,
+        "dead": TaskState.TERMINATED,
+    }
+)
+
+_ALLOWED_STATE_TRANSITIONS: Dict[Optional[TaskState], Set[TaskState]] = {
+    None: {
+        TaskState.READY,
+        TaskState.RUNNING,
+        TaskState.RETURNED,
+        TaskState.TERMINATED,
+        TaskState.PAUSED,
+    },
+    TaskState.READY: {
+        TaskState.READY,
+        TaskState.RUNNING,
+        TaskState.WAIT_MBX,
+        TaskState.SLEEPING,
+        TaskState.PAUSED,
+        TaskState.TERMINATED,
+        TaskState.KILLED,
+    },
+    TaskState.RUNNING: {
+        TaskState.RUNNING,
+        TaskState.READY,
+        TaskState.WAIT_MBX,
+        TaskState.SLEEPING,
+        TaskState.PAUSED,
+        TaskState.RETURNED,
+        TaskState.TERMINATED,
+        TaskState.KILLED,
+    },
+    TaskState.WAIT_MBX: {
+        TaskState.WAIT_MBX,
+        TaskState.READY,
+        TaskState.RUNNING,
+        TaskState.PAUSED,
+        TaskState.TERMINATED,
+        TaskState.KILLED,
+    },
+    TaskState.SLEEPING: {
+        TaskState.SLEEPING,
+        TaskState.READY,
+        TaskState.RUNNING,
+        TaskState.PAUSED,
+        TaskState.TERMINATED,
+        TaskState.KILLED,
+    },
+    TaskState.PAUSED: {
+        TaskState.PAUSED,
+        TaskState.READY,
+        TaskState.RUNNING,
+        TaskState.TERMINATED,
+        TaskState.KILLED,
+    },
+    TaskState.RETURNED: {
+        TaskState.RETURNED,
+        TaskState.TERMINATED,
+        TaskState.KILLED,
+    },
+    TaskState.TERMINATED: {
+        TaskState.TERMINATED,
+    },
+    TaskState.KILLED: {
+        TaskState.KILLED,
+    },
+}
 
 
 @dataclass
@@ -160,6 +267,7 @@ class ExecutiveState:
         self.trace_track_changed_regs = True
         self.symbol_cache_lock = threading.RLock()
         self.default_stack_frames = 16
+        self.last_state_transition: Dict[int, Dict[str, Any]] = {}
 
     def _register_metadata(self, pid: int, metadata: Dict[str, Any]) -> None:
         if not metadata:
@@ -327,6 +435,23 @@ class ExecutiveState:
             pids.append(pid_int)
         # ensure deterministic order and uniqueness
         return sorted(set(pids))
+
+    def _coerce_task_state(self, value: Any, *, allow_none: bool = False) -> Optional[TaskState]:
+        if value is None and allow_none:
+            return None
+        return TaskState.from_any(value)
+
+    def _validate_state_transition(self, pid: int, previous: Optional[TaskState], new: TaskState) -> None:
+        allowed = _ALLOWED_STATE_TRANSITIONS.get(previous, set())
+        if new not in allowed:
+            raise ValueError(f"invalid_state_transition:{previous}->{new}:pid={pid}")
+
+    def _record_state_transition(self, pid: int, previous: Optional[TaskState], new: TaskState) -> None:
+        self.last_state_transition[pid] = {
+            "from": previous.value if isinstance(previous, TaskState) else None,
+            "to": new.value,
+            "ts": time.time(),
+        }
 
     def _session_payload(self, session: SessionRecord) -> Dict[str, Any]:
         if not session.pid_locks:
@@ -2018,16 +2143,33 @@ class ExecutiveState:
             if "trace" in task:
                 context["trace"] = task.get("trace")
             prev_state = state_entry.get("state")
+            prev_state_enum = state_entry.get("state_enum")
+            if not isinstance(prev_state_enum, TaskState):
+                try:
+                    prev_state_enum = self._coerce_task_state(prev_state, allow_none=True)
+                except ValueError:
+                    prev_state_enum = None
             prev_sleep = bool(state_entry.get("sleep_pending"))
             new_state_value = task.get("state")
             if new_state_value is None:
-                new_state = context.get("state") or prev_state
+                new_state_str = context.get("state") or prev_state
             else:
-                new_state = str(new_state_value)
+                new_state_str = str(new_state_value)
+            try:
+                new_state_enum = self._coerce_task_state(new_state_str)
+            except ValueError as exc:
+                raise ValueError(f"task_state_invalid:{new_state_str}:pid={pid}") from exc
+            self._validate_state_transition(pid, prev_state_enum, new_state_enum)
+            if new_state_enum != prev_state_enum:
+                self._record_state_transition(pid, prev_state_enum, new_state_enum)
+            new_state = new_state_enum.value
             state_entry["state"] = new_state
+            state_entry["state_enum"] = new_state_enum
             sleep_flag = bool(task.get("sleep_pending"))
             state_entry["sleep_pending"] = sleep_flag
             state_entry["context"] = context
+            context["state"] = new_state
+            task["state"] = new_state
             new_states[pid] = state_entry
             current_pids.add(pid)
             bp_set = self.breakpoints.get(pid)
