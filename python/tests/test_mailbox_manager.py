@@ -192,6 +192,8 @@ def test_resource_stats_initial_state():
     assert stats["active_descriptors"] == 0
     assert stats["handles_total"] == 0
     assert stats["handles_per_pid"] == {}
+    assert stats["tap_count"] == 0
+    assert stats["tap_queue_depth"] == 0
 
 
 def test_resource_stats_with_handles_and_messages():
@@ -206,6 +208,8 @@ def test_resource_stats_with_handles_and_messages():
     assert stats["handles_per_pid"].get(1) >= 1
     assert stats["bytes_used"] >= len("ping")
     assert stats["queue_depth"] >= 1
+    assert stats["tap_count"] == 0
+    assert stats["tap_queue_depth"] == 0
 
 
 
@@ -239,6 +243,23 @@ def test_fanout_reclaims_after_all_consumers_ack():
     assert msg_b is not None and msg_b.payload == b"data"
     desc_obj = mgr.descriptor_by_id(descriptor_id)
     assert len(desc_obj.queue) == 0
+
+
+def test_tap_receives_copy_without_blocking_owner():
+    mgr = MailboxManager()
+    desc = mgr.bind(namespace=mbx_const.HSX_MBX_NAMESPACE_SHARED, name="tap_demo", capacity=64, mode_mask=mbx_const.HSX_MBX_MODE_RDWR)
+    owner = mgr.open(pid=1, target="shared:tap_demo")
+    tap_handle = mgr.open(pid=2, target="shared:tap_demo")
+    mgr.tap(pid=2, handle=tap_handle, enable=True)
+
+    ok, descriptor_id = mgr.send(pid=1, handle=owner, payload=b"hello")
+    assert ok is True
+    owner_msg = mgr.recv(pid=1, handle=owner)
+    assert owner_msg is not None and owner_msg.payload == b"hello"
+
+    tap_msg = mgr.recv(pid=2, handle=tap_handle)
+    assert tap_msg is not None and tap_msg.payload == b"hello"
+    assert not (tap_msg.flags & mbx_const.HSX_MBX_FLAG_OVERRUN)
 
 
 def test_fanout_overrun_sets_flag_and_triggers_event():

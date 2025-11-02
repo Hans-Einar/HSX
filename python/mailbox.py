@@ -60,6 +60,8 @@ class HandleState:
     last_seq: int = -1
     pending_overrun: bool = False
     is_sender: bool = False
+    is_tap: bool = False
+    pending_tap_overrun: bool = False
 
 
 @dataclass
@@ -73,12 +75,19 @@ class MailboxDescriptor:
     queue: Deque[MailboxMessage] = field(default_factory=collections.deque)
     bytes_used: int = 0
     waiters: List[int] = field(default_factory=list)
-    taps: List[int] = field(default_factory=list)
+    taps: List[Tuple[int, int]] = field(default_factory=list)
+    tap_buffers: Dict[Tuple[int, int], "TapBuffer"] = field(default_factory=dict)
     head_seq: int = 0
     next_seq: int = 0
 
     def space_remaining(self) -> int:
         return max(self.capacity - self.bytes_used, 0)
+
+
+@dataclass
+class TapBuffer:
+    queue: Deque[MailboxMessage] = field(default_factory=collections.deque)
+    bytes_used: int = 0
 
 
 class MailboxManager:
@@ -247,6 +256,10 @@ class MailboxManager:
         state = table.pop(handle)
         desc = self._descriptors.get(state.descriptor_id)
         if desc is not None:
+            if state.is_tap:
+                key = (pid, handle)
+                desc.tap_buffers.pop(key, None)
+                desc.taps = [entry for entry in desc.taps if entry != key]
             self._reclaim_acked(desc)
 
     def descriptor_for_handle(self, pid: int, handle: int) -> MailboxDescriptor:
@@ -306,6 +319,8 @@ class MailboxManager:
                 trace_fp.write(f"[MailboxManager] recv pid={pid} handle={handle} descriptor={desc.descriptor_id} depth={len(desc.queue)}\n")
         except OSError:
             pass
+        if state.is_tap:
+            return self._tap_recv(desc, state, pid, handle)
         if fanout_enabled:
             self._reclaim_acked(desc)
             next_msg = self._next_message_for_handle(desc, state)
@@ -366,13 +381,19 @@ class MailboxManager:
 
     def tap(self, *, pid: int, handle: int, enable: bool) -> None:
         desc = self.descriptor_for_handle(pid, handle)
-        taps = desc.taps
+        state = self._handle_state(pid, handle)
+        key = (pid, handle)
         if enable:
-            if pid not in taps:
-                taps.append(pid)
+            if key not in desc.taps:
+                desc.taps.append(key)
+            desc.tap_buffers.setdefault(key, TapBuffer())
+            state.is_tap = True
         else:
-            if pid in taps:
-                taps.remove(pid)
+            if key in desc.taps:
+                desc.taps = [entry for entry in desc.taps if entry != key]
+            desc.tap_buffers.pop(key, None)
+            state.is_tap = False
+            state.pending_tap_overrun = False
 
     def iter_waiters(self, descriptor_id: int) -> Iterable[int]:
         desc = self._descriptors.get(descriptor_id)
@@ -438,6 +459,11 @@ class MailboxManager:
     def descriptor_snapshot(self) -> List[Dict[str, object]]:
         out: List[Dict[str, object]] = []
         for desc in self._descriptors.values():
+            tap_infos: List[Dict[str, int]] = []
+            for pid, handle in desc.taps:
+                buffer = desc.tap_buffers.get((pid, handle))
+                depth = len(buffer.queue) if buffer is not None else 0
+                tap_infos.append({"pid": pid, "handle": handle, "depth": depth})
             out.append(
                 {
                     "descriptor_id": desc.descriptor_id,
@@ -450,9 +476,8 @@ class MailboxManager:
                     "head_seq": desc.head_seq,
                     "next_seq": desc.next_seq,
                     "mode_mask": desc.mode_mask,
-                    "subscriber_count": sum(1 for _ in self._iter_handle_states(desc.descriptor_id)),
                     "waiters": list(desc.waiters),
-                    "taps": list(desc.taps),
+                    "taps": tap_infos,
                 }
             )
         return sorted(out, key=lambda item: item["descriptor_id"])
@@ -466,6 +491,7 @@ class MailboxManager:
         handles_per_pid = {pid: len(handles) for pid, handles in self._handles.items()}
         total_handles = sum(handles_per_pid.values())
         tap_total = sum(len(desc.taps) for desc in descriptors)
+        tap_queue_depth = sum(len(buffer.queue) for desc in descriptors for buffer in desc.tap_buffers.values())
         wait_total = sum(len(desc.waiters) for desc in descriptors)
         fanout_descriptors = sum(1 for desc in descriptors if desc.mode_mask & HSX_MBX_MODE_FANOUT)
         return {
@@ -479,6 +505,7 @@ class MailboxManager:
             "handles_total": total_handles,
             "handles_per_pid": handles_per_pid,
             "tap_count": tap_total,
+            "tap_queue_depth": tap_queue_depth,
             "waiter_count": wait_total,
             "fanout_descriptors": fanout_descriptors,
         }
@@ -566,6 +593,7 @@ class MailboxManager:
             if cost > desc.space_remaining():
                 return False
             self._append_message(desc, message, cost)
+            self._deliver_to_taps(desc, message)
             return True
 
         self._reclaim_acked(desc)
@@ -591,6 +619,7 @@ class MailboxManager:
         if cost > desc.space_remaining():
             return False
         self._append_message(desc, message, cost)
+        self._deliver_to_taps(desc, message)
         return True
 
     def _append_message(self, desc: MailboxDescriptor, message: MailboxMessage, cost: int) -> None:
@@ -600,6 +629,47 @@ class MailboxManager:
         desc.next_seq = message.seq_no + 1
         if was_empty:
             desc.head_seq = message.seq_no
+
+    def _deliver_to_taps(self, desc: MailboxDescriptor, message: MailboxMessage) -> None:
+        if not desc.taps:
+            return
+        cost = _message_cost(message)
+        for tap_pid, tap_handle in list(desc.taps):
+            buffer = desc.tap_buffers.setdefault((tap_pid, tap_handle), TapBuffer())
+            state = self._handles.get(tap_pid, {}).get(tap_handle)
+            if state is None or not state.is_tap:
+                continue
+            if cost > desc.capacity:
+                state.pending_tap_overrun = True
+                continue
+            while buffer.bytes_used + cost > desc.capacity and buffer.queue:
+                old = buffer.queue.popleft()
+                buffer.bytes_used = max(buffer.bytes_used - _message_cost(old), 0)
+                state.pending_tap_overrun = True
+            if buffer.bytes_used + cost > desc.capacity:
+                state.pending_tap_overrun = True
+                continue
+            buffer.queue.append(message)
+            buffer.bytes_used += cost
+
+    def _tap_recv(self, desc: MailboxDescriptor, state: HandleState, pid: int, handle: int) -> Optional[MailboxMessage]:
+        buffer = desc.tap_buffers.get((pid, handle))
+        if buffer is None or not buffer.queue:
+            return None
+        message = buffer.queue.popleft()
+        buffer.bytes_used = max(buffer.bytes_used - _message_cost(message), 0)
+        flags = message.flags
+        if state.pending_tap_overrun:
+            flags |= mbx_const.HSX_MBX_FLAG_OVERRUN
+            state.pending_tap_overrun = False
+        return MailboxMessage(
+            length=message.length,
+            flags=flags,
+            src_pid=message.src_pid,
+            channel=message.channel,
+            payload=message.payload,
+            seq_no=message.seq_no,
+        )
 
     def _pop_head(self, desc: MailboxDescriptor) -> Optional[MailboxMessage]:
         if not desc.queue:

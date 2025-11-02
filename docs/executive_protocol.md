@@ -124,7 +124,7 @@ Clients are encouraged to reuse TCP connections and throttle polling (`info`,
 - The `load` response contains an `image.metadata` object for v2 images. The executive currently reports the number of sections and pre-registered resources (`values`, `commands`, `mailboxes`).
 - `ps`/`info` task entries echo the resolved `app_name` and include a lightweight `metadata` summary when declarative resources were present. These counts reflect the registries active inside the executive after preprocessing and can be used by debugger clients to decide whether to query additional detail.
 - Declarative mailboxes are bound during load via the existing mailbox manager, so subsequent mailbox RPCs (`mailbox_snapshot`, `mailbox_bind`, etc.) treat metadata-driven mailboxes exactly like runtime-created instances.
-- `mailbox_snapshot` responses include a `stats` object summarising descriptor usage (active vs. maximum), memory footprint (bytes used/available), aggregate queue depth, and per-PID handle counts alongside the per-descriptor list.
+- `mailbox_snapshot` responses include a `stats` object summarising descriptor usage (active vs. maximum), memory footprint (bytes used/available), aggregate queue depth, tap backlog, and per-PID handle counts alongside the per-descriptor list.
 
 Debugger Sessions & Event Streaming
 -----------------------------------

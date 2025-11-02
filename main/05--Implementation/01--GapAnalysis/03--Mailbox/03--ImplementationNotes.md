@@ -90,7 +90,8 @@ Start new sections chronologically. Keep notes concise but actionable so the nex
 
 ### Details
 - Summary of code changes / key decisions:
-  - Added esource_stats() on the mailbox manager and exposed aggregated metrics (capacity, handles, queue depth) through VM/Executive RPC and shell output.
+  - Added 
+esource_stats() on the mailbox manager and exposed aggregated metrics (capacity, handles, queue depth) through VM/Executive RPC and shell output.
   - Extended mailbox snapshots with stats, updated shell formatting, and refreshed protocol docs.
   - Added pytest coverage for stats reporting across manager/unit/integration layers.
 - Tests run (commands + result):
@@ -101,7 +102,7 @@ Start new sections chronologically. Keep notes concise but actionable so the nex
 ## 2025-11-04 - Codex (Session 5)
 
 ### Focus
-- Task(s) tackled: Phase 1.5 fan-out reclamation validation (ack cleanup, overrun signalling).
+- Task(s) tackled: Phase 1.5 fan-out reclamation and tap isolation validation (ack cleanup, overrun signalling, non-blocking taps).
 - Dependencies touched: `python/mailbox.py`, unit tests.
 
 ### Status
@@ -109,7 +110,7 @@ Start new sections chronologically. Keep notes concise but actionable so the nex
 
 ### Details
 - Summary of code changes / key decisions:
-  - Added targeted mailbox manager tests to verify fan-out queues reclaim once all readers acknowledge and drops raise overrun flags/events.
+  - Added targeted mailbox manager tests ensuring fan-out queues reclaim once all readers acknowledge and taps receive best-effort copies without blocking owners.
   - Leveraged existing event hook to assert `mailbox_overrun` emission during drop scenarios.
 - Tests run (commands + result):
   - `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_exec_mailbox.py python/tests/test_shell_client.py` (pass).

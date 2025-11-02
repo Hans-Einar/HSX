@@ -123,13 +123,13 @@ Design specifies messages acknowledged by all readers are removed (section 4.4.2
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.03--Mailbox](../../../04--Design/04.03--Mailbox.md)
-- [ ] Review fan-out reclamation algorithm implementation
-- [ ] Verify message cleanup when all readers acknowledge
-- [ ] Add test for fan-out with multiple readers (verify reclamation)
-- [ ] Add test for reader with lagging `last_seq` (verify messages retained)
-- [ ] Add test for all readers catching up (verify cleanup)
-- [ ] Document fan-out reclamation algorithm
-- [ ] Add memory leak tests for fan-out scenarios
+- [x] Review fan-out reclamation algorithm implementation
+- [x] Verify message cleanup when all readers acknowledge
+- [x] Add test for fan-out with multiple readers (verify reclamation)
+- [x] Add test for reader with lagging `last_seq` (verify messages retained)
+- [x] Add test for all readers catching up (verify cleanup)
+- [x] Document fan-out reclamation algorithm
+- [x] Add memory leak tests for fan-out scenarios
 
 ---
 
@@ -144,13 +144,13 @@ Design states taps should not block descriptor owner (sections 4.4.3, 6). System
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.03--Mailbox](../../../04--Design/04.03--Mailbox.md)
-- [ ] Review tap implementation for blocking behavior
-- [ ] Verify taps use drop-on-overflow policy
-- [ ] Verify taps don't block owner sends
-- [ ] Add test for tap with slow consumer (verify drops, no blocking)
-- [ ] Add test for tap with fast consumer (verify receives all)
-- [ ] Add tap isolation tests (owner unaffected by tap state)
-- [ ] Document tap isolation guarantees
+- [x] Review tap implementation for blocking behavior
+- [x] Verify taps use drop-on-overflow policy
+- [x] Verify taps don't block owner sends
+- [x] Add test for tap with slow consumer (verify drops, no blocking)
+- [x] Add test for tap with fast consumer (verify receives all)
+- [x] Add tap isolation tests (owner unaffected by tap state)
+- [x] Document tap isolation guarantees
 
 ---
 

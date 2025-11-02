@@ -16,6 +16,7 @@
 | 2025-11-04 | `<pending>` | `mailbox: emit structured mailbox events` | Codex | Tests: `python -m pytest python/tests/test_mailbox_constants.py python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_mailbox_wait.py` |
 | 2025-11-04 | `<pending>` | `mailbox: add resource monitoring stats` | Codex | Tests: `python -m pytest python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_exec_mailbox.py python/tests/test_shell_client.py` |
 
+| 2025-11-04 | `<pending>` | `mailbox: validate fan-out/tap isolation` | Codex | Tests: `python -m pytest python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_exec_mailbox.py python/tests/test_shell_client.py` |
 ## Pull Request
 - PR URL / ID: `<link or ID>`
 - Status: `<status>`

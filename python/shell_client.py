@@ -1380,6 +1380,12 @@ def _pretty_mbox(payload: dict) -> None:
             print(f"    queue depth : {queue_depth}")
         if total_handles is not None:
             print(f"    handles     : {total_handles}")
+        tap_count = stats.get("tap_count")
+        if tap_count is not None:
+            print(f"    taps        : {tap_count}")
+        tap_backlog = stats.get("tap_queue_depth")
+        if tap_backlog:
+            print(f"    tap backlog : {tap_backlog}")
         handles_per_pid = stats.get("handles_per_pid") or {}
         if handles_per_pid:
             formatted = ", ".join(f"{pid}:{count}" for pid, count in sorted(handles_per_pid.items()))
