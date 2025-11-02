@@ -76,17 +76,17 @@ Design specifies structured events for debugger/tooling (sections 5.2, 8). Syste
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.03--Mailbox](../../../04--Design/04.03--Mailbox.md)
-- [ ] Define mailbox event types: mailbox_send, mailbox_recv, mailbox_wait, mailbox_wake, mailbox_timeout, mailbox_overrun
-- [ ] Define event schema for each type (seq, ts, pid, descriptor, handle, size, etc.)
-- [ ] Integrate with executive event streaming (emit_event calls)
-- [ ] Emit mailbox_send event on successful send
-- [ ] Emit mailbox_recv event on successful receive
-- [ ] Emit mailbox_wait event when task blocks on mailbox
-- [ ] Emit mailbox_wake event when task unblocks from mailbox
-- [ ] Emit mailbox_timeout event when mailbox operation times out
-- [ ] Emit mailbox_overrun event when messages dropped (fan-out, tap)
-- [ ] Add event emission tests (verify events generated correctly)
-- [ ] Document mailbox event schema in `docs/executive_protocol.md`
+- [x] Define mailbox event types: mailbox_send, mailbox_recv, mailbox_wait, mailbox_wake, mailbox_timeout, mailbox_overrun
+- [x] Define event schema for each type (seq, ts, pid, descriptor, handle, size, etc.)
+- [x] Integrate with executive event streaming (emit_event calls)
+- [x] Emit mailbox_send event on successful send
+- [x] Emit mailbox_recv event on successful receive
+- [x] Emit mailbox_wait event when task blocks on mailbox
+- [x] Emit mailbox_wake event when task unblocks from mailbox
+- [x] Emit mailbox_timeout event when mailbox operation times out
+- [x] Emit mailbox_overrun event when messages dropped (fan-out, tap)
+- [x] Add event emission tests (verify events generated correctly)
+- [x] Document mailbox event schema in `docs/executive_protocol.md`
 
 ---
 

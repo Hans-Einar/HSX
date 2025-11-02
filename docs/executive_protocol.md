@@ -392,7 +392,13 @@ Typical payloads:
 - `trace_step`: `{ "pc": <uint32>, "next_pc": <uint32>, "opcode": <string>, "flags": <string?>, "regs": [<uint32> x16], "steps": <uint64?>, "changed_regs": ["R0", "PSW"]?, "mem_access": { "op": "read|write", "address": <uint32>, "width": <uint16?>, "value": <uint32?> }? }`
 - `debug_break`: `{ "pc": <uint32>, "reason": "BRK" | "virtual", "breakpoint_id": <int?> }`
 - `scheduler`: `{ "state": "switch", "prev_pid": <int>, "next_pid": <int?>, "reason": "quantum_expired|sleep|wait_mbx|paused|killed", "quantum_remaining": <int?>, "prev_state": <string?>, "post_state": <string?>, "next_state": <string?>, "executed": <int?>, "source": "auto|manual", "details": { ... }? }`
-- `mailbox_send` / `mailbox_recv`: `{ "descriptor": <int>, "length": <int>, "flags": <uint16>, "channel": <uint16> }`
+- `mailbox_send`: `{ "descriptor": <int>, "handle": <int>, "length": <int>, "flags": <uint16>, "channel": <uint16>, "src_pid": <int> }`
+- `mailbox_recv`: `{ "descriptor": <int>, "handle": <int>, "length": <int>, "flags": <uint16>, "channel": <uint16>, "src_pid": <int> }`
+- `mailbox_wait`: `{ "descriptor": <int>, "handle": <int>, "timeout": <uint16> }`
+- `mailbox_wake`: `{ "descriptor": <int>, "handle": <int>, "status": <uint16>, "length": <int>, "flags": <uint16>, "channel": <uint16>, "src_pid": <int> }`
+- `mailbox_timeout`: `{ "descriptor": <int>, "handle": <int>, "status": <uint16>, "length": <int>, "flags": <uint16>, "channel": <uint16>, "src_pid": <int> }`
+- `mailbox_overrun`: `{ "descriptor": <int>, "pid": <int>, "dropped_seq": <int>, "dropped_length": <int>, "dropped_flags": <uint16>, "channel": <uint16>, "reason": <string>, "queue_depth": <int> }`
+- `mailbox_error`: `{ "fn": <int>, "error": <string>, "status": <uint16?> }`
 - `watch_update`: `{ "watch_id": <string>, "value": <string>, "formatted": <string?> }`
 - `stdout` / `stderr`: `{ "text": <string> }`
 - `warning`: `{ "message": <string>, "category": <string> }`

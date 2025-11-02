@@ -611,7 +611,10 @@ class MiniVM:
         self.pending_events: List[Dict[str, Any]] = []
         self.attached = False
         self.trace_out = trace_file
-        self.mailboxes = mailboxes or MailboxManager()
+        if mailboxes is None:
+            self.mailboxes = MailboxManager(event_hook=lambda event, vm=self: vm.emit_event(event))
+        else:
+            self.mailboxes = mailboxes
         self._mailbox_handler: Optional[Callable[[int], None]] = mailbox_handler
         self.pid: Optional[int] = None
         self.call_stack: List[int] = []
@@ -1679,9 +1682,11 @@ class MiniVM:
                                 "type": "mailbox_send",
                                 "pid": self.pid or 0,
                                 "descriptor": descriptor_id,
+                                "handle": mailbox_handle,
                                 "length": len(buf),
                                 "flags": flags,
                                 "channel": 0,
+                                "src_pid": self.pid or 0,
                             }
                         )
                     return
@@ -1812,7 +1817,8 @@ class VMController:
         self.restart_requested: bool = False
         self.restart_targets: Optional[List[str]] = None
         self.server: Optional["VMServer"] = None
-        self.mailboxes = MailboxManager()
+        self._pending_mailbox_events: List[Dict[str, Any]] = []
+        self.mailboxes = self._create_mailbox_manager()
         self.waiting_tasks: Dict[int, Dict[str, Any]] = {}
         self.default_trace = trace
         self.traced_pids: Set[int] = set()
@@ -1826,6 +1832,30 @@ class VMController:
         self.scheduler_counters: Dict[int, Dict[str, int]] = defaultdict(dict)
         self.streaming_sessions: Dict[int, Dict[str, Any]] = {}
         self.metadata_by_pid: Dict[int, HXEMetadata] = {}
+
+    def _create_mailbox_manager(self) -> MailboxManager:
+        mgr = MailboxManager(event_hook=self._handle_mailbox_manager_event)
+        return mgr
+
+    def _handle_mailbox_manager_event(self, event: Dict[str, Any]) -> None:
+        if not isinstance(event, dict):
+            return
+        vm = self.vm
+        if vm is not None:
+            vm.emit_event(dict(event))
+        else:
+            self._pending_mailbox_events.append(dict(event))
+
+    def _flush_pending_mailbox_events(self) -> None:
+        if not self._pending_mailbox_events:
+            return
+        vm = self.vm
+        if vm is None:
+            return
+        pending = self._pending_mailbox_events
+        self._pending_mailbox_events = []
+        for event in pending:
+            vm.emit_event(dict(event))
 
     def _trace_mailbox_regs(self, label: str, vm: MiniVM, fn: int, *, extra: Optional[Dict[str, Any]] = None) -> None:
         """Append a compact register/PC snapshot to the mailbox trace log."""
@@ -1889,7 +1919,8 @@ class VMController:
         self.tasks.clear()
         self.task_states.clear()
         self.waiting_tasks.clear()
-        self.mailboxes = MailboxManager()
+        self._pending_mailbox_events = []
+        self.mailboxes = self._create_mailbox_manager()
         self.current_pid = None
         self.next_pid = 1
         self.debug_sessions.clear()
@@ -2303,9 +2334,11 @@ class VMController:
                         "type": "mailbox_send",
                         "pid": pid,
                         "descriptor": descriptor_id,
+                        "handle": handle,
                         "length": len(payload),
                         "flags": flags,
                         "channel": channel,
+                        "src_pid": pid,
                     })
                     self._deliver_mailbox_messages(descriptor_id)
                     self._trace_mailbox_regs(
@@ -2358,6 +2391,8 @@ class VMController:
                         pass
                     return
                 length = min(max_len, msg.length)
+                desc = self.mailboxes.descriptor_for_handle(pid, handle)
+                descriptor_id = desc.descriptor_id
                 vm.mem[ptr : ptr + length] = msg.payload[:length]
                 vm.regs[0] = mbx_const.HSX_MBX_STATUS_OK
                 vm.regs[1] = length
@@ -2383,6 +2418,8 @@ class VMController:
                 vm.emit_event({
                     "type": "mailbox_recv",
                     "pid": pid,
+                    "descriptor": descriptor_id,
+                    "handle": handle,
                     "length": length,
                     "flags": msg.flags,
                     "channel": msg.channel,
@@ -2479,6 +2516,7 @@ class VMController:
         wait_info = self.waiting_tasks.pop(pid, None)
         if wait_info is None:
             return
+        handle_value = wait_info.get("handle")
         if descriptor_id is None:
             descriptor_id = wait_info.get("descriptor_id")
         if descriptor_id is not None:
@@ -2570,6 +2608,7 @@ class VMController:
             "type": event_type,
             "pid": pid,
             "descriptor": descriptor_id,
+            "handle": handle_value,
             "status": status,
             "length": length,
             "flags": flags,
@@ -3054,6 +3093,7 @@ class VMController:
         ctx_dict = self._ensure_task_memory(pid, state)
         if not ctx_dict.get("reg_base") or not ctx_dict.get("stack_base"):
             raise RuntimeError(f"task {pid} missing register/stack base allocation")
+        preserved_events: List[Dict[str, Any]] = []
         if self.vm is None:
             initial_code = bytes(state.get("code", bytearray()))
             entry = state.get("context", {}).get("pc", task.get("pc", 0))
@@ -3065,8 +3105,13 @@ class VMController:
                 dev_libm=self.dev_libm,
                 mailboxes=self.mailboxes,
             )
+            self._flush_pending_mailbox_events()
+        else:
+            preserved_events = list(self.vm.pending_events)
         self.vm.set_mailbox_handler(lambda fn, vm=self.vm: self._svc_mailbox_controller(vm, fn))
         self.vm.restore_state(state)
+        if preserved_events:
+            self.vm.pending_events.extend(preserved_events)
         self.vm.trace = trace_enabled
         self.vm.attached = self.attached
         self._apply_debug_state(pid)

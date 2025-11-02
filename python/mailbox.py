@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import collections
 from dataclasses import dataclass, field
-from typing import Deque, Dict, Iterable, Iterator, List, Optional, Tuple
+from typing import Any, Callable, Deque, Dict, Iterable, Iterator, List, Optional, Tuple
 
 from python import hsx_mailbox_constants as mbx_const  # namespace package import
 
@@ -84,7 +84,7 @@ class MailboxDescriptor:
 class MailboxManager:
     """Tracks HSX mailboxes and per-task handle tables."""
 
-    def __init__(self, *, max_descriptors: int = 256) -> None:
+    def __init__(self, *, max_descriptors: int = 256, event_hook: Optional[Callable[[Dict[str, Any]], None]] = None) -> None:
         self._max_descriptors = max(1, int(max_descriptors))
         self._next_descriptor_id = 1
         self._descriptors: Dict[int, MailboxDescriptor] = {}
@@ -97,6 +97,7 @@ class MailboxManager:
             HSX_MBX_STDIO_ERR: HSX_MBX_MODE_RDWR,
         }
         self._stdio_handles: Dict[int, Dict[str, int]] = {}
+        self._event_hook: Optional[Callable[[Dict[str, Any]], None]] = event_hook
 
     # ------------------------------------------------------------------
     # Lifecycle helpers
@@ -108,6 +109,20 @@ class MailboxManager:
     @property
     def descriptor_count(self) -> int:
         return len(self._descriptors)
+
+    def set_event_hook(self, hook: Optional[Callable[[Dict[str, Any]], None]]) -> None:
+        """Assign or clear the event hook used for instrumentation callbacks."""
+        self._event_hook = hook
+
+    def _emit_event(self, event_type: str, **fields: Any) -> None:
+        if self._event_hook is None:
+            return
+        event = {"type": event_type, **fields}
+        try:
+            self._event_hook(event)
+        except Exception:
+            # Instrumentation must never disrupt mailbox operation.
+            pass
 
     def register_task(self, pid: int) -> None:
         """Ensure the per-task mailboxes exist (stdio + control)."""
@@ -534,6 +549,17 @@ class MailboxManager:
             while cost > desc.space_remaining() and desc.queue:
                 dropped = self._pop_head(desc)
                 if dropped is not None:
+                    self._emit_event(
+                        "mailbox_overrun",
+                        pid=dropped.src_pid,
+                        descriptor=desc.descriptor_id,
+                        dropped_seq=dropped.seq_no,
+                        dropped_length=dropped.length,
+                        dropped_flags=dropped.flags,
+                        channel=dropped.channel,
+                        reason="fanout_drop",
+                        queue_depth=len(desc.queue),
+                    )
                     self._mark_overrun(desc.descriptor_id, dropped.seq_no)
         if cost > desc.space_remaining():
             return False

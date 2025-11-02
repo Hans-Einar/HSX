@@ -1,6 +1,7 @@
 """Unit tests for hsx-cc-build.py (HSXBuilder class)"""
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -29,6 +30,7 @@ def make_args(**kwargs):
         'no_make': False,
         'jobs': None,
         'verbose': False,
+        'clean': False,
     }
     defaults.update(kwargs)
     return argparse.Namespace(**defaults)
@@ -73,6 +75,24 @@ class TestHSXBuilderInit:
         args = make_args(directory=str(target_dir))
         builder = HSXBuilder(args)
         assert Path.cwd() == target_dir
+
+    def test_init_with_clean_flag_removes_existing_build_dir(self, tmp_path):
+        """Test --clean removes existing build directory contents"""
+        stale_dir = tmp_path / "build"
+        stale_dir.mkdir()
+        stale_file = stale_dir / "stale.txt"
+        stale_file.write_text("old data")
+
+        args = make_args(clean=True)
+        original_cwd = Path.cwd()
+        try:
+            os.chdir(tmp_path)
+            builder = HSXBuilder(args)
+        finally:
+            os.chdir(original_cwd)
+        assert builder.build_dir == Path('build')
+        assert not stale_file.exists()
+        assert (tmp_path / builder.build_dir).exists()
 
 
 class TestHSXBuilderFindTool:

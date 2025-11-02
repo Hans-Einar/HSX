@@ -64,7 +64,17 @@ class _StubVM:
         self.kill_calls = 0
         self.step_calls = 0
         self.steps = 0
-        self.tasks = {1: {"pid": 1, "state": "running", "pc": 0}}
+        self.tasks = {
+            1: {
+                "pid": 1,
+                "state": "running",
+                "pc": 0,
+                "reg_base": 0x0100,
+                "stack_base": 0x7000,
+                "stack_limit": 0x6E00,
+                "stack_size": 0x0200,
+            }
+        }
         self.current_pid = 1
 
     def pause(self, pid: int | None = None):
@@ -138,9 +148,10 @@ class _StubVM:
                 "regs": [0] * 16,
                 "sp": 0x8000,
                 "psw": 0,
-                "reg_base": 0,
-                "stack_base": 0,
-                "stack_limit": 0,
+                "reg_base": 0x0100,
+                "stack_base": 0x7000,
+                "stack_limit": 0x6E00,
+                "stack_size": 0x0200,
                 "time_slice_steps": 1,
                 "time_slice_cycles": 1,
                 "accounted_steps": self.steps,
@@ -180,7 +191,18 @@ def test_executive_pause_resume_kill():
     vm = _StubVM()
     state = ExecutiveState(vm)
     state._refresh_tasks()
-    state.tasks = {1: {"pid": 1, "state": "running", "pc": 0, "sleep_pending": False}}
+    state.tasks = {
+        1: {
+            "pid": 1,
+            "state": "running",
+            "pc": 0,
+            "sleep_pending": False,
+            "reg_base": 0x0100,
+            "stack_base": 0x7000,
+            "stack_limit": 0x6E00,
+            "stack_size": 0x0200,
+        }
+    }
 
     paused_task = state.pause_task(1)
     assert paused_task["state"] == "paused"

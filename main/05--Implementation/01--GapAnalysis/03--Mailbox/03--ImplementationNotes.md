@@ -59,3 +59,22 @@ Start new sections chronologically. Keep notes concise but actionable so the nex
   - `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_mailbox_constants.py python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_mailbox_wait.py` (pass).
 - Follow-up actions / hand-off notes:
   - Phase 1.3 should define and emit the mailbox event payloads now that status plumbing is in place.
+
+## 2025-11-04 - Codex (Session 3)
+
+### Focus
+- Task(s) tackled: Phase 1.3 mailbox event integration (send/recv/wait/wake/timeout/overrun) and schema documentation.
+- Dependencies touched: `platforms/python/host_vm.py`, `python/mailbox.py`, executive event handling/tests, `docs/executive_protocol.md`.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions:
+  - Standardised mailbox events to include descriptor/handle/src metadata and added an overrun signal from the manager hook.
+  - Wired the mailbox manager to emit instrumentation through the controller, ensured wake/timeout events carry handle/status, and refreshed protocol docs.
+  - Added targeted pytest coverage exercising send/recv/wait/wake/timeout/overrun event payloads.
+- Tests run (commands + result):
+  - `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_mailbox_constants.py python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_mailbox_wait.py` (pass).
+- Follow-up actions / hand-off notes:
+  - Next step: Phase 1.4 resource monitoring APIs (descriptor/queue metrics exposed via snapshot/RPC).
