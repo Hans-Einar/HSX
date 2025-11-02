@@ -21,6 +21,9 @@ if str(REPO_ROOT) not in sys.path:
 try:
     from python.mailbox import MailboxManager, MailboxError, MailboxMessage
     from python import hsx_mailbox_constants as mbx_const
+    from python.valcmd import ValCmdRegistry
+    from python import hsx_value_constants as val_const
+    from python import hsx_command_constants as cmd_const
     from python.disasm_util import OPCODE_NAMES, format_operands
 except ImportError as exc:  # pragma: no cover - require repo sources
     raise ImportError("HSX repo modules not found; ensure repository root on PYTHONPATH") from exc
@@ -780,6 +783,8 @@ class MiniVM:
         else:
             self.mailboxes = mailboxes
         self._mailbox_handler: Optional[Callable[[int], None]] = mailbox_handler
+        self._value_handler: Optional[Callable[[int], None]] = None
+        self._command_handler: Optional[Callable[[int], None]] = None
         self.pid: Optional[int] = None
         self.call_stack: List[int] = []
         self._last_pc: Optional[int] = None
@@ -919,6 +924,12 @@ class MiniVM:
 
     def set_mailbox_handler(self, handler: Optional[Callable[[int], None]]) -> None:
         self._mailbox_handler = handler
+
+    def set_value_handler(self, handler: Optional[Callable[[int], None]]) -> None:
+        self._value_handler = handler
+
+    def set_command_handler(self, handler: Optional[Callable[[int], None]]) -> None:
+        self._command_handler = handler
 
     def _load_regs_from_memory(self) -> None:
         ctx = self.context
@@ -1764,18 +1775,10 @@ class MiniVM:
             self._svc_mailbox(fn)
         elif mod == 0x6:
             self._svc_exec(fn)
-        elif mod == 0x7:
-            if fn == 1:  # Legacy SLEEP_MS on module 0x07
-                if not self._legacy_exec_module_warned:
-                    self._log("[SVC] mod=0x07 exec traps are deprecated; use module 0x06")
-                    self._legacy_exec_module_warned = True
-                # Map legacy fn=1 to new fn=0 (SLEEP_MS)
-                self.regs[0] = self.regs[0]  # preserve sleep duration in R0
-                self._svc_exec(0)
-            else:
-                self._log(f"[SVC] mod=0x{mod:X} fn=0x{fn:X} (stub)")
-                self.regs[0] = HSX_ERR_ENOSYS
-            return
+        elif mod == val_const.HSX_VAL_MODULE_ID:  # 0x07 - VALUE module
+            self._svc_value(fn)
+        elif mod == cmd_const.HSX_CMD_MODULE_ID:  # 0x08 - COMMAND module
+            self._svc_command(fn)
         elif mod == 0x4:
             self._svc_fs(fn)
         else:
@@ -1963,6 +1966,24 @@ class MiniVM:
             return
         self.regs[0] = mbx_const.HSX_MBX_STATUS_INTERNAL_ERROR
 
+    def _svc_value(self, fn: int) -> None:
+        """Handle VALUE SVC calls (module 0x07)."""
+        handler = self._value_handler
+        if handler is not None:
+            handler(fn)
+        else:
+            self._log(f"[VALUE] fn=0x{fn:02X} - no handler (stub)")
+            self.regs[0] = val_const.HSX_VAL_STATUS_ENOENT
+
+    def _svc_command(self, fn: int) -> None:
+        """Handle COMMAND SVC calls (module 0x08)."""
+        handler = self._command_handler
+        if handler is not None:
+            handler(fn)
+        else:
+            self._log(f"[COMMAND] fn=0x{fn:02X} - no handler (stub)")
+            self.regs[0] = cmd_const.HSX_CMD_STATUS_ENOENT
+
 
 class VMController:
     def __init__(self, *, trace: bool = False, svc_trace: bool = False, dev_libm: bool = False):
@@ -1983,6 +2004,7 @@ class VMController:
         self.server: Optional["VMServer"] = None
         self._pending_mailbox_events: List[Dict[str, Any]] = []
         self.mailboxes = self._create_mailbox_manager()
+        self.valcmd = self._create_valcmd_registry()
         self.waiting_tasks: Dict[int, Dict[str, Any]] = {}
         self.default_trace = trace
         self.traced_pids: Set[int] = set()
@@ -2000,6 +2022,17 @@ class VMController:
     def _create_mailbox_manager(self) -> MailboxManager:
         mgr = MailboxManager(event_hook=self._handle_mailbox_manager_event)
         return mgr
+
+    def _create_valcmd_registry(self) -> ValCmdRegistry:
+        """Create the value/command registry with event hook."""
+        registry = ValCmdRegistry()
+        registry.set_event_hook(self._handle_valcmd_event)
+        return registry
+
+    def _handle_valcmd_event(self, event_type: str, **kwargs):
+        """Handle ValCmd events by emitting them to the VM event stream."""
+        if self.vm:
+            self.vm.emit_event({'type': event_type, **kwargs})
 
     def _handle_mailbox_manager_event(self, event: Dict[str, Any]) -> None:
         if not isinstance(event, dict):
@@ -2977,6 +3010,158 @@ class VMController:
                 timed_out=True,
             )
 
+    def _svc_value_controller(self, vm: MiniVM, fn: int) -> None:
+        """Handle VALUE SVC calls through the valcmd registry."""
+        pid = self.current_pid or vm.pid or (vm.context.pid if vm.context else 0) or 0
+        
+        try:
+            if fn == val_const.HSX_VAL_FN_REGISTER:
+                group_id = vm.regs[1] & 0xFF
+                value_id = vm.regs[2] & 0xFF
+                flags = vm.regs[3] & 0xFF
+                # desc_ptr = vm.regs[4]  # TODO: parse descriptors
+                auth_level = val_const.HSX_VAL_AUTH_PUBLIC  # Default auth level
+                
+                status, oid = self.valcmd.value_register(
+                    group_id=group_id,
+                    value_id=value_id,
+                    flags=flags,
+                    auth_level=auth_level,
+                    owner_pid=pid
+                )
+                vm.regs[0] = status
+                if status == val_const.HSX_VAL_STATUS_OK:
+                    vm.regs[1] = oid
+                return
+            
+            elif fn == val_const.HSX_VAL_FN_LOOKUP:
+                group_id = vm.regs[1] & 0xFF
+                value_id = vm.regs[2] & 0xFF
+                status, oid = self.valcmd.value_lookup(group_id, value_id)
+                vm.regs[0] = status
+                if status == val_const.HSX_VAL_STATUS_OK:
+                    vm.regs[1] = oid
+                return
+            
+            elif fn == val_const.HSX_VAL_FN_GET:
+                oid = vm.regs[1] & 0xFFFF
+                status, value = self.valcmd.value_get(oid, caller_pid=pid)
+                vm.regs[0] = status
+                if status == val_const.HSX_VAL_STATUS_OK:
+                    # Return f16 in low 16 bits of R0
+                    vm.regs[0] = (vm.regs[0] & 0xFFFF0000) | (int(value) & 0xFFFF)
+                return
+            
+            elif fn == val_const.HSX_VAL_FN_SET:
+                oid = vm.regs[1] & 0xFFFF
+                f16_value = float(vm.regs[2] & 0xFFFF)  # Simplified f16 handling
+                current_time = time.monotonic()
+                status = self.valcmd.value_set(
+                    oid, f16_value, caller_pid=pid, current_time=current_time
+                )
+                vm.regs[0] = status
+                return
+            
+            elif fn == val_const.HSX_VAL_FN_LIST:
+                group_filter = vm.regs[1] & 0xFF
+                # out_ptr = vm.regs[2]  # TODO: write OID list to memory
+                # max_items = vm.regs[3]
+                oids = self.valcmd.value_list(group_filter=group_filter, caller_pid=pid)
+                vm.regs[0] = val_const.HSX_VAL_STATUS_OK
+                vm.regs[1] = len(oids)
+                return
+            
+            elif fn == val_const.HSX_VAL_FN_SUB:
+                oid = vm.regs[1] & 0xFFFF
+                # mbox_ptr = vm.regs[2]  # TODO: parse mailbox handle
+                # For now, just register subscription
+                status = self.valcmd.value_subscribe(oid, mailbox_handle=None)
+                vm.regs[0] = status
+                return
+            
+            elif fn == val_const.HSX_VAL_FN_PERSIST:
+                oid = vm.regs[1] & 0xFFFF
+                mode = vm.regs[2] & 0xFF
+                status = self.valcmd.value_persist(oid, mode, caller_pid=pid)
+                vm.regs[0] = status
+                return
+            
+            else:
+                vm.regs[0] = val_const.HSX_VAL_STATUS_EINVAL
+                return
+                
+        except Exception as exc:
+            vm.regs[0] = val_const.HSX_VAL_STATUS_EINVAL
+            return
+
+    def _svc_command_controller(self, vm: MiniVM, fn: int) -> None:
+        """Handle COMMAND SVC calls through the valcmd registry."""
+        pid = self.current_pid or vm.pid or (vm.context.pid if vm.context else 0) or 0
+        
+        try:
+            if fn == cmd_const.HSX_CMD_FN_REGISTER:
+                group_id = vm.regs[1] & 0xFF
+                cmd_id = vm.regs[2] & 0xFF
+                flags = vm.regs[3] & 0xFF
+                # desc_ptr = vm.regs[4]  # TODO: parse descriptors
+                auth_level = val_const.HSX_VAL_AUTH_PUBLIC  # Default auth level
+                
+                status, oid = self.valcmd.command_register(
+                    group_id=group_id,
+                    cmd_id=cmd_id,
+                    flags=flags,
+                    auth_level=auth_level,
+                    owner_pid=pid
+                )
+                vm.regs[0] = status
+                if status == cmd_const.HSX_CMD_STATUS_OK:
+                    vm.regs[1] = oid
+                return
+            
+            elif fn == cmd_const.HSX_CMD_FN_LOOKUP:
+                group_id = vm.regs[1] & 0xFF
+                cmd_id = vm.regs[2] & 0xFF
+                status, oid = self.valcmd.command_lookup(group_id, cmd_id)
+                vm.regs[0] = status
+                if status == cmd_const.HSX_CMD_STATUS_OK:
+                    vm.regs[1] = oid
+                return
+            
+            elif fn == cmd_const.HSX_CMD_FN_CALL:
+                oid = vm.regs[1] & 0xFFFF
+                # token_ptr = vm.regs[2]  # TODO: parse auth token
+                status, result = self.valcmd.command_call(oid, caller_pid=pid)
+                vm.regs[0] = status
+                if result is not None:
+                    vm.regs[1] = int(result) if isinstance(result, (int, float)) else 0
+                return
+            
+            elif fn == cmd_const.HSX_CMD_FN_CALL_ASYNC:
+                oid = vm.regs[1] & 0xFFFF
+                # token_ptr = vm.regs[2]  # TODO: parse auth token
+                # mbox_ptr = vm.regs[3]  # TODO: parse mailbox for async result
+                # For now, just call synchronously
+                status, result = self.valcmd.command_call(oid, caller_pid=pid)
+                vm.regs[0] = status
+                return
+            
+            elif fn == cmd_const.HSX_CMD_FN_HELP:
+                oid = vm.regs[1] & 0xFFFF
+                # out_ptr = vm.regs[2]  # TODO: write help text to memory
+                # max_len = vm.regs[3]
+                # For now, just return success
+                vm.regs[0] = cmd_const.HSX_CMD_STATUS_OK
+                vm.regs[1] = 0  # bytes written
+                return
+            
+            else:
+                vm.regs[0] = cmd_const.HSX_CMD_STATUS_EINVAL
+                return
+                
+        except Exception as exc:
+            vm.regs[0] = cmd_const.HSX_CMD_STATUS_EINVAL
+            return
+
     def info(self, pid: Optional[int] = None) -> Dict[str, Any]:
         vm = self.vm
         active_ctx = None
@@ -3382,6 +3567,8 @@ class VMController:
         else:
             preserved_events = list(self.vm.pending_events)
         self.vm.set_mailbox_handler(lambda fn, vm=self.vm: self._svc_mailbox_controller(vm, fn))
+        self.vm.set_value_handler(lambda fn, vm=self.vm: self._svc_value_controller(vm, fn))
+        self.vm.set_command_handler(lambda fn, vm=self.vm: self._svc_command_controller(vm, fn))
         self.vm.restore_state(state)
         if preserved_events:
             self.vm.pending_events.extend(preserved_events)

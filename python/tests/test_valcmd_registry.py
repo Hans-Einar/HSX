@@ -1,0 +1,494 @@
+"""Tests for the ValCmd Registry Manager."""
+
+import pytest
+from python.valcmd import (
+    ValCmdRegistry,
+    ValueEntry,
+    CommandEntry,
+    GroupDescriptor,
+    NameDescriptor,
+    UnitDescriptor,
+    RangeDescriptor,
+    PersistDescriptor,
+    StringTable,
+)
+from python.hsx_value_constants import (
+    HSX_VAL_STATUS_OK,
+    HSX_VAL_STATUS_ENOENT,
+    HSX_VAL_STATUS_EPERM,
+    HSX_VAL_STATUS_ENOSPC,
+    HSX_VAL_STATUS_EEXIST,
+    HSX_VAL_STATUS_EBUSY,
+    HSX_VAL_FLAG_RO,
+    HSX_VAL_FLAG_PERSIST,
+    HSX_VAL_AUTH_PUBLIC,
+    HSX_VAL_AUTH_USER,
+)
+from python.hsx_command_constants import (
+    HSX_CMD_STATUS_OK,
+    HSX_CMD_STATUS_ENOENT,
+    HSX_CMD_STATUS_ENOSPC,
+    HSX_CMD_STATUS_EEXIST,
+    HSX_CMD_FLAG_ASYNC,
+)
+
+
+class TestStringTable:
+    """Test string table deduplication."""
+    
+    def test_string_table_insert(self):
+        """Test inserting strings into the table."""
+        table = StringTable(capacity=100)
+        
+        offset1 = table.insert("hello")
+        assert offset1 == 0
+        
+        offset2 = table.insert("world")
+        assert offset2 == 1
+        
+        # Deduplication - same string returns same offset
+        offset3 = table.insert("hello")
+        assert offset3 == 0
+    
+    def test_string_table_get(self):
+        """Test retrieving strings by offset."""
+        table = StringTable(capacity=100)
+        
+        offset = table.insert("test")
+        assert table.get(offset) == "test"
+        assert table.get(999) is None
+    
+    def test_string_table_overflow(self):
+        """Test string table capacity limits."""
+        table = StringTable(capacity=10)
+        
+        # Small string should fit
+        offset1 = table.insert("abc")
+        assert offset1 is not None
+        
+        # Large string should fail
+        offset2 = table.insert("x" * 100)
+        assert offset2 is None
+        
+        # First string still accessible
+        assert table.get(offset1) == "abc"
+    
+    def test_string_table_usage(self):
+        """Test usage tracking."""
+        table = StringTable(capacity=100)
+        
+        used, total = table.usage
+        assert used == 0
+        assert total == 100
+        
+        table.insert("hello")
+        used, total = table.usage
+        assert used > 0
+        assert total == 100
+
+
+class TestDescriptors:
+    """Test descriptor chain building."""
+    
+    def test_group_descriptor(self):
+        """Test group descriptor creation."""
+        desc = GroupDescriptor(group_id=1, group_name="System")
+        assert desc.group_id == 1
+        assert desc.group_name == "System"
+        assert desc.next is None
+    
+    def test_name_descriptor(self):
+        """Test name descriptor creation."""
+        desc = NameDescriptor(value_name="Temperature")
+        assert desc.value_name == "Temperature"
+    
+    def test_unit_descriptor(self):
+        """Test unit descriptor creation."""
+        desc = UnitDescriptor(unit="degC", epsilon=0.1, rate_ms=100)
+        assert desc.unit == "degC"
+        assert desc.epsilon == 0.1
+        assert desc.rate_ms == 100
+    
+    def test_range_descriptor(self):
+        """Test range descriptor creation."""
+        desc = RangeDescriptor(min_value=-40.0, max_value=125.0, default_value=20.0)
+        assert desc.min_value == -40.0
+        assert desc.max_value == 125.0
+        assert desc.default_value == 20.0
+    
+    def test_descriptor_chain(self):
+        """Test chaining multiple descriptors."""
+        name = NameDescriptor(value_name="Temperature")
+        unit = UnitDescriptor(unit="degC", epsilon=0.1)
+        range_desc = RangeDescriptor(min_value=-40.0, max_value=125.0)
+        
+        name.next = unit
+        unit.next = range_desc
+        
+        # Traverse chain
+        assert name.next == unit
+        assert unit.next == range_desc
+        assert range_desc.next is None
+
+
+class TestValueEntry:
+    """Test value entry structure."""
+    
+    def test_value_entry_oid(self):
+        """Test OID calculation."""
+        entry = ValueEntry(
+            group_id=0x12,
+            value_id=0x34,
+            flags=0,
+            auth_level=HSX_VAL_AUTH_PUBLIC,
+            owner_pid=100,
+            last_f16=0.0
+        )
+        assert entry.oid == 0x1234
+    
+    def test_value_entry_flags(self):
+        """Test flag properties."""
+        entry = ValueEntry(
+            group_id=1,
+            value_id=1,
+            flags=HSX_VAL_FLAG_RO | HSX_VAL_FLAG_PERSIST,
+            auth_level=HSX_VAL_AUTH_PUBLIC,
+            owner_pid=100,
+            last_f16=0.0
+        )
+        assert entry.is_readonly is True
+        assert entry.is_persistent is True
+        assert entry.requires_pin is False
+
+
+class TestCommandEntry:
+    """Test command entry structure."""
+    
+    def test_command_entry_oid(self):
+        """Test OID calculation."""
+        entry = CommandEntry(
+            group_id=0x12,
+            cmd_id=0x34,
+            flags=0,
+            auth_level=HSX_VAL_AUTH_PUBLIC,
+            owner_pid=100
+        )
+        assert entry.oid == 0x1234
+    
+    def test_command_entry_flags(self):
+        """Test flag properties."""
+        entry = CommandEntry(
+            group_id=1,
+            cmd_id=1,
+            flags=HSX_CMD_FLAG_ASYNC,
+            auth_level=HSX_VAL_AUTH_PUBLIC,
+            owner_pid=100
+        )
+        assert entry.allows_async is True
+        assert entry.requires_pin is False
+
+
+class TestValCmdRegistry:
+    """Test the main registry manager."""
+    
+    def test_registry_init(self):
+        """Test registry initialization."""
+        registry = ValCmdRegistry(max_values=256, max_commands=256)
+        assert registry.max_values == 256
+        assert registry.max_commands == 256
+        
+        stats = registry.get_stats()
+        assert stats['values']['count'] == 0
+        assert stats['commands']['count'] == 0
+    
+    def test_value_register(self):
+        """Test value registration."""
+        registry = ValCmdRegistry()
+        
+        status, oid = registry.value_register(
+            group_id=1,
+            value_id=1,
+            flags=0,
+            auth_level=HSX_VAL_AUTH_PUBLIC,
+            owner_pid=100
+        )
+        
+        assert status == HSX_VAL_STATUS_OK
+        assert oid == 0x0101
+        
+        # Duplicate registration should fail
+        status, oid2 = registry.value_register(
+            group_id=1,
+            value_id=1,
+            flags=0,
+            auth_level=HSX_VAL_AUTH_PUBLIC,
+            owner_pid=100
+        )
+        assert status == HSX_VAL_STATUS_EEXIST
+    
+    def test_value_lookup(self):
+        """Test value lookup."""
+        registry = ValCmdRegistry()
+        
+        # Lookup non-existent value
+        status, oid = registry.value_lookup(1, 1)
+        assert status == HSX_VAL_STATUS_ENOENT
+        
+        # Register and lookup
+        registry.value_register(1, 1, 0, HSX_VAL_AUTH_PUBLIC, 100)
+        status, oid = registry.value_lookup(1, 1)
+        assert status == HSX_VAL_STATUS_OK
+        assert oid == 0x0101
+    
+    def test_value_get_set(self):
+        """Test getting and setting values."""
+        registry = ValCmdRegistry()
+        
+        status, oid = registry.value_register(1, 1, 0, HSX_VAL_AUTH_PUBLIC, 100)
+        assert status == HSX_VAL_STATUS_OK
+        
+        # Get initial value
+        status, value = registry.value_get(oid, caller_pid=100)
+        assert status == HSX_VAL_STATUS_OK
+        assert value == 0.0
+        
+        # Set value
+        status = registry.value_set(oid, 42.5, caller_pid=100)
+        assert status == HSX_VAL_STATUS_OK
+        
+        # Get updated value
+        status, value = registry.value_get(oid, caller_pid=100)
+        assert status == HSX_VAL_STATUS_OK
+        assert value == 42.5
+    
+    def test_value_permissions(self):
+        """Test value permission checks."""
+        registry = ValCmdRegistry()
+        
+        # Register value with user-level auth
+        status, oid = registry.value_register(
+            1, 1, 0, HSX_VAL_AUTH_USER, owner_pid=100
+        )
+        assert status == HSX_VAL_STATUS_OK
+        
+        # Owner can access
+        status, value = registry.value_get(oid, caller_pid=100)
+        assert status == HSX_VAL_STATUS_OK
+        
+        # Other PID with insufficient auth cannot access
+        status, value = registry.value_get(oid, caller_pid=200, caller_auth=HSX_VAL_AUTH_PUBLIC)
+        assert status == HSX_VAL_STATUS_EPERM
+        
+        # Other PID with sufficient auth can access
+        status, value = registry.value_get(oid, caller_pid=200, caller_auth=HSX_VAL_AUTH_USER)
+        assert status == HSX_VAL_STATUS_OK
+    
+    def test_value_readonly(self):
+        """Test read-only value enforcement."""
+        registry = ValCmdRegistry()
+        
+        status, oid = registry.value_register(
+            1, 1, HSX_VAL_FLAG_RO, HSX_VAL_AUTH_PUBLIC, owner_pid=100
+        )
+        assert status == HSX_VAL_STATUS_OK
+        
+        # Setting read-only value should fail
+        status = registry.value_set(oid, 42.0, caller_pid=100)
+        assert status == HSX_VAL_STATUS_EPERM
+    
+    def test_value_list(self):
+        """Test value enumeration."""
+        registry = ValCmdRegistry()
+        
+        # Register values in different groups
+        registry.value_register(1, 1, 0, HSX_VAL_AUTH_PUBLIC, 100)
+        registry.value_register(1, 2, 0, HSX_VAL_AUTH_PUBLIC, 100)
+        registry.value_register(2, 1, 0, HSX_VAL_AUTH_PUBLIC, 200)
+        
+        # List all values
+        oids = registry.value_list(group_filter=0xFF)
+        assert len(oids) == 3
+        
+        # List group 1 values
+        oids = registry.value_list(group_filter=1)
+        assert len(oids) == 2
+        assert all(oid >> 8 == 1 for oid in oids)
+        
+        # List values owned by PID 100
+        oids = registry.value_list(group_filter=0xFF, caller_pid=100)
+        assert len(oids) == 2
+    
+    def test_value_capacity(self):
+        """Test value registry capacity limits."""
+        registry = ValCmdRegistry(max_values=2)
+        
+        # Fill registry
+        status, _ = registry.value_register(1, 1, 0, HSX_VAL_AUTH_PUBLIC, 100)
+        assert status == HSX_VAL_STATUS_OK
+        
+        status, _ = registry.value_register(1, 2, 0, HSX_VAL_AUTH_PUBLIC, 100)
+        assert status == HSX_VAL_STATUS_OK
+        
+        # Registry full
+        status, _ = registry.value_register(1, 3, 0, HSX_VAL_AUTH_PUBLIC, 100)
+        assert status == HSX_VAL_STATUS_ENOSPC
+    
+    def test_command_register(self):
+        """Test command registration."""
+        registry = ValCmdRegistry()
+        
+        status, oid = registry.command_register(
+            group_id=1,
+            cmd_id=1,
+            flags=0,
+            auth_level=HSX_VAL_AUTH_PUBLIC,
+            owner_pid=100
+        )
+        
+        assert status == HSX_CMD_STATUS_OK
+        assert oid == 0x0101
+        
+        # Duplicate registration should fail
+        status, oid2 = registry.command_register(
+            group_id=1,
+            cmd_id=1,
+            flags=0,
+            auth_level=HSX_VAL_AUTH_PUBLIC,
+            owner_pid=100
+        )
+        assert status == HSX_CMD_STATUS_EEXIST
+    
+    def test_command_lookup(self):
+        """Test command lookup."""
+        registry = ValCmdRegistry()
+        
+        # Lookup non-existent command
+        status, oid = registry.command_lookup(1, 1)
+        assert status == HSX_CMD_STATUS_ENOENT
+        
+        # Register and lookup
+        registry.command_register(1, 1, 0, HSX_VAL_AUTH_PUBLIC, 100)
+        status, oid = registry.command_lookup(1, 1)
+        assert status == HSX_CMD_STATUS_OK
+        assert oid == 0x0101
+    
+    def test_command_call(self):
+        """Test command invocation."""
+        registry = ValCmdRegistry()
+        
+        # Register command with handler
+        call_count = [0]
+        
+        def handler():
+            call_count[0] += 1
+            return "success"
+        
+        status, oid = registry.command_register(
+            1, 1, 0, HSX_VAL_AUTH_PUBLIC, 100, handler_ref=handler
+        )
+        assert status == HSX_CMD_STATUS_OK
+        
+        # Call command
+        status, result = registry.command_call(oid, caller_pid=100)
+        assert status == HSX_CMD_STATUS_OK
+        assert result == "success"
+        assert call_count[0] == 1
+    
+    def test_command_list(self):
+        """Test command enumeration."""
+        registry = ValCmdRegistry()
+        
+        # Register commands in different groups
+        registry.command_register(1, 1, 0, HSX_VAL_AUTH_PUBLIC, 100)
+        registry.command_register(1, 2, 0, HSX_VAL_AUTH_PUBLIC, 100)
+        registry.command_register(2, 1, 0, HSX_VAL_AUTH_PUBLIC, 200)
+        
+        # List all commands
+        oids = registry.command_list(group_filter=0xFF)
+        assert len(oids) == 3
+        
+        # List group 1 commands
+        oids = registry.command_list(group_filter=1)
+        assert len(oids) == 2
+    
+    def test_command_capacity(self):
+        """Test command registry capacity limits."""
+        registry = ValCmdRegistry(max_commands=2)
+        
+        # Fill registry
+        status, _ = registry.command_register(1, 1, 0, HSX_VAL_AUTH_PUBLIC, 100)
+        assert status == HSX_CMD_STATUS_OK
+        
+        status, _ = registry.command_register(1, 2, 0, HSX_VAL_AUTH_PUBLIC, 100)
+        assert status == HSX_CMD_STATUS_OK
+        
+        # Registry full
+        status, _ = registry.command_register(1, 3, 0, HSX_VAL_AUTH_PUBLIC, 100)
+        assert status == HSX_CMD_STATUS_ENOSPC
+    
+    def test_event_emission(self):
+        """Test event hook integration."""
+        registry = ValCmdRegistry()
+        events = []
+        
+        def event_hook(event_type, **kwargs):
+            events.append((event_type, kwargs))
+        
+        registry.set_event_hook(event_hook)
+        
+        # Register value should emit event
+        registry.value_register(1, 1, 0, HSX_VAL_AUTH_PUBLIC, 100)
+        assert len(events) == 1
+        assert events[0][0] == 'value_registered'
+        
+        # Set value should emit event
+        oid = 0x0101
+        registry.value_set(oid, 42.0, caller_pid=100)
+        assert len(events) == 2
+        assert events[1][0] == 'value_changed'
+    
+    def test_cleanup_pid(self):
+        """Test PID cleanup on task termination."""
+        registry = ValCmdRegistry()
+        
+        # Register resources for PID 100
+        registry.value_register(1, 1, 0, HSX_VAL_AUTH_PUBLIC, 100)
+        registry.value_register(1, 2, 0, HSX_VAL_AUTH_PUBLIC, 100)
+        registry.command_register(1, 1, 0, HSX_VAL_AUTH_PUBLIC, 100)
+        
+        # Register resources for PID 200
+        registry.value_register(2, 1, 0, HSX_VAL_AUTH_PUBLIC, 200)
+        
+        # Verify initial state
+        assert len(registry.value_list()) == 3
+        assert len(registry.command_list()) == 1
+        
+        # Clean up PID 100
+        registry.cleanup_pid(100)
+        
+        # Verify PID 100 resources removed
+        assert len(registry.value_list()) == 1
+        assert len(registry.command_list()) == 0
+        
+        # Verify PID 200 resources remain
+        status, _ = registry.value_lookup(2, 1)
+        assert status == HSX_VAL_STATUS_OK
+    
+    def test_get_stats(self):
+        """Test registry statistics."""
+        registry = ValCmdRegistry(max_values=10, max_commands=10)
+        
+        # Register some resources
+        registry.value_register(1, 1, 0, HSX_VAL_AUTH_PUBLIC, 100)
+        registry.value_register(1, 2, 0, HSX_VAL_AUTH_PUBLIC, 100)
+        registry.command_register(1, 1, 0, HSX_VAL_AUTH_PUBLIC, 100)
+        
+        stats = registry.get_stats()
+        
+        assert stats['values']['count'] == 2
+        assert stats['values']['capacity'] == 10
+        assert stats['values']['usage_pct'] == 20.0
+        
+        assert stats['commands']['count'] == 1
+        assert stats['commands']['capacity'] == 10
+        assert stats['commands']['usage_pct'] == 10.0
