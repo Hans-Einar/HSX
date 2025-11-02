@@ -368,33 +368,78 @@ class ExecutiveState:
         for entry in mailboxes_block:
             if not isinstance(entry, dict):
                 raise ValueError("metadata_mailbox_invalid")
-            name = entry.get("name")
-            if not isinstance(name, str) or not name.strip():
+            target_value = entry.get("target") or entry.get("name")
+            if not isinstance(target_value, str) or not target_value.strip():
                 raise ValueError("metadata_mailbox_name")
-            target = name.strip()
+            target = target_value.strip()
             if target in new_mailboxes:
                 raise ValueError(f"metadata_mailbox_duplicate:{target}")
-            queue_depth = entry.get("queue_depth")
+            capacity_value = entry.get("capacity", entry.get("queue_depth"))
             capacity: Optional[int]
-            if queue_depth in (None, "", 0):
+            if capacity_value in (None, "", 0):
                 capacity = None
             else:
                 try:
-                    capacity = int(queue_depth)
+                    capacity = int(capacity_value)
                 except (TypeError, ValueError):
                     raise ValueError(f"metadata_mailbox_capacity:{target}")
                 if capacity <= 0:
                     capacity = None
-            mode_mask = int(entry.get("flags", 0)) & 0xFFFF
-            if mode_mask == 0:
+            mode_value = entry.get("mode_mask", entry.get("mode", entry.get("flags", 0)))
+            try:
+                mode_mask = int(mode_value)
+            except (TypeError, ValueError):
+                raise ValueError(f"metadata_mailbox_mode:{target}")
+            if mode_mask <= 0:
                 mode_mask = mbx_const.HSX_MBX_MODE_RDWR
+            else:
+                mode_mask &= 0xFFFF
+            owner_pid_val = entry.get("owner_pid")
+            owner_pid: Optional[int]
+            if owner_pid_val in (None, ""):
+                owner_pid = None
+            else:
+                try:
+                    owner_pid = int(owner_pid_val)
+                except (TypeError, ValueError):
+                    raise ValueError(f"metadata_mailbox_owner:{target}")
+            bindings_raw = entry.get("bindings") or []
+            if not isinstance(bindings_raw, list):
+                raise ValueError(f"metadata_mailbox_bindings:{target}")
+            bindings: List[Dict[str, Any]] = []
+            for index, binding in enumerate(bindings_raw):
+                if not isinstance(binding, dict):
+                    raise ValueError(f"metadata_mailbox_binding_object:{target}:{index}")
+                pid_val = binding.get("pid")
+                if pid_val in (None, ""):
+                    raise ValueError(f"metadata_mailbox_binding_pid:{target}:{index}")
+                try:
+                    pid_int = int(pid_val)
+                except (TypeError, ValueError):
+                    raise ValueError(f"metadata_mailbox_binding_pid:{target}:{index}")
+                flags_val = binding.get("flags", 0)
+                try:
+                    flags_int = int(flags_val) & 0xFFFF
+                except (TypeError, ValueError):
+                    raise ValueError(f"metadata_mailbox_binding_flags:{target}:{index}")
+                binding_record = dict(binding)
+                binding_record["pid"] = pid_int
+                binding_record["flags"] = flags_int
+                bindings.append(binding_record)
             record = {
                 "name": target,
+                "target": target,
                 "queue_depth": entry.get("queue_depth"),
-                "flags": entry.get("flags"),
+                "capacity": capacity,
+                "flags": entry.get("flags", mode_mask),
                 "mode": mode_mask,
                 "reserved": entry.get("reserved"),
+                "owner_pid": owner_pid,
+                "bindings": bindings,
+                "source": entry.get("_source"),
             }
+            if "raw" in entry and isinstance(entry["raw"], dict):
+                record["raw"] = entry["raw"]
             mailbox_bind_requests.append((target, capacity, mode_mask, record))
 
         bound_mailboxes: List[Tuple[str, Dict[str, Any]]] = []

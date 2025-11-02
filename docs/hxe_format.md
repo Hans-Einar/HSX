@@ -119,18 +119,52 @@ Defines commands to be registered. Each entry:
 - **Executive handling:** Commands share the same `(group_id,value_id)` namespace as values. The `handler_offset` points to the VM entry point (relative to the code section). The executive enforces uniqueness and records the supplied names/help strings for debugger shells. Flags/auth levels map directly to the command SVC policy (`HSX_CMD_FL_PIN`, etc.).
 
 ### `.mailbox` Section (type=3)
-Defines mailboxes to be created. Each entry:
+Defines mailboxes to be created before the VM starts running. HXE v2 uses a UTF-8 JSON payload:
+
+```json
+{
+  "version": 1,
+  "mailboxes": [
+    {
+      "target": "app:telemetry",
+      "capacity": 128,
+      "mode_mask": 0x0007,
+      "owner_pid": 2,
+      "bindings": [
+        {"pid": 2, "flags": 0x0001}
+      ]
+    }
+  ]
+}
+```
+
+Each entry object supports the following fields (all optional unless noted):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `target` | string (**required**) | Mailbox name with namespace prefix (`svc:`, `pid:`, `app:`, `shared:`). |
+| `capacity` | integer | Requested ring capacity in bytes. Omit or set to `0` for the default (`HSX_MBX_DEFAULT_RING_CAPACITY`). |
+| `mode_mask` | integer | `HSX_MBX_MODE_*` bit-mask. Defaults to `HSX_MBX_MODE_RDWR` when not provided. |
+| `owner_pid` | integer | Declares the owning PID (used by provisioning tooling; optional). |
+| `bindings` | array<object> | Declarative binding hints. Each object must include `pid` (int) and may specify `flags` or other module-defined attributes. |
+| `reserved` | any | Reserved for future use. Preserved verbatim in metadata snapshots. |
+
+The loader validates the JSON structure, normalises numeric fields, and rejects duplicate mailbox names. Declarative bindings are stored for higher-level tooling but are not acted upon during image load yet.
+
+Legacy (pre-v2) images may still encode `.mailbox` entries as fixed-size binary structures:
 
 | Offset | Size | Field | Description |
 |--------|------|-------|-------------|
 | 0x00   | 4    | `name_offset` | Offset to mailbox name string. |
-| 0x04   | 2    | `queue_depth` | Maximum messages (0=default). |
-| 0x06   | 2    | `flags` | Mailbox flags (shared, persistent). |
+| 0x04   | 2    | `queue_depth` | Requested capacity (`0` = default). |
+| 0x06   | 2    | `flags` | Mode mask (`HSX_MBX_MODE_*`). |
 | 0x08   | 8    | `reserved` | Reserved for future use. |
 
 **Entry size: 16 bytes**
 
-- **Executive handling:** `name_offset` resolves to a UTF-8 string that must include a recognised namespace prefix (`svc:`, `pid:`, `app:`, `shared:`). The executive binds the mailbox via `mailbox_bind`, applying `queue_depth` as the ring capacity (defaults to `HSX_MBX_DEFAULT_RING_CAPACITY` when `0`) and interpreting the flag bits as an access mode mask. Duplicate mailbox names within the same image abort the load.
+Images authored with the legacy format continue to load; the parser automatically falls back to the struct layout when the payload does not contain JSON.
+
+- **Executive handling:** the executive validates each mailbox record and calls `mailbox_bind` with the normalised `target`, `capacity` (if non-zero), and `mode_mask`. Declarative bindings and owner metadata are stored in the executive registry for later phases. Duplicate mailbox names within the same image abort the load.
 
 ### String Table
 Each section may reference a string table located at the end of that section. String offsets are relative to the section start. Strings are null-terminated UTF-8.

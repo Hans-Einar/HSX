@@ -116,3 +116,35 @@ esource_stats() on the mailbox manager and exposed aggregated metrics (capacity,
   - `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_exec_mailbox.py python/tests/test_shell_client.py` (pass).
 - Follow-up actions / hand-off notes:
   - Proceed to next plan item (Phase 1.6) once ready.
+
+## 2025-11-04 - Codex (Session 6)
+
+### Focus
+- Task(s) tackled: Phase 2.1 schema design for declarative .mailbox sections.
+- Dependencies touched: design docs review.
+
+### Status
+- DONE
+
+### Details
+- Summary of activities: drafted candidate schema for `.mailbox` metadata (versioned entries with target, capacity, mode, bindings).
+- Follow-up: documented schema and updated plan in Session 7; proceed with parser implementation (Phase 2.2).
+
+## 2025-11-05 - Codex (Session 7)
+
+### Focus
+- Task(s) tackled: Phase 2.2 `.mailbox` section parser (JSON + legacy fallback) and documentation updates for the schema.
+- Dependencies touched: `platforms/python/host_vm.py`, `python/execd.py`, `docs/hxe_format.md`, mailbox metadata tests.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions:
+  - Replaced the struct-only parser with a JSON-aware implementation that normalises targets, capacities, mode masks, bindings, and owner hints while preserving backward compatibility with the legacy table.
+  - Updated the executive metadata registrar to accept the new fields, persist declarative bindings, and surface them in the registry; tightened validation for malformed entries.
+  - Documented the JSON schema in `docs/hxe_format.md` and refreshed the schema notes/plan checklists; added pytest coverage for JSON/legacy parsing and executive integration.
+- Tests run (commands + result):
+  - `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_hxe_v2_metadata.py python/tests/test_metadata_preprocess.py` (pass).
+- Follow-up actions / hand-off notes:
+  - Next phase (2.3) will consume the new metadata to instantiate descriptors/bindings during load; ensure tooling honours the stored binding hints.

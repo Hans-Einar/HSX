@@ -187,7 +187,86 @@ def _parse_command_metadata(section: bytes, entry_count: int) -> List[Dict[str, 
     return entries
 
 
-def _parse_mailbox_metadata(section: bytes, entry_count: int) -> List[Dict[str, Any]]:
+def _normalise_mailbox_capacity(value: Any) -> Optional[int]:
+    if value in (None, "", 0):
+        return None
+    try:
+        capacity = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("mailbox metadata capacity must be an integer") from exc
+    if capacity < 0:
+        raise ValueError("mailbox metadata capacity must be non-negative")
+    return capacity
+
+
+def _normalise_mode_mask(value: Any) -> int:
+    if value in (None, "", 0):
+        return mbx_const.HSX_MBX_MODE_RDWR
+    try:
+        mode_mask = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("mailbox metadata mode_mask must be an integer") from exc
+    if mode_mask < 0:
+        raise ValueError("mailbox metadata mode_mask must be non-negative")
+    return mode_mask & 0xFFFF
+
+
+def _normalise_mailbox_bindings(value: Any) -> List[Dict[str, Any]]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ValueError("mailbox metadata bindings must be a list")
+    bindings: List[Dict[str, Any]] = []
+    for entry in value:
+        if not isinstance(entry, dict):
+            raise ValueError("mailbox metadata binding entries must be objects")
+        if "pid" not in entry:
+            raise ValueError("mailbox metadata binding missing pid")
+        try:
+            pid_val = int(entry.get("pid"))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("mailbox metadata binding pid must be an integer") from exc
+        try:
+            flags_val = int(entry.get("flags", 0))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("mailbox metadata binding flags must be an integer") from exc
+        normalised = dict(entry)
+        normalised["pid"] = pid_val
+        normalised["flags"] = flags_val & 0xFFFF
+        bindings.append(normalised)
+    return bindings
+
+
+def _mailbox_record(
+    *,
+    target: str,
+    capacity: Optional[int],
+    mode_mask: int,
+    reserved: Any = None,
+    owner_pid: Optional[int] = None,
+    bindings: Optional[List[Dict[str, Any]]] = None,
+    source: str,
+    raw: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    queue_depth = capacity if capacity is not None else 0
+    record: Dict[str, Any] = {
+        "target": target,
+        "name": target,
+        "capacity": capacity,
+        "queue_depth": queue_depth,
+        "mode_mask": mode_mask,
+        "flags": mode_mask,
+        "reserved": reserved,
+        "owner_pid": owner_pid,
+        "bindings": bindings or [],
+        "_source": source,
+    }
+    if raw is not None:
+        record["raw"] = raw
+    return record
+
+
+def _parse_mailbox_metadata_legacy(section: bytes, entry_count: int) -> List[Dict[str, Any]]:
     entry_size = MAILBOX_ENTRY_STRUCT.size
     required = entry_count * entry_size
     if required > len(section):
@@ -196,14 +275,99 @@ def _parse_mailbox_metadata(section: bytes, entry_count: int) -> List[Dict[str, 
     for idx in range(entry_count):
         start = idx * entry_size
         name_offset, queue_depth, flags, reserved = MAILBOX_ENTRY_STRUCT.unpack_from(section, start)
-        entry = {
-            "name": _decode_metadata_string(section, name_offset),
-            "queue_depth": queue_depth,
-            "flags": flags,
-            "reserved": reserved,
-        }
-        entries.append(entry)
+        name = _decode_metadata_string(section, name_offset)
+        if not name:
+            raise ValueError("mailbox metadata missing name")
+        capacity = _normalise_mailbox_capacity(queue_depth)
+        mode_mask = _normalise_mode_mask(flags)
+        record = _mailbox_record(
+            target=name,
+            capacity=capacity,
+            mode_mask=mode_mask,
+            reserved=reserved,
+            source="legacy",
+            raw={
+                "name_offset": name_offset,
+                "queue_depth": queue_depth,
+                "flags": flags,
+                "reserved": reserved,
+            },
+        )
+        entries.append(record)
     return entries
+
+
+def _parse_mailbox_metadata_json(section: bytes) -> List[Dict[str, Any]]:
+    try:
+        text = section.decode("utf-8").strip()
+    except UnicodeDecodeError as exc:
+        raise ValueError("mailbox metadata JSON must be UTF-8") from exc
+    if not text:
+        return []
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ValueError("mailbox metadata JSON invalid") from exc
+    if isinstance(payload, dict):
+        version = payload.get("version")
+        if version not in (None, 1):
+            raise ValueError("mailbox metadata JSON version not supported")
+        entries_data = payload.get("mailboxes") or payload.get("entries") or []
+    elif isinstance(payload, list):
+        entries_data = payload
+    else:
+        raise ValueError("mailbox metadata JSON must be an object or array")
+    if not isinstance(entries_data, list):
+        raise ValueError("mailbox metadata entries must be a list")
+
+    entries: List[Dict[str, Any]] = []
+    for idx, raw_entry in enumerate(entries_data):
+        if not isinstance(raw_entry, dict):
+            raise ValueError(f"mailbox metadata entry {idx} must be an object")
+        target_val = raw_entry.get("target") or raw_entry.get("name")
+        if not isinstance(target_val, str) or not target_val.strip():
+            raise ValueError(f"mailbox metadata entry {idx} missing target")
+        target = target_val.strip()
+        capacity = _normalise_mailbox_capacity(
+            raw_entry.get("capacity", raw_entry.get("queue_depth"))
+        )
+        mode_mask = _normalise_mode_mask(
+            raw_entry.get("mode_mask", raw_entry.get("mode", raw_entry.get("flags")))
+        )
+        owner_val = raw_entry.get("owner_pid")
+        owner_pid: Optional[int]
+        if owner_val in (None, ""):
+            owner_pid = None
+        else:
+            try:
+                owner_pid = int(owner_val)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"mailbox metadata entry {idx} owner_pid must be an integer") from exc
+        bindings = _normalise_mailbox_bindings(raw_entry.get("bindings"))
+        record = _mailbox_record(
+            target=target,
+            capacity=capacity,
+            mode_mask=mode_mask,
+            reserved=raw_entry.get("reserved"),
+            owner_pid=owner_pid,
+            bindings=bindings,
+            source="json",
+            raw=dict(raw_entry),
+        )
+        entries.append(record)
+    return entries
+
+
+def _parse_mailbox_metadata(section: bytes, entry_count: int) -> List[Dict[str, Any]]:
+    if not section:
+        return []
+    trimmed = section.rstrip(b"\x00")
+    if not trimmed:
+        return []
+    probe = trimmed.lstrip()
+    if probe.startswith(b"{") or probe.startswith(b"["):
+        return _parse_mailbox_metadata_json(trimmed)
+    return _parse_mailbox_metadata_legacy(section, entry_count)
 
 
 def _parse_metadata_sections(data: bytes, header: Dict[str, Any], header_size: int) -> HXEMetadata:

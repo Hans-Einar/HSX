@@ -167,20 +167,20 @@ Design specifies `.mailbox` metadata section for declarative mailbox creation (s
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.03--Mailbox](../../../04--Design/04.03--Mailbox.md)
-- [ ] Design .mailbox section JSON/binary format
-- [ ] Define fields: target, capacity, mode_mask, bindings
-- [ ] Define validation rules (capacity limits, valid targets)
-- [ ] Document .mailbox section format
-- [ ] Create example .mailbox sections
-- [ ] Add format version field for future extensions
-- [ ] Coordinate with HXE format specification updates
+- [x] Design .mailbox section JSON/binary format
+- [x] Define fields: target, capacity, mode_mask, bindings
+- [x] Define validation rules (capacity limits, valid targets)
+- [x] Document .mailbox section format
+- [x] Create example .mailbox sections
+- [x] Add format version field for future extensions
+- [x] Coordinate with HXE format specification updates
 
 ---
 
 ### 2.2 Section Parser
 
 **Priority:** MEDIUM  
-**Dependencies:** 2.1 (.mailbox section format), Executive Phase 3.1 (HXE v2 support)  
+**Dependencies:** Executive Phase 3.1 (HXE v2 support)  
 **Estimated Effort:** 2-3 days
 
 **Rationale:**  
@@ -188,13 +188,13 @@ Parser needed to extract .mailbox metadata from HXE header (section 4.5.1). Enab
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.03--Mailbox](../../../04--Design/04.03--Mailbox.md)
-- [ ] Implement .mailbox section parser in executive
-- [ ] Parse JSON/binary .mailbox data from HXE header
-- [ ] Validate .mailbox section contents
-- [ ] Handle parsing errors gracefully
-- [ ] Add .mailbox parsing tests (valid/invalid sections)
-- [ ] Document parser API
-- [ ] Integrate with HXE loader
+- [x] Implement .mailbox section parser in executive
+- [x] Parse JSON/binary .mailbox data from HXE header
+- [x] Validate .mailbox section contents
+- [x] Handle parsing errors gracefully
+- [x] Add .mailbox parsing tests (valid/invalid sections)
+- [x] Document parser API
+- [x] Integrate with HXE loader
 
 ---
 

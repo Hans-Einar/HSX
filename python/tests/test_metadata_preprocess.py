@@ -59,9 +59,14 @@ def test_register_metadata_success():
         ],
         "mailboxes": [
             {
-                "name": "app:motor.telemetry",
-                "queue_depth": 16,
-                "flags": 0,
+                "target": "app:motor.telemetry",
+                "capacity": 16,
+                "mode_mask": mbx_const.HSX_MBX_MODE_FANOUT | mbx_const.HSX_MBX_MODE_RDWR,
+                "owner_pid": 1,
+                "bindings": [
+                    {"pid": 1, "flags": 0x10},
+                    {"pid": "2", "flags": "3"},
+                ],
             }
         ],
     }
@@ -80,10 +85,17 @@ def test_register_metadata_success():
     mailboxes = state.mailbox_registry[1]
     assert "app:motor.telemetry" in mailboxes
     entry = mailboxes["app:motor.telemetry"]
-    assert entry["mode"] == mbx_const.HSX_MBX_MODE_RDWR
+    assert entry["mode"] == (mbx_const.HSX_MBX_MODE_FANOUT | mbx_const.HSX_MBX_MODE_RDWR)
     assert entry["capacity"] == 16
+    assert entry["owner_pid"] == 1
+    assert entry["bindings"] == [
+        {"pid": 1, "flags": 0x10},
+        {"pid": 2, "flags": 3},
+    ]
 
-    assert vm.bound == [(1, "app:motor.telemetry", 16, mbx_const.HSX_MBX_MODE_RDWR)]
+    assert vm.bound == [
+        (1, "app:motor.telemetry", 16, mbx_const.HSX_MBX_MODE_FANOUT | mbx_const.HSX_MBX_MODE_RDWR)
+    ]
 
 
 def test_register_metadata_duplicate_value_raises():
@@ -113,3 +125,20 @@ def test_register_metadata_mailbox_bind_failure():
     with pytest.raises(RuntimeError, match="metadata_mailbox_bind_failed"):
         state._register_metadata(1, metadata)
     assert 1 not in state.mailbox_registry
+
+
+def test_register_metadata_accepts_legacy_mailbox_format():
+    vm = MetadataVM()
+    state = _make_state(vm)
+    metadata = {
+        "values": [],
+        "commands": [],
+        "mailboxes": [
+            {"name": "app:legacy", "queue_depth": 0, "flags": mbx_const.HSX_MBX_MODE_RDWR},
+        ],
+    }
+    state._register_metadata(2, metadata)
+    assert vm.bound == [(2, "app:legacy", None, mbx_const.HSX_MBX_MODE_RDWR)]
+    entry = state.mailbox_registry[2]["app:legacy"]
+    assert entry["mode"] == mbx_const.HSX_MBX_MODE_RDWR
+    assert entry["capacity"] == mbx_const.HSX_MBX_DEFAULT_RING_CAPACITY
