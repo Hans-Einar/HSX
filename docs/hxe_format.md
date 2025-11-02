@@ -153,6 +153,18 @@ The loader validates the JSON structure, normalises numeric fields, and rejects 
 
 - **Precreation:** The Python loader binds each declared mailbox before the task runs. Creation results are surfaced both in the load response (`mailbox_creation`) and in `metadata._mailbox_creation`, and each metadata entry is updated with the resolved `descriptor`, `queue_depth`, and `mode_mask`.
 
+### Declarative Mailbox Pragmas
+
+HSX source files declare mailbox metadata with a C-style pragma:
+
+```c
+#pragma hsx_mailbox(target="app:telemetry", capacity=96, mode="RDWR|FANOUT")
+```
+
+- `target` (required) follows the same namespace rules as the JSON schema (`svc:`, `pid:`, `app:`, `shared:`).
+- Optional fields (`capacity`, `mode_mask`, `mode`, `owner_pid`, `bindings`) mirror the JSON object. The `mode` string supports `RDONLY`, `WRONLY`, `RDWR`, `FANOUT`, `FANOUT_DROP`, `FANOUT_BLOCK`, and `TAP`, combined with `|`.
+- The Clang → LLVM pipeline lowers the pragma to a comment in the IR: `; #pragma hsx_mailbox(...)`. `hsx-llc.py` detects these directives and emits matching `.mailbox { ... }` MVASM entries, which the assembler/linker convert into the HXE `.mailbox` section described above.
+
 Legacy (pre-v2) images may still encode `.mailbox` entries as fixed-size binary structures:
 
 | Offset | Size | Field | Description |

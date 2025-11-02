@@ -230,9 +230,9 @@ Toolchain needs to generate .mailbox sections from application code. Enables dec
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.03--Mailbox](../../../04--Design/04.03--Mailbox.md)
-- [ ] Design source annotation syntax for mailbox declarations
+- [x] Design source annotation syntax for mailbox declarations
 - [x] Update assembler to recognize mailbox directives
-- [ ] Update compiler to generate .mailbox metadata
+- [x] Update compiler to generate .mailbox metadata
 - [x] Implement .mailbox section generation in HXE builder
 - [x] Add toolchain tests for .mailbox generation
 - [x] Document mailbox declaration syntax

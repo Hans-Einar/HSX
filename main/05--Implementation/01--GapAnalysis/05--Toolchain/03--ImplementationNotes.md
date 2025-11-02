@@ -57,6 +57,7 @@ Start new sections chronologically. Keep notes concise but actionable so the nex
 ### Details
 - Summary of code changes / key decisions:
   - Added JSON-based `.mailbox` directive handling in `asm.py`, captured metadata in `LAST_METADATA`, and emitted it in `.hxo` objects.
+  - Extended `hsx-llc.py` to recognise `#pragma hsx_mailbox(...)` in LLVM IR (via comment directives) and emit `.mailbox { ... }` MVASM directives.
   - Reworked the linker to produce HXE v2 images in-place (header v0x0002, metadata table, CRC) and merge mailbox metadata across modules.
   - Updated streaming loader tests to build real HXE images through the toolchain, ensuring `VMController` pre-creates declared mailboxes, and documented the directive in MVASM spec.
 - Tests run (commands + result):

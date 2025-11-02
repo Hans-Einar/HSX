@@ -7,10 +7,15 @@ hsx-llc.py — LLVM IR (text) -> HSX .mvasm (MVP)
 Usage:
   python3 hsx-llc.py input.ll -o output.mvasm --trace
 """
-import argparse, re, sys
+import argparse, json, re, sys
 import struct
 from collections import defaultdict
 from typing import Dict, List, Optional, Set, Tuple
+
+try:
+    import hsx_mailbox_constants as mbx_const
+except ImportError:  # pragma: no cover - allow running as package
+    from python import hsx_mailbox_constants as mbx_const
 
 R_RET = "R0"
 ATTR_TOKENS = {"nsw", "nuw", "noundef", "dso_local", "local_unnamed_addr", "volatile"}
@@ -21,6 +26,19 @@ LDI_RE = re.compile(rf"LDI\s+(R\d{{1,2}}),\s*({IMM_TOKEN})$", re.IGNORECASE)
 LDI32_RE = re.compile(rf"LDI32\s+(R\d{{1,2}}),\s*({IMM_TOKEN})$", re.IGNORECASE)
 
 ARG_REGS = ["R1","R2","R3"]  # more via stack later
+
+MODE_ALIASES = {
+    "RDONLY": mbx_const.HSX_MBX_MODE_RDONLY,
+    "RO": mbx_const.HSX_MBX_MODE_RDONLY,
+    "WRONLY": mbx_const.HSX_MBX_MODE_WRONLY,
+    "WO": mbx_const.HSX_MBX_MODE_WRONLY,
+    "RDWR": mbx_const.HSX_MBX_MODE_RDWR,
+    "RW": mbx_const.HSX_MBX_MODE_RDWR,
+    "TAP": mbx_const.HSX_MBX_MODE_TAP,
+    "FANOUT": mbx_const.HSX_MBX_MODE_FANOUT,
+    "FANOUT_DROP": mbx_const.HSX_MBX_MODE_FANOUT_DROP,
+    "FANOUT_BLOCK": mbx_const.HSX_MBX_MODE_FANOUT_BLOCK,
+}
 
 
 # ---------------------------------------------------------------------------
@@ -236,12 +254,88 @@ def render_globals(globals_list):
             lines.append(f"    .word 0x{value:08X}")
     return lines
 
+
+def _coerce_pragma_value(value: str) -> object:
+    text = value.strip()
+    if not text:
+        return ""
+    if text[0] in {'"', "'"} and text[-1] == text[0]:
+        body = text[1:-1]
+        return bytes(body, "utf-8").decode("unicode_escape")
+    if text[0] in {'{', '['} and text[-1] in {'}', ']'}:
+        return json.loads(text)
+    if text.lower() in {"true", "false"}:
+        return text.lower() == "true"
+    try:
+        return int(text, 0)
+    except ValueError:
+        return text
+
+
+def _parse_mailbox_mode_tokens(spec: str) -> int:
+    tokens = [tok.strip().upper() for tok in re.split(r"[|]", spec) if tok.strip()]
+    if not tokens:
+        raise ISelError("hsx_mailbox pragma mode string cannot be empty")
+    mask = 0
+    for tok in tokens:
+        value = MODE_ALIASES.get(tok)
+        if value is None:
+            raise ISelError(f"hsx_mailbox pragma uses unknown mode token '{tok}'")
+        mask |= int(value)
+    return mask
+
+
+def _parse_mailbox_pragma(arg_text: str) -> Dict[str, object]:
+    params = _split_top_level(arg_text, ',')
+    parsed: Dict[str, object] = {}
+    for piece in params:
+        if not piece.strip():
+            continue
+        if '=' not in piece:
+            raise ISelError(f"hsx_mailbox pragma expected key=value entries, got '{piece}'")
+        key, value = piece.split('=', 1)
+        key = key.strip()
+        if not key:
+            raise ISelError("hsx_mailbox pragma contains empty key")
+        parsed[key] = _coerce_pragma_value(value)
+    target_val = parsed.pop("target", None)
+    if target_val is None:
+        raise ISelError("hsx_mailbox pragma requires target=\"namespace:name\"")
+    target = str(target_val).strip()
+    if not target:
+        raise ISelError("hsx_mailbox pragma target cannot be empty")
+    entry: Dict[str, object] = {"target": target}
+    if "capacity" in parsed:
+        entry["capacity"] = int(parsed.pop("capacity"))
+    if "queue_depth" in parsed:
+        entry["queue_depth"] = int(parsed.pop("queue_depth"))
+    if "mode_mask" in parsed:
+        entry["mode_mask"] = int(parsed.pop("mode_mask"))
+    elif "mode" in parsed:
+        entry["mode_mask"] = _parse_mailbox_mode_tokens(str(parsed.pop("mode")))
+    if "owner_pid" in parsed:
+        entry["owner_pid"] = int(parsed.pop("owner_pid"))
+    if "bindings" in parsed:
+        entry["bindings"] = parsed.pop("bindings")
+    for key, value in parsed.items():
+        entry[key] = value
+    return entry
+
+
 def parse_ir(lines: List[str]) -> Dict:
-    ir = {"functions": [], "globals": [], "types": {}}
+    ir = {"functions": [], "globals": [], "types": {}, "mailboxes": []}
     cur = None
     bb = None
     for raw in lines:
         line = raw.strip()
+        if not line:
+            continue
+        if line.startswith(";"):
+            pragma_match = re.match(r';\s*#pragma\s+hsx_mailbox\s*\((.*)\)\s*$', line, re.IGNORECASE)
+            if pragma_match:
+                entry = _parse_mailbox_pragma(pragma_match.group(1))
+                ir["mailboxes"].append(entry)
+            continue
         if not line or line.startswith(";"):
             continue
         if cur is None:
@@ -1713,6 +1807,7 @@ def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
         if fn_spill_data:
             spill_data_all.extend(fn_spill_data)
     data_section = render_globals(globals_list)
+    mailbox_entries = ir.get("mailboxes", [])
     if spill_data_all:
         if data_section:
             data_section.extend(spill_data_all)
@@ -1730,6 +1825,9 @@ def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
         if imports:
             for name in sorted(imports):
                 header.append(f".import {name}")
+        if mailbox_entries:
+            for entry in mailbox_entries:
+                header.append(".mailbox " + json.dumps(entry, separators=(",", ":"), sort_keys=True))
         if data_section:
             header += data_section
         header.append('.text')

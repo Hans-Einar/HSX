@@ -11,7 +11,7 @@
 ## Commit Log
 | Date | Commit hash | Message | Author | Notes |
 | --- | --- | --- | --- | --- |
-| <YYYY-MM-DD> | <commit-hash> | <short message> | <author> | Tests: `<command>` |
+| 2025-11-05 | `5a47e6b` | `toolchain: add .mailbox directive support and emit HXE v2 metadata` | Codex | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_hsx_llc_mailbox.py python/tests/test_vm_stream_loader.py python/tests/test_linker.py python/tests/test_linker_dupdef.py python/tests/test_import_unresolved.py python/tests/test_asm_sections.py python/tests/test_vm_exit.py` |
 
 ## Pull Request
 - PR URL / ID: `<link or ID>`
