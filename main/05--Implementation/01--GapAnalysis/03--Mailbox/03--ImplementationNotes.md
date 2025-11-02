@@ -148,3 +148,22 @@ esource_stats() on the mailbox manager and exposed aggregated metrics (capacity,
   - `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_hxe_v2_metadata.py python/tests/test_metadata_preprocess.py` (pass).
 - Follow-up actions / hand-off notes:
   - Next phase (2.3) will consume the new metadata to instantiate descriptors/bindings during load; ensure tooling honours the stored binding hints.
+
+## 2025-11-05 - Codex (Session 8)
+
+### Focus
+- Task(s) tackled: Phase 2.3 preprocessed creation (instantiate descriptors during load, surface creation results, add regression coverage).
+- Dependencies touched: `platforms/python/host_vm.py`, `python/tests/test_vm_stream_loader.py`, `docs/hxe_format.md`, implementation plan/notes.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions:
+  - Added `VMController._instantiate_metadata_mailboxes` to bind `.mailbox` descriptors as soon as an image is loaded, stamping descriptor/capacity/mode data back into metadata and returning a `_mailbox_creation` summary to callers.
+  - Updated load results to include creation summaries, preserved binding hints, and ensured tasks cache the creation log for later executive hand-off.
+  - Documented the lifecycle in `docs/hxe_format.md` and extended streaming loader tests with a synthesized HXE v2 payload that proves descriptors exist before the VM runs and rebind operations remain idempotent.
+- Tests run (commands + result):
+  - `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_vm_stream_loader.py python/tests/test_metadata_preprocess.py python/tests/test_hxe_v2_metadata.py` (pass).
+- Follow-up actions / hand-off notes:
+  - Coordinate with executive Phase 2.3 to consume `_mailbox_creation` summaries (auto-handle bindings) and begin planning toolchain emission work (Phase 2.4).

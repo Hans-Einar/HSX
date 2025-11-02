@@ -2021,6 +2021,72 @@ class VMController:
         for event in pending:
             vm.emit_event(dict(event))
 
+    def _instantiate_metadata_mailboxes(self, pid: int, entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        results: List[Dict[str, Any]] = []
+        for entry in entries:
+            target_value = entry.get("target") or entry.get("name")
+            if not isinstance(target_value, str) or not target_value.strip():
+                results.append(
+                    {
+                        "target": target_value,
+                        "status": "error",
+                        "error": "missing_target",
+                    }
+                )
+                continue
+            target = target_value.strip()
+            capacity_value = entry.get("capacity", entry.get("queue_depth"))
+            if capacity_value in (None, "", 0):
+                capacity = None
+            else:
+                capacity = int(capacity_value)
+                if capacity <= 0:
+                    capacity = None
+            mode_value = entry.get("mode_mask", entry.get("mode", entry.get("flags", 0)))
+            mode_mask = int(mode_value) if mode_value not in (None, "") else 0
+            if mode_mask <= 0:
+                mode_mask = mbx_const.HSX_MBX_MODE_RDWR
+            else:
+                mode_mask &= 0xFFFF
+            owner_hint = entry.get("owner_pid")
+            try:
+                bind_pid = int(owner_hint) if owner_hint not in (None, "") else pid
+            except (TypeError, ValueError):
+                bind_pid = pid
+            try:
+                desc = self.mailboxes.bind_target(
+                    pid=bind_pid,
+                    target=target,
+                    capacity=capacity,
+                    mode_mask=mode_mask,
+                )
+            except MailboxError as exc:
+                results.append(
+                    {
+                        "target": target,
+                        "status": "error",
+                        "error": str(exc),
+                    }
+                )
+                continue
+            entry["descriptor"] = desc.descriptor_id
+            entry["capacity"] = desc.capacity
+            entry["queue_depth"] = desc.capacity
+            entry["flags"] = desc.mode_mask
+            entry["mode_mask"] = desc.mode_mask
+            entry["owner_pid"] = desc.owner_pid
+            results.append(
+                {
+                    "target": target,
+                    "status": "ok",
+                    "descriptor": desc.descriptor_id,
+                    "capacity": desc.capacity,
+                    "mode_mask": desc.mode_mask,
+                    "owner_pid": desc.owner_pid,
+                }
+            )
+        return results
+
     def _trace_mailbox_regs(self, label: str, vm: MiniVM, fn: int, *, extra: Optional[Dict[str, Any]] = None) -> None:
         """Append a compact register/PC snapshot to the mailbox trace log."""
         try:
@@ -3043,6 +3109,40 @@ class VMController:
         self.task_states[pid] = state
         self.mailboxes.register_task(pid)
         stdio_handles = self.mailboxes.ensure_stdio_handles(pid)
+        mailbox_creation: List[Dict[str, Any]] = []
+        if isinstance(metadata_obj, HXEMetadata) and metadata_obj.mailboxes:
+            mailbox_creation = self._instantiate_metadata_mailboxes(pid, metadata_obj.mailboxes)
+        metadata_mailboxes = metadata_dict.get("mailboxes")
+        if not isinstance(metadata_mailboxes, list):
+            metadata_mailboxes = None
+        if metadata_mailboxes is None and isinstance(metadata_obj, HXEMetadata) and metadata_obj.mailboxes:
+            metadata_mailboxes = [dict(entry) for entry in metadata_obj.mailboxes]
+            metadata_dict["mailboxes"] = metadata_mailboxes
+        if metadata_mailboxes is not None and isinstance(metadata_obj, HXEMetadata):
+            for idx, entry in enumerate(metadata_obj.mailboxes):
+                if idx >= len(metadata_mailboxes):
+                    metadata_mailboxes.append(dict(entry))
+                    continue
+                metadata_mailboxes[idx].update(
+                    {
+                        key: entry.get(key)
+                        for key in (
+                            "descriptor",
+                            "capacity",
+                            "queue_depth",
+                            "flags",
+                            "mode_mask",
+                            "owner_pid",
+                            "bindings",
+                            "target",
+                            "name",
+                        )
+                        if entry.get(key) is not None
+                    }
+                )
+        if mailbox_creation:
+            metadata_dict["_mailbox_creation"] = mailbox_creation
+            self.tasks[pid]["metadata_mailbox_creation"] = mailbox_creation
         fd_table = {int(k): int(v) for k, v in dict(ctx.get("fd_table", {})).items()}
         fd_table.update(
             {
@@ -3075,6 +3175,7 @@ class VMController:
             "metadata": metadata_dict,
             "meta_count": len(metadata_dict.get("sections", [])),
             "manifest_present": bool(header.get("manifest_present")),
+            "mailbox_creation": mailbox_creation,
         }
 
     def load_from_path(self, path: str, *, verbose: bool = False) -> Dict[str, Any]:

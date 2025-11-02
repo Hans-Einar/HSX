@@ -151,6 +151,8 @@ Each entry object supports the following fields (all optional unless noted):
 
 The loader validates the JSON structure, normalises numeric fields, and rejects duplicate mailbox names. Declarative bindings are stored for higher-level tooling but are not acted upon during image load yet.
 
+- **Precreation:** The Python loader binds each declared mailbox before the task runs. Creation results are surfaced both in the load response (`mailbox_creation`) and in `metadata._mailbox_creation`, and each metadata entry is updated with the resolved `descriptor`, `queue_depth`, and `mode_mask`.
+
 Legacy (pre-v2) images may still encode `.mailbox` entries as fixed-size binary structures:
 
 | Offset | Size | Field | Description |

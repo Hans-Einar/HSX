@@ -27,3 +27,4 @@ Legend: Status column uses **Done**, **In progress**, **Blocked**, or **Not star
 - 2025-11-03 - Executive Phases 4-5 delivered (clock polish, watch expressions, trace polling); Python milestone complete pending documentation sweep.
 - 2025-11-03 - Mailbox work unblocked by Executive event APIs; Phase 1 ready to start.
 - 2025-11-05 - Mailbox Phase 2 underway: declarative `.mailbox` schema documented and parser implemented (Phase 2.1-2.2 complete).
+- 2025-11-05 - Mailbox Phase 2.3: loader now pre-creates declarative mailboxes and reports `_mailbox_creation` results; Phase 2 continues with executive/tooling consumption.

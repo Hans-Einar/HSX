@@ -209,13 +209,13 @@ Design specifies creating mailboxes before VM execution (section 3.9). Ensures m
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.03--Mailbox](../../../04--Design/04.03--Mailbox.md)
-- [ ] Implement mailbox creation from .mailbox metadata
-- [ ] Create descriptors during task load (before VM execution)
-- [ ] Register mailbox bindings with executive
-- [ ] Handle creation failures (descriptor exhaustion)
-- [ ] Add preprocessed mailbox tests (verify created before VM runs)
-- [ ] Document preprocessed mailbox lifecycle
-- [ ] Update task load sequence documentation
+- [x] Implement mailbox creation from .mailbox metadata
+- [x] Create descriptors during task load (before VM execution)
+- [x] Register mailbox bindings with executive
+- [x] Handle creation failures (descriptor exhaustion)
+- [x] Add preprocessed mailbox tests (verify created before VM runs)
+- [x] Document preprocessed mailbox lifecycle
+- [x] Update task load sequence documentation
 
 ---
 
