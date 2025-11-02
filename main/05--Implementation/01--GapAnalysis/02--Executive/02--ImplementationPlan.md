@@ -310,12 +310,12 @@ Design specifies extending loader to handle version 0x0002 with metadata section
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
-- [ ] Extend Python MiniVM loader to recognise version 0x0002 (app_name, allow_multiple_instances, meta table) while remaining compatible with v1 images.
-- [ ] Expose metadata/detail blocks from `load_hxe_bytes()` so `ExecutiveState.load()` can consume them (including app_name + flags).
-- [ ] Implement metadata table parsing helpers for `.value`, `.cmd`, `.mailbox` sections and build canonical descriptor structures.
-- [ ] Teach `ExecutiveState.load()` to register declarative values/commands/mailboxes with existing managers (or stage stubs if runtime support is pending), and enforce allow_multiple_instances policy + app_name uniqueness.
-- [ ] Surface metadata in task records (`ps`, `info`, etc.) for downstream consumers.
-- [ ] Add pytest coverage for v2 loader paths (header parsing, metadata table, duplicate-instance handling) plus integration smoke via execd load.
+- [x] Extend Python MiniVM loader to recognise version 0x0002 (app_name, allow_multiple_instances, meta table) while remaining compatible with v1 images.
+- [x] Expose metadata/detail blocks from `load_hxe_bytes()` so `ExecutiveState.load()` can consume them (including app_name + flags).
+- [x] Implement metadata table parsing helpers for `.value`, `.cmd`, `.mailbox` sections and build canonical descriptor structures.
+- [x] Teach `ExecutiveState.load()` to register declarative values/commands/mailboxes with existing managers (or stage stubs if runtime support is pending), and enforce allow_multiple_instances policy + app_name uniqueness.
+- [x] Surface metadata in task records (`ps`, `info`, etc.) for downstream consumers.
+- [x] Add pytest coverage for v2 loader paths (header parsing, metadata table, duplicate-instance handling) plus integration smoke via execd load.
 - [ ] Update `docs/hxe_format.md`/protocol docs with any behavioural clarifications discovered during implementation.
 
 ---

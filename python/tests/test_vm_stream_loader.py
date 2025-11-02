@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from platforms.python.host_vm import VMController, load_hxe
+from platforms.python.host_vm import VMController, load_hxe, HXEMetadata
 
 
 SAMPLE_HXE = Path(__file__).resolve().parents[2] / "examples" / "tests" / "build" / "test_ir_half_main" / "main.hxe"
@@ -36,6 +36,11 @@ def test_streaming_loader_round_trip():
     assert pid not in controller.streaming_sessions
     assert controller.tasks[pid]["state"] == "running"
     assert controller.vm is not None
+    assert result["app_name"]
+    assert controller.tasks[pid]["app_name"] == result["app_name"]
+    assert isinstance(result.get("metadata"), dict)
+    assert result.get("allow_multiple_instances") is True
+    assert isinstance(controller.metadata_by_pid.get(pid), HXEMetadata)
     # Smoke a few steps to ensure the VM is operational.
     for _ in range(32):
         if not controller.vm.running:
@@ -49,8 +54,9 @@ def test_streaming_loader_rejects_overflow():
     begin = controller.load_stream_begin()
     pid = begin["pid"]
     controller.load_stream_write(pid, data)
-    overflow = controller.load_stream_write(pid, b"\x00")
-    assert overflow["status"] == "error"
+    controller.load_stream_write(pid, b"\x00")
+    result = controller.load_stream_end(pid)
+    assert result["status"] == "error"
     controller.load_stream_abort(pid)
     assert pid not in controller.streaming_sessions
 

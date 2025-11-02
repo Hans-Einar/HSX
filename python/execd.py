@@ -149,6 +149,7 @@ class ExecutiveState:
         self.symbol_tables: Dict[int, Dict[str, Any]] = {}
         self.disasm_cache: Dict[int, Dict[Tuple[int, int], Dict[str, Any]]] = {}
         self.memory_layouts: Dict[int, Dict[str, int]] = {}
+        self.image_metadata: Dict[int, Dict[str, Any]] = {}
         self.watchers: Dict[int, Dict[int, Dict[str, Any]]] = {}
         self._next_watch_id = 1
         self.task_state_pending: Dict[int, Dict[str, Any]] = {}
@@ -156,6 +157,23 @@ class ExecutiveState:
         self.trace_track_changed_regs = True
         self.symbol_cache_lock = threading.RLock()
         self.default_stack_frames = 16
+
+    def _stage_metadata(self, pid: int, metadata: Dict[str, Any]) -> None:
+        if not metadata:
+            return
+        if not isinstance(metadata, dict):
+            return
+        values = metadata.get("values")
+        commands = metadata.get("commands")
+        mailboxes = metadata.get("mailboxes")
+        self.log(
+            "debug",
+            "metadata_loaded",
+            pid=pid,
+            values=len(values) if isinstance(values, list) else 0,
+            commands=len(commands) if isinstance(commands, list) else 0,
+            mailboxes=len(mailboxes) if isinstance(mailboxes, list) else 0,
+        )
 
     def _normalise_pid_list(self, pid_lock: Any) -> List[int]:
         if pid_lock is None:
@@ -2000,6 +2018,9 @@ class ExecutiveState:
         stale_layouts = set(self.memory_layouts.keys()) - current_pids
         for pid in stale_layouts:
             self.memory_layouts.pop(pid, None)
+        stale_meta = set(self.image_metadata.keys()) - current_pids
+        for pid in stale_meta:
+            self.image_metadata.pop(pid, None)
         stale_trace = set(self.trace_last_regs.keys()) - current_pids
         for pid in stale_trace:
             self.trace_last_regs.pop(pid, None)
@@ -2055,11 +2076,19 @@ class ExecutiveState:
             task = self.tasks.get(pid_int, {})
             program = task.get("program") or info.get("program") or str(program_path)
             symbol_status = self.load_symbols_for_pid(pid_int, program=program, override=symbols)
+            metadata_summary = info.get("metadata") or {}
+            self.image_metadata[pid_int] = metadata_summary
+            self._stage_metadata(pid_int, metadata_summary)
             layout = {
                 "entry": self._coerce_int(info.get("entry")) if info.get("entry") is not None else None,
                 "code_len": self._coerce_int(info.get("code_len")) if info.get("code_len") is not None else None,
                 "ro_len": self._coerce_int(info.get("ro_len")) if info.get("ro_len") is not None else None,
                 "bss": self._coerce_int(info.get("bss")) if info.get("bss") is not None else None,
+                "app_name": task.get("app_name") or info.get("app_name"),
+                "app_name_base": task.get("app_name_base") or info.get("app_name_base"),
+                "meta_count": self._coerce_int(info.get("meta_count")) if info.get("meta_count") is not None else None,
+                "allow_multiple": info.get("allow_multiple_instances"),
+                "version": self._coerce_int(info.get("version")) if info.get("version") is not None else None,
             }
             self.memory_layouts[pid_int] = {k: v for k, v in layout.items() if v is not None}
         if symbol_status is not None:
@@ -2262,6 +2291,7 @@ class ExecutiveState:
         self.disasm_cache.pop(pid, None)
         self.memory_layouts.pop(pid, None)
         self.watchers.pop(pid, None)
+        self.image_metadata.pop(pid, None)
         return {"pid": pid, "state": "terminated"}
 
     def set_task_attrs(self, pid: int, *, priority: Optional[int] = None, quantum: Optional[int] = None) -> Dict[str, Any]:

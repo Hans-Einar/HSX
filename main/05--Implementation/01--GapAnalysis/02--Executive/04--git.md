@@ -11,6 +11,7 @@
 ## Commit Log
 | Date | Commit hash | Message | Author | Notes |
 | --- | --- | --- | --- | --- |
+| 2025-11-02 | 69df86f9a9cf | Mid-cycle review & trace config | Hans Einar | Follows code review: adds trace-config toggle, removes implicit PC deltas; tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py` |
 | 2025-11-01 | 75fc1873b0db | Trace step changed_regs diffing | Hans Einar | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py` |
 | 2025-11-01 | 8fec000f4dd9 | Task state events & docs | Hans Einar | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py` |
 | 2025-11-01 | bb6969edb48b | Event back-pressure metrics & slow-consumer handling | Hans Einar | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py` |
@@ -24,6 +25,7 @@
 | 2025-11-01 | cf5ccc0327d2 | Breakpoint halt semantics | Codex | Tests: `python -m pytest python/tests/test_executive_sessions.py` |
 | 2025-11-01 | pending | Session wiring + breakpoint RPC | Codex | Tests: `python -m pytest python/tests/test_executive_sessions.py` |
 | 2025-11-01 | ee9f0a2ac36c | Executive Phase 1 - Sessions & Event Streaming | Hans Einar | Tests: `python -m pytest python/tests/test_executive_sessions.py` |
+| 2025-11-02 | pending | HXE v2 metadata ingestion (Phase 3.1) | Codex | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_hxe_v2_metadata.py python/tests/test_vm_stream_loader.py python/tests/test_hxe_fuzz.py` |
 
 ## Pull Request
 - PR URL / ID: `<link or ID>`

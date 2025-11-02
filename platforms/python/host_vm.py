@@ -5,7 +5,7 @@ import socketserver
 import time
 import os
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from pathlib import Path
 import struct
 import sys
@@ -26,7 +26,10 @@ except ImportError as exc:  # pragma: no cover - require repo sources
     raise ImportError("HSX repo modules not found; ensure repository root on PYTHONPATH") from exc
 
 HSX_MAGIC = 0x48535845  # 'HSXE'
-HSX_VERSION = 0x0001
+HSX_VERSION_V1 = 0x0001
+HSX_VERSION_V2 = 0x0002
+HSX_VERSION = HSX_VERSION_V1
+SUPPORTED_HSX_VERSIONS = {HSX_VERSION_V1, HSX_VERSION_V2}
 MAX_CODE_LEN = 0x10000
 MAX_RODATA_LEN = 0x10000
 MAX_BSS_SIZE = 0x10000
@@ -35,8 +38,8 @@ HSX_ERR_STACK_UNDERFLOW = 0xFFFF_FF02
 HSX_ERR_STACK_OVERFLOW = 0xFFFF_FF03
 HSX_ERR_MEM_FAULT = 0xFFFF_FF04
 HSX_ERR_DIV_ZERO = 0xFFFF_FF05
-HEADER = struct.Struct(">IHHIIIIII")
-HEADER_FIELDS = (
+HEADER_V1 = struct.Struct(">IHHIIIIII")
+HEADER_V1_FIELDS = (
     "magic",
     "version",
     "flags",
@@ -47,8 +50,198 @@ HEADER_FIELDS = (
     "req_caps",
     "crc32",
 )
+HEADER_V2 = struct.Struct(">IHHIIIIII32sII24s")
+HEADER_V2_FIELDS = (
+    "magic",
+    "version",
+    "flags",
+    "entry",
+    "code_len",
+    "ro_len",
+    "bss_size",
+    "req_caps",
+    "crc32",
+    "app_name_raw",
+    "meta_offset",
+    "meta_count",
+    "reserved",
+)
+META_ENTRY_STRUCT = struct.Struct(">IIII")
+VALUE_ENTRY_STRUCT = struct.Struct(">BBBBHHHHHHHH")
+CMD_ENTRY_STRUCT = struct.Struct(">BBBBIHHI")
+MAILBOX_ENTRY_STRUCT = struct.Struct(">IHHQ")
+FLAG_MANIFEST_PRESENT = 0x0001
+FLAG_ALLOW_MULTIPLE = 0x0002
+METADATA_SECTION_VALUE = 1
+METADATA_SECTION_COMMAND = 2
+METADATA_SECTION_MAILBOX = 3
+CRC_FIELD_OFFSET = 0x1C
+CRC_FIELD_SIZE = 4
+
+# Backwards compatibility exports for existing tests/utilities that still import HEADER/HEADER_FIELDS.
+HEADER = HEADER_V1
+HEADER_FIELDS = HEADER_V1_FIELDS
 
 RECV_INFO_STRUCT = struct.Struct("<iiIII")
+
+
+@dataclass
+class HXEMetadata:
+    sections: List[Dict[str, Any]] = field(default_factory=list)
+    values: List[Dict[str, Any]] = field(default_factory=list)
+    commands: List[Dict[str, Any]] = field(default_factory=list)
+    mailboxes: List[Dict[str, Any]] = field(default_factory=list)
+
+
+def _empty_metadata() -> HXEMetadata:
+    return HXEMetadata()
+
+
+def _decode_metadata_string(section: bytes, offset: int) -> Optional[str]:
+    if offset == 0:
+        return None
+    if offset < 0 or offset >= len(section):
+        raise ValueError(f"metadata string offset {offset} out of range (size={len(section)})")
+    end = section.find(b"\x00", offset)
+    if end == -1:
+        raise ValueError("metadata string is not null-terminated")
+    raw = section[offset:end]
+    if not raw:
+        return ""
+    return raw.decode("utf-8")
+
+
+def _parse_value_metadata(section: bytes, entry_count: int) -> List[Dict[str, Any]]:
+    entry_size = VALUE_ENTRY_STRUCT.size
+    required = entry_count * entry_size
+    if required > len(section):
+        raise ValueError("value metadata table truncated")
+    entries: List[Dict[str, Any]] = []
+    for idx in range(entry_count):
+        start = idx * entry_size
+        (
+            group_id,
+            value_id,
+            flags,
+            auth_level,
+            init_raw,
+            name_offset,
+            unit_offset,
+            epsilon_raw,
+            min_raw,
+            max_raw,
+            persist_key,
+            reserved,
+        ) = VALUE_ENTRY_STRUCT.unpack_from(section, start)
+        entry = {
+            "group_id": group_id,
+            "value_id": value_id,
+            "flags": flags,
+            "auth_level": auth_level,
+            "init_raw": init_raw,
+            "init_value": f16_to_f32(init_raw),
+            "name": _decode_metadata_string(section, name_offset),
+            "unit": _decode_metadata_string(section, unit_offset),
+            "epsilon_raw": epsilon_raw,
+            "epsilon": f16_to_f32(epsilon_raw),
+            "min_raw": min_raw,
+            "min": f16_to_f32(min_raw),
+            "max_raw": max_raw,
+            "max": f16_to_f32(max_raw),
+            "persist_key": persist_key,
+            "reserved": reserved,
+        }
+        entries.append(entry)
+    return entries
+
+
+def _parse_command_metadata(section: bytes, entry_count: int) -> List[Dict[str, Any]]:
+    entry_size = CMD_ENTRY_STRUCT.size
+    required = entry_count * entry_size
+    if required > len(section):
+        raise ValueError("command metadata table truncated")
+    entries: List[Dict[str, Any]] = []
+    for idx in range(entry_count):
+        start = idx * entry_size
+        (
+            group_id,
+            cmd_id,
+            flags,
+            auth_level,
+            handler_offset,
+            name_offset,
+            help_offset,
+            reserved,
+        ) = CMD_ENTRY_STRUCT.unpack_from(section, start)
+        entry = {
+            "group_id": group_id,
+            "cmd_id": cmd_id,
+            "flags": flags,
+            "auth_level": auth_level,
+            "handler_offset": handler_offset,
+            "name": _decode_metadata_string(section, name_offset),
+            "help": _decode_metadata_string(section, help_offset),
+            "reserved": reserved,
+        }
+        entries.append(entry)
+    return entries
+
+
+def _parse_mailbox_metadata(section: bytes, entry_count: int) -> List[Dict[str, Any]]:
+    entry_size = MAILBOX_ENTRY_STRUCT.size
+    required = entry_count * entry_size
+    if required > len(section):
+        raise ValueError("mailbox metadata table truncated")
+    entries: List[Dict[str, Any]] = []
+    for idx in range(entry_count):
+        start = idx * entry_size
+        name_offset, queue_depth, flags, reserved = MAILBOX_ENTRY_STRUCT.unpack_from(section, start)
+        entry = {
+            "name": _decode_metadata_string(section, name_offset),
+            "queue_depth": queue_depth,
+            "flags": flags,
+            "reserved": reserved,
+        }
+        entries.append(entry)
+    return entries
+
+
+def _parse_metadata_sections(data: bytes, header: Dict[str, Any], header_size: int) -> HXEMetadata:
+    meta_count = int(header.get("meta_count") or 0)
+    meta_offset = int(header.get("meta_offset") or 0)
+    if meta_count <= 0 or meta_offset <= 0:
+        return _empty_metadata()
+
+    table_size = meta_count * META_ENTRY_STRUCT.size
+    if meta_offset < header_size or meta_offset + table_size > len(data):
+        raise ValueError("metadata table outside HXE payload bounds")
+
+    bundle = HXEMetadata()
+    for index in range(meta_count):
+        entry_offset = meta_offset + index * META_ENTRY_STRUCT.size
+        section_type, section_offset, section_size, entry_count = META_ENTRY_STRUCT.unpack_from(data, entry_offset)
+        if section_offset < header_size or section_offset + section_size > len(data):
+            raise ValueError(f"metadata section {index} exceeds HXE length")
+        section_bytes = data[section_offset : section_offset + section_size]
+        section_info = {
+            "type": section_type,
+            "offset": section_offset,
+            "size": section_size,
+            "entry_count": entry_count,
+        }
+        if section_type == METADATA_SECTION_VALUE:
+            section_info["entries"] = _parse_value_metadata(section_bytes, entry_count)
+            bundle.values.extend(section_info["entries"])
+        elif section_type == METADATA_SECTION_COMMAND:
+            section_info["entries"] = _parse_command_metadata(section_bytes, entry_count)
+            bundle.commands.extend(section_info["entries"])
+        elif section_type == METADATA_SECTION_MAILBOX:
+            section_info["entries"] = _parse_mailbox_metadata(section_bytes, entry_count)
+            bundle.mailboxes.extend(section_info["entries"])
+        else:
+            section_info["entries"] = []
+        bundle.sections.append(section_info)
+    return bundle
 
 REGISTER_BANK_BYTES = 16 * 4  # 16 GPRs × 32-bit
 DEFAULT_STACK_BYTES = 0x1000  # 4 KiB per task (tunable)
@@ -1561,6 +1754,7 @@ class VMController:
         self.scheduler_trace: deque[Dict[str, Any]] = deque(maxlen=256)
         self.scheduler_counters: Dict[int, Dict[str, int]] = defaultdict(dict)
         self.streaming_sessions: Dict[int, Dict[str, Any]] = {}
+        self.metadata_by_pid: Dict[int, HXEMetadata] = {}
 
     def _trace_mailbox_regs(self, label: str, vm: MiniVM, fn: int, *, extra: Optional[Dict[str, Any]] = None) -> None:
         """Append a compact register/PC snapshot to the mailbox trace log."""
@@ -1575,6 +1769,45 @@ class VMController:
                 )
         except OSError:
             pass
+
+    def _normalise_app_name(self, name: Optional[str]) -> str:
+        if not name:
+            return ""
+        clean = str(name).strip()
+        if len(clean) > 31:
+            clean = clean[:31]
+        return clean
+
+    def _default_app_name(self, program_path: Optional[str], pid: int) -> str:
+        if program_path:
+            stem = Path(program_path).stem
+            stem = self._normalise_app_name(stem)
+            if stem:
+                return stem
+        return f"task_{pid}"
+
+    def _assign_app_instance_name(self, base_name: str, allow_multiple: bool) -> str:
+        base = self._normalise_app_name(base_name)
+        if not base:
+            base = "app"
+        existing = {task.get("app_name") for task in self.tasks.values() if task.get("app_name")}
+        if base not in existing:
+            return base
+        if not allow_multiple:
+            raise ValueError(f"app_exists:{base}")
+        suffix = 0
+        max_len = 31
+        while True:
+            suffix_token = f"_#{suffix}"
+            trimmed = base
+            if len(trimmed) + len(suffix_token) > max_len:
+                trimmed = trimmed[: max_len - len(suffix_token)]
+                if not trimmed:
+                    trimmed = "app"
+            candidate = f"{trimmed}{suffix_token}"
+            if candidate not in existing:
+                return candidate
+            suffix += 1
 
     def reset(self) -> Dict[str, Any]:
         self.vm = None
@@ -1597,6 +1830,7 @@ class VMController:
         self.scheduler_trace.clear()
         self.scheduler_counters.clear()
         self.streaming_sessions.clear()
+        self.metadata_by_pid.clear()
         return {"status": "ok"}
 
     def mailbox_snapshot(self) -> List[Dict[str, Any]]:
@@ -2458,6 +2692,17 @@ class VMController:
         else:
             # Ensure next_pid always advances beyond explicitly provided pid.
             self.next_pid = max(self.next_pid, pid + 1)
+        if program_path is None:
+            program_label = f"<stream:{pid}>"
+        else:
+            program_label = str(program_path)
+
+        allow_multiple = bool(header.get("allow_multiple_instances", True))
+        base_app_name = header.get("app_name") or self._default_app_name(program_label, pid)
+        assigned_app_name = self._assign_app_instance_name(base_app_name, allow_multiple)
+        header["app_name_base"] = base_app_name
+        header["app_instance"] = assigned_app_name
+
         ctx = state["context"]
         allocation = self._task_memory.get(pid)
         if allocation is None:
@@ -2492,10 +2737,8 @@ class VMController:
         ctx["sp"] = allocation["sp"]
         ctx["stack_size"] = allocation["stack_size"]
         state["context"] = ctx
-        if program_path is None:
-            program_label = f"<stream:{pid}>"
-        else:
-            program_label = str(program_path)
+        metadata_dict = header.get("metadata") or {}
+        metadata_obj = header.get("_metadata_obj")
         self.tasks[pid] = {
             "pid": pid,
             "program": program_label,
@@ -2512,6 +2755,10 @@ class VMController:
             "stack_base": allocation["stack_base"],
             "stack_limit": allocation["stack_limit"],
             "stack_size": allocation["stack_size"],
+            "app_name": assigned_app_name,
+            "app_name_base": base_app_name,
+            "allow_multiple_instances": allow_multiple,
+            "metadata": metadata_dict,
         }
         self.task_states[pid] = state
         self.mailboxes.register_task(pid)
@@ -2529,6 +2776,8 @@ class VMController:
             }
         )
         ctx["fd_table"] = fd_table
+        self.metadata_by_pid[pid] = metadata_obj if isinstance(metadata_obj, HXEMetadata) else _empty_metadata()
+        self.header = header
         self.program_path = program_label
         self._activate_task(pid, state_override=state)
         return {
@@ -2537,6 +2786,15 @@ class VMController:
             "code_len": header["code_len"],
             "ro_len": header["ro_len"],
             "bss": header["bss_size"],
+            "version": header["version"],
+            "flags": header["flags"],
+            "req_caps": header["req_caps"],
+            "app_name": assigned_app_name,
+            "app_name_base": base_app_name,
+            "allow_multiple_instances": allow_multiple,
+            "metadata": metadata_dict,
+            "meta_count": len(metadata_dict.get("sections", [])),
+            "manifest_present": bool(header.get("manifest_present")),
         }
 
     def load_from_path(self, path: str, *, verbose: bool = False) -> Dict[str, Any]:
@@ -2552,8 +2810,6 @@ class VMController:
             "pid": pid,
             "buffer": bytearray(),
             "state": "writing",
-            "header": None,
-            "expected_total": None,
             "program": label,
         }
         return {"status": "ok", "pid": pid}
@@ -2570,20 +2826,6 @@ class VMController:
             chunk = bytes(chunk)
         buffer = session["buffer"]
         buffer.extend(chunk)
-        if session["header"] is None and len(buffer) >= HEADER.size:
-            header_bytes = bytes(buffer[: HEADER.size])
-            header = dict(zip(HEADER_FIELDS, HEADER.unpack_from(header_bytes)))
-            try:
-                _validate_hxe_header(header)
-            except ValueError as exc:  # pragma: no cover - defensive
-                session["state"] = "error"
-                return {"status": "error", "error": "EBADMSG", "message": str(exc)}
-            session["header"] = header
-            session["expected_total"] = HEADER.size + header["code_len"] + header["ro_len"]
-        expected_total = session.get("expected_total")
-        if expected_total is not None and len(buffer) > expected_total:
-            session["state"] = "error"
-            return {"status": "error", "error": "EBADMSG", "message": "stream exceeds declared length"}
         return {"status": "ok", "bytes": len(chunk)}
 
     def load_stream_end(self, pid: int, *, verbose: bool = False) -> Dict[str, Any]:
@@ -2592,11 +2834,8 @@ class VMController:
             return {"status": "error", "error": "ESRCH", "message": f"unknown streaming pid {pid}"}
         if session.get("state") == "error":
             return {"status": "error", "error": "EBUSY", "message": "streaming session is in an error state"}
-        expected_total = session.get("expected_total")
-        if expected_total is None:
-            return {"status": "error", "error": "EBADMSG", "message": "HXE header incomplete"} 
         buffer = session["buffer"]
-        if len(buffer) != expected_total:
+        if len(buffer) < HEADER_V1.size:
             return {"status": "error", "error": "EBADMSG", "message": "HXE payload incomplete"}
         try:
             header, code, rodata = load_hxe_bytes(bytes(buffer), verbose=verbose)
@@ -2622,6 +2861,7 @@ class VMController:
             self._release_task_memory(pid)
         self.tasks.pop(pid, None)
         self.task_states.pop(pid, None)
+        self.metadata_by_pid.pop(pid, None)
         return {"status": "ok"}
 
     # ------------------------------------------------------------------
@@ -3002,6 +3242,7 @@ class VMController:
         self.tasks.pop(pid, None)
         self.task_states.pop(pid, None)
         self.debug_sessions.pop(pid, None)
+        self.metadata_by_pid.pop(pid, None)
         summary["state"] = "terminated"
         if self.tasks:
             remaining = sorted(self.tasks)
@@ -3517,15 +3758,16 @@ class VMServer(socketserver.ThreadingTCPServer):
         self.controller = controller
         controller.server = self
 
-def _validate_hxe_header(header: Dict[str, int]) -> None:
+def _validate_hxe_header(header: Dict[str, Any]) -> None:
     if header["magic"] != HSX_MAGIC:
         raise ValueError(f"Bad magic 0x{header['magic']:08X}")
-    if header["version"] != HSX_VERSION:
-        raise ValueError(f"Unsupported HSXE version 0x{header['version']:04X}")
-    code_len = header["code_len"]
-    ro_len = header["ro_len"]
-    bss_size = header["bss_size"]
-    entry = header["entry"]
+    version = int(header.get("version", -1))
+    if version not in SUPPORTED_HSX_VERSIONS:
+        raise ValueError(f"Unsupported HSXE version 0x{version:04X}")
+    code_len = int(header["code_len"])
+    ro_len = int(header["ro_len"])
+    bss_size = int(header["bss_size"])
+    entry = int(header["entry"])
     if code_len < 0 or ro_len < 0 or bss_size < 0:
         raise ValueError("Negative section length not permitted")
     if code_len > MAX_CODE_LEN:
@@ -3538,40 +3780,61 @@ def _validate_hxe_header(header: Dict[str, int]) -> None:
         raise ValueError("Code section must be 4-byte aligned")
     if entry % 4 != 0:
         raise ValueError("Entry address must be 4-byte aligned")
+    if version == HSX_VERSION_V2:
+        meta_offset = int(header.get("meta_offset") or 0)
+        meta_count = int(header.get("meta_count") or 0)
+        if meta_offset < 0 or meta_count < 0:
+            raise ValueError("Metadata offset/count must be non-negative")
 
 
 def load_hxe_bytes(data: bytes, *, verbose: bool = False):
-    if len(data) < HEADER.size:
+    if len(data) < HEADER_V1.size:
         raise ValueError(".hxe file too small")
 
-    fields = HEADER.unpack_from(data)
-    header = dict(zip(HEADER_FIELDS, fields))
+    base_values = dict(zip(HEADER_V1_FIELDS, HEADER_V1.unpack_from(data)))
+    version = base_values["version"]
+    header_size = HEADER_V1.size
+    header: Dict[str, Any] = dict(base_values)
+    header["manifest_present"] = bool(header["flags"] & FLAG_MANIFEST_PRESENT)
+    header["allow_multiple_instances"] = True
+    header["app_name"] = None
+    header["meta_offset"] = 0
+    header["meta_count"] = 0
 
+    if version == HSX_VERSION_V2:
+        if len(data) < HEADER_V2.size:
+            raise ValueError("HXE header truncated (v2 requires 96 bytes)")
+        v2_values = dict(zip(HEADER_V2_FIELDS, HEADER_V2.unpack_from(data)))
+        reserved = v2_values.pop("reserved")
+        if reserved.strip(b"\x00"):
+            raise ValueError("Reserved HXE header bytes must be zero")
+        app_name_raw = v2_values.pop("app_name_raw")
+        try:
+            app_name = app_name_raw.split(b"\x00", 1)[0].decode("ascii")
+        except UnicodeDecodeError as exc:
+            raise ValueError("HXE app_name must be ASCII") from exc
+        app_name = app_name.strip()
+        header.update(v2_values)
+        header["app_name"] = app_name or None
+        header["manifest_present"] = bool(header["flags"] & FLAG_MANIFEST_PRESENT)
+        header["allow_multiple_instances"] = bool(header["flags"] & FLAG_ALLOW_MULTIPLE)
+        header_size = HEADER_V2.size
+    elif version != HSX_VERSION_V1:
+        raise ValueError(f"Unsupported HSXE version 0x{version:04X}")
+
+    header["header_size"] = header_size
     _validate_hxe_header(header)
-    crc_input = data[: HEADER.size - 4] + data[HEADER.size :]
+
+    crc_input = data[:CRC_FIELD_OFFSET] + data[header_size:]
     calc_crc = zlib.crc32(crc_input) & 0xFFFFFFFF
     if calc_crc != header["crc32"]:
         raise ValueError(f"CRC mismatch: file=0x{header['crc32']:08X} calc=0x{calc_crc:08X}")
 
-    code_len = header["code_len"]
-    ro_len = header["ro_len"]
-    bss_size = header["bss_size"]
-    entry = header["entry"]
+    code_len = int(header["code_len"])
+    ro_len = int(header["ro_len"])
+    entry = int(header["entry"])
 
-    if code_len < 0 or ro_len < 0 or bss_size < 0:
-        raise ValueError("Negative section length not permitted")
-    if code_len > MAX_CODE_LEN:
-        raise ValueError("Code section exceeds VM capacity")
-    if ro_len > MAX_RODATA_LEN:
-        raise ValueError("RODATA section exceeds VM capacity")
-    if bss_size > MAX_BSS_SIZE:
-        raise ValueError("BSS size exceeds VM capacity")
-    if code_len % 4 != 0:
-        raise ValueError("Code section must be 4-byte aligned")
-    if entry % 4 != 0:
-        raise ValueError("Entry address must be 4-byte aligned")
-
-    code_start = HEADER.size
+    code_start = header_size
     code_end = code_start + code_len
     ro_end = code_end + ro_len
 
@@ -3580,12 +3843,27 @@ def load_hxe_bytes(data: bytes, *, verbose: bool = False):
     if entry < 0 or entry >= code_len:
         raise ValueError("Entry point outside code section")
 
+    if version == HSX_VERSION_V2 and header.get("meta_offset"):
+        meta_offset = int(header["meta_offset"])
+        if meta_offset < ro_end:
+            raise ValueError("Metadata table overlaps code or rodata sections")
+
     code = data[code_start:code_end]
     rodata = data[code_end:ro_end]
 
+    metadata_obj = (
+        _parse_metadata_sections(data, header, header_size)
+        if version == HSX_VERSION_V2
+        else _empty_metadata()
+    )
+    header["_metadata_obj"] = metadata_obj
+    header["metadata"] = asdict(metadata_obj)
+
     if verbose:
+        app_label = header.get("app_name") or "<unnamed>"
         print(
-            f"[HXE] entry=0x{entry:08X} code_len={code_len} ro_len={ro_len} bss={bss_size} caps=0x{header['req_caps']:08X}"
+            f"[HXE] version=0x{version:04X} app='{app_label}' entry=0x{entry:08X} "
+            f"code_len={code_len} ro_len={ro_len} bss={header['bss_size']} caps=0x{header['req_caps']:08X}"
         )
     return header, code, rodata
 

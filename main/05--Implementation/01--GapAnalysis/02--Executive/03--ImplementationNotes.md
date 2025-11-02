@@ -292,3 +292,26 @@ Start new sections chronologically. Keep notes concise but actionable so the nex
 
 ### Follow-up actions / hand-off notes
 - Consider surfacing `changed_regs` in higher-level debugger views (e.g., selective register refresh) and exposing a configuration knob once client requirements solidify.
+## 2025-11-03 - Codex (Session 15)
+
+### Focus
+- Task(s) tackled: Phase 3.1 HXE v2 loader + metadata exposure (MiniVM loader updates, executive plumbing, regression coverage).
+- Dependencies touched: `platforms/python/host_vm.py`, `python/execd.py`, `python/tests/test_hxe_v2_metadata.py`, `python/tests/test_vm_stream_loader.py`, `python/tests/test_hxe_fuzz.py`, `main/05--Implementation/01--GapAnalysis/02--Executive/02--ImplementationPlan.md`.
+
+### Status
+- IN PROGRESS
+
+### Details
+- Taught `load_hxe_bytes()` to detect v1/v2 headers, decode app names, allow_multiple flags, and parse metadata tables into canonical descriptors (value/cmd/mailbox) with string resolution and CRC validation that excludes the extended header fields.
+- Updated `VMController` to assign unique app instance names, surface metadata/app fields in task records and return payloads, maintain `metadata_by_pid`, and adapt streaming loads for variable header sizes.
+- Extended `ExecutiveState.load()` to capture metadata summaries, log staged resource counts, and retain app/metadata details in layout snapshots for downstream tooling.
+- Added regression coverage for the new behaviour (v2 metadata unit test, streaming loader assertions, fuzz test adjustments).
+
+### Tests run (commands + result)
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_hxe_v2_metadata.py`
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_vm_stream_loader.py`
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_hxe_fuzz.py`
+
+### Follow-up actions / hand-off notes
+- Update `docs/hxe_format.md` and related protocol notes to reflect v2 header semantics and metadata availability.
+- Integrate metadata registration with value/command/mailbox managers (Phase 3.2) once the runtime hooks are ready, and add duplicate-instance regression coverage when metadata-driven loads land.

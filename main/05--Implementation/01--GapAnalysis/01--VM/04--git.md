@@ -1,6 +1,6 @@
-# Git Log — VM Shift Opcode Work
+# Git Log - VM Shift Opcode Work
 
-> File name: `(4)git.md`. Use this log to capture branch, commits, and PR status for the VM implementation gap analysis.
+> File name: `04--git.md`. Use this log to capture branch, commits, and PR status for the VM implementation gap analysis.
 
 ## Branch
 - Name: `implementation/VM`
@@ -11,12 +11,13 @@
 ## Commit Log
 | Date | Commit hash | Message | Author | Notes |
 | --- | --- | --- | --- | --- |
-| 2025-11-01 | 369908abfc54ed0b3a98e361759c242e62c7d6b4 | Shift Support | Hans Einar | Adds LSL/LSR/ASR opcodes, documentation updates, and regression test `python/tests/test_vm_shift_ops.py`. ✔ `python -m pytest python/tests/test_vm_shift_ops.py` |
-| 2025-11-01 | e20d92cdae354701ad9e38d4dfea690718567ae1 | MiniVM PSW flags | Hans Einar | Implements full Z/C/N/V handling across ADD/SUB/CMP/MUL/logic/shift ops, documents PSW semantics, and adds `python/tests/test_vm_psw_flags.py`. ✔ `python -m pytest python/tests` |
-| 2025-11-01 | 7f7cc5b7696d3c149ffae2b903a119e65ad7110e | Carry-aware arithmetic | Hans Einar | Adds ADC/SBC opcodes (VM + assembler/disassembler), updates docs, and extends PSW tests. ✔ `python -m pytest python/tests` |
-| 2025-11-01 | 9e8b9c7054734151461cf7778d5a12f435a14eb5 | Integer DIV support | Hans Einar | Implements signed DIV with zero-trap handling, updates docs, and adds `python/tests/test_vm_div.py`. ✔ `python -m pytest python/tests` |
-| 2025-11-01 | 0caa12fc66d4601322a21c20d9215dc40093d575 | Trace API snapshot | Hans Einar | Adds VM trace accessors/events, updates gap notes, and adds `python/tests/test_vm_trace_api.py`. ✔ `python -m pytest python/tests` |
-| 2025-11-01 | a1e640be6a26fa97a1bd83ec4f3f61d61dfd81cd | Streaming loader | Hans Einar | Implements VM streaming load APIs and tests (`python/tests/test_vm_stream_loader.py`). ✔ `python -m pytest python/tests` |
+| 2025-11-02 | 69df86f9a9cf | Mid-cycle VM review fixes | Hans Einar | Clears shift overflow flag and refreshes docs; tests: `python -m pytest python/tests/test_vm_shift_ops.py`. |
+| 2025-11-01 | 369908abfc54ed0b3a98e361759c242e62c7d6b4 | Shift Support | Hans Einar | Adds LSL/LSR/ASR opcodes, documentation updates, and regression test `python/tests/test_vm_shift_ops.py`; tests: `python -m pytest python/tests/test_vm_shift_ops.py`. |
+| 2025-11-01 | e20d92cdae354701ad9e38d4dfea690718567ae1 | MiniVM PSW flags | Hans Einar | Implements full Z/C/N/V handling across ADD/SUB/CMP/MUL/logic/shift ops, documents PSW semantics, and adds `python/tests/test_vm_psw_flags.py`; tests: `python -m pytest python/tests`. |
+| 2025-11-01 | 7f7cc5b7696d3c149ffae2b903a119e65ad7110e | Carry-aware arithmetic | Hans Einar | Adds ADC/SBC opcodes (VM + assembler/disassembler), updates docs, and extends PSW tests; tests: `python -m pytest python/tests`. |
+| 2025-11-01 | 9e8b9c7054734151461cf7778d5a12f435a14eb5 | Integer DIV support | Hans Einar | Implements signed DIV with zero-trap handling, updates docs, and adds `python/tests/test_vm_div.py`; tests: `python -m pytest python/tests`. |
+| 2025-11-01 | 0caa12fc66d4601322a21c20d9215dc40093d575 | Trace API snapshot | Hans Einar | Adds VM trace accessors/events, updates gap notes, and adds `python/tests/test_vm_trace_api.py`; tests: `python -m pytest python/tests`. |
+| 2025-11-01 | a1e640be6a26fa97a1bd83ec4f3f61d61dfd81cd | Streaming loader | Hans Einar | Implements VM streaming load APIs and tests (`python/tests/test_vm_stream_loader.py`); tests: `python -m pytest python/tests`. |
 
 ## Pull Request
 - PR URL / ID: _TBD_
