@@ -449,6 +449,17 @@ def test_trace_buffer_disable_clears_records():
     assert info["count"] == 0
 
 
+def test_trace_polling_uses_trace_last_when_no_events():
+    state, vm = make_debug_state()
+    vm.step_delta = 4
+    before = state.trace_records(1)
+    assert before["count"] == 0
+    result = state.step(steps=1, pid=1)
+    assert "trace_last" not in result
+    after = state.trace_records(1)
+    assert after["count"] >= 1
+
+
 def test_trace_export_returns_format():
     state = make_state()
     state.set_trace_buffer_size(4)
@@ -683,13 +694,28 @@ class DebugVM:
     def step(self, steps: int, pid: int | None = None) -> dict:
         self.step_calls += 1
         self.paused = False
+        prev_pc = self.pc
         self.pc = (self.pc + self.step_delta) & 0xFFFF
         self.regs_list[7] = self.fp & 0xFFFFFFFF
-        return {"executed": 1 if steps is not None else 0, "running": True, "current_pid": pid, "paused": False}
+        trace_last = {
+            "pid": pid if pid is not None else 1,
+            "pc": prev_pc & 0xFFFF,
+            "next_pc": self.pc & 0xFFFF,
+            "opcode": 0,
+            "flags": 0,
+            "regs": list(self.regs_list),
+        }
+        return {
+            "executed": 1 if steps is not None else 0,
+            "running": True,
+            "current_pid": pid,
+            "paused": False,
+            "events": [],
+            "trace_last": trace_last,
+        }
 
     def read_mem(self, addr: int, length: int, pid: int | None = None) -> bytes:
         return bytes(self.memory.get((addr + i) & 0xFFFFFFFF, 0) for i in range(length))
-
     def kill(self, pid: int) -> dict:
         self.paused = False
         return {"status": "ok"}
@@ -1081,3 +1107,4 @@ def test_disasm_read_basic():
     assert cached_first["cached"] is False
     cached_second = state.disasm_read(1, address=base, count=3, mode="cached")
     assert cached_second["cached"] is True
+

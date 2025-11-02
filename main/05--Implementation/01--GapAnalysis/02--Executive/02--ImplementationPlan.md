@@ -501,13 +501,12 @@ Design specifies polling VM minimal trace state after each step (section 6.4). I
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
-- [ ] Call vm_get_last_pc() after each VM step
-- [ ] Call vm_get_last_opcode() after each VM step
-- [ ] Call vm_get_last_regs() after each VM step
-- [ ] Store trace data in executive trace buffer
-- [ ] Add trace polling configuration (enable/disable)
-- [ ] Add trace polling tests
-- [ ] Document trace polling behavior
+- [x] Surface `trace_last` / `vm_trace_last` snapshots (PC/opcode/regs) after each VM step
+- [x] Store polled trace data in the executive trace buffer when no `trace_step` events are emitted
+- [x] Capture memory access metadata alongside polled instruction records
+- [x] Honour existing trace buffer configuration (size `0` disables polling)
+- [x] Add trace polling tests (synthetic VM + integration)
+- [x] Document trace polling workflow and CLI usage
 
 ---
 

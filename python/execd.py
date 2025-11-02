@@ -2218,6 +2218,29 @@ class ExecutiveState:
             )[0]
             buffer.append(normalized)
 
+    def _emit_trace_snapshot(self, pid: int, snapshot: Mapping[str, Any]) -> None:
+        pid_value = self._optional_int(snapshot.get("pid")) or pid
+        payload: Dict[str, Any] = {k: v for k, v in snapshot.items() if k != "pid"}
+        regs_value = payload.get("regs")
+        if isinstance(regs_value, list):
+            payload["regs"] = [int(val) & 0xFFFFFFFF for val in regs_value]
+        elif isinstance(regs_value, tuple):
+            payload["regs"] = [int(val) & 0xFFFFFFFF for val in regs_value]
+        else:
+            payload["regs"] = []
+        if "flags" in payload:
+            try:
+                payload["flags"] = int(payload["flags"]) & 0xFF
+            except (TypeError, ValueError):
+                payload["flags"] = 0
+        else:
+            payload["flags"] = 0
+        mem_access = payload.get("mem_access")
+        if isinstance(mem_access, dict):
+            payload["mem_access"] = dict(mem_access)
+        self._handle_trace_step_event(pid_value, payload)
+        self.emit_event("trace_step", pid=pid_value, data=payload)
+
     def _parse_event_filters(self, filters: Optional[Dict[str, Any]]) -> Tuple[Optional[Set[int]], Optional[Set[str]], Optional[int]]:
         if not isinstance(filters, dict):
             return None, None, None
@@ -2742,7 +2765,8 @@ class ExecutiveState:
             executed=executed,
             source=source,
         )
-        events = result.get('events') or []
+        events = result.get("events") or []
+        has_trace_event = any(evt.get("type") == "trace_step" for evt in events)
         self._process_vm_events(events)
         if executed > 0:
             self.total_steps += executed
@@ -2768,6 +2792,16 @@ class ExecutiveState:
                 paused=result.get("paused"),
             )
         self._last_vm_running = running_flag
+        trace_last = result.pop("trace_last", None)
+        if not has_trace_event and trace_last:
+            pid_from_trace = self._optional_int(trace_last.get("pid"))
+            if pid_from_trace is None:
+                pid_from_trace = self._optional_int(result.get("current_pid")) or self.current_pid
+            if pid_from_trace is not None:
+                try:
+                    self._emit_trace_snapshot(pid_from_trace, trace_last)
+                except Exception:
+                    pass
         self._refresh_tasks()
         watch_events = self._check_watches(pid if pid is not None else None)
         if watch_events:

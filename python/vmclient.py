@@ -149,6 +149,12 @@ class VMClient:
             payload["mode"] = 1 if enable else 0
         return _check_ok(self.request(payload)).get("trace", {})
 
+    def trace_last(self, pid: int | None = None) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {"cmd": "vm_trace_last"}
+        if pid is not None:
+            payload["pid"] = pid
+        return _check_ok(self.request(payload)).get("trace", {})
+
     def restart(self, targets: list[str] | None = None) -> Dict[str, Any]:
         payload: Dict[str, Any] = {"cmd": "restart"}
         if targets:

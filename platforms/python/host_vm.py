@@ -619,6 +619,7 @@ class MiniVM:
         self._repeat_pc_count: int = 0
         self._last_opcode: Optional[int] = None
         self._last_regs: List[int] = [0] * 16
+        self._last_mem_access: Optional[Dict[str, Any]] = None
         self._legacy_exec_module_warned: bool = False
         self.debug_enabled: bool = False
         self.debug_breakpoints: Set[int] = set()
@@ -1541,6 +1542,7 @@ class MiniVM:
             if mem_access:
                 event["mem_access"] = dict(mem_access)
             self.emit_event(event)
+        self._last_mem_access = dict(mem_access) if mem_access else None
 
     def get_last_pc(self) -> int:
         if self._last_pc is None:
@@ -1554,6 +1556,11 @@ class MiniVM:
 
     def get_last_regs(self) -> List[int]:
         return list(self._last_regs)
+
+    def get_last_mem_access(self) -> Optional[Dict[str, Any]]:
+        if self._last_mem_access is None:
+            return None
+        return dict(self._last_mem_access)
 
     def handle_svc(self, mod, fn):
         if mod == 0x0 and fn == 0:
@@ -3237,7 +3244,14 @@ class VMController:
             if dbg_state is not None:
                 dbg_state.halted = False
 
-        return {
+        trace_last = None
+        if self.vm is not None and last_pid is not None:
+            try:
+                trace_last = self.trace_last_snapshot(last_pid)
+            except Exception:
+                trace_last = None
+
+        result = {
             "executed": executed,
             "running": running_flag,
             "pc": last_snapshot.get("pc") if last_snapshot else None,
@@ -3250,6 +3264,33 @@ class VMController:
             "next_pid": next_pid,
             "debug_event": debug_event,
         }
+        if trace_last:
+            result["trace_last"] = trace_last
+        return result
+
+    def trace_last_snapshot(self, pid: Optional[int] = None) -> Dict[str, Any]:
+        vm = self._require_vm()
+        trace_pid = pid
+        if trace_pid is None:
+            ctx = vm.context
+            if ctx and ctx.pid is not None:
+                trace_pid = ctx.pid
+            else:
+                trace_pid = self.current_pid
+        snapshot: Dict[str, Any] = {
+            "pc": vm.get_last_pc(),
+            "next_pc": vm.pc & 0xFFFFFFFF,
+            "opcode": vm.get_last_opcode(),
+            "regs": vm.get_last_regs(),
+            "flags": vm.flags & 0xFF,
+            "steps": vm.steps,
+        }
+        mem_access = vm.get_last_mem_access()
+        if mem_access:
+            snapshot["mem_access"] = dict(mem_access)
+        if trace_pid is not None:
+            snapshot["pid"] = trace_pid
+        return snapshot
 
     def read_regs(self, pid: Optional[int] = None) -> Dict[str, Any]:
         pid = self.current_pid if pid is None else pid
@@ -3717,6 +3758,11 @@ class VMController:
                         raise ValueError("trace mode must be 'on' or 'off'")
                 trace_info = self.trace_task(int(pid_value), enable)
                 return {"status": "ok", "trace": trace_info}
+            if cmd == "vm_trace_last":
+                pid_value = request.get("pid")
+                pid = int(pid_value) if pid_value is not None else None
+                trace_snapshot = self.trace_last_snapshot(pid)
+                return {"status": "ok", "trace": trace_snapshot}
             if cmd == "read_regs":
                 pid_value = request.get("pid")
                 pid = int(pid_value) if pid_value is not None else None

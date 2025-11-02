@@ -41,3 +41,16 @@ def test_reg_set_masks_value_and_uses_command():
     assert captured["value"] == 0x1FFFFFFFF & 0xFFFFFFFF
     assert value == 0x1FFFFFFFF & 0xFFFFFFFF
 
+
+def test_trace_last_uses_vm_trace_last_command():
+    captured = {}
+
+    def responder(payload):
+        captured.update(payload)
+        return {"version": 1, "status": "ok", "trace": {"pc": 0x100}}
+
+    client = _make_client(responder)
+    trace = vmclient.VMClient.trace_last(client, pid=1)
+    assert captured["cmd"] == "vm_trace_last"
+    assert captured["pid"] == 1
+    assert trace["pc"] == 0x100
