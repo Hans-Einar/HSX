@@ -372,3 +372,22 @@ Start new sections chronologically. Keep notes concise but actionable so the nex
 
 ### Follow-up actions / hand-off notes
 - Consider richer mailbox wait instrumentation (per-descriptor backlog metrics) during later scheduler upgrades.
+## 2025-11-02 - Codex (Session 19)
+
+### Focus
+- Task(s) tackled: Phase 4.3 scheduler events (context-switch emission, reason codes, docs/tests).
+- Dependencies touched: `python/execd.py`, `python/tests/test_scheduler_state_machine.py`, `docs/executive_protocol.md`, `main/04--Design/04.02--Executive.md`, `main/05--Implementation/01--GapAnalysis/02--Executive/02--ImplementationPlan.md`.
+
+### Status
+- DONE
+
+### Details
+- Added `_maybe_emit_scheduler_event` to infer context switches from `ps()` snapshots, emit `scheduler` events with reason codes, quantum remainder, and before/after state metadata, and wired baseline context capture into `step()`.
+- Ensured scheduler snapshot handling retains the previous active PID so switches can be detected without VM assistance; `_optional_int` and `_update_scheduler_context` provide safe coercion and hint accumulation.
+- Expanded unit coverage with new scheduler-event tests (quantum rotation, sleep transitions, PID removal) and refreshed protocol/design docs to describe the enriched payload and reason taxonomy.
+
+### Tests run (commands + result)
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_scheduler_state_machine.py`
+
+### Follow-up actions / hand-off notes
+- Surface the new scheduler event data in CLI/TUI tooling when those milestones begin (e.g., highlight reason + quantum remainder alongside task timelines).

@@ -386,13 +386,15 @@ Typical payloads:
 
 - `trace_step`: `{ "pc": <uint32>, "next_pc": <uint32>, "opcode": <string>, "flags": <string?>, "regs": [<uint32> x16], "steps": <uint64?>, "changed_regs": ["R0", "PSW"]? }`
 - `debug_break`: `{ "pc": <uint32>, "reason": "BRK" | "virtual", "breakpoint_id": <int?> }`
-- `scheduler`: `{ "state": "READY|RUNNING|WAIT_MBX|SLEEPING|PAUSED|RETURNED", "prev_pid": <int?>, "next_pid": <int?> }`
+- `scheduler`: `{ "state": "switch", "prev_pid": <int>, "next_pid": <int?>, "reason": "quantum_expired|sleep|wait_mbx|paused|killed", "quantum_remaining": <int?>, "prev_state": <string?>, "post_state": <string?>, "next_state": <string?>, "executed": <int?>, "source": "auto|manual", "details": { ... }? }`
 - `mailbox_send` / `mailbox_recv`: `{ "descriptor": <int>, "length": <int>, "flags": <uint16>, "channel": <uint16> }`
 - `watch_update`: `{ "watch_id": <string>, "value": <string>, "formatted": <string?> }`
 - `stdout` / `stderr`: `{ "text": <string> }`
 - `warning`: `{ "message": <string>, "category": <string> }`
 
 `trace_step.data.changed_regs` is optional and, when present, lists the architectural registers that changed relative to the previous step for the same PID. Register names follow the `R<N>` convention with `PSW` used for the processor status word; the program counter is omitted (it advances on every instruction) so consumers can focus on meaningful state deltas without post-filtering. Clients may use the list to highlight deltas without diffing the full register file.
+
+`scheduler` events fire whenever the executive hands control to a different PID (including transitions to `null` when the run queue empties). The `reason` field enumerates the cause: `quantum_expired` (round-robin rotation), `sleep` (task issued a sleep request), `wait_mbx` (blocking mailbox call), `paused` (user or debugger intervention), and `killed` (task exited or was forcibly removed). When a task shuts down cleanly the event still uses `killed`; `post_state` reports `terminated` or is omitted if the PID disappears entirely. `quantum_remaining` reflects the unused portion of the outgoing PID's configured quantum. `prev_state` mirrors the scheduler state before the switch, `post_state` captures the new state assigned to the outgoing PID, and `next_state` reports the incoming PID's state snapshot. `executed` records the instruction count the VM reported for the triggering step and `source` indicates whether the tick came from the auto-runner or a manual `step/clock`. Additional diagnostic fields may appear under `details`; clients must ignore keys they do not understand.
 
 ### Back-pressure & errors
 

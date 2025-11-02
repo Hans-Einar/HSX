@@ -416,11 +416,11 @@ Design specifies emitting scheduler events on context switches (section 7.2). En
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.02--Executive](../../../04--Design/04.02--Executive.md)
-- [ ] Define scheduler event structure (old_pid, new_pid, reason, quantum_remaining)
-- [ ] Emit scheduler events on every context switch
-- [ ] Add reason codes: quantum_expired, sleep, wait_mbx, paused, killed
-- [ ] Add scheduler event tests
-- [ ] Update event schema documentation with scheduler event
+- [x] Define scheduler event structure (old_pid, new_pid, reason, quantum_remaining)
+- [x] Emit scheduler events on every context switch
+- [x] Add reason codes: quantum_expired, sleep, wait_mbx, paused, killed
+- [x] Add scheduler event tests
+- [x] Update event schema documentation with scheduler event
 
 ---
 

@@ -11,10 +11,14 @@ class StubVM:
         self.tasks = tasks
         self.current_pid = tasks[0]["pid"] if tasks else None
 
-    def set_tasks(self, tasks):
+    def set_tasks(self, tasks, current_pid=None):
         self.tasks = tasks
-        if tasks:
+        if current_pid is not None:
+            self.current_pid = current_pid
+        elif tasks:
             self.current_pid = tasks[0]["pid"]
+        else:
+            self.current_pid = None
 
     def ps(self):
         return {"tasks": {"tasks": self.tasks, "current_pid": self.current_pid}}
@@ -24,6 +28,10 @@ def make_task(pid, state, **extra):
     payload = {"pid": pid, "state": state}
     payload.update(extra)
     return payload
+
+
+def scheduler_events(state):
+    return [event for event in state.event_history if event.get("type") == "scheduler"]
 
 
 def test_task_state_transitions_recorded():
@@ -74,3 +82,88 @@ def test_sleep_tracking_and_wake(monkeypatch):
     assert 3 not in state.sleeping_deadlines
     assert state.tasks[3]["state"] == "ready"
     assert state.task_state_pending[3]["reason"] == "sleep_wake"
+
+
+def test_scheduler_event_quantum_expired():
+    vm = StubVM(
+        [
+            make_task(1, "running", quantum=4, accounted_steps=1),
+            make_task(2, "ready", quantum=4, accounted_steps=0),
+        ]
+    )
+    state = ExecutiveState(vm, step_batch=1)
+    state._refresh_tasks()
+    vm.set_tasks(
+        [
+            make_task(2, "running", quantum=4, accounted_steps=0),
+            make_task(1, "ready", quantum=4, accounted_steps=2),
+        ],
+        current_pid=2,
+    )
+    state._refresh_tasks()
+
+    events = scheduler_events(state)
+    assert events, "expected scheduler event to be emitted"
+    event = events[-1]
+    assert event["pid"] == 2
+    data = event["data"]
+    assert data["prev_pid"] == 1
+    assert data["next_pid"] == 2
+    assert data["reason"] == "quantum_expired"
+    assert data.get("quantum_remaining") == 3
+    assert data.get("post_state") == "ready"
+
+
+def test_scheduler_event_sleep_reason():
+    vm = StubVM(
+        [
+            make_task(1, "running"),
+            make_task(2, "ready"),
+        ]
+    )
+    state = ExecutiveState(vm, step_batch=1)
+    state._refresh_tasks()
+    vm.set_tasks(
+        [
+            make_task(2, "running"),
+            make_task(1, "sleeping", sleep_pending=True, sleep_deadline=time.monotonic() + 0.05),
+        ],
+        current_pid=2,
+    )
+    state._refresh_tasks()
+
+    events = scheduler_events(state)
+    assert events, "expected scheduler event for sleep transition"
+    event = events[-1]
+    data = event["data"]
+    assert data["reason"] == "sleep"
+    assert data["prev_pid"] == 1
+    assert data["next_pid"] == 2
+    assert data.get("post_state") == "sleeping"
+
+
+def test_scheduler_event_killed_reason():
+    vm = StubVM(
+        [
+            make_task(1, "running"),
+            make_task(2, "ready"),
+        ]
+    )
+    state = ExecutiveState(vm, step_batch=1)
+    state._refresh_tasks()
+    vm.set_tasks(
+        [
+            make_task(2, "running"),
+        ],
+        current_pid=2,
+    )
+    state._refresh_tasks()
+
+    events = scheduler_events(state)
+    assert events, "expected scheduler event when previous task exits"
+    event = events[-1]
+    data = event["data"]
+    assert data["reason"] == "killed"
+    assert data["prev_pid"] == 1
+    assert data["next_pid"] == 2
+    assert data.get("post_state") == "terminated" or data.get("post_state") is None

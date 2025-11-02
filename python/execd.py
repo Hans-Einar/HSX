@@ -273,6 +273,7 @@ class ExecutiveState:
         self.last_state_transition: Dict[int, Dict[str, Any]] = {}
         self.sleeping_heap: List[Tuple[float, int]] = []
         self.sleeping_deadlines: Dict[int, float] = {}
+        self._pending_scheduler_context: Optional[Dict[str, Any]] = None
 
     def _register_metadata(self, pid: int, metadata: Dict[str, Any]) -> None:
         if not metadata:
@@ -514,6 +515,16 @@ class ExecutiveState:
             return deadline
         return None
 
+    def _update_scheduler_context(self, **fields: Any) -> None:
+        if not fields:
+            return
+        context = self._pending_scheduler_context or {}
+        for key, value in fields.items():
+            if value is None:
+                continue
+            context[key] = value
+        self._pending_scheduler_context = context or None
+
     def _session_payload(self, session: SessionRecord) -> Dict[str, Any]:
         if not session.pid_locks:
             pid_lock_repr: Optional[Any] = None
@@ -675,6 +686,15 @@ class ExecutiveState:
         if isinstance(value, str):
             return int(value, 0)
         raise ValueError(f"expected integer-compatible value, got {value!r}")
+
+    @staticmethod
+    def _optional_int(value: Any) -> Optional[int]:
+        if value is None:
+            return None
+        try:
+            return ExecutiveState._coerce_int(value)
+        except (ValueError, TypeError):
+            return None
 
     def _vm_debug(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         response = self.vm.request(payload)
@@ -1918,6 +1938,115 @@ class ExecutiveState:
         state_entry["last_state_ts"] = time.time()
         return event
 
+    def _maybe_emit_scheduler_event(
+        self,
+        prev_snapshot: Dict[str, Any],
+        *,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        context = context or {}
+        prev_tasks_raw = prev_snapshot.get("tasks")
+        prev_tasks: Dict[Any, Dict[str, Any]]
+        if isinstance(prev_tasks_raw, dict):
+            prev_tasks = prev_tasks_raw
+        else:
+            prev_tasks = {}
+
+        def _fetch_task(tasks: Dict[Any, Dict[str, Any]], pid: Optional[int]) -> Optional[Dict[str, Any]]:
+            if pid is None:
+                return None
+            entry = tasks.get(pid)
+            if entry is None:
+                entry = tasks.get(str(pid))
+            if isinstance(entry, dict):
+                return entry
+            return None
+
+        prev_pid = self._optional_int(context.get("prev_pid"))
+        if prev_pid is None:
+            prev_pid = self._optional_int(prev_snapshot.get("current_pid"))
+        if prev_pid is None:
+            for key, task in prev_tasks.items():
+                pid_candidate = self._optional_int(key)
+                if pid_candidate is None:
+                    continue
+                state_val = str(task.get("state") or "").lower()
+                if state_val == "running":
+                    prev_pid = pid_candidate
+                    break
+
+        next_pid = self._optional_int(context.get("next_pid"))
+        if next_pid is None:
+            next_pid = self._optional_int(self.current_pid)
+
+        if prev_pid is None or prev_pid == next_pid:
+            return None
+
+        prev_task = _fetch_task(prev_tasks, prev_pid)
+        prev_state = None
+        if prev_task is not None:
+            prev_state = prev_task.get("state")
+
+        next_task = _fetch_task(self.tasks, next_pid)
+        next_state = None
+        if next_task is not None:
+            next_state = next_task.get("state")
+
+        post_task = _fetch_task(self.tasks, prev_pid)
+        post_state = (post_task.get("state") if isinstance(post_task, dict) else None) if post_task else None
+        post_state_norm = str(post_state or "").lower() if post_state is not None else None
+
+        reason = context.get("reason") or context.get("reason_hint")
+        if reason is None:
+            if post_task is None:
+                reason = "killed"
+            elif post_state_norm in {"sleeping"}:
+                reason = "sleep"
+            elif post_state_norm in {"waiting_mbx", "waiting"}:
+                reason = "wait_mbx"
+            elif post_state_norm == "paused":
+                reason = "paused"
+            elif post_state_norm in {"terminated", "killed", "returned"}:
+                reason = "killed"
+            else:
+                reason = "quantum_expired"
+
+        quantum_remaining: Optional[int] = None
+        if isinstance(prev_task, dict):
+            quantum = self._optional_int(prev_task.get("quantum"))
+            accounted = self._optional_int(prev_task.get("accounted_steps"))
+            if quantum and quantum > 0 and accounted is not None:
+                remainder = quantum - (accounted % quantum)
+                if remainder == quantum:
+                    remainder = 0
+                quantum_remaining = remainder
+
+        data: Dict[str, Any] = {
+            "state": "switch",
+            "prev_pid": prev_pid,
+            "next_pid": next_pid,
+            "reason": reason,
+        }
+        if quantum_remaining is not None:
+            data["quantum_remaining"] = quantum_remaining
+        if prev_state is not None:
+            data["prev_state"] = str(prev_state)
+        if next_state is not None:
+            data["next_state"] = str(next_state)
+        if post_state is not None:
+            data["post_state"] = str(post_state)
+        executed = self._optional_int(context.get("executed"))
+        if executed is not None:
+            data["executed"] = executed
+        source = context.get("source")
+        if isinstance(source, str):
+            data["source"] = source
+        details = context.get("details")
+        if isinstance(details, dict) and details:
+            data["details"] = dict(details)
+
+        return self.emit_event("scheduler", pid=next_pid, data=data)
+
     def _infer_task_state_reason(
         self,
         prev_state: Optional[str],
@@ -2166,13 +2295,19 @@ class ExecutiveState:
             snapshot = self.vm.ps()
         except RuntimeError:
             return
+        prev_current_pid = self.current_pid
         tasks_block = snapshot.get("tasks", [])
         if isinstance(tasks_block, dict):
             tasks = tasks_block.get("tasks", [])
-            self.current_pid = tasks_block.get("current_pid")
+            new_current_pid = tasks_block.get("current_pid")
         else:
             tasks = tasks_block
-            self.current_pid = snapshot.get("current_pid")
+            new_current_pid = snapshot.get("current_pid")
+        prev_snapshot = {
+            "current_pid": prev_current_pid,
+            "tasks": {pid: dict(task) for pid, task in self.tasks.items()},
+        }
+        self.current_pid = self._optional_int(new_current_pid)
         prev_states = self.task_states
         self.tasks = {}
         new_states: Dict[int, Dict[str, Any]] = {}
@@ -2341,6 +2476,9 @@ class ExecutiveState:
             self._untrack_sleep(pid)
 
         self.task_states = new_states
+        context = self._pending_scheduler_context or {}
+        self._pending_scheduler_context = None
+        self._maybe_emit_scheduler_event(prev_snapshot, context=context)
         stale = set(self.breakpoints.keys()) - current_pids
         for pid in stale:
             self.breakpoints.pop(pid, None)
@@ -2480,13 +2618,19 @@ class ExecutiveState:
             return result
         with self.lock:
             result = self.vm.step(budget, pid=pid)
-        events = result.get('events') or []
-        self._process_vm_events(events)
         executed_raw = result.get("executed", 0)
         try:
             executed = int(executed_raw)
         except (TypeError, ValueError):
             executed = 0
+        self._update_scheduler_context(
+            prev_pid=self._optional_int(result.get("current_pid")),
+            next_pid=self._optional_int(result.get("next_pid")),
+            executed=executed,
+            source=source,
+        )
+        events = result.get('events') or []
+        self._process_vm_events(events)
         if executed > 0:
             self.total_steps += executed
         if source == "auto":
