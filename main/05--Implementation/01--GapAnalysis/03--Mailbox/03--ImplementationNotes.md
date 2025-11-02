@@ -40,3 +40,22 @@ Start new sections chronologically. Keep notes concise but actionable so the nex
   - `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_mailbox_constants.py python/tests/test_mailbox_wait.py python/tests/test_mailbox_svc_runtime.py` (pass).
 - Follow-up actions / hand-off notes:
   - Phase 1.2 should introduce the descriptor exhaustion status (`HSX_MBX_STATUS_NO_DESCRIPTOR`) and associated handling.
+
+## 2025-11-03 - Codex (Session 2)
+
+### Focus
+- Task(s) tackled: Phase 1.2 descriptor exhaustion handling (status constant, manager limit enforcement, SVC mapping, docs/tests).
+- Dependencies touched: `include/hsx_mailbox.h`, `python/mailbox.py`, `platforms/python/host_vm.py`, mailbox unit/runtime tests, ABI docs.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions:
+  - Introduced `HSX_MBX_STATUS_NO_DESCRIPTOR` and wired it through the Python constant loader, mailbox manager, and executive SVC handler.
+  - Added a configurable descriptor pool limit to `MailboxManager`, returning the new status when the pool is exhausted and surfacing the code via `MailboxError`.
+  - Extended unit and SVC runtime tests to cover descriptor exhaustion, and updated documentation to describe the new status code.
+- Tests run (commands + result):
+  - `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_mailbox_constants.py python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_mailbox_wait.py` (pass).
+- Follow-up actions / hand-off notes:
+  - Phase 1.3 should define and emit the mailbox event payloads now that status plumbing is in place.

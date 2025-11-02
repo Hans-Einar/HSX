@@ -1,6 +1,8 @@
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 from python.mailbox import MailboxManager, MailboxError
 from python import hsx_mailbox_constants as mbx_const
 
@@ -59,23 +61,17 @@ def test_send_raises_when_message_exceeds_capacity():
     mgr = MailboxManager()
     mgr.bind_target(pid=1, target="svc:small", capacity=16)
     handle = mgr.open(pid=1, target="svc:small")
-    try:
+    with pytest.raises(MailboxError) as exc:
         mgr.send(pid=1, handle=handle, payload=b"123456789012", flags=0)
-    except MailboxError:
-        pass
-    else:
-        raise AssertionError("expected MailboxError for oversize message")
+    assert exc.value.code == mbx_const.HSX_MBX_STATUS_MSG_TOO_LARGE
 
 
 def test_close_unknown_handle_raises():
     mgr = MailboxManager()
     mgr.open(pid=1, target="svc:stdio")
-    try:
+    with pytest.raises(MailboxError) as exc:
         mgr.close(pid=1, handle=99)
-    except MailboxError:
-        pass
-    else:
-        raise AssertionError("expected failure for invalid handle")
+    assert exc.value.code == mbx_const.HSX_MBX_STATUS_INVALID_HANDLE
 
 def test_recv_records_waiter():
     mgr = MailboxManager()
@@ -174,6 +170,18 @@ def test_fanout_block_policy_prevents_overfill():
 
     ok, _ = mgr.send(pid=1, handle=producer, payload=b"third")
     assert ok is True
+
+
+def test_descriptor_pool_exhaustion_raises_with_status():
+    mgr = MailboxManager(max_descriptors=4)
+    # Create descriptors up to the limit
+    mgr.register_task(1)  # consumes 4 descriptors for pid:1 stdio + control
+    assert mgr.descriptor_count == mgr.max_descriptors
+
+    with pytest.raises(MailboxError) as exc:
+        mgr.bind_target(pid=1, target="app:overflow")
+
+    assert exc.value.code == mbx_const.HSX_MBX_STATUS_NO_DESCRIPTOR
 
 
 def test_app_namespace_reused_across_pids():

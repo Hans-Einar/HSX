@@ -55,13 +55,13 @@ Design defines `HSX_MBX_STATUS_NO_DESCRIPTOR` (0x05) for descriptor pool exhaust
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.03--Mailbox](../../../04--Design/04.03--Mailbox.md)
-- [ ] Add `HSX_MBX_STATUS_NO_DESCRIPTOR` (0x05) to `include/hsx_mailbox.h`
-- [ ] Add `HSX_MBX_STATUS_NO_DESCRIPTOR` to `python/hsx_mailbox_constants.py`
-- [ ] Update mailbox manager to return NO_DESCRIPTOR on pool exhaustion
-- [ ] Update BIND operation to detect and report exhaustion
-- [ ] Add descriptor exhaustion tests (create descriptors until pool exhausted)
-- [ ] Update `docs/abi_syscalls.md` with NO_DESCRIPTOR status code
-- [ ] Verify constant synchronization tests pass
+- [x] Add `HSX_MBX_STATUS_NO_DESCRIPTOR` (0x05) to `include/hsx_mailbox.h`
+- [x] Add `HSX_MBX_STATUS_NO_DESCRIPTOR` to `python/hsx_mailbox_constants.py`
+- [x] Update mailbox manager to return NO_DESCRIPTOR on pool exhaustion
+- [x] Update BIND operation to detect and report exhaustion
+- [x] Add descriptor exhaustion tests (create descriptors until pool exhausted)
+- [x] Update `docs/abi_syscalls.md` with NO_DESCRIPTOR status code
+- [x] Verify constant synchronization tests pass
 
 ---
 

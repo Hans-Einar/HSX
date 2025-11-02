@@ -2395,13 +2395,16 @@ class VMController:
                     pass
                 return
         except MailboxError as exc:
+            status = getattr(exc, "code", None)
+            if status is None:
+                status = mbx_const.HSX_MBX_STATUS_INTERNAL_ERROR
             try:
                 with open("/tmp/hsx_mailbox_trace.log", "a", encoding="utf-8") as trace_fp:
-                    trace_fp.write(f"[MAILBOX] error fn=0x{fn:02X} pid={pid}: {exc}\n")
+                    trace_fp.write(f"[MAILBOX] error fn=0x{fn:02X} pid={pid}: {exc} status=0x{status:04X}\n")
             except OSError:
                 pass
-            vm.regs[0] = mbx_const.HSX_MBX_STATUS_INTERNAL_ERROR
-            vm.emit_event({"type": "mailbox_error", "pid": pid, "fn": fn, "error": str(exc)})
+            vm.regs[0] = status
+            vm.emit_event({"type": "mailbox_error", "pid": pid, "fn": fn, "error": str(exc), "status": status})
             return
         vm.regs[0] = mbx_const.HSX_MBX_STATUS_INTERNAL_ERROR
 

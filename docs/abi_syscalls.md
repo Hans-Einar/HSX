@@ -15,7 +15,7 @@ Sources:
 - `R0` carries the return value. Some calls (for example `TASK_EXIT`) pass input arguments through `R0` before the handler overwrites it on return.
 - `R1`..`R5` carry positional arguments as documented below. Registers above `R5` are caller saved.
 - Unknown module or function pairs set `R0 = HSX_ERR_ENOSYS` (0xFFFF_FF01). Fatal VM faults raise the other `HSX_ERR_*` codes defined in `platforms/python/host_vm.py`.
-- Mailbox calls return status codes defined in `include/hsx_mailbox.h`. Success is `HSX_MBX_STATUS_OK` (0), non-blocking polls return `HSX_MBX_STATUS_NO_DATA`, and blocking receives that expire now return `HSX_MBX_STATUS_TIMEOUT` (0x0007).
+- Mailbox calls return status codes defined in `include/hsx_mailbox.h`. Success is `HSX_MBX_STATUS_OK` (0), non-blocking polls return `HSX_MBX_STATUS_NO_DATA`, descriptor pool exhaustion returns `HSX_MBX_STATUS_NO_DESCRIPTOR` (0x0005), and blocking receives that expire now return `HSX_MBX_STATUS_TIMEOUT` (0x0007).
 - All return values are 32 bit. The low 16 bits carry f16 payloads where noted.
 
 ## VM ISA notes

@@ -342,3 +342,26 @@ def test_mailbox_svc_recv_timeout_populates_info_struct():
         0,
     )
     assert vm.mem[buffer_ptr : buffer_ptr + 16] == b"\x00" * 16
+
+
+def test_mailbox_bind_returns_no_descriptor_when_pool_full():
+    controller = VMController()
+    controller.mailboxes = MailboxManager(max_descriptors=8)
+    controller.mailboxes.register_task(1)
+    controller.mailboxes.ensure_stdio_handles(1)
+
+    fill_idx = 0
+    while controller.mailboxes.descriptor_count < controller.mailboxes.max_descriptors:
+        controller.mailboxes.bind_target(pid=1, target=f"app:fill_{fill_idx}")
+        fill_idx += 1
+
+    vm = _attach_vm(controller, 1)
+    target_addr = 0x0900
+    overflow_target = "app:overflow_limit"
+    _write_c_string(vm, target_addr, overflow_target)
+    vm.regs[1] = target_addr
+    vm.regs[2] = 0
+    vm.regs[3] = mbx_const.HSX_MBX_MODE_RDWR
+
+    controller._svc_mailbox_controller(vm, mbx_const.HSX_MBX_FN_BIND)
+    assert vm.regs[0] == mbx_const.HSX_MBX_STATUS_NO_DESCRIPTOR

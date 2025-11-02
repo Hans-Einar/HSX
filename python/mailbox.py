@@ -39,6 +39,10 @@ HSX_MBX_TIMEOUT_POLL = mbx_const.HSX_MBX_TIMEOUT_POLL
 class MailboxError(Exception):
     """Raised for mailbox failures."""
 
+    def __init__(self, message: str, *, code: Optional[int] = None) -> None:
+        super().__init__(message)
+        self.code = code
+
 
 @dataclass
 class MailboxMessage:
@@ -80,7 +84,8 @@ class MailboxDescriptor:
 class MailboxManager:
     """Tracks HSX mailboxes and per-task handle tables."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, max_descriptors: int = 256) -> None:
+        self._max_descriptors = max(1, int(max_descriptors))
         self._next_descriptor_id = 1
         self._descriptors: Dict[int, MailboxDescriptor] = {}
         self._lookup: Dict[Tuple[int, str, Optional[int]], int] = {}
@@ -95,6 +100,14 @@ class MailboxManager:
 
     # ------------------------------------------------------------------
     # Lifecycle helpers
+
+    @property
+    def max_descriptors(self) -> int:
+        return self._max_descriptors
+
+    @property
+    def descriptor_count(self) -> int:
+        return len(self._descriptors)
 
     def register_task(self, pid: int) -> None:
         """Ensure the per-task mailboxes exist (stdio + control)."""
@@ -139,6 +152,11 @@ class MailboxManager:
         key = (namespace, name, owner_pid)
         descriptor_id = self._lookup.get(key)
         if descriptor_id is None:
+            if len(self._descriptors) >= self._max_descriptors:
+                raise MailboxError(
+                    "descriptor pool exhausted",
+                    code=mbx_const.HSX_MBX_STATUS_NO_DESCRIPTOR,
+                )
             descriptor_id = self._next_descriptor_id
             self._next_descriptor_id += 1
             desc = MailboxDescriptor(
@@ -206,7 +224,10 @@ class MailboxManager:
     def close(self, *, pid: int, handle: int) -> None:
         table = self._handles.get(pid)
         if not table or handle not in table:
-            raise MailboxError(f"invalid handle {handle} for pid {pid}")
+            raise MailboxError(
+                f"invalid handle {handle} for pid {pid}",
+                code=mbx_const.HSX_MBX_STATUS_INVALID_HANDLE,
+            )
         state = table.pop(handle)
         desc = self._descriptors.get(state.descriptor_id)
         if desc is not None:
@@ -464,7 +485,10 @@ class MailboxManager:
     def _handle_state(self, pid: int, handle: int) -> HandleState:
         table = self._handles.get(pid)
         if not table or handle not in table:
-            raise MailboxError(f"invalid handle {handle} for pid {pid}")
+            raise MailboxError(
+                f"invalid handle {handle} for pid {pid}",
+                code=mbx_const.HSX_MBX_STATUS_INVALID_HANDLE,
+            )
         return table[handle]
 
     def _iter_handle_states(self, descriptor_id: int) -> Iterator[HandleState]:
@@ -490,7 +514,10 @@ class MailboxManager:
     def _enqueue_message(self, desc: MailboxDescriptor, message: MailboxMessage) -> bool:
         cost = _message_cost(message)
         if cost > desc.capacity:
-            raise MailboxError("message too large for mailbox capacity")
+            raise MailboxError(
+                "message too large for mailbox capacity",
+                code=mbx_const.HSX_MBX_STATUS_MSG_TOO_LARGE,
+            )
 
         fanout_enabled = bool(desc.mode_mask & HSX_MBX_MODE_FANOUT)
         if not fanout_enabled:

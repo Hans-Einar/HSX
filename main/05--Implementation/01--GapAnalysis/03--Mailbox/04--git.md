@@ -3,15 +3,16 @@
 > File name: `04--git.md`. Use this log to capture branch, commits, and PR status for the Mailbox implementation track.
 
 ## Branch
-- Name: `<branch-name>`
-- Created on: `<YYYY-MM-DD>`
-- Owner: `<team or lead>`
-- Based on commit: `<commit-id>`
+- Name: `mailbox-phase1`
+- Created on: `2025-11-03`
+- Owner: `hsx-tools`
+- Based on commit: `TODO(update-after-merge)`
 
 ## Commit Log
 | Date | Commit hash | Message | Author | Notes |
 | --- | --- | --- | --- | --- |
-| <YYYY-MM-DD> | <commit-hash> | <short message> | <author> | Tests: `<command>` |
+| 2025-11-03 | `<pending>` | `mailbox: add timeout status constant` | Codex | Tests: `python -m pytest python/tests/test_mailbox_constants.py python/tests/test_mailbox_wait.py python/tests/test_mailbox_svc_runtime.py` |
+| 2025-11-03 | `<pending>` | `mailbox: enforce descriptor pool limit` | Codex | Tests: `python -m pytest python/tests/test_mailbox_constants.py python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py` |
 
 ## Pull Request
 - PR URL / ID: `<link or ID>`
