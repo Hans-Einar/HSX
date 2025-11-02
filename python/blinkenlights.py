@@ -10,6 +10,7 @@ import argparse
 import json
 import sys
 import time
+import threading
 from typing import Dict, List, Optional, Tuple
 
 from executive_session import ExecutiveSession, ExecutiveSessionError
@@ -42,7 +43,8 @@ _EVENT_FILTER = {
 class ShellRPC:
     """Session-aware wrapper for the executive RPC server."""
 
-    def __init__(self, host: str, port: int, timeout: float = 5.0) -> None:
+    def __init__(self, host: str, port: int, timeout: float = 5.0, *, debug: bool = False) -> None:
+        self.debug_enabled = debug
         self.session = ExecutiveSession(
             host,
             port,
@@ -52,12 +54,18 @@ class ShellRPC:
             timeout=timeout,
             event_buffer=512,
         )
-        # Start streaming non-trace events so the UI can poll the buffer.
-        self.session.start_event_stream(filters=_EVENT_FILTER, callback=None, ack_interval=10)
+        self._event_lock = threading.Lock()
+        self._event_thread: Optional[threading.Thread] = None
+        self._event_started = False
+        self._start_event_stream_async()
         self.current_pid: Optional[int] = None
 
     def close(self) -> None:
         self.session.close()
+
+    def debug_print(self, message: str) -> None:
+        if self.debug_enabled:
+            print(f"[blinkenlights][rpc] {message}")
 
     def request(self, payload: Dict[str, object]) -> Dict[str, object]:
         response = self.session.request(payload)
@@ -67,6 +75,40 @@ class ShellRPC:
 
     def recent_events(self, limit: int = 20) -> List[Dict[str, object]]:
         return self.session.get_recent_events(limit)
+
+    def _start_event_stream_async(self) -> None:
+        with self._event_lock:
+            if self._event_started:
+                return
+            self._event_started = True
+
+        def _runner() -> None:
+            stream_ok = True
+            try:
+                self.debug_print("Requesting event stream ...")
+                # force a short timeout by temporarily adjusting session timeout
+                original_timeout = self.session.timeout
+                self.session.timeout = min(original_timeout, 2.0)
+                try:
+                    ok = self.session.start_event_stream(filters=_EVENT_FILTER, callback=None, ack_interval=10)
+                finally:
+                    self.session.timeout = original_timeout
+            except Exception as exc:
+                self.debug_print(f"Event stream unavailable: {exc}")
+                stream_ok = False
+            else:
+                if not ok:
+                    self.debug_print("Executive declined event streaming feature")
+                    stream_ok = False
+                else:
+                    self.debug_print("Event stream established")
+            finally:
+                if not stream_ok:
+                    with self._event_lock:
+                        self._event_started = False
+
+        self._event_thread = threading.Thread(target=_runner, name="hsx-blinkenlights-events", daemon=True)
+        self._event_thread.start()
 
     def info(self) -> Dict[str, object]:
         return self.request({"cmd": "info"}).get("info", {})
@@ -160,11 +202,11 @@ class BlinkenlightsApp:
     STACK_DETAIL_COUNT = 8
     STACK_MAX_FRAMES = 16
 
-    def __init__(self, host: str, port: int, refresh: float) -> None:
+    def __init__(self, host: str, port: int, refresh: float, *, debug: bool = False) -> None:
         self.host = host
         self.port = port
         self.refresh = refresh
-        self.rpc = ShellRPC(host, port)
+        self.rpc = ShellRPC(host, port, debug=debug)
         pygame.init()
         pygame.display.set_caption("HSX Blinkenlights")
         self.font = pygame.font.SysFont("Consolas", 16)
@@ -184,8 +226,14 @@ class BlinkenlightsApp:
         self.status_message: str = ""
         self.status_timestamp: float = 0.0
         self.current_pid: Optional[int] = None
+        self.state_lock = threading.RLock()
+        self.refresh_event = threading.Event()
+        self.debug_enabled = debug
         self._build_sidebar()
         self._initial_attach()
+        self.refresh_event.set()
+        self.poll_thread = threading.Thread(target=self._poll_loop, daemon=True)
+        self.poll_thread.start()
 
     def _initial_attach(self) -> None:
         try:
@@ -199,6 +247,24 @@ class BlinkenlightsApp:
             self.set_status(f"Attach failed: {exc}")
         finally:
             self.manual_refresh()
+
+    def _poll_loop(self) -> None:
+        self.debug_print("Poll thread started")
+        while self.running:
+            triggered = self.refresh_event.wait(timeout=self.refresh)
+            self.refresh_event.clear()
+            if not self.running:
+                break
+            if triggered:
+                self.debug_print("Refresh event triggered")
+            else:
+                self.debug_print("Refresh interval elapsed")
+            try:
+                self._fetch_state()
+            except RuntimeError as exc:
+                self.set_status(f"RPC error: {exc}")
+        self.refresh_event.set()
+        self.debug_print("Poll thread stopping")
 
     def _build_sidebar(self) -> None:
         btn_specs = [
@@ -286,95 +352,117 @@ class BlinkenlightsApp:
         summary = self._format_clock_summary(clock if isinstance(clock, dict) else {})
         return f"{summary}; executed {executed_text} instruction(s)"
 
-    def manual_refresh(self) -> None:
-        self.last_poll = 0
+    def debug_print(self, message: str) -> None:
+        if self.debug_enabled:
+            print(f"[blinkenlights] {message}")
+
+    def manual_refresh(self) -> str:
+        self.debug_print("Manual refresh requested")
+        self.refresh_event.set()
         return "Refresh queued"
 
     def toggle_stack(self, pid: int) -> str:
-        state = self.stack_state.setdefault(pid, {"expanded": False, "offset": 0, "selected": 0})
-        expanded = bool(state.get("expanded"))
-        if expanded:
-            state["expanded"] = False
-            state["offset"] = 0
-            state["selected"] = 0
-            self.last_poll = 0
-            return f"Stack collapsed for pid {pid}"
+        with self.state_lock:
+            state = self.stack_state.setdefault(pid, {"expanded": False, "offset": 0, "selected": 0})
+            if state.get("expanded"):
+                state["expanded"] = False
+                state["offset"] = 0
+                state["selected"] = 0
+                self.refresh_event.set()
+                self.debug_print(f"Stack collapsed for pid {pid}")
+                return f"Stack collapsed for pid {pid}"
+
         try:
             info = self.rpc.stack_info(pid, max_frames=self.STACK_MAX_FRAMES, refresh=True)
         except RuntimeError as exc:
             return f"Stack fetch failed: {exc}"
-        if info:
-            self.task_stacks[pid] = info
-        state["expanded"] = True
-        state["offset"] = 0
-        state["selected"] = 0
-        self.last_poll = 0
+
+        with self.state_lock:
+            state = self.stack_state.setdefault(pid, {"expanded": False, "offset": 0, "selected": 0})
+            if info:
+                self.task_stacks[pid] = info
+            state["expanded"] = True
+            state["offset"] = 0
+            state["selected"] = 0
+        self.refresh_event.set()
         return f"Stack expanded for pid {pid}"
 
     def scroll_stack(self, pid: int, delta: int) -> str:
-        state = self.stack_state.get(pid)
-        stack = self.task_stacks.get(pid)
-        if not state or not state.get("expanded") or not stack:
-            return "No stack to scroll"
-        frames = stack.get("frames") or []
-        if not frames:
-            return "No stack to scroll"
-        current = int(state.get("offset", 0))
-        target = current + delta
-        max_offset = max(0, len(frames) - self.STACK_DETAIL_COUNT)
-        target = max(0, min(max_offset, target))
-        if target == current:
-            if delta < 0 and current == 0:
-                return "Top of stack"
-            if delta > 0 and current == max_offset:
-                return "End of captured stack"
-            return "Stack unchanged"
-        state["offset"] = target
-        selected = int(state.get("selected", 0))
-        if selected < target:
-            state["selected"] = target
-        elif selected >= target + self.STACK_DETAIL_COUNT:
-            state["selected"] = min(target + self.STACK_DETAIL_COUNT - 1, len(frames) - 1)
-        self.last_poll = 0
+        with self.state_lock:
+            state = self.stack_state.get(pid)
+            stack = self.task_stacks.get(pid)
+            if not state or not state.get("expanded") or not stack:
+                return "No stack to scroll"
+            frames = stack.get("frames") or []
+            if not frames:
+                return "No stack to scroll"
+            current = int(state.get("offset", 0))
+            target = current + delta
+            max_offset = max(0, len(frames) - self.STACK_DETAIL_COUNT)
+            target = max(0, min(max_offset, target))
+            if target == current:
+                if delta < 0 and current == 0:
+                    return "Top of stack"
+                if delta > 0 and current == max_offset:
+                    return "End of captured stack"
+                return "Stack unchanged"
+            state["offset"] = target
+            selected = int(state.get("selected", 0))
+            if selected < target:
+                state["selected"] = target
+            elif selected >= target + self.STACK_DETAIL_COUNT:
+                state["selected"] = min(target + self.STACK_DETAIL_COUNT - 1, len(frames) - 1)
+        self.refresh_event.set()
         direction = "up" if delta < 0 else "down"
         return f"Stack scrolled {direction} (offset {target})"
 
     def select_stack_frame(self, pid: int, frame_idx: int) -> str:
-        state = self.stack_state.setdefault(pid, {"expanded": False, "offset": 0, "selected": 0})
-        frames = self.task_stacks.get(pid, {}).get("frames") or []
-        if not state.get("expanded"):
-            message = self.toggle_stack(pid)
-            if not state.get("expanded"):
-                return message or "Stack unavailable"
+        with self.state_lock:
+            state = self.stack_state.setdefault(pid, {"expanded": False, "offset": 0, "selected": 0})
             frames = self.task_stacks.get(pid, {}).get("frames") or []
-            if not frames:
-                return "Stack unavailable"
+            expanded = bool(state.get("expanded"))
+        if not expanded:
+            message = self.toggle_stack(pid)
+            with self.state_lock:
+                state = self.stack_state.setdefault(pid, {"expanded": False, "offset": 0, "selected": 0})
+                frames = self.task_stacks.get(pid, {}).get("frames") or []
+                expanded = bool(state.get("expanded"))
+            if not expanded:
+                return message or "Stack unavailable"
         if not frames:
             return "Stack unavailable"
         frame_idx = max(0, min(int(frame_idx), len(frames) - 1))
-        state["selected"] = frame_idx
-        offset = int(state.get("offset", 0))
-        if frame_idx < offset:
-            offset = frame_idx
-        elif frame_idx >= offset + self.STACK_DETAIL_COUNT:
-            offset = max(0, frame_idx - self.STACK_DETAIL_COUNT + 1)
-        max_offset = max(0, len(frames) - self.STACK_DETAIL_COUNT)
-        state["offset"] = max(0, min(offset, max_offset))
-        self.last_poll = 0
+        with self.state_lock:
+            state = self.stack_state.setdefault(pid, {"expanded": False, "offset": 0, "selected": 0})
+            frames = self.task_stacks.get(pid, {}).get("frames") or []
+            if not frames:
+                return "Stack unavailable"
+            state["selected"] = frame_idx
+            offset = int(state.get("offset", 0))
+            if frame_idx < offset:
+                offset = frame_idx
+            elif frame_idx >= offset + self.STACK_DETAIL_COUNT:
+                offset = max(0, frame_idx - self.STACK_DETAIL_COUNT + 1)
+            max_offset = max(0, len(frames) - self.STACK_DETAIL_COUNT)
+            state["offset"] = max(0, min(offset, max_offset))
+        self.refresh_event.set()
         return f"Stack frame {frame_idx} selected"
 
-    def fetch_state(self) -> None:
+    def _fetch_state(self) -> None:
         try:
             tasks = self.rpc.ps()
             regs_map: Dict[int, Dict[str, object]] = {}
             stacks_map: Dict[int, Dict[str, object]] = {}
             visible_pids: set[int] = set()
+            with self.state_lock:
+                stack_state_snapshot = {pid: dict(state) for pid, state in self.stack_state.items()}
+                existing_stacks = {pid: data for pid, data in self.task_stacks.items()}
             for task in tasks:
                 pid = int(task.get("pid", -1))
                 if pid < 0:
                     continue
                 visible_pids.add(pid)
-                state = self.stack_state.setdefault(pid, {"expanded": False, "offset": 0, "selected": 0})
+                state = stack_state_snapshot.setdefault(pid, {"expanded": False, "offset": 0, "selected": 0})
                 try:
                     regs_map[pid] = self.rpc.dumpregs(pid)
                 except RuntimeError:
@@ -399,18 +487,20 @@ class BlinkenlightsApp:
                     else:
                         state["offset"] = 0
                         state["selected"] = 0
-                elif pid in self.task_stacks:
-                    stacks_map[pid] = self.task_stacks[pid]
+                elif pid in existing_stacks:
+                    stacks_map[pid] = existing_stacks[pid]
                     state["offset"] = 0
                     state["selected"] = 0
-            self.tasks = tasks
-            self.task_regs = regs_map
-            self.task_stacks = stacks_map
-            self.current_pid = self.rpc.current_pid
-            for stale_pid in list(self.stack_state.keys()):
-                if stale_pid not in visible_pids:
-                    self.stack_state.pop(stale_pid, None)
-                    self.task_stacks.pop(stale_pid, None)
+            with self.state_lock:
+                self.tasks = tasks
+                self.task_regs = regs_map
+                self.task_stacks = stacks_map
+                self.current_pid = self.rpc.current_pid
+                self.stack_state = stack_state_snapshot
+                for stale_pid in list(self.stack_state.keys()):
+                    if stale_pid not in visible_pids:
+                        self.stack_state.pop(stale_pid, None)
+                        self.task_stacks.pop(stale_pid, None)
         except RuntimeError as exc:
             self.set_status(f"RPC error: {exc}")
 
@@ -420,8 +510,10 @@ class BlinkenlightsApp:
         self.sidebar_surface.blit(title, (20, 10))
         for button in self.global_buttons:
             button.draw(self.sidebar_surface, self.font)
-        if self.status_message:
-            status = self.small_font.render(self.status_message, True, (200, 220, 180))
+        with self.state_lock:
+            status_message = self.status_message
+        if status_message:
+            status = self.small_font.render(status_message, True, (200, 220, 180))
             self.sidebar_surface.blit(status, (20, self.sidebar_surface.get_height() - 40))
         self.screen.blit(self.sidebar_surface, (0, 0))
 
@@ -429,12 +521,18 @@ class BlinkenlightsApp:
         width = self.screen.get_width() - self.SIDEBAR_WIDTH
         task_area = pygame.Surface((width, self.screen.get_height()))
         task_area.fill((10, 10, 20))
+        with self.state_lock:
+            tasks = list(self.tasks)
+            regs_map = {pid: info for pid, info in self.task_regs.items()}
+            stacks_map = {pid: info for pid, info in self.task_stacks.items()}
+            stack_state_snapshot = {pid: dict(state) for pid, state in self.stack_state.items()}
+            current_pid = self.current_pid
         y = self.TASK_MARGIN - self.scroll_offset
-        for task in self.tasks:
+        for task in tasks:
             pid = int(task.get("pid", -1))
             box = pygame.Rect(20, y, width - 40, self.TASK_HEIGHT)
             pygame.draw.rect(task_area, (40, 40, 60), box, border_radius=10)
-            border_color = (200, 170, 60) if pid == self.current_pid else (100, 100, 140)
+            border_color = (200, 170, 60) if pid == current_pid else (100, 100, 140)
             pygame.draw.rect(task_area, border_color, box, width=2, border_radius=10)
             info = f"PID {pid} | {task.get('state')} | prio {task.get('priority', '?')} | q {task.get('quantum', '?')}"
             prog = task.get("program", "")
@@ -443,16 +541,16 @@ class BlinkenlightsApp:
             program_text = self.small_font.render(str(prog), True, (180, 180, 200))
             task_area.blit(program_text, (box.x + 12, box.y + 36))
 
-            regs = self.task_regs.get(pid)
+            regs = regs_map.get(pid)
             if regs:
                 reg_values = regs.get("regs", [])
                 for idx, value in enumerate(reg_values[:8]):
                     self.draw_register(task_area, box.x + 12, box.y + 60 + idx * 10, idx, int(value))
             self.draw_stack(task_area, box, pid)
 
-            state = self.stack_state.get(pid, {"expanded": False, "offset": 0, "selected": 0})
+            state = stack_state_snapshot.get(pid, {"expanded": False, "offset": 0, "selected": 0})
             expanded = bool(state.get("expanded"))
-            stack_frames = self.task_stacks.get(pid, {}).get("frames") or []
+            stack_frames = stacks_map.get(pid, {}).get("frames") or []
             stack_button_label = "Stack+" if not expanded else "Stack-"
             button_specs = [
                 ("Pause", 68, lambda p=pid: self.rpc.pause(p)),
@@ -498,40 +596,56 @@ class BlinkenlightsApp:
         self._task_buttons.append((rect.move(self.SIDEBAR_WIDTH, 0), label, action))
 
     def draw_stack(self, surface: pygame.Surface, box: pygame.Rect, pid: int) -> None:
-        state = self.stack_state.setdefault(pid, {"expanded": False, "offset": 0, "selected": 0})
-        stack = self.task_stacks.get(pid)
+        with self.state_lock:
+            state = self.stack_state.setdefault(pid, {"expanded": False, "offset": 0, "selected": 0})
+            stack = self.task_stacks.get(pid)
+            supports_stack = self.rpc.session.supports_stack()
+            if not stack:
+                stack_copy = None
+            else:
+                stack_copy = dict(stack)
+            if stack_copy:
+                frames = list(stack_copy.get("frames") or [])
+            else:
+                frames = []
+            expanded = bool(state.get("expanded"))
+            if frames:
+                max_visible = self.STACK_DETAIL_COUNT if expanded else self.STACK_SUMMARY_COUNT
+                offset = int(state.get("offset", 0)) if expanded else 0
+                max_offset = max(0, len(frames) - max_visible)
+                if offset > max_offset:
+                    offset = max_offset
+                    state["offset"] = offset
+                frames_slice = frames[offset: offset + max_visible]
+                selected_idx = int(state.get("selected", 0))
+                if selected_idx < 0 or selected_idx >= len(frames):
+                    selected_idx = 0
+                    state["selected"] = selected_idx
+            else:
+                max_visible = 0
+                offset = 0
+                frames_slice = []
+                selected_idx = 0
+            truncated = bool(stack_copy.get("truncated")) if stack_copy else False
+            errors = list(stack_copy.get("errors") or []) if stack_copy else []
         stack_x = box.x + 210
         stack_y = box.y + 60
         header = self.small_font.render("Stack:", True, (200, 210, 240))
         surface.blit(header, (stack_x, stack_y - 14))
 
-        if not stack:
-            message = "stack unsupported" if not self.rpc.session.supports_stack() else "(no stack data yet)"
+        if stack_copy is None:
+            message = "stack unsupported" if not supports_stack else "(no stack data yet)"
             rendered = self.small_font.render(message, True, (180, 180, 200))
             surface.blit(rendered, (stack_x, stack_y))
             return
 
-        frames = stack.get("frames") or []
         if not frames:
             rendered = self.small_font.render("(stack empty)", True, (180, 180, 200))
             surface.blit(rendered, (stack_x, stack_y))
             return
 
         line_height = 14
-        expanded = bool(state.get("expanded"))
-        max_visible = self.STACK_DETAIL_COUNT if expanded else self.STACK_SUMMARY_COUNT
-        offset = int(state.get("offset", 0)) if expanded else 0
-        max_offset = max(0, len(frames) - max_visible)
-        if offset > max_offset:
-            offset = max_offset
-            state["offset"] = offset
-        frames_slice = frames[offset: offset + max_visible]
         y_cursor = stack_y
-        selected_idx = int(state.get("selected", 0))
-        if selected_idx < 0 or selected_idx >= len(frames):
-            selected_idx = 0
-            state["selected"] = selected_idx
-
         for local_idx, frame in enumerate(frames_slice):
             actual_idx = offset + local_idx
             pc = int(frame.get("pc", 0))
@@ -615,12 +729,11 @@ class BlinkenlightsApp:
 
     def run(self) -> None:
         while self.running:
+            pygame.event.pump()
             now = time.monotonic()
-            if now - self.last_poll > max(self.refresh, self.POLL_INTERVAL):
-                self.fetch_state()
-                self.last_poll = now
-            if self.status_message and now - self.status_timestamp > 5.0:
-                self.status_message = ""
+            with self.state_lock:
+                if self.status_message and now - self.status_timestamp > 5.0:
+                    self.status_message = ""
             self._task_buttons: List[Tuple[pygame.Rect, str, object]] = []
             self._stack_click_targets = []
             for event in pygame.event.get():
@@ -638,6 +751,11 @@ class BlinkenlightsApp:
             self.draw_tasks()
             pygame.display.flip()
             self.clock.tick(30)
+        self.refresh_event.set()
+        if self.poll_thread.is_alive():
+            self.debug_print("Waiting for poll thread to exit")
+            self.poll_thread.join(timeout=1.0)
+        self.debug_print("Main loop exiting")
         self.rpc.close()
         pygame.quit()
 
@@ -671,8 +789,9 @@ class BlinkenlightsApp:
                         break
 
     def set_status(self, message: str) -> None:
-        self.status_message = str(message)
-        self.status_timestamp = time.monotonic()
+        with self.state_lock:
+            self.status_message = str(message)
+            self.status_timestamp = time.monotonic()
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -680,13 +799,14 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--host", default="127.0.0.1", help="executive host (default 127.0.0.1)")
     parser.add_argument("--port", type=int, default=9998, help="executive port (default 9998)")
     parser.add_argument("--refresh", type=float, default=0.75, help="seconds between polls")
+    parser.add_argument("--debug", action="store_true", help="enable debug logging")
     args = parser.parse_args(argv)
 
     if pygame is None:
         print("pygame is required for blinkenlights; install with `pip install pygame`.", file=sys.stderr)
         return 1
 
-    app = BlinkenlightsApp(args.host, args.port, args.refresh)
+    app = BlinkenlightsApp(args.host, args.port, args.refresh, debug=args.debug)
     try:
         app.run()
     except KeyboardInterrupt:
@@ -696,3 +816,5 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+

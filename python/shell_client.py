@@ -2006,7 +2006,6 @@ def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: boo
     session = _ensure_session(host, port, auto_events=False)
     print(" connected.")
     print("Type 'help' for commands or 'help <command>' for details.")
-    _ensure_event_stream(session)
     while True:
         try:
             line = input('hsx> ')
@@ -2048,6 +2047,7 @@ def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: boo
                 _print_general_help()
             continue
         if cmd == 'events':
+            _ensure_event_stream(session)
             limit = 10
             if args:
                 try:

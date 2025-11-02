@@ -3063,6 +3063,10 @@ class VMController:
             "exit_status": task.get("exit_status"),
             "trace": task.get("trace"),
             "metadata": metadata_summary if metadata_summary else None,
+            "reg_base": task.get("reg_base"),
+            "stack_base": task.get("stack_base"),
+            "stack_limit": task.get("stack_limit"),
+            "stack_size": task.get("stack_size"),
         }
 
     def trace_task(self, pid: int, enable: Optional[bool]) -> Dict[str, Any]:

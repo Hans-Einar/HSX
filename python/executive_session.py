@@ -153,9 +153,15 @@ class ExecutiveSession:
         with self._session_lock:
             if self._event_stream is not None:
                 return True
+            session_disabled = self.session_disabled
+        if session_disabled:
+            return False
+        self._ensure_session()
+        with self._session_lock:
+            if self._event_stream is not None:
+                return True
             if self.session_disabled:
                 return False
-            self._ensure_session()
             if "events" not in self.negotiated_features:
                 return False
             stream = self._open_event_stream(filters or {}, ack_interval)
@@ -567,6 +573,11 @@ class ExecutiveSession:
         token = ""
         if isinstance(events_block, dict):
             token = str(events_block.get("token") or "")
+        # The handshake uses a short timeout; switch the socket back to blocking mode for streaming.
+        try:
+            sock.settimeout(None)
+        except Exception:
+            pass
         stop_event = threading.Event()
         thread = threading.Thread(
             target=self._event_stream_worker,
@@ -588,7 +599,14 @@ class ExecutiveSession:
         last_seq_ack = 0
         try:
             while not stop_event.is_set():
-                line = rfile.readline()
+                try:
+                    line = rfile.readline()
+                except TimeoutError:
+                    continue
+                except OSError as exc:
+                    if getattr(exc, "errno", None) == socket.timeout:
+                        continue
+                    raise
                 if not line:
                     break
                 try:

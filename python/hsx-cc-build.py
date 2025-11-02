@@ -16,6 +16,7 @@ Options:
     --app-name NAME     Application name for HXE header
     --no-make           Skip make invocation, build files directly
     -j JOBS             Parallel jobs for make (default: auto)
+    --clean             Remove build directory before building
     -v, --verbose       Verbose output
     -h, --help          Show this help message
     
@@ -92,6 +93,11 @@ class HSXBuilder:
             self.build_dir = Path('build/debug')
         else:
             self.build_dir = Path('build')
+
+        if args.clean and self.build_dir.exists():
+            if self.verbose:
+                print(f"[hsx-cc-build] Cleaning build directory: {self.build_dir}")
+            shutil.rmtree(self.build_dir)
         
         self.build_dir.mkdir(parents=True, exist_ok=True)
         
@@ -455,6 +461,12 @@ def main():
         type=int,
         metavar='N',
         help='Parallel jobs for make'
+    )
+    
+    parser.add_argument(
+        '--clean',
+        action='store_true',
+        help='Remove build directory before building'
     )
     
     parser.add_argument(

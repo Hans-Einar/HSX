@@ -1,6 +1,8 @@
+import threading
+
 import pytest
 
-from python.executive_session import ExecutiveSession, ExecutiveSessionError
+from python.executive_session import ExecutiveSession, ExecutiveSessionError, _EventStream
 
 
 class StubSession(ExecutiveSession):
@@ -187,3 +189,39 @@ def test_watch_unknown_marks_unsupported():
     result = session.watch_list(2)
     assert result is None
     assert session.supports_watch() is False
+
+
+def test_start_event_stream_establishes_once():
+    handshake = make_handshake(["events"])
+    stream_started = threading.Event()
+
+    class EventSession(StubSession):
+        def __init__(self):
+            super().__init__([handshake], features=["events"])
+            self.open_calls = 0
+            self.stream_filters = None
+            self.stream_ack_interval = None
+
+        def _open_event_stream(self, filters, ack_interval):
+            self.open_calls += 1
+            self.stream_filters = filters
+            self.stream_ack_interval = ack_interval
+            thread = threading.Thread(target=stream_started.set, daemon=True)
+            return _EventStream(
+                sock=None,
+                rfile=None,
+                stop_event=threading.Event(),
+                thread=thread,
+                token="tok",
+            )
+
+    session = EventSession()
+    assert session.start_event_stream(filters={"categories": ["scheduler"]}, ack_interval=5) is True
+    assert stream_started.wait(0.5)
+    assert session.open_calls == 1
+    assert session.stream_filters == {"categories": ["scheduler"]}
+    assert session.stream_ack_interval == 5
+    assert len(session.sent) == 1
+    assert session.sent[0]["cmd"] == "session.open"
+    assert session.start_event_stream() is True
+    assert session.open_calls == 1

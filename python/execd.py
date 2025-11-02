@@ -3386,6 +3386,15 @@ class _ShellHandler(socketserver.StreamRequestHandler):
             except json.JSONDecodeError:
                 self._send({"version": 1, "status": "error", "error": "invalid_json"})
                 continue
+            try:
+                self.server.state.log(
+                    "debug",
+                    "shell request",
+                    command=str(request.get("cmd")),
+                    session=request.get("session"),
+                )
+            except Exception:
+                pass
             response = self.server.exec_state_handle(request)
             stream_info = response.get("__stream__") if isinstance(response, dict) else None
             if stream_info:
