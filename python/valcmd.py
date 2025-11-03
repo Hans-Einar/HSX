@@ -518,6 +518,8 @@ class ValueEntry:
     desc_head: int = HSX_VAL_DESC_INVALID
     last_change_time: float = 0.0
     subscribers: List[Any] = field(default_factory=list)
+    persist_key: int = 0
+    persist_debounce_ms: int = 0
 
     @property
     def oid(self) -> int:
@@ -590,6 +592,7 @@ class ValCmdRegistry:
         self._next_handler_ref: int = 1
         self._token_validator: Optional[Callable[[CommandEntry, Optional[bytes], int], bool]] = None
         self._async_executor: Callable[[Callable[[], None]], None] = self._default_async_executor
+        self._persist_backend: Optional[Any] = None
         self._value_high_water = 0
         self._command_high_water = 0
         self._value_warn_active = False
@@ -614,6 +617,14 @@ class ValCmdRegistry:
     def set_async_executor(self, executor: Optional[Callable[[Callable[[], None]], None]]) -> None:
         """Override the async executor used for CMD_CALL_ASYNC."""
         self._async_executor = executor or self._default_async_executor
+
+    def set_persistence_backend(self, backend: Optional[Any]) -> None:
+        """Install persistence backend for value load/save operations."""
+        self._persist_backend = backend
+        if backend is None:
+            return
+        for entry in self._values.values():
+            self._apply_persisted_value(entry)
 
     @staticmethod
     def _default_async_executor(runnable: Callable[[], None]) -> None:
@@ -732,6 +743,26 @@ class ValCmdRegistry:
     def _iter_command_descriptors(self, entry: CommandEntry) -> Iterable[DescriptorRecord]:
         return self._descriptors.iter_chain(entry.desc_head)
 
+    def _apply_value_descriptor_metadata(self, entry: ValueEntry) -> None:
+        entry.persist_key = 0
+        entry.persist_debounce_ms = 0
+        for record in self._iter_value_descriptors(entry):
+            if isinstance(record, PersistDescriptorRecord):
+                entry.persist_key = int(record.persist_key)
+                entry.persist_debounce_ms = int(record.debounce_ms)
+
+    def _apply_persisted_value(self, entry: ValueEntry) -> None:
+        if (
+            not entry.is_persistent
+            or entry.persist_key == 0
+            or self._persist_backend is None
+        ):
+            return
+        raw = self._persist_backend.load(entry.persist_key)
+        if raw is None:
+            return
+        entry.last_f16_raw = int(raw) & 0xFFFF
+
     def _observe_string_usage(self) -> None:
         used, total = self._string_table.usage
         usage_pct = (used / total) if total else 0.0
@@ -816,6 +847,8 @@ class ValCmdRegistry:
             desc_head=desc_head,
         )
         self._values[oid] = entry
+        self._apply_value_descriptor_metadata(entry)
+        self._apply_persisted_value(entry)
         self._record_value_usage()
         self._emit_event(
             "value_registered",
@@ -895,6 +928,12 @@ class ValCmdRegistry:
             flags=entry.flags,
             auth_level=entry.auth_level,
         )
+        if entry.is_persistent and entry.persist_key and self._persist_backend:
+            self._persist_backend.schedule_write(
+                entry.persist_key,
+                new_raw,
+                entry.persist_debounce_ms,
+            )
         return HSX_VAL_STATUS_OK
 
     def value_list(self, group_filter: int = 0xFF, caller_pid: Optional[int] = None) -> List[int]:
@@ -1203,6 +1242,8 @@ class ValCmdRegistry:
             "last_f16": entry.last_f16_raw,
             "last_value": entry.last_value,
             "desc_head": entry.desc_head,
+            "persist_key": entry.persist_key,
+            "persist_debounce_ms": entry.persist_debounce_ms,
         }
         info.update(self._summarize_value_descriptors(entry))
         return info

@@ -589,15 +589,6 @@ Construct descriptor chains from section metadata. Enables rich metadata without
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.04--ValCmd](../../../04--Design/04.04--ValCmd.md)
-- [ ] Parse descriptor metadata from .value/.cmd sections
-- [ ] Build Group descriptors
-- [ ] Build Name descriptors
-- [ ] Build Unit descriptors
-- [ ] Build Range descriptors
-- [ ] Build Persist descriptors
-- [ ] Link descriptors into chains
-- [ ] Add descriptor building tests
-- [ ] Document descriptor metadata format
  - [x] Parse descriptor metadata from .value/.cmd sections
  - [x] Build Group descriptors
  - [x] Build Name descriptors

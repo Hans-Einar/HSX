@@ -22,6 +22,7 @@ if str(REPO_ROOT) not in sys.path:
 try:
     from python.mailbox import MailboxManager, MailboxError, MailboxMessage
     from python import hsx_mailbox_constants as mbx_const
+    from python.persistence import PersistenceStore
     from python.valcmd import ValCmdRegistry, float_to_f16, f16_to_float
     from python import hsx_value_constants as val_const
     from python import hsx_command_constants as cmd_const
@@ -2093,6 +2094,8 @@ class VMController:
         profile_name, profile_config = self._resolve_mailbox_profile(mailbox_profile)
         self.mailbox_profile_name = profile_name
         self.mailbox_profile: Dict[str, Any] = profile_config
+        fram_path = os.environ.get("HSX_FRAM_PATH")
+        self.persistence_store = PersistenceStore(fram_path)
         self.mailboxes = self._create_mailbox_manager()
         self.valcmd = self._create_valcmd_registry()
         self.waiting_tasks: Dict[int, Dict[str, Any]] = {}
@@ -2132,6 +2135,7 @@ class VMController:
         """Create the value/command registry with event hook."""
         registry = ValCmdRegistry()
         registry.set_event_hook(self._handle_valcmd_event)
+        registry.set_persistence_backend(self.persistence_store)
         return registry
 
     def _handle_valcmd_event(self, event_type: str, **kwargs):

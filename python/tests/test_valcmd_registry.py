@@ -1,7 +1,7 @@
 """Tests for the ValCmd Registry Manager."""
 
 import logging
-from typing import Any, Callable, Tuple
+from typing import Any, Callable, Optional, Tuple
 
 import pytest
 from python.valcmd import (
@@ -587,6 +587,42 @@ class TestValCmdRegistry:
         assert results == [(HSX_CMD_STATUS_OK, 42)]
         assert events.count("cmd_invoked") == 1
         assert events.count("cmd_completed") == 1
+
+    def test_persistence_backend_load_and_store(self):
+        registry = ValCmdRegistry()
+
+        class FakePersistence:
+            def __init__(self):
+                self.storage = {99: float_to_f16(3.5)}
+                self.last_write: Optional[Tuple[int, int, int]] = None
+
+            def load(self, key: int) -> Optional[int]:
+                return self.storage.get(key)
+
+            def schedule_write(self, key: int, raw_value: int, debounce_ms: int = 0) -> None:
+                self.last_write = (key, raw_value & 0xFFFF, debounce_ms)
+                self.storage[key] = raw_value & 0xFFFF
+
+        backend = FakePersistence()
+        registry.set_persistence_backend(backend)
+
+        status, oid = registry.value_register(
+            5,
+            6,
+            HSX_VAL_FLAG_PERSIST,
+            HSX_VAL_AUTH_PUBLIC,
+            owner_pid=11,
+            descriptors=[{"type": "persist", "key": 99, "debounce_ms": 75}],
+        )
+        assert status == HSX_VAL_STATUS_OK
+
+        status, value = registry.value_get(oid, caller_pid=11)
+        assert status == HSX_VAL_STATUS_OK
+        assert value == pytest.approx(3.5)
+
+        status = registry.value_set(oid, 7.25, caller_pid=11, current_time=1.0)
+        assert status == HSX_VAL_STATUS_OK
+        assert backend.last_write == (99, float_to_f16(7.25) & 0xFFFF, 75)
     
     def test_command_list(self):
         """Test command enumeration."""

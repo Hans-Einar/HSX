@@ -17,7 +17,7 @@ from python.hsx_command_constants import (
     HSX_CMD_STATUS_OK,
     HSX_CMD_STATUS_EPERM,
 )
-from python.valcmd import f16_to_float
+from python.valcmd import f16_to_float, float_to_f16
 from platforms.python.host_vm import HXEMetadata, VMController, load_hxe, load_hxe_bytes
 
 
@@ -248,6 +248,9 @@ def test_value_command_metadata_roundtrip(tmp_path):
     assert value_entry.owner_pid == pid
     described_value = controller.valcmd.describe_value(value_oid)
     assert described_value is not None and described_value.get("group_name") == "sensors"
+    status = controller.valcmd.value_set(value_oid, 18.5, caller_pid=pid)
+    assert status == HSX_VAL_STATUS_OK
+    assert controller.persistence_store.load(17) == float_to_f16(18.5)
     status, cmd_oid = controller.valcmd.command_lookup(1, 7)
     assert status == HSX_CMD_STATUS_OK
     status, _ = controller.valcmd.command_call(cmd_oid, caller_pid=pid)
