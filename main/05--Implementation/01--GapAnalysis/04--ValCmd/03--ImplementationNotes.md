@@ -281,3 +281,20 @@ Append sessions chronologically and ensure every entry references the relevant d
 
 ### Next Steps
 - Phase 6.3 change detection (epsilon/rate limiting) to avoid excessive notifications and persistence churn.
+
+## 2025-11-06 - Codex (Session 11)
+
+### Scope
+- Plan item / phase addressed: Phase 7.2 Shell/CLI Integration
+- Design sections reviewed: 04.04--ValCmd.md §4.4.7 (shell) and docs/executive_protocol.md RPC table (for behaviour parity)
+
+### Work Summary
+- Extended `python/shell_client.py` with named value/command resolution, numeric address parsing, and tab-completion sourced from live registry snapshots. Added `val.get`, `val.set`, `val.list`, `cmd.call`, and `cmd.list` handlers with rich pretty-printers and context tracking.
+- Introduced registry lookup helpers with caching/ambiguous detection, plus readline completer wiring that surfaces descriptor-based suggestions. Added CLI help entries for the new commands (help/val.*.txt, help/cmd.*.txt).
+- Refreshed the ValCmd implementation plan checklist (Phase 7.2) and recorded the session; no design deviations identified.
+
+### Testing
+- `python -m pytest python/tests/test_shell_client.py`
+
+### Next Steps
+- Resume Phase 6.3 change-detection work (debounce/epsilon tuning) before tackling Phase 7.3 UART access.

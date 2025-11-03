@@ -4,5 +4,10 @@
         "hsx_stdio.h": "c"
     },
     
-  "chatgpt.preferWsl": true
+  "chatgpt.preferWsl": true,
+  "python.testing.pytestArgs": [
+    "tests"
+  ],
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestEnabled": true
 }

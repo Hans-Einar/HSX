@@ -702,13 +702,13 @@ Design specifies numeric and named value access (section 4.4.7). Enables interac
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.04--ValCmd](../../../04--Design/04.04--ValCmd.md)
-- [ ] Implement named value lookup (by string name)
-- [ ] Support val.get("my_value") syntax
-- [ ] Support val.set("my_value", 3.14) syntax
-- [ ] Support cmd.call("my_command") syntax
-- [ ] Implement tab completion for value/command names
-- [ ] Add shell integration tests
-- [ ] Document shell command usage
+- [x] Implement named value lookup (by string name)
+- [x] Support val.get("my_value") syntax
+- [x] Support val.set("my_value", 3.14) syntax
+- [x] Support cmd.call("my_command") syntax
+- [x] Implement tab completion for value/command names
+- [x] Add shell integration tests
+- [x] Document shell command usage
 
 ---
 

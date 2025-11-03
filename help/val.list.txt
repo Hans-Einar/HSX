@@ -1,0 +1,5 @@
+val.list [--pid <pid>] [--group <group_id>] [--oid <oid>] [--name <pattern>]
+    Enumerate registered values with descriptor details (unit, range,
+    persistence). Filters are optional; --group and --oid accept decimal or
+    hex integers, --name narrows to an exact descriptor name, and --pid limits
+    results to a specific task.

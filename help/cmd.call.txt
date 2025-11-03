@@ -1,0 +1,4 @@
+cmd.call <identifier> [--pid <pid>] [--async]
+    Invoke a registered command. Identifiers can be numeric (group:cmd or OID)
+    or descriptor names such as maint:reset. Add --async to request asynchronous
+    execution; monitor the caller's mailbox for completion frames.

@@ -1,0 +1,4 @@
+cmd.list [--pid <pid>] [--group <group_id>] [--oid <oid>] [--name <pattern>]
+    Enumerate registered commands, showing flags and help text. Filters mirror
+    val.list: group and oid accept decimal or hex integers, name selects a
+    descriptor string, and pid limits results to commands owned by that task.

@@ -9,7 +9,8 @@ from datetime import datetime
 from pathlib import Path
 import shlex
 import threading
-from typing import Optional, List
+import time
+from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 from executive_session import ExecutiveSession
 
@@ -39,6 +40,8 @@ COMMAND_NAMES = sorted(
         "bp",
         "cd",
         "clock",
+        "cmd.call",
+        "cmd.list",
         "detach",
         "dbg",
         "dumpregs",
@@ -76,6 +79,9 @@ COMMAND_NAMES = sorted(
         "sym",
         "trace",
         "step",
+        "val.get",
+        "val.list",
+        "val.set",
     ]
 )
 
@@ -97,6 +103,17 @@ _SESSION_MANAGER: Optional[ExecutiveSession] = None
 _SESSION_LOCK = threading.Lock()
 _EVENT_STREAM_STARTED = False
 _EVENT_STREAM_LOCK = threading.Lock()
+
+_CURRENT_HOST = "127.0.0.1"
+_CURRENT_PORT = 9998
+_COMPLETION_ENABLED = False
+
+_VALUE_CACHE: Dict[str, Any] = {"timestamp": 0.0, "entries": []}
+_COMMAND_CACHE: Dict[str, Any] = {"timestamp": 0.0, "entries": []}
+_CACHE_LOCK = threading.Lock()
+_CACHE_TTL_SECONDS = 1.0
+_LAST_VALUE_CONTEXT: Dict[str, Any] = {}
+_LAST_COMMAND_CONTEXT: Dict[str, Any] = {}
 
 
 def _ensure_session(host: str, port: int, *, auto_events: bool = False) -> ExecutiveSession:
@@ -155,6 +172,291 @@ def _close_session() -> None:
 
 
 atexit.register(_close_session)
+
+
+def _update_completion_target(host: str, port: int) -> None:
+    global _CURRENT_HOST, _CURRENT_PORT
+    _CURRENT_HOST = host
+    _CURRENT_PORT = port
+
+
+def _try_parse_int(token: Any) -> Optional[int]:
+    if isinstance(token, int):
+        return int(token)
+    if isinstance(token, str):
+        try:
+            return int(token, 0)
+        except ValueError:
+            return None
+    return None
+
+
+def _require_int(token: Any, label: str) -> int:
+    value = _try_parse_int(token)
+    if value is None:
+        raise ValueError(f"{label} must be an integer value")
+    return value
+
+
+def _format_entry_label(entry: Dict[str, Any], *, kind: str) -> str:
+    name = entry.get("name")
+    group = entry.get("group_name")
+    group_id = entry.get("group_id")
+    entry_id = entry.get("value_id" if kind == "value" else "cmd_id")
+    oid = entry.get("oid")
+    label_parts: list[str] = []
+    if isinstance(group, str) and group:
+        label_parts.append(group)
+    elif isinstance(group_id, int):
+        label_parts.append(str(group_id))
+    if isinstance(name, str) and name:
+        label_parts.append(name)
+    elif isinstance(entry_id, int):
+        label_parts.append(str(entry_id))
+    label = ":".join(label_parts) if label_parts else str(oid)
+    if isinstance(oid, int):
+        label += f" (oid=0x{oid & 0xFFFF:04X})"
+    return label
+
+
+def _load_registry_entries(kind: str, host: str, port: int, *, force: bool = False) -> List[Dict[str, Any]]:
+    cache = _VALUE_CACHE if kind == "value" else _COMMAND_CACHE
+    now = time.monotonic()
+    with _CACHE_LOCK:
+        if not force and cache.get("entries") and now - cache.get("timestamp", 0.0) < _CACHE_TTL_SECONDS:
+            return list(cache["entries"])
+    cmd = "val.list" if kind == "value" else "cmd.list"
+    key = "values" if kind == "value" else "commands"
+    try:
+        response = send_request(host, port, {"cmd": cmd})
+    except Exception:
+        with _CACHE_LOCK:
+            return list(cache.get("entries", []))
+    entries = response.get(key) if isinstance(response, dict) else None
+    if response.get("status") != "ok" or not isinstance(entries, list):
+        entries = []
+    with _CACHE_LOCK:
+        cache["entries"] = entries
+        cache["timestamp"] = now
+    return list(entries)
+
+
+def _invalidate_value_cache() -> None:
+    with _CACHE_LOCK:
+        _VALUE_CACHE["entries"] = []
+        _VALUE_CACHE["timestamp"] = 0.0
+
+
+def _invalidate_command_cache() -> None:
+    with _CACHE_LOCK:
+        _COMMAND_CACHE["entries"] = []
+        _COMMAND_CACHE["timestamp"] = 0.0
+
+
+def _match_registry_entries(
+    entries: Iterable[Dict[str, Any]],
+    identifier: str,
+    *,
+    kind: str,
+) -> List[Dict[str, Any]]:
+    normalized = identifier.strip()
+    if not normalized:
+        return []
+
+    matches: List[Dict[str, Any]] = []
+    oid_value = _try_parse_int(normalized)
+    if oid_value is not None:
+        for entry in entries:
+            entry_oid = _try_parse_int(entry.get("oid"))
+            if entry_oid == oid_value:
+                matches.append(entry)
+        if matches:
+            return matches
+
+    group_token: Optional[str] = None
+    value_token = normalized
+    if ":" in normalized:
+        parts = normalized.split(":", 1)
+        group_token = parts[0].strip()
+        value_token = parts[1].strip()
+
+    group_int = _try_parse_int(group_token) if group_token else None
+    group_str = group_token.lower() if isinstance(group_token, str) else None
+    value_int = _try_parse_int(value_token)
+    value_str = value_token.lower()
+
+    id_key = "value_id" if kind == "value" else "cmd_id"
+
+    for entry in entries:
+        group_id = _try_parse_int(entry.get("group_id"))
+        entry_group_name = entry.get("group_name")
+        entry_id = _try_parse_int(entry.get(id_key))
+        entry_name = entry.get("name")
+
+        if group_token is not None:
+            if group_int is not None:
+                if group_id != group_int:
+                    continue
+            else:
+                if not isinstance(entry_group_name, str) or entry_group_name.lower() != group_str:
+                    continue
+
+        if value_int is not None:
+            if entry_id != value_int:
+                continue
+        else:
+            if not isinstance(entry_name, str) or entry_name.lower() != value_str:
+                continue
+        matches.append(entry)
+
+    return matches
+
+
+def _resolve_registry_identifier(
+    identifier: str,
+    *,
+    host: str,
+    port: int,
+    kind: str,
+) -> Dict[str, Any]:
+    entries = _load_registry_entries(kind, host, port, force=False)
+    matches = _match_registry_entries(entries, identifier, kind=kind)
+    if not matches:
+        entries = _load_registry_entries(kind, host, port, force=True)
+        matches = _match_registry_entries(entries, identifier, kind=kind)
+    if not matches:
+        raise ValueError(f"unknown {kind} '{identifier}'")
+    if len(matches) > 1:
+        labels = ", ".join(_format_entry_label(entry, kind=kind) for entry in matches)
+        raise ValueError(f"{kind} identifier '{identifier}' is ambiguous ({labels})")
+    return matches[0]
+
+
+def _resolve_value_identifier(identifier: str, *, host: str, port: int) -> Dict[str, Any]:
+    return _resolve_registry_identifier(identifier, host=host, port=port, kind="value")
+
+
+def _resolve_command_identifier(identifier: str, *, host: str, port: int) -> Dict[str, Any]:
+    return _resolve_registry_identifier(identifier, host=host, port=port, kind="command")
+
+
+def _value_completion_candidates(host: str, port: int) -> List[str]:
+    entries = _load_registry_entries("value", host, port, force=False)
+    suggestions: list[str] = []
+    seen: set[str] = set()
+    for entry in entries:
+        oid = _try_parse_int(entry.get("oid"))
+        group_id = _try_parse_int(entry.get("group_id"))
+        value_id = _try_parse_int(entry.get("value_id"))
+        name = entry.get("name")
+        group_name = entry.get("group_name")
+        candidates: list[str] = []
+        if isinstance(name, str) and name:
+            candidates.append(name)
+        if isinstance(group_name, str) and group_name and isinstance(name, str) and name:
+            candidates.append(f"{group_name}:{name}")
+        if group_id is not None and value_id is not None:
+            candidates.append(f"{group_id}:{value_id}")
+        if oid is not None:
+            candidates.append(str(oid))
+            candidates.append(f"0x{oid & 0xFFFF:04X}")
+        for candidate in candidates:
+            if candidate and candidate not in seen:
+                seen.add(candidate)
+                suggestions.append(candidate)
+    return sorted(suggestions)
+
+
+def _command_completion_candidates(host: str, port: int) -> List[str]:
+    entries = _load_registry_entries("command", host, port, force=False)
+    suggestions: list[str] = []
+    seen: set[str] = set()
+    for entry in entries:
+        oid = _try_parse_int(entry.get("oid"))
+        group_id = _try_parse_int(entry.get("group_id"))
+        cmd_id = _try_parse_int(entry.get("cmd_id"))
+        name = entry.get("name")
+        group_name = entry.get("group_name")
+        candidates: list[str] = []
+        if isinstance(name, str) and name:
+            candidates.append(name)
+        if isinstance(group_name, str) and group_name and isinstance(name, str) and name:
+            candidates.append(f"{group_name}:{name}")
+        if group_id is not None and cmd_id is not None:
+            candidates.append(f"{group_id}:{cmd_id}")
+        if oid is not None:
+            candidates.append(str(oid))
+            candidates.append(f"0x{oid & 0xFFFF:04X}")
+        for candidate in candidates:
+            if candidate and candidate not in seen:
+                seen.add(candidate)
+                suggestions.append(candidate)
+    return sorted(suggestions)
+
+
+def _configure_completion(host: str, port: int) -> None:
+    if readline is None:
+        return
+    _update_completion_target(host, port)
+    global _COMPLETION_ENABLED
+    if not _COMPLETION_ENABLED:
+        try:
+            readline.set_completer(_readline_complete)  # type: ignore[attr-defined]
+        except Exception:
+            return
+        try:
+            readline.parse_and_bind("tab: complete")  # type: ignore[attr-defined]
+        except Exception:
+            pass
+        _COMPLETION_ENABLED = True
+
+
+def _readline_complete(text: str, state: int) -> Optional[str]:
+    if readline is None:
+        return None
+    try:
+        buffer = readline.get_line_buffer()  # type: ignore[attr-defined]
+        endidx = readline.get_endidx()  # type: ignore[attr-defined]
+    except Exception:
+        buffer = ""
+        endidx = 0
+    prefix = buffer[:endidx]
+    trailing_space = prefix.endswith(" ")
+    tokens = prefix.split()
+    if trailing_space:
+        tokens.append("")
+
+    candidates: List[str] = []
+    try:
+        if not tokens:
+            base = COMMAND_NAMES
+            candidates = [cmd for cmd in base if cmd.startswith(text)]
+        elif len(tokens) == 1 and not trailing_space:
+            base = COMMAND_NAMES
+            candidates = [cmd for cmd in base if cmd.startswith(text)]
+        else:
+            command = tokens[0]
+            arg_index = len(tokens) - 1
+            base: List[str] = []
+            if command in {"val.get", "val.set", "val.list"} and arg_index == 1:
+                base = _value_completion_candidates(_CURRENT_HOST, _CURRENT_PORT)
+            elif command in {"cmd.call", "cmd.list"} and arg_index == 1:
+                base = _command_completion_candidates(_CURRENT_HOST, _CURRENT_PORT)
+            elif command == "cmd.call" and arg_index >= 2:
+                base = ["--async", "--pid"]
+            elif command in {"val.get", "val.set", "val.list"} and arg_index >= 2:
+                base = ["--pid"]
+            else:
+                base = []
+            candidates = [option for option in base if option.startswith(text)]
+    except Exception:
+        candidates = []
+
+    candidates.sort()
+    if state < len(candidates):
+        return candidates[state]
+    return None
+
 
 def _command_usage(name: str) -> str:
     filename = HELP_ALIASES.get(name, name)
@@ -1435,6 +1737,192 @@ def _pretty_mbox(payload: dict) -> None:
         name = desc.get("name", "")
         print(f"  {descriptor_id:5}  {namespace:<9}  {owner_str:>5}  {depth:5}  {bytes_used:5}  0x{mode:04X}  {name}")
 
+
+def _format_numeric(value: Any) -> str:
+    if isinstance(value, float):
+        return f"{value:.6g}"
+    if isinstance(value, int):
+        return str(value)
+    return str(value)
+
+
+def _render_value_response(resp: Dict[str, Any], *, action: str) -> None:
+    if resp.get("status") != "ok":
+        print(json.dumps(resp, indent=2, sort_keys=True))
+        return
+    value_block = resp.get("value")
+    if not isinstance(value_block, dict):
+        print(json.dumps(resp, indent=2, sort_keys=True))
+        return
+    context = dict(_LAST_VALUE_CONTEXT)
+    entry = context.get("entry") if isinstance(context.get("entry"), dict) else {}
+    oid = context.get("oid")
+    if oid is None:
+        oid = _try_parse_int(value_block.get("oid"))
+    print(f"{action}:")
+    if oid is not None:
+        print(f"  oid       : 0x{oid & 0xFFFF:04X}")
+    name = entry.get("name")
+    group_name = entry.get("group_name")
+    if isinstance(name, str) and name:
+        if isinstance(group_name, str) and group_name:
+            print(f"  path      : {group_name}:{name}")
+        else:
+            print(f"  name      : {name}")
+    elif entry:
+        group_id = entry.get("group_id")
+        value_id = entry.get("value_id")
+        if group_id is not None and value_id is not None:
+            print(f"  path      : {group_id}:{value_id}")
+    unit = entry.get("unit")
+    if unit:
+        print(f"  unit      : {unit}")
+    flags = entry.get("flags")
+    if isinstance(flags, int):
+        print(f"  flags     : 0x{flags & 0xFFFF:04X}")
+    last_value = value_block.get("value")
+    if last_value is not None:
+        print(f"  value     : {_format_numeric(last_value)}")
+    raw = value_block.get("f16")
+    if raw is not None:
+        raw_int = _try_parse_int(raw)
+        if raw_int is not None:
+            print(f"  raw_f16   : 0x{raw_int & 0xFFFF:04X}")
+    status = value_block.get("status")
+    if status is not None:
+        print(f"  status    : {status}")
+    pid = value_block.get("pid")
+    if pid is not None:
+        print(f"  owner_pid : {pid}")
+    epsilon = entry.get("epsilon")
+    if epsilon is not None:
+        print(f"  epsilon   : {_format_numeric(epsilon)}")
+    min_val = entry.get("min")
+    max_val = entry.get("max")
+    if min_val is not None or max_val is not None:
+        print(
+            f"  range     : "
+            f"{'-' if min_val is None else _format_numeric(min_val)} .. "
+            f"{'-' if max_val is None else _format_numeric(max_val)}"
+        )
+    persist_key = entry.get("persist_key")
+    debounce = entry.get("debounce_ms")
+    if persist_key is not None or debounce is not None:
+        detail = f"key={persist_key}" if persist_key is not None else ""
+        if debounce is not None:
+            if detail:
+                detail += " "
+            detail += f"debounce={debounce}ms"
+        print(f"  persist   : {detail or '-'}")
+
+
+def _pretty_val_get(resp: Dict[str, Any]) -> None:
+    _render_value_response(resp, action="Value")
+
+
+def _pretty_val_set(resp: Dict[str, Any]) -> None:
+    _render_value_response(resp, action="Updated value")
+
+
+def _pretty_val_list(resp: Dict[str, Any]) -> None:
+    if resp.get("status") != "ok":
+        print(json.dumps(resp, indent=2, sort_keys=True))
+        return
+    values = resp.get("values")
+    if not isinstance(values, list) or not values:
+        print("Values: <none>")
+        return
+    header = "  OID    Group            Name                 Value       Unit"
+    print("Values:")
+    print(header)
+    print("  " + "-" * (len(header) - 2))
+    for entry in values:
+        oid = _try_parse_int(entry.get("oid"))
+        group = entry.get("group_name") or entry.get("group_id") or "-"
+        name = entry.get("name") or entry.get("value_id") or "-"
+        value = entry.get("last_value")
+        unit = entry.get("unit") or "-"
+        row = (
+            f"  {('0x%04X' % (oid & 0xFFFF) if oid is not None else '----'):>6}  "
+            f"{str(group):<15}  {str(name):<20}  {_format_numeric(value) if value is not None else '-':<10}  {unit}"
+        )
+        print(row)
+        min_val = entry.get("min")
+        max_val = entry.get("max")
+        if min_val is not None or max_val is not None:
+            print(
+                f"       range: "
+                f"{'-' if min_val is None else _format_numeric(min_val)} .. "
+                f"{'-' if max_val is None else _format_numeric(max_val)}"
+            )
+        help_text = entry.get("help")
+        if isinstance(help_text, str) and help_text:
+            print(f"       help : {help_text}")
+
+
+def _pretty_cmd_list(resp: Dict[str, Any]) -> None:
+    if resp.get("status") != "ok":
+        print(json.dumps(resp, indent=2, sort_keys=True))
+        return
+    commands = resp.get("commands")
+    if not isinstance(commands, list) or not commands:
+        print("Commands: <none>")
+        return
+    header = "  OID    Group            Name                 Flags"
+    print("Commands:")
+    print(header)
+    print("  " + "-" * (len(header) - 2))
+    for entry in commands:
+        oid = _try_parse_int(entry.get("oid"))
+        group = entry.get("group_name") or entry.get("group_id") or "-"
+        name = entry.get("name") or entry.get("cmd_id") or "-"
+        flags = entry.get("flags")
+        row = (
+            f"  {('0x%04X' % (oid & 0xFFFF) if oid is not None else '----'):>6}  "
+            f"{str(group):<15}  {str(name):<20}  "
+            f"{('0x%04X' % (flags & 0xFFFF) if isinstance(flags, int) else '-')}"
+        )
+        print(row)
+        help_text = entry.get("help")
+        if isinstance(help_text, str) and help_text:
+            print(f"       help : {help_text}")
+
+
+def _pretty_cmd_call(resp: Dict[str, Any]) -> None:
+    if resp.get("status") != "ok":
+        print(json.dumps(resp, indent=2, sort_keys=True))
+        return
+    info = resp.get("command")
+    if not isinstance(info, dict):
+        print(json.dumps(resp, indent=2, sort_keys=True))
+        return
+    context = dict(_LAST_COMMAND_CONTEXT)
+    entry = context.get("entry") if isinstance(context.get("entry"), dict) else {}
+    oid = context.get("oid")
+    if oid is None:
+        oid = _try_parse_int(info.get("oid"))
+    print("Command result:")
+    if oid is not None:
+        print(f"  oid       : 0x{oid & 0xFFFF:04X}")
+    name = entry.get("name")
+    group_name = entry.get("group_name")
+    if isinstance(name, str) and name:
+        if isinstance(group_name, str) and group_name:
+            print(f"  path      : {group_name}:{name}")
+        else:
+            print(f"  name      : {name}")
+    status = info.get("status")
+    if status is not None:
+        print(f"  status    : {status}")
+    result = info.get("result")
+    if isinstance(result, (dict, list)):
+        print("  result    :")
+        print(json.dumps(result, indent=4, sort_keys=True))
+    elif result is not None:
+        print(f"  result    : {result}")
+    if context.get("async"):
+        print("  async     : request dispatched (watch mailbox for completion)")
+
 PRETTY_HANDLERS = {
     'dumpregs': _pretty_dumpregs,
     'info': _pretty_info,
@@ -1459,6 +1947,11 @@ PRETTY_HANDLERS = {
     'send': _pretty_send,
     'dbg': _pretty_dbg,
     'sched': _pretty_sched,
+    'val.get': _pretty_val_get,
+    'val.set': _pretty_val_set,
+    'val.list': _pretty_val_list,
+    'cmd.list': _pretty_cmd_list,
+    'cmd.call': _pretty_cmd_call,
 }
 
 
@@ -1509,9 +2002,26 @@ def send_request(host: str, port: int, payload: dict, *, auto_events: bool = Fal
 
 
 
-def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -> dict:
+def _build_payload(
+    cmd: str,
+    args: list[str],
+    current_dir: Path | None = None,
+    *,
+    host: str | None = None,
+    port: int | None = None,
+) -> dict:
     payload_cmd = cmd
     payload: dict[str, object] = {"cmd": payload_cmd}
+
+    if cmd in {"val.get", "val.set", "val.list"}:
+        if host is None or port is None:
+            raise ValueError("val.* commands require host/port context")
+        return _build_val_command_payload(cmd, args, host, port)
+
+    if cmd in {"cmd.call", "cmd.list"}:
+        if host is None or port is None:
+            raise ValueError("cmd.* commands require host/port context")
+        return _build_cmd_command_payload(cmd, args, host, port)
 
     if cmd in {"attach", "detach", "ps", "clock", "shutdown", "pause", "resume", "kill", "load", "exec", "reload", "list", "step", "listen", "send", "sched", "info", "peek", "poke", "dumpregs", "stdio", "mbox", "mailboxes", "mailbox_snapshot", "mailbox_open", "mailbox_close", "mailbox_bind", "mailbox_send", "mailbox_recv", "mailbox_peek", "mailbox_tap", "dbg", "disasm", "stack"}:
         pass
@@ -2171,6 +2681,7 @@ def _build_sym_payload(args: list[str]) -> dict:
 
 def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: bool = False) -> None:
     _init_history()
+    _configure_completion(host, port)
     current_dir = (cwd or Path.cwd()).resolve()
     print(f"Connecting to executive at {host}:{port} ...", end="", flush=True)
     session = _ensure_session(host, port, auto_events=False)
@@ -2411,7 +2922,7 @@ def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: boo
             continue
 
         try:
-            payload = _build_payload(cmd, args, current_dir)
+            payload = _build_payload(cmd, args, current_dir, host=host, port=port)
         except ValueError as exc:
             print(exc)
             continue
@@ -2615,7 +3126,7 @@ def main() -> None:
         args = [str(args_ns.steps)]
 
     try:
-        payload = _build_payload(cmd, args, Path.cwd())
+        payload = _build_payload(cmd, args, Path.cwd(), host=args_ns.host, port=args_ns.port)
     except ValueError as exc:
         parser.error(str(exc))
 
@@ -2649,3 +3160,187 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+def _extract_pid_option(tokens: Sequence[str]) -> tuple[Optional[int], List[str]]:
+    pid: Optional[int] = None
+    remaining: List[str] = []
+    idx = 0
+    while idx < len(tokens):
+        token = tokens[idx]
+        if token in {"--pid", "-p"}:
+            idx += 1
+            if idx >= len(tokens):
+                raise ValueError("pid option requires a value")
+            pid = _require_int(tokens[idx], "pid")
+        elif token.startswith("pid="):
+            pid = _require_int(token.split("=", 1)[1], "pid")
+        else:
+            remaining.append(token)
+        idx += 1
+    return pid, remaining
+
+
+def _parse_float_value(token: str) -> float:
+    lowered = token.strip().lower()
+    if lowered in {"true", "on"}:
+        return 1.0
+    if lowered in {"false", "off"}:
+        return 0.0
+    try:
+        return float(token)
+    except ValueError as exc:
+        int_value = _try_parse_int(token)
+        if int_value is not None:
+            return float(int_value)
+        raise ValueError(f"value '{token}' is not a valid number") from exc
+
+
+def _build_val_command_payload(cmd: str, args: list[str], host: str, port: int) -> dict:
+    global _LAST_VALUE_CONTEXT
+    if cmd == "val.get":
+        if not args:
+            raise ValueError("val.get requires <identifier>")
+        identifier = args[0]
+        pid, remaining = _extract_pid_option(args[1:])
+        if remaining:
+            raise ValueError(f"val.get: unknown option '{remaining[0]}'")
+        entry = _resolve_value_identifier(identifier, host=host, port=port)
+        oid = _try_parse_int(entry.get("oid"))
+        if oid is None:
+            raise ValueError(f"val.get: unable to resolve OID for '{identifier}'")
+        _LAST_VALUE_CONTEXT = {"command": cmd, "oid": oid, "entry": entry, "identifier": identifier}
+        payload: Dict[str, Any] = {"cmd": "val.get", "oid": oid}
+        if pid is not None:
+            payload["pid"] = pid
+        return payload
+
+    if cmd == "val.set":
+        if len(args) < 2:
+            raise ValueError("val.set requires <identifier> <value>")
+        identifier = args[0]
+        value_token = args[1]
+        pid, remaining = _extract_pid_option(args[2:])
+        if remaining:
+            raise ValueError(f"val.set: unknown option '{remaining[0]}'")
+        entry = _resolve_value_identifier(identifier, host=host, port=port)
+        oid = _try_parse_int(entry.get("oid"))
+        if oid is None:
+            raise ValueError(f"val.set: unable to resolve OID for '{identifier}'")
+        value = _parse_float_value(value_token)
+        payload = {"cmd": "val.set", "oid": oid, "value": value}
+        if pid is not None:
+            payload["pid"] = pid
+        _LAST_VALUE_CONTEXT = {"command": cmd, "oid": oid, "entry": entry, "identifier": identifier, "value": value}
+        _invalidate_value_cache()
+        return payload
+
+    if cmd == "val.list":
+        pid, remaining = _extract_pid_option(args)
+        payload: Dict[str, Any] = {"cmd": "val.list"}
+        if pid is not None:
+            payload["pid"] = pid
+        idx = 0
+        while idx < len(remaining):
+            token = remaining[idx]
+            if token in {"--group", "-g"}:
+                idx += 1
+                if idx >= len(remaining):
+                    raise ValueError("val.list --group requires a value")
+                payload["group"] = _require_int(remaining[idx], "group")
+            elif token.startswith("group="):
+                payload["group"] = _require_int(token.split("=", 1)[1], "group")
+            elif token == "--oid":
+                idx += 1
+                if idx >= len(remaining):
+                    raise ValueError("val.list --oid requires a value")
+                payload["oid"] = _require_int(remaining[idx], "oid")
+            elif token.startswith("oid="):
+                payload["oid"] = _require_int(token.split("=", 1)[1], "oid")
+            elif token == "--name":
+                idx += 1
+                if idx >= len(remaining):
+                    raise ValueError("val.list --name requires a value")
+                payload["name"] = remaining[idx]
+            elif token.startswith("name="):
+                payload["name"] = token.split("=", 1)[1]
+            else:
+                raise ValueError(f"val.list: unknown option '{token}'")
+            idx += 1
+        _LAST_VALUE_CONTEXT = {}
+        return payload
+
+    raise ValueError(f"unsupported val.* command '{cmd}'")
+
+
+def _build_cmd_command_payload(cmd: str, args: list[str], host: str, port: int) -> dict:
+    global _LAST_COMMAND_CONTEXT
+    if cmd == "cmd.call":
+        if not args:
+            raise ValueError("cmd.call requires <identifier>")
+        identifier = args[0]
+        pid, remaining = _extract_pid_option(args[1:])
+        async_call = False
+        idx = 0
+        while idx < len(remaining):
+            token = remaining[idx]
+            if token == "--async":
+                async_call = True
+            elif token.startswith("async="):
+                value = token.split("=", 1)[1].strip().lower()
+                async_call = value in {"1", "true", "yes", "on"}
+            else:
+                raise ValueError(f"cmd.call: unknown option '{token}'")
+            idx += 1
+        entry = _resolve_command_identifier(identifier, host=host, port=port)
+        oid = _try_parse_int(entry.get("oid"))
+        if oid is None:
+            raise ValueError(f"cmd.call: unable to resolve OID for '{identifier}'")
+        payload: Dict[str, Any] = {"cmd": "cmd.call", "oid": oid}
+        if pid is not None:
+            payload["pid"] = pid
+        if async_call:
+            payload["async"] = True
+        _LAST_COMMAND_CONTEXT = {
+            "command": cmd,
+            "oid": oid,
+            "entry": entry,
+            "identifier": identifier,
+            "async": async_call,
+        }
+        return payload
+
+    if cmd == "cmd.list":
+        pid, remaining = _extract_pid_option(args)
+        payload: Dict[str, Any] = {"cmd": "cmd.list"}
+        if pid is not None:
+            payload["pid"] = pid
+        idx = 0
+        while idx < len(remaining):
+            token = remaining[idx]
+            if token in {"--group", "-g"}:
+                idx += 1
+                if idx >= len(remaining):
+                    raise ValueError("cmd.list --group requires a value")
+                payload["group"] = _require_int(remaining[idx], "group")
+            elif token.startswith("group="):
+                payload["group"] = _require_int(token.split("=", 1)[1], "group")
+            elif token == "--oid":
+                idx += 1
+                if idx >= len(remaining):
+                    raise ValueError("cmd.list --oid requires a value")
+                payload["oid"] = _require_int(remaining[idx], "oid")
+            elif token.startswith("oid="):
+                payload["oid"] = _require_int(token.split("=", 1)[1], "oid")
+            elif token == "--name":
+                idx += 1
+                if idx >= len(remaining):
+                    raise ValueError("cmd.list --name requires a value")
+                payload["name"] = remaining[idx]
+            elif token.startswith("name="):
+                payload["name"] = token.split("=", 1)[1]
+            else:
+                raise ValueError(f"cmd.list: unknown option '{token}'")
+            idx += 1
+        _LAST_COMMAND_CONTEXT = {}
+        return payload
+
+    raise ValueError(f"unsupported cmd.* command '{cmd}'")

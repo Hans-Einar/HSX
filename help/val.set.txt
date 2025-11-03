@@ -1,0 +1,5 @@
+val.set <identifier> <value> [--pid <pid>]
+    Update a value in the executive registry. Identifiers support the same
+    formats as val.get (name, group:name, numeric OID). Values must be numeric;
+    booleans such as true/false are accepted. Use --pid to target a specific
+    task when permitted by ownership rules.
