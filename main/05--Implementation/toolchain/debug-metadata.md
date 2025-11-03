@@ -15,7 +15,7 @@ This document specifies the implementation of debug metadata preservation throug
 **Goal:** Enable basic disassembly with function names and start lines.
 
 **Components:**
-1. **hsx-llc.py**: Parse `!DISubprogram` nodes
+1. **hsx-llc.py**: Parse `!DISubprogram` / `!DIFile` nodes and surface function metadata in the intermediate IR
 2. **Linker (hld.py)**: Generate .sym file with function list
 3. **Executive**: Load .sym file and provide symbol lookup
 

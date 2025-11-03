@@ -286,13 +286,13 @@ Design specifies 3-phase plan for debug metadata extraction (section 4.2.1). Pha
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Parse `!DISubprogram` nodes from LLVM IR
-- [ ] Extract function names from debug metadata
-- [ ] Extract source file names from `!DIFile` nodes
-- [ ] Extract function start lines
-- [ ] Build function metadata structure
-- [ ] Add debug extraction tests
-- [ ] Document debug metadata structures
+- [x] Parse `!DISubprogram` nodes from LLVM IR
+- [x] Extract function names from debug metadata
+- [x] Extract source file names from `!DIFile` nodes
+- [x] Extract function start lines
+- [x] Build function metadata structure
+- [x] Add debug extraction tests
+- [x] Document debug metadata structures
 
 ---
 

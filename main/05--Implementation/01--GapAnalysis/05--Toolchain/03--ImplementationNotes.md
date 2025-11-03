@@ -88,3 +88,20 @@ Append sessions chronologically and ensure every entry references the relevant d
 ### Next Steps
 - Document pragma-to-LLVM metadata mapping details and outline the helper pipeline for later debug metadata work (Phase 2.2 documentation task).
 - Begin planning Phase 3 debug metadata extraction once value/command pipeline lands in review.
+
+## 2025-11-07 - Codex (Session 4)
+
+### Scope
+- Plan item / phase addressed: Phase 3.1 Function-Level Debug Metadata
+- Design sections reviewed: 04.05--Toolchain.md §4.2.1, main/05--Implementation/toolchain/debug-metadata.md
+
+### Work Summary
+- Updated `hsx-llc.parse_ir` to accumulate `!DIFile` / `!DISubprogram` metadata (including multi-line definitions), capturing filenames, directories, and start-line info. Function definitions now retain their associated `!dbg !<id>` references.
+- Added helper parsing utilities and surfaced a `debug` section in the parsed IR containing files, subprograms, and function summaries.
+- Introduced regression coverage (`python/tests/test_hsx_llc_debug.py`) verifying that function/file metadata is extracted correctly for downstream debug tooling. Documented the new IR metadata in the debug-metadata implementation guide.
+
+### Testing
+- `python -m pytest python/tests/test_hsx_llc_debug.py python/tests/test_hsx_llc_mailbox.py python/tests/test_vm_stream_loader.py python/tests/test_linker.py python/tests/test_linker_dupdef.py python/tests/test_import_unresolved.py python/tests/test_asm_sections.py`
+
+### Next Steps
+- Implement the `--emit-debug` flag to persist the collected metadata into `.dbg` sidecar files (Phase 3.2).

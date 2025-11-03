@@ -10,7 +10,7 @@ Usage:
 import argparse, json, re, sys
 import struct
 from collections import defaultdict
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 try:
     import hsx_mailbox_constants as mbx_const
@@ -585,85 +585,6 @@ def _parse_command_pragma(arg_text: str) -> Dict[str, object]:
     return entry
 
 
-def parse_ir(lines: List[str]) -> Dict:
-    ir = {"functions": [], "globals": [], "types": {}, "mailboxes": [], "values": [], "commands": []}
-    cur = None
-    bb = None
-    for raw in lines:
-        line = raw.strip()
-        if not line:
-            continue
-        if line.startswith(";"):
-            mailbox_match = re.match(r';\s*#pragma\s+hsx_mailbox\s*\((.*)\)\s*$', line, re.IGNORECASE)
-            if mailbox_match:
-                entry = _parse_mailbox_pragma(mailbox_match.group(1))
-                ir["mailboxes"].append(entry)
-                continue
-            value_match = re.match(r';\s*#pragma\s+hsx_value\s*\((.*)\)\s*$', line, re.IGNORECASE)
-            if value_match:
-                entry = _parse_value_pragma(value_match.group(1))
-                ir["values"].append(entry)
-                continue
-            command_match = re.match(r';\s*#pragma\s+hsx_command\s*\((.*)\)\s*$', line, re.IGNORECASE)
-            if command_match:
-                entry = _parse_command_pragma(command_match.group(1))
-                ir["commands"].append(entry)
-                continue
-            continue
-        if cur is None:
-            type_match = re.match(r'(%[A-Za-z0-9_.]+)\s*=\s*type\s+(.+)', line)
-            if type_match:
-                type_name, type_body = type_match.groups()
-                ir["types"][type_name] = type_body.strip()
-                continue
-        if cur is None and line.startswith('@'):
-            glob = parse_global_definition(line)
-            if glob:
-                ir["globals"].append(glob)
-            continue
-        if line.startswith("define "):
-            m = re.match(r'define\s+(?:[\w.]+\s+)*(void|half|i\d+)\s+@([A-Za-z0-9_]+)\s*\(([^)]*)\)\s*(?:[^{}]*)\{', line)
-            if not m:
-                raise ISelError("Unsupported function signature: " + line)
-            rettype, name, args = m.groups()
-            if rettype.startswith('i'):
-                retbits = int(rettype[1:])
-            elif rettype == 'half':
-                retbits = 16
-            elif rettype == 'void':
-                retbits = 0
-            else:
-                raise ISelError("Unsupported return type: " + rettype)
-            cur = {"name": name, "rettype": rettype, "retbits": retbits, "args": args.split(",") if args.strip() else [], "blocks": []}
-            ir["functions"].append(cur)
-            bb = None
-            continue
-        if cur is None:
-            continue
-        label_match = re.match(r'([A-Za-z0-9_.]+):', line)
-        if label_match and not line.startswith(";"):
-            tail = line[label_match.end():].strip()
-            if not tail or tail.startswith(';'):
-                label = label_match.group(1)
-                bb = {"label": label, "ins": []}
-                cur["blocks"].append(bb)
-                continue
-        if line.endswith(":") and not line.startswith(";"):
-            label = line[:-1]
-            bb = {"label": label, "ins": []}
-            cur["blocks"].append(bb)
-            continue
-        if line == "}":
-            cur = None
-            bb = None
-            continue
-        if bb is None:
-            bb = {"label": "entry", "ins": []}
-            cur["blocks"].append(bb)
-        bb["ins"].append(line)
-    return ir
-
-
 def _align_to(value: int, alignment: int) -> int:
     if alignment <= 0:
         alignment = 1
@@ -693,6 +614,255 @@ def _split_top_level(expr: str, sep: str = ',') -> List[str]:
     if tail:
         parts.append(tail)
     return parts
+
+
+def _strip_quotes(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    text = value.strip()
+    if len(text) >= 2 and text[0] == '"' and text[-1] == '"':
+        body = text[1:-1]
+        try:
+            return bytes(body, "utf-8").decode("unicode_escape")
+        except Exception:
+            return body
+    return text or None
+
+
+def _parse_metadata_fields(body: str) -> Dict[str, str]:
+    fields: Dict[str, str] = {}
+    for piece in _split_top_level(body):
+        if ':' not in piece:
+            continue
+        key, value = piece.split(':', 1)
+        fields[key.strip()] = value.strip()
+    return fields
+
+
+def _extract_metadata_args(text: str, marker: str) -> Optional[str]:
+    idx = text.find(marker)
+    if idx == -1:
+        return None
+    start = text.find('(', idx)
+    if start == -1:
+        return None
+    start += 1
+    depth = 1
+    pos = start
+    end = len(text)
+    while pos < len(text) and depth > 0:
+        ch = text[pos]
+        if ch == '(':
+            depth += 1
+        elif ch == ')':
+            depth -= 1
+            if depth == 0:
+                end = pos
+                break
+        pos += 1
+    if depth != 0:
+        return None
+    return text[start:end]
+
+
+def _parse_int_field(value: Optional[str]) -> Optional[int]:
+    if value is None:
+        return None
+    text = value.strip()
+    if not text or text.lower() == "null":
+        return None
+    try:
+        return int(text, 0)
+    except ValueError:
+        return None
+
+
+def _parse_difile(meta_id: str, text: str) -> Optional[Dict[str, Any]]:
+    body = _extract_metadata_args(text, "!DIFile")
+    if body is None:
+        return None
+    fields = _parse_metadata_fields(body)
+    filename = _strip_quotes(fields.get("filename")) or ""
+    directory = _strip_quotes(fields.get("directory")) or ""
+    return {
+        "id": meta_id,
+        "filename": filename,
+        "directory": directory,
+    }
+
+
+def _parse_disubprogram(meta_id: str, text: str) -> Optional[Dict[str, Any]]:
+    body = _extract_metadata_args(text, "!DISubprogram")
+    if body is None:
+        return None
+    fields = _parse_metadata_fields(body)
+    name = _strip_quotes(fields.get("name"))
+    linkage_name = _strip_quotes(fields.get("linkageName"))
+    file_ref = fields.get("file")
+    line = _parse_int_field(fields.get("line")) or 0
+    scope_line = _parse_int_field(fields.get("scopeLine"))
+    return {
+        "id": meta_id,
+        "name": name,
+        "linkage_name": linkage_name,
+        "file": file_ref,
+        "line": line,
+        "scope_line": scope_line or 0,
+        "raw": text,
+    }
+
+
+def parse_ir(lines: List[str]) -> Dict:
+    ir = {
+        "functions": [],
+        "globals": [],
+        "types": {},
+        "mailboxes": [],
+        "values": [],
+        "commands": [],
+    }
+    cur = None
+    bb = None
+    debug_files: Dict[str, Dict[str, Any]] = {}
+    debug_subprograms: Dict[str, Dict[str, Any]] = {}
+    total = len(lines)
+    idx = 0
+    while idx < total:
+        raw = lines[idx]
+        idx += 1
+        line = raw.strip()
+        if not line:
+            continue
+        if line.startswith(";"):
+            mailbox_match = re.match(r';\s*#pragma\s+hsx_mailbox\s*\((.*)\)\s*$', line, re.IGNORECASE)
+            if mailbox_match:
+                entry = _parse_mailbox_pragma(mailbox_match.group(1))
+                ir["mailboxes"].append(entry)
+                continue
+            value_match = re.match(r';\s*#pragma\s+hsx_value\s*\((.*)\)\s*$', line, re.IGNORECASE)
+            if value_match:
+                entry = _parse_value_pragma(value_match.group(1))
+                ir["values"].append(entry)
+                continue
+            command_match = re.match(r';\s*#pragma\s+hsx_command\s*\((.*)\)\s*$', line, re.IGNORECASE)
+            if command_match:
+                entry = _parse_command_pragma(command_match.group(1))
+                ir["commands"].append(entry)
+                continue
+            continue
+        if line.startswith("!"):
+            meta_match = re.match(r'(!\d+)\s*=\s*(.*)', line)
+            if meta_match:
+                meta_id = meta_match.group(1)
+                rhs = meta_match.group(2).strip()
+                if "!DISubprogram" in rhs or "!DIFile" in rhs:
+                    parts = [rhs]
+                    balance = rhs.count("(") - rhs.count(")")
+                    while balance > 0 and idx < total:
+                        next_line = lines[idx].strip()
+                        parts.append(next_line)
+                        balance += next_line.count("(") - next_line.count(")")
+                        idx += 1
+                    merged = " ".join(part for part in parts)
+                    if "!DISubprogram" in merged:
+                        parsed = _parse_disubprogram(meta_id, merged)
+                        if parsed:
+                            debug_subprograms[meta_id] = parsed
+                    elif "!DIFile" in merged:
+                        parsed = _parse_difile(meta_id, merged)
+                        if parsed:
+                            debug_files[meta_id] = parsed
+            continue
+        if cur is None:
+            type_match = re.match(r'(%[A-Za-z0-9_.]+)\s*=\s*type\s+(.+)', line)
+            if type_match:
+                type_name, type_body = type_match.groups()
+                ir["types"][type_name] = type_body.strip()
+                continue
+        if cur is None and line.startswith('@'):
+            glob = parse_global_definition(line)
+            if glob:
+                ir["globals"].append(glob)
+            continue
+        if line.startswith("define "):
+            m = re.match(
+                r'define\s+(?:[\w.]+\s+)*(void|half|i\d+)\s+@([A-Za-z0-9_]+)\s*\(([^)]*)\)\s*(?:[^{}]*)\{',
+                line,
+            )
+            if not m:
+                raise ISelError("Unsupported function signature: " + line)
+            rettype, name, args = m.groups()
+            if rettype.startswith('i'):
+                retbits = int(rettype[1:])
+            elif rettype == 'half':
+                retbits = 16
+            elif rettype == 'void':
+                retbits = 0
+            else:
+                raise ISelError("Unsupported return type: " + rettype)
+            dbg_match = re.search(r'!dbg\s+(!\d+)', line)
+            dbg_id = dbg_match.group(1) if dbg_match else None
+            cur = {
+                "name": name,
+                "rettype": rettype,
+                "retbits": retbits,
+                "args": args.split(",") if args.strip() else [],
+                "blocks": [],
+            }
+            if dbg_id:
+                cur["dbg"] = dbg_id
+            ir["functions"].append(cur)
+            bb = None
+            continue
+        if cur is None:
+            continue
+        label_match = re.match(r'([A-Za-z0-9_.]+):', line)
+        if label_match and not line.startswith(";"):
+            tail = line[label_match.end():].strip()
+            if not tail or tail.startswith(';'):
+                label = label_match.group(1)
+                bb = {"label": label, "ins": []}
+                cur["blocks"].append(bb)
+                continue
+        if line.endswith(":") and not line.startswith(";"):
+            label = line[:-1]
+            bb = {"label": label, "ins": []}
+            cur["blocks"].append(bb)
+            continue
+        if line == "}":
+            cur = None
+            bb = None
+            continue
+        if bb is None:
+            bb = {"label": "entry", "ins": []}
+            cur["blocks"].append(bb)
+        bb["ins"].append(line)
+
+    debug_functions: List[Dict[str, Any]] = []
+    for fn in ir["functions"]:
+        dbg_id = fn.get("dbg")
+        if not dbg_id:
+            continue
+        sub = debug_subprograms.get(dbg_id)
+        if not sub:
+            continue
+        file_info = debug_files.get(sub.get("file"))
+        debug_entry = {
+            "function": fn["name"],
+            "subprogram": dbg_id,
+            "name": sub.get("name") or fn["name"],
+            "linkage_name": sub.get("linkage_name"),
+            "file": file_info,
+            "line": sub.get("line"),
+        }
+        debug_functions.append(debug_entry)
+
+    ir["debug"] = {
+        "files": debug_files,
+        "subprograms": debug_subprograms,
+        "functions": debug_functions,
+    }
+    return ir
 
 
 def compute_type_layout(
