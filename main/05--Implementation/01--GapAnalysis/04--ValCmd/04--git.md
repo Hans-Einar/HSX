@@ -23,6 +23,7 @@
 | 2025-11-03 | `5ea1518` | `valcmd: persistence backend + FRAM load/save` | Hans Einar | Tests: `python -m pytest python/tests/test_vm_stream_loader.py`, `python -m pytest python/tests/test_valcmd_registry.py`, `python -m pytest python/tests/test_valcmd_svc_integration.py` |
 | 2025-11-03 | `9e941c5` | `valcmd: persistence mailbox integration polish` | Hans Einar | Tests: `python -m pytest python/tests/test_vm_stream_loader.py`, `python -m pytest python/tests/test_valcmd_registry.py`, `python -m pytest python/tests/test_valcmd_svc_integration.py` |
 | 2025-11-03 | `8e9050c` | `valcmd shell: add named lookup + CLI polishing` | Hans Einar | Tests: `python -m pytest python/tests/test_shell_client.py` |
+| 2025-11-07 | `<pending>` | `valcmd: enforce epsilon/rate change detection with cached metadata` | Codex | Tests: `python -m pytest python/tests/test_valcmd_registry.py python/tests/test_valcmd_svc_integration.py python/tests/test_vm_stream_loader.py` |
 
 ## Pull Request
 - PR URL / ID: `<link or ID>`

@@ -657,13 +657,13 @@ Design specifies epsilon threshold and rate_limit enforcement (section 4.4.2). R
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.04--ValCmd](../../../04--Design/04.04--ValCmd.md)
-- [ ] Implement epsilon threshold check (abs(new - old) < epsilon)
-- [ ] Store epsilon value in descriptor or flags
-- [ ] Implement rate limiting (min time between changes)
-- [ ] Track last_change_time per value
-- [ ] Skip notifications if epsilon/rate limit not met
-- [ ] Add change detection tests
-- [ ] Document epsilon and rate limit semantics
+- [x] Implement epsilon threshold check (abs(new - old) < epsilon)
+- [x] Store epsilon value in descriptor or flags
+- [x] Implement rate limiting (min time between changes)
+- [x] Track last_change_time per value
+- [x] Skip notifications if epsilon/rate limit not met
+- [x] Add change detection tests
+- [x] Document epsilon and rate limit semantics
 
 ---
 

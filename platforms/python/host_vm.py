@@ -2224,8 +2224,16 @@ class VMController:
             if name_value:
                 specs.append({"type": "name", "name": name_value})
             unit_value = entry.get("unit")
-            if unit_value:
-                specs.append({"type": "unit", "unit": unit_value, "epsilon": epsilon_value, "rate_ms": int(entry.get("rate_ms", 0))})
+            rate_ms_value = int(entry.get("rate_ms", 0))
+            if unit_value or epsilon_value or rate_ms_value:
+                specs.append(
+                    {
+                        "type": "unit",
+                        "unit": unit_value or "",
+                        "epsilon": epsilon_value,
+                        "rate_ms": rate_ms_value,
+                    }
+                )
             if min_raw not in (None, 0) or max_raw not in (None, 0):
                 specs.append({"type": "range", "min": min_value, "max": max_value})
             if persist_key:

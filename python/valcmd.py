@@ -520,6 +520,8 @@ class ValueEntry:
     subscribers: List[Any] = field(default_factory=list)
     persist_key: int = 0
     persist_debounce_ms: int = 0
+    epsilon: float = 0.0
+    rate_ms: int = 0
 
     @property
     def oid(self) -> int:
@@ -751,10 +753,15 @@ class ValCmdRegistry:
     def _apply_value_descriptor_metadata(self, entry: ValueEntry) -> None:
         entry.persist_key = 0
         entry.persist_debounce_ms = 0
+        entry.epsilon = 0.0
+        entry.rate_ms = 0
         for record in self._iter_value_descriptors(entry):
             if isinstance(record, PersistDescriptorRecord):
                 entry.persist_key = int(record.persist_key)
                 entry.persist_debounce_ms = int(record.debounce_ms)
+            elif isinstance(record, UnitDescriptorRecord):
+                entry.epsilon = record.epsilon
+                entry.rate_ms = int(record.rate_ms)
 
     def _apply_persisted_value(self, entry: ValueEntry) -> None:
         if (
@@ -920,13 +927,8 @@ class ValCmdRegistry:
         if entry.is_readonly:
             return HSX_VAL_STATUS_EPERM
 
-        epsilon = 0.0
-        rate_ms = 0
-        for record in self._iter_value_descriptors(entry):
-            if isinstance(record, UnitDescriptorRecord):
-                epsilon = record.epsilon
-                rate_ms = record.rate_ms
-                break
+        epsilon = entry.epsilon
+        rate_ms = entry.rate_ms
 
         if current_time and rate_ms:
             elapsed_ms = (current_time - entry.last_change_time) * 1000

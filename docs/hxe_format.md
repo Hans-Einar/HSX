@@ -100,6 +100,7 @@ Defines values to be registered by executive before VM execution. Each entry:
 - **Executive handling:** Each `(group_id,value_id)` pair must be unique. The loader rejects values outside `0..255`. Absent strings resolve to `None`. The executive stores the raw f16 values (`init_raw`, `epsilon_raw`, `min_raw`, `max_raw`) while also exposing the decoded float fields. When `persist_key` is non-zero the runtime flags the value for FRAM persistence via `val.persist`.
 - **Pre-registration:** During image load the executive automatically registers each value with the runtime registry, applies the `init_value`, and synthesises name/unit/range/persist descriptors from the metadata. Duplicate registrations or invalid string offsets abort the load.
 - **Validation:** Duplicate IDs or malformed string offsets cause the load to fail. The executive ignores entries when the section is omitted.
+- **Change filtering:** When `epsilon` is non-zero, updates within the epsilon band are ignored (no notifications or persistence). When `rate_ms` is non-zero, repeated updates within the window return `EBUSY` and must be retried once the suppression interval elapses.
 
 ### `.cmd` Section (type=2)
 Defines commands to be registered. Each entry:

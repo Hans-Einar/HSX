@@ -654,6 +654,72 @@ class TestValCmdRegistry:
         assert calls == [((42, 1), 0, float_to_f16(5.0)), ((42, 2), 0, float_to_f16(5.0))]
         subs = registry.get_value_subscribers(oid)
         assert subs == [(42, 1)]
+
+    def test_value_set_within_epsilon_skips_update(self):
+        registry = ValCmdRegistry()
+        events: list[str] = []
+        registry.set_event_hook(lambda event, **kwargs: events.append(event))
+        specs = [
+            {"type": "unit", "unit": "rpm", "epsilon": 0.5, "rate_ms": 0},
+        ]
+        status, oid = registry.value_register(
+            1,
+            2,
+            0,
+            HSX_VAL_AUTH_PUBLIC,
+            owner_pid=7,
+            descriptors=specs,
+        )
+        assert status == HSX_VAL_STATUS_OK
+        status = registry.value_set(oid, 10.0, caller_pid=7)
+        assert status == HSX_VAL_STATUS_OK
+        assert events.count("value_changed") == 1
+        entry = registry.get_value_entry(oid)
+        assert entry is not None and entry.last_value == pytest.approx(10.0)
+        status = registry.value_set(oid, 10.2, caller_pid=7)
+        assert status == HSX_VAL_STATUS_OK
+        assert events.count("value_changed") == 1, "epsilon suppression should avoid new events"
+        entry = registry.get_value_entry(oid)
+        assert entry is not None and entry.last_value == pytest.approx(10.0)
+
+    def test_value_set_rate_limit_returns_ebusy_and_preserves_state(self):
+        registry = ValCmdRegistry()
+        events: list[str] = []
+        registry.set_event_hook(lambda event, **kwargs: events.append(event))
+        specs = [
+            {"type": "unit", "unit": "rpm", "epsilon": 0.0, "rate_ms": 120},
+        ]
+        status, oid = registry.value_register(
+            2,
+            3,
+            0,
+            HSX_VAL_AUTH_PUBLIC,
+            owner_pid=9,
+            descriptors=specs,
+        )
+        assert status == HSX_VAL_STATUS_OK
+        status = registry.value_set(oid, 5.0, caller_pid=9, current_time=1.0)
+        assert status == HSX_VAL_STATUS_OK
+        assert events.count("value_changed") == 1
+        entry = registry.get_value_entry(oid)
+        assert entry is not None and entry.last_value == pytest.approx(5.0)
+        first_change_time = entry.last_change_time
+        assert first_change_time == pytest.approx(1.0)
+
+        status = registry.value_set(oid, 6.0, caller_pid=9, current_time=1.05)
+        assert status == HSX_VAL_STATUS_EBUSY
+        # Value remains unchanged and no new events emitted
+        entry = registry.get_value_entry(oid)
+        assert entry is not None and entry.last_value == pytest.approx(5.0)
+        assert entry.last_change_time == pytest.approx(first_change_time)
+        assert events.count("value_changed") == 1
+
+        status = registry.value_set(oid, 6.0, caller_pid=9, current_time=1.3)
+        assert status == HSX_VAL_STATUS_OK
+        entry = registry.get_value_entry(oid)
+        assert entry is not None and entry.last_value == pytest.approx(6.0)
+        assert entry.last_change_time == pytest.approx(1.3)
+        assert events.count("value_changed") == 2
     
     def test_command_list(self):
         """Test command enumeration."""

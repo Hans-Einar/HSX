@@ -282,6 +282,24 @@ Append sessions chronologically and ensure every entry references the relevant d
 ### Next Steps
 - Phase 6.3 change detection (epsilon/rate limiting) to avoid excessive notifications and persistence churn.
 
+## 2025-11-07 - Codex (Session 11)
+
+### Scope
+- Plan item / phase addressed: Phase 6.3 Change Detection
+- Design sections reviewed: 04.04--ValCmd.md §4.4.2 (epsilon/rate limit semantics)
+
+### Work Summary
+- Cached epsilon/rate metadata on each `ValueEntry`, ensured descriptor parsing captures these fields from both legacy and declarative registrations, and updated the executive metadata loader to emit unit descriptors whenever epsilon/rate data exists.
+- Refined `value_set` to enforce epsilon threshold and rate limiting per cached metadata (continuing to return `HSX_VAL_STATUS_EBUSY` when throttled) while leaving persistence/notification flows untouched for accepted updates.
+- Added regression coverage for epsilon suppression and rate-limit throttling in `python/tests/test_valcmd_registry.py` to lock down behaviour.
+- Documented the CLI/metadata updates earlier; rate/epsilon semantics are now reflected in the implementation plan checklist.
+
+### Testing
+- `python -m pytest python/tests/test_valcmd_registry.py python/tests/test_valcmd_svc_integration.py python/tests/test_vm_stream_loader.py`
+
+### Next Steps
+- Consider deferred-notification hooks if future transports need to queue rate-limited updates.
+
 ## 2025-11-06 - Codex (Session 11)
 
 ### Scope
