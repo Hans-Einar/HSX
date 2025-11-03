@@ -711,8 +711,50 @@ def _parse_disubprogram(meta_id: str, text: str) -> Optional[Dict[str, Any]]:
         "file": file_ref,
         "line": line,
         "scope_line": scope_line or 0,
+        "scope": fields.get("scope"),
         "raw": text,
     }
+
+
+def _parse_dilocation(meta_id: str, text: str) -> Optional[Dict[str, Any]]:
+    body = _extract_metadata_args(text, "!DILocation")
+    if body is None:
+        return None
+    fields = _parse_metadata_fields(body)
+    result: Dict[str, Any] = {
+        "id": meta_id,
+        "line": _parse_int_field(fields.get("line")),
+        "column": _parse_int_field(fields.get("column")),
+    }
+    scope = fields.get("scope")
+    if scope:
+        result["scope"] = scope
+    inlined = fields.get("inlinedAt")
+    if inlined:
+        result["inlined_at"] = inlined
+    file_ref = fields.get("file")
+    if file_ref:
+        result["file"] = file_ref
+    return result
+
+
+def _parse_dilexicalblock(meta_id: str, text: str) -> Optional[Dict[str, Any]]:
+    body = _extract_metadata_args(text, "!DILexicalBlock")
+    if body is None:
+        return None
+    fields = _parse_metadata_fields(body)
+    result: Dict[str, Any] = {
+        "id": meta_id,
+        "line": _parse_int_field(fields.get("line")),
+        "column": _parse_int_field(fields.get("column")),
+    }
+    scope = fields.get("scope")
+    if scope:
+        result["scope"] = scope
+    file_ref = fields.get("file")
+    if file_ref:
+        result["file"] = file_ref
+    return result
 
 
 def parse_ir(lines: List[str]) -> Dict:
@@ -728,6 +770,8 @@ def parse_ir(lines: List[str]) -> Dict:
     bb = None
     debug_files: Dict[str, Dict[str, Any]] = {}
     debug_subprograms: Dict[str, Dict[str, Any]] = {}
+    debug_locations: Dict[str, Dict[str, Any]] = {}
+    debug_lexical_blocks: Dict[str, Dict[str, Any]] = {}
     total = len(lines)
     idx = 0
     while idx < total:
@@ -758,7 +802,9 @@ def parse_ir(lines: List[str]) -> Dict:
             if meta_match:
                 meta_id = meta_match.group(1)
                 rhs = meta_match.group(2).strip()
-                if "!DISubprogram" in rhs or "!DIFile" in rhs:
+                target_tokens = ("!DISubprogram", "!DIFile", "!DILocation", "!DILexicalBlock")
+                merged = rhs
+                if any(token in rhs for token in target_tokens):
                     parts = [rhs]
                     balance = rhs.count("(") - rhs.count(")")
                     while balance > 0 and idx < total:
@@ -767,14 +813,22 @@ def parse_ir(lines: List[str]) -> Dict:
                         balance += next_line.count("(") - next_line.count(")")
                         idx += 1
                     merged = " ".join(part for part in parts)
-                    if "!DISubprogram" in merged:
-                        parsed = _parse_disubprogram(meta_id, merged)
-                        if parsed:
-                            debug_subprograms[meta_id] = parsed
-                    elif "!DIFile" in merged:
-                        parsed = _parse_difile(meta_id, merged)
-                        if parsed:
-                            debug_files[meta_id] = parsed
+                if "!DISubprogram" in merged:
+                    parsed = _parse_disubprogram(meta_id, merged)
+                    if parsed:
+                        debug_subprograms[meta_id] = parsed
+                elif "!DIFile" in merged:
+                    parsed = _parse_difile(meta_id, merged)
+                    if parsed:
+                        debug_files[meta_id] = parsed
+                elif "!DILocation" in merged:
+                    parsed = _parse_dilocation(meta_id, merged)
+                    if parsed:
+                        debug_locations[meta_id] = parsed
+                elif "!DILexicalBlock" in merged:
+                    parsed = _parse_dilexicalblock(meta_id, merged)
+                    if parsed:
+                        debug_lexical_blocks[meta_id] = parsed
             continue
         if cur is None:
             type_match = re.match(r'(%[A-Za-z0-9_.]+)\s*=\s*type\s+(.+)', line)
@@ -824,12 +878,12 @@ def parse_ir(lines: List[str]) -> Dict:
             tail = line[label_match.end():].strip()
             if not tail or tail.startswith(';'):
                 label = label_match.group(1)
-                bb = {"label": label, "ins": []}
+                bb = {"label": label, "ins": [], "dbg_refs": []}
                 cur["blocks"].append(bb)
                 continue
         if line.endswith(":") and not line.startswith(";"):
             label = line[:-1]
-            bb = {"label": label, "ins": []}
+            bb = {"label": label, "ins": [], "dbg_refs": []}
             cur["blocks"].append(bb)
             continue
         if line == "}":
@@ -837,9 +891,12 @@ def parse_ir(lines: List[str]) -> Dict:
             bb = None
             continue
         if bb is None:
-            bb = {"label": "entry", "ins": []}
+            bb = {"label": "entry", "ins": [], "dbg_refs": []}
             cur["blocks"].append(bb)
+        dbg_match = re.search(r'!dbg\s+(!\d+)', line)
+        dbg_id = dbg_match.group(1) if dbg_match else None
         bb["ins"].append(line)
+        bb.setdefault("dbg_refs", []).append(dbg_id)
 
     debug_functions: List[Dict[str, Any]] = []
     for fn in ir["functions"]:
@@ -863,6 +920,8 @@ def parse_ir(lines: List[str]) -> Dict:
     ir["debug"] = {
         "files": debug_files,
         "subprograms": debug_subprograms,
+        "locations": debug_locations,
+        "lexical_blocks": debug_lexical_blocks,
         "functions": debug_functions,
     }
     return ir
@@ -1079,17 +1138,29 @@ def is_return_mov(lines: List[str], mov_index: int) -> bool:
 
 
 def combine_ldi_movs(lines: List[str]) -> List[str]:
+    return _combine_ldi_movs_core(lines)[0]
+
+
+def _combine_ldi_movs_core(
+    lines: List[str],
+    tags: Optional[List[Optional[Any]]] = None,
+) -> Tuple[List[str], Optional[List[Optional[Any]]]]:
     work = list(lines)
+    work_tags = list(tags) if tags is not None else None
     while True:
         result: List[str] = []
+        result_tags: Optional[List[Optional[Any]]] = [] if work_tags is not None else None
         changed = False
         i = 0
         label_positions = build_label_positions(work)
         while i < len(work):
             line = work[i]
             stripped = line.strip()
+            current_tag = work_tags[i] if work_tags is not None else None
             if not is_instruction_line(line):
                 result.append(line)
+                if result_tags is not None:
+                    result_tags.append(current_tag)
                 i += 1
                 continue
             instr = None
@@ -1118,16 +1189,26 @@ def combine_ldi_movs(lines: List[str]) -> List[str]:
                                 labels=label_positions,
                             ):
                                 result.append(f"{instr} {dst_reg}, {imm}")
-                                for filler in work[i + 1:next_idx]:
+                                if result_tags is not None:
+                                    new_tag = work_tags[next_idx] if work_tags is not None else None
+                                    if new_tag is None:
+                                        new_tag = current_tag
+                                    result_tags.append(new_tag)
+                                for rel_idx, filler in enumerate(work[i + 1:next_idx], start=1):
                                     result.append(filler)
+                                    if result_tags is not None and work_tags is not None:
+                                        result_tags.append(work_tags[i + rel_idx])
                                 i = next_idx + 1
                                 changed = True
                                 continue
             result.append(line)
+            if result_tags is not None:
+                result_tags.append(current_tag)
             i += 1
         if not changed:
-            return result
+            return result, result_tags
         work = result
+        work_tags = result_tags
 
 
 def find_last_instruction(lines: List[str]):
@@ -1137,25 +1218,34 @@ def find_last_instruction(lines: List[str]):
         match = MOV_RE.match(line.strip())
         if match:
             return ('MOV', match.group(1).upper(), match.group(2).upper())
-        return ('OTHER', None, None)
+            return ('OTHER', None, None)
     return None
 
 
-def pop_last_instruction(lines: List[str]) -> None:
+def pop_last_instruction(lines: List[str], tags: Optional[List[Optional[Any]]] = None) -> None:
     for idx in range(len(lines) - 1, -1, -1):
         if is_instruction_line(lines[idx]):
             lines.pop(idx)
+            if tags is not None:
+                tags.pop(idx)
             return
 
 
-def eliminate_mov_chains(lines: List[str]) -> List[str]:
+def _eliminate_mov_chains_core(
+    lines: List[str],
+    tags: Optional[List[Optional[Any]]] = None,
+) -> Tuple[List[str], Optional[List[Optional[Any]]]]:
     label_positions = build_label_positions(lines)
     result: List[str] = []
+    result_tags: Optional[List[Optional[Any]]] = [] if tags is not None else None
     last_instr = None
     for idx, line in enumerate(lines):
         stripped = line.strip()
+        current_tag = tags[idx] if tags is not None else None
         if not is_instruction_line(line):
             result.append(line)
+            if result_tags is not None:
+                result_tags.append(current_tag)
             continue
         mov_match = MOV_RE.match(stripped)
         if mov_match:
@@ -1165,6 +1255,8 @@ def eliminate_mov_chains(lines: List[str]) -> List[str]:
                 continue
             if dst == R_RET and is_return_mov(lines, idx):
                 result.append(f"MOV {dst}, {src}")
+                if result_tags is not None:
+                    result_tags.append(current_tag)
                 last_instr = ('MOV', dst, src, idx)
                 continue
             if last_instr and last_instr[0] == 'MOV' and last_instr[1] == src:
@@ -1177,7 +1269,7 @@ def eliminate_mov_chains(lines: List[str]) -> List[str]:
                     origin_idx=origin_idx,
                     labels=label_positions,
                 ):
-                    pop_last_instruction(result)
+                    pop_last_instruction(result, result_tags)
                     last_instr = find_last_instruction(result)
                     if last_instr and len(last_instr) == 3:
                         last_instr = last_instr + (None,)
@@ -1185,19 +1277,37 @@ def eliminate_mov_chains(lines: List[str]) -> List[str]:
                     if dst == src:
                         continue
             result.append(f"MOV {dst}, {src}")
+            if result_tags is not None:
+                result_tags.append(current_tag)
             last_instr = ('MOV', dst, src, idx)
             continue
         result.append(line)
+        if result_tags is not None:
+            result_tags.append(current_tag)
         last_instr = ('OTHER', None, None, idx)
-    return result
+    return result, result_tags
+
+
+def eliminate_mov_chains(lines: List[str]) -> List[str]:
+    return _eliminate_mov_chains_core(lines)[0]
 
 
 def optimize_movs(lines: List[str]) -> List[str]:
+    return _optimize_movs(lines)[0]
+
+
+def _optimize_movs(
+    lines: List[str],
+    tags: Optional[List[Optional[Any]]] = None,
+) -> Tuple[List[str], Optional[List[Optional[Any]]]]:
     if not lines:
-        return lines
-    stage1 = combine_ldi_movs(list(lines))
-    stage2 = eliminate_mov_chains(stage1)
-    return stage2
+        empty_tags: Optional[List[Optional[Any]]] = [] if tags is not None else None
+        return [], empty_tags
+    if tags is not None and len(tags) != len(lines):
+        raise ValueError("optimize_movs tag length mismatch")
+    stage1_lines, stage1_tags = _combine_ldi_movs_core(list(lines), list(tags) if tags is not None else None)
+    stage2_lines, stage2_tags = _eliminate_mov_chains_core(stage1_lines, stage1_tags)
+    return stage2_lines, stage2_tags
 
 def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_symbols=None, type_info=None) -> List[str]:
     asm: List[str] = []
@@ -1212,6 +1322,10 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
 
 
     asm.append(f"; -- function {fn['name']} --")
+
+    line_debug_entries: List[Tuple[int, Optional[str], str]] = []
+    instruction_records: List[Dict[str, Any]] = []
+    inst_counter = 0
 
     use_counts: Dict[str, int] = defaultdict(int)
     for block in fn["blocks"]:
@@ -1628,8 +1742,10 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
         asm.append("POP R7")
 
     for block in fn["blocks"]:
-        remaining_ins = []
-        for raw in block["ins"]:
+        remaining_ins: List[str] = []
+        remaining_dbg: List[Optional[str]] = []
+        dbg_refs = block.get("dbg_refs", [])
+        for idx_ins, raw in enumerate(block["ins"]):
             norm = normalize_ir_line(raw)
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*phi\s+([A-Za-z0-9_]+)\s+(.+)', norm)
             if m:
@@ -1646,7 +1762,10 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 maybe_release(dest)
             else:
                 remaining_ins.append(raw)
+                dbg_id = dbg_refs[idx_ins] if idx_ins < len(dbg_refs) else None
+                remaining_dbg.append(dbg_id)
         block["ins"] = remaining_ins
+        block["dbg_refs"] = remaining_dbg
 
     def apply_phi_moves(pred_label: str, succ_label: str) -> None:
         moves = phi_moves.get((pred_label, succ_label))
@@ -1661,21 +1780,9 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 asm.append(f"MOV {dest_reg}, {src_reg}")
             maybe_release(dest)
 
-    for b in fn["blocks"]:
-        if is_first_block:
-            asm.append(f"{fn['name']}:")
-            is_first_block = False
-        asm.append(label_map[b["label"]] + ":")
-        if not prologue_emitted:
-            asm.append("PUSH R7")
-            asm.append("MOV R7, R15")
-            prologue_emitted = True
-        if trace and phi_comments.get(b["label"]):
-            for phi_line in phi_comments[b["label"]]:
-                asm.append(f"; PHI: {phi_line}")
-        for line in b["ins"]:
-            orig_line = line
-            line = normalize_ir_line(line)
+    def _lower_ir_instruction(raw_line: str, block_label: str) -> str:
+            orig_line = raw_line
+            line = normalize_ir_line(raw_line)
             if trace: asm.append(f"; IR: {orig_line}")
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*alloca\s+([^,]+)', line)
             if m:
@@ -1695,7 +1802,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     load_const('R14', offset)
                     asm.append(f"ADD {rd}, {rd}, R14")
                 maybe_release(slot)
-                continue
+                return line
 
             if line.startswith("ret "):
                 if " i32 " in line and "%" in line:
@@ -1726,7 +1833,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     raise ISelError("Unsupported ret form: " + orig_line)
                 emit_stack_teardown()
                 asm.append("RET")
-                continue
+                return line
 
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*(add|sub|mul)(?:\s+[A-Za-z]+)*\s+i32\s+([^,]+),\s*([^,]+)', line)
             if m:
@@ -1738,7 +1845,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 opmap = {"add":"ADD","sub":"SUB","mul":"MUL"}
                 asm.append(f"{opmap[op]} {rd}, {ra}, {rb}")
                 maybe_release(dst)
-                continue
+                return line
 
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*f(add|sub|mul|div)\s+half\s+([^,]+),\s*([^,]+)', line)
             if m:
@@ -1751,7 +1858,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 asm.append(f"{opmap[op]} {rd}, {ra}, {rb}")
                 float_alias[dst] = rd
                 maybe_release(dst)
-                continue
+                return line
 
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*f(add|sub|mul|div)\s+float\s+([^,]+),\s*([^,]+)', line)
             if m:
@@ -1766,7 +1873,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 asm.append(f"{opmap[op]} {rd}, {ra}, {rb}")
                 float_alias[dst] = rd
                 maybe_release(dst)
-                continue
+                return line
 
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*fpext\s+half\s+(%[A-Za-z0-9_]+)\s+to\s+float', line)
             if m:
@@ -1778,7 +1885,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     asm.append(f"MOV {rd}, {src_reg}")
                 float_alias[dst] = rd
                 maybe_release(dst)
-                continue
+                return line
 
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*fptrunc\s+float\s+(%[A-Za-z0-9_]+)\s+to\s+half', line)
             if m:
@@ -1792,7 +1899,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     asm.append(f"MOV {rd}, {rs}")
                 float_alias[dst] = rd
                 maybe_release(dst)
-                continue
+                return line
 
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*fptosi\s+half\s+(%[A-Za-z0-9_]+)\s+to\s+i32', line)
             if m:
@@ -1802,7 +1909,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 rd = alloc_vreg(dst, 'i32')
                 asm.append(f"F2I {rd}, {rs}")
                 maybe_release(dst)
-                continue
+                return line
 
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*fptosi\s+float\s+(%[A-Za-z0-9_]+)\s+to\s+i32', line)
             if m:
@@ -1814,7 +1921,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 rd = alloc_vreg(dst, 'i32')
                 asm.append(f"F2I {rd}, {rs}")
                 maybe_release(dst)
-                continue
+                return line
 
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*call\s+([^@]*)@llvm\.convert\.to\.fp16\.f32\(([^)]*)\)', line)
             if m:
@@ -1836,7 +1943,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     bits = float_literal_to_half_bits(value_token)
                     load_const(rd, bits)
                 maybe_release(dst)
-                continue
+                return line
 
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*call\s+([^@]*)@llvm\.convert\.from\.fp16\.f32\(([^)]*)\)', line)
             if m:
@@ -1853,7 +1960,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     asm.append(f"MOV {rd}, {rs}")
                 float_alias[dst] = rd
                 maybe_release(dst)
-                continue
+                return line
 
             m = re.match(r'(?:(%[A-Za-z0-9_]+)\s*=\s*)?call\s+([^@]+)@([A-Za-z0-9_]+)\s*\(([^)]*)\)', line)
             if m:
@@ -1890,7 +1997,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     if dst_type == 'float':
                         float_alias[dst] = rd
                     maybe_release(dst)
-                continue
+                return line
 
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*icmp\s+(eq|ne|sgt|slt|sge|sle)\s+i32\s+([^,]+),\s*([^,]+)', line)
             if m:
@@ -1941,7 +2048,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 release_reg(zero_name)
                 release_reg(tmp_name)
                 maybe_release(dst)
-                continue
+                return line
 
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*select\s+i1\s+(%[A-Za-z0-9_]+),\s+i32\s+([^,]+),\s+i32\s+([^,]+)', line)
             if m:
@@ -1967,7 +2074,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     asm.append(f"MOV {rd}, {true_reg}")
                 asm.append(f"{end_label}:")
                 maybe_release(dst)
-                continue
+                return line
 
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*sext\s+i(8|16|32)\s+([^,]+?)\s+to\s+i(32|64)', line)
             if m:
@@ -1995,13 +2102,13 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     asm.append(f"SUB {rd}, {rd}, R12")
                     asm.append(f"{nonneg_label}:")
                     maybe_release(dst)
-                    continue
+                    return line
                 if src_bits == 32 and dst_bits == 64:
                     rd = alloc_vreg(dst, 'i32')
                     if rd != rs:
                         asm.append(f"MOV {rd}, {rs}")
                     maybe_release(dst)
-                    continue
+                    return line
                 raise ISelError(f"Unsupported sext: {orig_line}")
 
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*zext\s+i1\s+(%[A-Za-z0-9_]+)\s+to\s+i32', line)
@@ -2016,7 +2123,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 if rd != rs:
                     asm.append(f"MOV {rd}, {rs}")
                 maybe_release(dst)
-                continue
+                return line
 
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*zext\s+i(8|16|32)\s+([^,]+)\s+to\s+i(32|64)', line)
             if m:
@@ -2035,7 +2142,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 asm.append(f"AND {rd}, {rd}, {mask_reg}")
                 release_reg(mask_name)
                 maybe_release(dst)
-                continue
+                return line
 
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*trunc\s+i(32|16)\s+([^,]+)\s+to\s+i(8|16)', line)
             if m:
@@ -2053,14 +2160,14 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 load_const('R13', mask)
                 asm.append(f"AND {rd}, {rd}, R13")
                 maybe_release(dst)
-                continue
+                return line
 
             m = re.match(r'br\s+label\s+%([A-Za-z0-9_]+)', line)
             if m:
                 target_label = m.group(1)
-                apply_phi_moves(b["label"], target_label)
+                apply_phi_moves(block_label, target_label)
                 asm.append(f"JMP {label_map.get(target_label, target_label)}")
-                continue
+                return line
 
             m = re.match(r'br\s+i1\s+(%[A-Za-z0-9_]+),\s*label\s+%([A-Za-z0-9_]+),\s*label\s+%([A-Za-z0-9_]+)', line)
             if m:
@@ -2074,12 +2181,12 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 asm.append(f"CMP {cond_reg}, {zero_reg}")
                 asm.append(f"JZ {else_label}")
                 release_reg(zero_name)
-                apply_phi_moves(b["label"], tlabel)
+                apply_phi_moves(block_label, tlabel)
                 asm.append(f"JMP {label_map.get(tlabel, tlabel)}")
                 asm.append(f"{else_label}:")
-                apply_phi_moves(b["label"], flabel)
+                apply_phi_moves(block_label, flabel)
                 asm.append(f"JMP {label_map.get(flabel, flabel)}")
-                continue
+                return line
 
             m = re.match(
                 r'(%[A-Za-z0-9_]+)\s*=\s*getelementptr\s+inbounds\s+\[(\d+)\s+x\s+([A-Za-z0-9_.]+)\],\s*ptr\s+([@%][A-Za-z0-9_.]+),\s*i(?:32|64)\s+0,\s*i(?:32|64)\s+([^,]+)',
@@ -2121,7 +2228,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     if base_name in frame_ptr_offsets:
                         frame_ptr_offsets[dst] = frame_ptr_offsets[base_name]
                 maybe_release(dst)
-                continue
+                return line
 
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*getelementptr\s+inbounds\s+(i8|i16|i32|i64|half|float|ptr),\s*ptr\s+([@%][A-Za-z0-9_.]+),\s*i(?:32|64)\s+([^,]+)', line)
             if m:
@@ -2160,7 +2267,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     if base_name in frame_ptr_offsets:
                         frame_ptr_offsets[dst] = frame_ptr_offsets[base_name]
                 maybe_release(dst)
-                continue
+                return line
 
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*getelementptr\s+inbounds\s+%[A-Za-z0-9_.]+,\s*ptr\s+([@%][A-Za-z0-9_.]+),\s*(.+)', line)
             if m:
@@ -2176,7 +2283,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 if base_name in frame_ptr_offsets:
                     frame_ptr_offsets[dst] = frame_ptr_offsets[base_name]
                 maybe_release(dst)
-                continue
+                return line
 
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*load(?:\s+volatile)?\s+(i8|i16|i32|ptr|half|float),\s*(?:i\d+\*|ptr)\s+([^,]+)(?:,\s*align\s+\d+)?', line)
             if m:
@@ -2199,7 +2306,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 if dst_type == 'float':
                     float_alias[dst] = rd
                 maybe_release(dst)
-                continue
+                return line
 
             m = re.match(r'store(?:\s+volatile)?\s+(i8|i16|i32|ptr|half|float)\s+([^,]+),\s*(?:i\d+\*|ptr)\s+([^,]+)(?:,\s*align\s+\d+)?', line)
             if m:
@@ -2223,10 +2330,59 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     op_map = {"i8": "STB", "i16": "STH", "half": "STH"}
                     instr = op_map.get(dtype, "ST")
                     asm.append(f"{instr} [{rp}+0], {rs}")
-                continue
+                return line
 
             raise ISelError("Unsupported IR line: "+orig_line)
-    return asm, spill_data_lines
+
+    for b in fn["blocks"]:
+        if is_first_block:
+            asm.append(f"{fn['name']}:")
+            is_first_block = False
+        asm.append(label_map[b["label"]] + ":")
+        if not prologue_emitted:
+            asm.append("PUSH R7")
+            asm.append("MOV R7, R15")
+            prologue_emitted = True
+        if trace and phi_comments.get(b["label"]):
+            for phi_line in phi_comments[b["label"]]:
+                asm.append(f"; PHI: {phi_line}")
+        dbg_refs = b.get("dbg_refs", [])
+        for instr_idx, raw in enumerate(b["ins"]):
+            dbg_id = dbg_refs[instr_idx] if instr_idx < len(dbg_refs) else None
+            inst_counter += 1
+            inst_id = f"{fn['name']}@{inst_counter}"
+            start_idx = len(asm)
+            normalized_line = None
+            emitted_indices: List[int] = []
+            try:
+                normalized_line = _lower_ir_instruction(raw, b["label"])
+            finally:
+                if sys.exc_info()[0] is None:
+                    if normalized_line is None:
+                        normalized_line = normalize_ir_line(raw)
+                    end_idx = len(asm)
+                    for asm_index in range(start_idx, end_idx):
+                        if is_instruction_line(asm[asm_index]):
+                            emitted_indices.append(asm_index)
+                    if emitted_indices:
+                        instruction_records.append(
+                            {
+                                "id": inst_id,
+                                "function": fn["name"],
+                                "ir": normalized_line,
+                                "raw_ir": raw.strip(),
+                                "dbg": dbg_id,
+                            }
+                        )
+                        for asm_index in emitted_indices:
+                            line_debug_entries.append((asm_index, dbg_id, inst_id))
+    line_tags: List[Optional[Dict[str, Any]]] = [None] * len(asm)
+    for asm_index, dbg_id, inst_id in line_debug_entries:
+        tag: Dict[str, Any] = {"inst": inst_id}
+        if dbg_id:
+            tag["dbg"] = dbg_id
+        line_tags[asm_index] = tag
+    return asm, spill_data_lines, line_tags, instruction_records
 
 def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
     global LAST_DEBUG_INFO
@@ -2239,11 +2395,14 @@ def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
     global_names = {g['name'] for g in globals_list}
     imports = set()
     out: List[str] = []
+    line_tags: List[Optional[Dict[str, Any]]] = []
     spill_data_all: List[str] = []
     function_spans: List[Tuple[str, int, int]] = []
+    instruction_records: Dict[str, Dict[str, Any]] = {}
+    instruction_order: List[str] = []
     for fn in ir['functions']:
         start_line = len(out)
-        fn_asm, fn_spill_data = lower_function(
+        fn_asm, fn_spill_data, fn_tags, fn_instruction_records = lower_function(
             fn,
             trace=trace,
             imports=imports,
@@ -2252,10 +2411,15 @@ def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
             type_info=ir.get('types', {}),
         )
         out += fn_asm
+        line_tags.extend(fn_tags)
         end_line = len(out)
         function_spans.append((fn["name"], start_line, end_line))
         if fn_spill_data:
             spill_data_all.extend(fn_spill_data)
+        for record in fn_instruction_records:
+            inst_id = record["id"]
+            instruction_records[inst_id] = record
+            instruction_order.append(inst_id)
     data_section = render_globals(globals_list)
     mailbox_entries = ir.get("mailboxes", [])
     value_entries = ir.get("values", [])
@@ -2290,16 +2454,66 @@ def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
             header += data_section
         header.append('.text')
         out = header + out
+        header_tags: List[Optional[Dict[str, Any]]] = [None] * len(header)
+        line_tags = header_tags + line_tags
         header_len = len(header)
         function_spans = [(name, start + header_len, end + header_len) for (name, start, end) in function_spans]
         if enable_opt and not trace:
-            out = optimize_movs(out)
+            out, line_tags = _optimize_movs(out, line_tags)
     else:
         header_len = 0
 
     debug_info = ir.get("debug", {"files": {}, "subprograms": {}, "functions": []})
     files = debug_info.get("files", {})
+    subprograms = debug_info.get("subprograms", {})
+    locations = debug_info.get("locations", {})
+    lexical_blocks = debug_info.get("lexical_blocks", {})
     functions_meta = debug_info.get("functions", [])
+
+    def _resolve_file_ref(file_id: Optional[str], scope_id: Optional[str]) -> Optional[Dict[str, Any]]:
+        visited: Set[str] = set()
+        current_file = file_id
+        current_scope = scope_id
+        while True:
+            if current_file and current_file in files:
+                info = files[current_file]
+                return {
+                    "id": current_file,
+                    "filename": info.get("filename"),
+                    "directory": info.get("directory"),
+                }
+            if not current_scope or current_scope in visited:
+                return None
+            visited.add(current_scope)
+            scope_info = lexical_blocks.get(current_scope) or subprograms.get(current_scope)
+            if not scope_info:
+                return None
+            current_file = scope_info.get("file")
+            current_scope = scope_info.get("scope")
+
+    def _resolve_location_ref(dbg_id: str) -> Optional[Dict[str, Any]]:
+        visited: Set[str] = set()
+        current = dbg_id
+        while current and current not in visited:
+            visited.add(current)
+            loc = locations.get(current)
+            if not loc:
+                break
+            line_val = loc.get("line")
+            column_val = loc.get("column")
+            file_entry = _resolve_file_ref(loc.get("file"), loc.get("scope"))
+            if line_val is not None:
+                result: Dict[str, Any] = {
+                    "line": line_val,
+                    "column": column_val,
+                    "file": file_entry,
+                }
+                if file_entry:
+                    result["file_id"] = file_entry.get("id")
+                return result
+            current = loc.get("inlined_at")
+        return None
+
     span_map = {name: (start, end) for name, start, end in function_spans}
     files_list: List[Dict[str, Any]] = []
     for meta_id, info in files.items():
@@ -2334,10 +2548,70 @@ def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
                 "mvasm_end_line": end_line,
             }
         )
+    line_map_entries: List[Dict[str, Any]] = []
+    instruction_line_map: Dict[str, List[int]] = defaultdict(list)
+    for idx, tag in enumerate(line_tags):
+        if not tag or not isinstance(tag, dict):
+            continue
+        inst_id = tag.get("inst")
+        if inst_id:
+            instruction_line_map.setdefault(inst_id, []).append(idx + 1)
+        dbg_id = tag.get("dbg")
+        if not dbg_id:
+            continue
+        loc_info = _resolve_location_ref(dbg_id)
+        if not loc_info:
+            continue
+        entry: Dict[str, Any] = {
+            "mvasm_line": idx + 1,
+            "source_line": loc_info["line"],
+        }
+        if loc_info.get("column") is not None:
+            entry["source_column"] = loc_info["column"]
+        file_entry = loc_info.get("file")
+        if file_entry:
+            entry["source_file"] = file_entry.get("filename")
+            if file_entry.get("directory"):
+                entry["source_directory"] = file_entry["directory"]
+            entry["source_file_id"] = file_entry.get("id")
+        line_map_entries.append(entry)
+    line_map_entries.sort(key=lambda item: item["mvasm_line"])
+
+    llvm_map_entries: List[Dict[str, Any]] = []
+    for inst_id in instruction_order:
+        lines_for_inst = instruction_line_map.get(inst_id)
+        if not lines_for_inst:
+            continue
+        record = instruction_records.get(inst_id)
+        if not record:
+            continue
+        entry: Dict[str, Any] = {
+            "id": inst_id,
+            "function": record.get("function"),
+            "ir": record.get("ir"),
+            "raw_ir": record.get("raw_ir"),
+            "mvasm_lines": lines_for_inst,
+        }
+        dbg_ref = record.get("dbg")
+        if dbg_ref:
+            entry["dbg"] = dbg_ref
+            loc_info = _resolve_location_ref(dbg_ref)
+            if loc_info:
+                entry["source_line"] = loc_info.get("line")
+                if loc_info.get("column") is not None:
+                    entry["source_column"] = loc_info.get("column")
+                file_entry = loc_info.get("file")
+                if file_entry:
+                    entry["source_file"] = file_entry.get("filename")
+                    if file_entry.get("directory"):
+                        entry["source_directory"] = file_entry["directory"]
+        llvm_map_entries.append(entry)
     LAST_DEBUG_INFO = {
         "version": 1,
         "files": files_list,
         "functions": functions_list,
+        "line_map": line_map_entries,
+        "llvm_to_mvasm": llvm_map_entries,
     }
     return "\n".join(out) + "\n"
 

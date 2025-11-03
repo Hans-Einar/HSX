@@ -328,13 +328,13 @@ Phase 2 requires mapping LLVM instructions to MVASM line numbers (section 4.2.1)
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Parse `!DILocation` metadata for each LLVM instruction
-- [ ] Track source line numbers during lowering
-- [ ] Map LLVM instruction to MVASM line
-- [ ] Store instruction mappings in .dbg file
-- [ ] Add instruction mapping tests
-- [ ] Document mapping format
-- [ ] Verify mapping accuracy
+- [x] Parse `!DILocation` metadata for each LLVM instruction
+- [x] Track source line numbers during lowering
+- [x] Map LLVM instruction to MVASM line
+- [x] Store instruction mappings in .dbg file
+- [x] Add instruction mapping tests
+- [x] Document mapping format
+- [x] Verify mapping accuracy
 
 ---
 

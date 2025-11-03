@@ -123,3 +123,22 @@ Append sessions chronologically and ensure every entry references the relevant d
 
 ### Next Steps
 - Phase 3.3: capture instruction-level mappings (`!DILocation`) and extend `.dbg` / `.sym` outputs accordingly.
+
+## 2025-11-08 - Codex (Session 6)
+
+### Scope
+- Plan item / phase addressed: Phase 3.3 instruction mapping (line_map + llvm_to_mvasm)
+- Design sections reviewed: 04.05--Toolchain §4.2.1, toolchain/debug-metadata.md schema, Implementation Plan Phase 3.3 checklist
+
+### Work Summary
+- Extended `parse_ir` to collect `!DILocation`/`!DILexicalBlock` nodes and preserved per-instruction debug IDs through lowering, including phi pruning.
+- Refactored `lower_function` to emit instruction metadata (inst IDs, dbg IDs) and propagate tags through MVASM emission and peephole optimizations; added `_optimize_movs` helper so metadata survives MOV folding/elimination.
+- Emitted `line_map` and `llvm_to_mvasm` arrays in `LAST_DEBUG_INFO` / `.dbg` output with file/column context, updated docs and implementation plan checklist, and captured instruction order for downstream symbol generation.
+- Added regression coverage in `test_hsx_llc_debug.py` asserting the new mappings, and refreshed debug metadata documentation to describe the richer schema.
+
+### Testing
+- `python -m pytest python/tests/test_hsx_llc_debug.py`
+- `python -m pytest python/tests/test_opt_movs.py python/tests/test_opt_peephole_extra.py`
+
+### Next Steps
+- Phase 3.4: enrich `.dbg` with variable metadata and begin linker `.sym` integration once symbol layout work resumes.
