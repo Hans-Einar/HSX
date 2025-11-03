@@ -134,3 +134,31 @@ Append sessions chronologically and ensure every entry references the relevant d
   - Wire mailbox notifications/persistence to the new descriptor pool during SVC rework.
 - Reviews or coordination required:
   - Schedule design review after SVC handler rework to confirm ABI compliance.
+
+
+## 2025-11-05 - Codex (Session 4)
+
+### Scope
+- Plan item / phase addressed: VALUE/CMD SVC handlers (Phases 2 & 3).
+- Design sections reviewed: 04.04--ValCmd.md (§4.4 registration/get/set, §5.3 help semantics).
+
+### Work Summary
+- Key decisions & code changes:
+  - Implemented VALUE_* SVCs in `VMController` to parse descriptor chains from guest memory, convert half-precision payloads, stream OID lists into VM memory, and wire subscriptions to mailbox handles.
+  - Implemented COMMAND_* SVCs with descriptor parsing, async guard checks, and help-text emission.
+  - Added descriptor parsing helpers/tests and command help accessors in `ValCmdRegistry` to back the SVC logic.
+- Design updates filed/applied:
+  - None yet; behaviour now matches the design ABI expectations for VALUE/CMD flows.
+
+### Testing
+- Commands executed + results:
+  - `PYTHONPATH=. pytest python/tests/test_valcmd_registry.py python/tests/test_valcmd_svc_integration.py` (pass)
+- Issues encountered:
+  - None beyond adjusting tests for descriptor parsing offsets.
+
+### Next Steps
+- Follow-ups / blockers:
+  - Extend VALUE_LIST/VALUE_SUB coverage via integration tests to exercise buffer writes and mailbox wiring.
+  - Begin Phase 4 event/RPC integration once SVC paths settle.
+- Reviews or coordination required:
+  - Request implementation review of the updated SVC handlers.

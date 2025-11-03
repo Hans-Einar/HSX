@@ -888,6 +888,15 @@ class ValCmdRegistry:
             oids.append(oid)
         return oids
 
+    def command_help_text(self, oid: int) -> Optional[str]:
+        entry = self._commands.get(oid)
+        if entry is None:
+            return None
+        for record in self._iter_command_descriptors(entry):
+            if isinstance(record, CommandNameDescriptorRecord):
+                return self._string_table.get(record.help_offset) or ""
+        return None
+
     # --------------------------------------------------------- housekeeping
 
     def get_stats(self) -> Dict[str, Any]:

@@ -22,7 +22,7 @@ if str(REPO_ROOT) not in sys.path:
 try:
     from python.mailbox import MailboxManager, MailboxError, MailboxMessage
     from python import hsx_mailbox_constants as mbx_const
-    from python.valcmd import ValCmdRegistry
+    from python.valcmd import ValCmdRegistry, float_to_f16, f16_to_float
     from python import hsx_value_constants as val_const
     from python import hsx_command_constants as cmd_const
     from python.disasm_util import OPCODE_NAMES, format_operands
@@ -3166,154 +3166,180 @@ class VMController:
     def _svc_value_controller(self, vm: MiniVM, fn: int) -> None:
         """Handle VALUE SVC calls through the valcmd registry."""
         pid = self.current_pid or vm.pid or (vm.context.pid if vm.context else 0) or 0
-        
+        memory = memoryview(vm.mem)
+
         try:
             if fn == val_const.HSX_VAL_FN_REGISTER:
                 group_id = vm.regs[1] & 0xFF
                 value_id = vm.regs[2] & 0xFF
                 flags = vm.regs[3] & 0xFF
-                # desc_ptr = vm.regs[4]  # TODO: parse descriptors
-                auth_level = val_const.HSX_VAL_AUTH_PUBLIC  # Default auth level
-                
+                desc_ptr = vm.regs[4] & 0xFFFF
+                ok, specs = self.valcmd.parse_value_descriptors_from_memory(memory, desc_ptr)
+                if not ok:
+                    vm.regs[0] = val_const.HSX_VAL_STATUS_EINVAL
+                    return
                 status, oid = self.valcmd.value_register(
                     group_id=group_id,
                     value_id=value_id,
                     flags=flags,
-                    auth_level=auth_level,
-                    owner_pid=pid
+                    auth_level=val_const.HSX_VAL_AUTH_PUBLIC,
+                    owner_pid=pid,
+                    descriptors=specs,
                 )
-                vm.regs[0] = status
+                vm.regs[0] = status & 0xFFFF
                 if status == val_const.HSX_VAL_STATUS_OK:
                     vm.regs[1] = oid
                 return
-            
-            elif fn == val_const.HSX_VAL_FN_LOOKUP:
+
+            if fn == val_const.HSX_VAL_FN_LOOKUP:
                 group_id = vm.regs[1] & 0xFF
                 value_id = vm.regs[2] & 0xFF
                 status, oid = self.valcmd.value_lookup(group_id, value_id)
-                vm.regs[0] = status
+                vm.regs[0] = status & 0xFFFF
                 if status == val_const.HSX_VAL_STATUS_OK:
                     vm.regs[1] = oid
                 return
-            
-            elif fn == val_const.HSX_VAL_FN_GET:
+
+            if fn == val_const.HSX_VAL_FN_GET:
                 oid = vm.regs[1] & 0xFFFF
                 status, value = self.valcmd.value_get(oid, caller_pid=pid)
-                vm.regs[0] = status
                 if status == val_const.HSX_VAL_STATUS_OK:
-                    # Return f16 in low 16 bits of R0
-                    vm.regs[0] = (vm.regs[0] & 0xFFFF0000) | (int(value) & 0xFFFF)
+                    vm.regs[0] = ((status & 0xFFFF) << 16) | float_to_f16(value)
+                else:
+                    vm.regs[0] = status & 0xFFFF
                 return
-            
-            elif fn == val_const.HSX_VAL_FN_SET:
+
+            if fn == val_const.HSX_VAL_FN_SET:
                 oid = vm.regs[1] & 0xFFFF
-                f16_value = float(vm.regs[2] & 0xFFFF)  # Simplified f16 handling
-                current_time = time.monotonic()
+                raw_value = vm.regs[2] & 0xFFFF
+                new_value = f16_to_float(raw_value)
                 status = self.valcmd.value_set(
-                    oid, f16_value, caller_pid=pid, current_time=current_time
+                    oid,
+                    new_value,
+                    caller_pid=pid,
+                    current_time=time.monotonic(),
                 )
-                vm.regs[0] = status
+                vm.regs[0] = status & 0xFFFF
                 return
-            
-            elif fn == val_const.HSX_VAL_FN_LIST:
+
+            if fn == val_const.HSX_VAL_FN_LIST:
                 group_filter = vm.regs[1] & 0xFF
-                # out_ptr = vm.regs[2]  # TODO: write OID list to memory
-                # max_items = vm.regs[3]
+                out_ptr = vm.regs[2] & 0xFFFF
+                max_items = vm.regs[3] & 0xFFFF
                 oids = self.valcmd.value_list(group_filter=group_filter, caller_pid=pid)
+                max_buffer = (len(vm.mem) - out_ptr) // 2 if out_ptr < len(vm.mem) else 0
+                count = min(len(oids), max_items, max_buffer)
+                for idx in range(count):
+                    offset = out_ptr + idx * 2
+                    vm.mem[offset : offset + 2] = (oids[idx] & 0xFFFF).to_bytes(2, "little")
                 vm.regs[0] = val_const.HSX_VAL_STATUS_OK
-                vm.regs[1] = len(oids)
+                vm.regs[1] = count
                 return
-            
-            elif fn == val_const.HSX_VAL_FN_SUB:
+
+            if fn == val_const.HSX_VAL_FN_SUB:
                 oid = vm.regs[1] & 0xFFFF
-                # mbox_ptr = vm.regs[2]  # TODO: parse mailbox handle
-                # For now, just register subscription
-                status = self.valcmd.value_subscribe(oid, mailbox_handle=None)
-                vm.regs[0] = status
+                target = vm._read_c_string(vm.regs[2])
+                if not target:
+                    vm.regs[0] = val_const.HSX_VAL_STATUS_EINVAL
+                    return
+                try:
+                    handle = self.mailboxes.open(pid=pid, target=target)
+                except MailboxError:
+                    vm.regs[0] = val_const.HSX_VAL_STATUS_EINVAL
+                    return
+                status = self.valcmd.value_subscribe(oid, mailbox_handle=(pid, handle, target))
+                vm.regs[0] = status & 0xFFFF
+                if status == val_const.HSX_VAL_STATUS_OK:
+                    vm.regs[1] = handle
                 return
-            
-            elif fn == val_const.HSX_VAL_FN_PERSIST:
+
+            if fn == val_const.HSX_VAL_FN_PERSIST:
                 oid = vm.regs[1] & 0xFFFF
                 mode = vm.regs[2] & 0xFF
                 status = self.valcmd.value_persist(oid, mode, caller_pid=pid)
-                vm.regs[0] = status
+                vm.regs[0] = status & 0xFFFF
                 return
-            
-            else:
-                vm.regs[0] = val_const.HSX_VAL_STATUS_EINVAL
-                return
-                
-        except Exception as exc:
+
             vm.regs[0] = val_const.HSX_VAL_STATUS_EINVAL
-            return
+
+        except Exception:
+            vm.regs[0] = val_const.HSX_VAL_STATUS_EINVAL
 
     def _svc_command_controller(self, vm: MiniVM, fn: int) -> None:
         """Handle COMMAND SVC calls through the valcmd registry."""
         pid = self.current_pid or vm.pid or (vm.context.pid if vm.context else 0) or 0
-        
+        memory = memoryview(vm.mem)
+
         try:
             if fn == cmd_const.HSX_CMD_FN_REGISTER:
                 group_id = vm.regs[1] & 0xFF
                 cmd_id = vm.regs[2] & 0xFF
                 flags = vm.regs[3] & 0xFF
-                # desc_ptr = vm.regs[4]  # TODO: parse descriptors
-                auth_level = val_const.HSX_VAL_AUTH_PUBLIC  # Default auth level
-                
+                desc_ptr = vm.regs[4] & 0xFFFF
+                ok, specs = self.valcmd.parse_command_descriptors_from_memory(memory, desc_ptr)
+                if not ok:
+                    vm.regs[0] = cmd_const.HSX_CMD_STATUS_EINVAL
+                    return
                 status, oid = self.valcmd.command_register(
                     group_id=group_id,
                     cmd_id=cmd_id,
                     flags=flags,
-                    auth_level=auth_level,
-                    owner_pid=pid
+                    auth_level=val_const.HSX_VAL_AUTH_PUBLIC,
+                    owner_pid=pid,
+                    descriptors=specs,
                 )
-                vm.regs[0] = status
+                vm.regs[0] = status & 0xFFFF
                 if status == cmd_const.HSX_CMD_STATUS_OK:
                     vm.regs[1] = oid
                 return
-            
-            elif fn == cmd_const.HSX_CMD_FN_LOOKUP:
+
+            if fn == cmd_const.HSX_CMD_FN_LOOKUP:
                 group_id = vm.regs[1] & 0xFF
                 cmd_id = vm.regs[2] & 0xFF
                 status, oid = self.valcmd.command_lookup(group_id, cmd_id)
-                vm.regs[0] = status
+                vm.regs[0] = status & 0xFFFF
                 if status == cmd_const.HSX_CMD_STATUS_OK:
                     vm.regs[1] = oid
                 return
-            
-            elif fn == cmd_const.HSX_CMD_FN_CALL:
+
+            if fn == cmd_const.HSX_CMD_FN_CALL:
                 oid = vm.regs[1] & 0xFFFF
-                # token_ptr = vm.regs[2]  # TODO: parse auth token
                 status, result = self.valcmd.command_call(oid, caller_pid=pid)
-                vm.regs[0] = status
+                vm.regs[0] = status & 0xFFFF
                 if result is not None:
                     vm.regs[1] = int(result) if isinstance(result, (int, float)) else 0
                 return
-            
-            elif fn == cmd_const.HSX_CMD_FN_CALL_ASYNC:
+
+            if fn == cmd_const.HSX_CMD_FN_CALL_ASYNC:
                 oid = vm.regs[1] & 0xFFFF
-                # token_ptr = vm.regs[2]  # TODO: parse auth token
-                # mbox_ptr = vm.regs[3]  # TODO: parse mailbox for async result
-                # For now, just call synchronously
-                status, result = self.valcmd.command_call(oid, caller_pid=pid)
-                vm.regs[0] = status
+                status, _ = self.valcmd.command_call_async(oid, caller_pid=pid)
+                vm.regs[0] = status & 0xFFFF
                 return
-            
-            elif fn == cmd_const.HSX_CMD_FN_HELP:
+
+            if fn == cmd_const.HSX_CMD_FN_HELP:
                 oid = vm.regs[1] & 0xFFFF
-                # out_ptr = vm.regs[2]  # TODO: write help text to memory
-                # max_len = vm.regs[3]
-                # For now, just return success
+                out_ptr = vm.regs[2] & 0xFFFF
+                max_len = vm.regs[3] & 0xFFFF
+                help_text = self.valcmd.command_help_text(oid)
+                if help_text is None:
+                    vm.regs[0] = cmd_const.HSX_CMD_STATUS_ENOENT
+                    return
+                encoded = help_text.encode("utf-8")
+                if max_len == 0 or out_ptr >= len(vm.mem):
+                    vm.regs[0] = cmd_const.HSX_CMD_STATUS_OK
+                    vm.regs[1] = 0
+                    return
+                write_len = min(len(encoded), max_len - 1, len(vm.mem) - out_ptr - 1)
+                vm.mem[out_ptr : out_ptr + write_len] = encoded[:write_len]
+                vm.mem[out_ptr + write_len] = 0
                 vm.regs[0] = cmd_const.HSX_CMD_STATUS_OK
-                vm.regs[1] = 0  # bytes written
+                vm.regs[1] = write_len
                 return
-            
-            else:
-                vm.regs[0] = cmd_const.HSX_CMD_STATUS_EINVAL
-                return
-                
-        except Exception as exc:
+
             vm.regs[0] = cmd_const.HSX_CMD_STATUS_EINVAL
-            return
+
+        except Exception:
+            vm.regs[0] = cmd_const.HSX_CMD_STATUS_EINVAL
 
     def info(self, pid: Optional[int] = None) -> Dict[str, Any]:
         vm = self.vm
