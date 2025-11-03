@@ -7,6 +7,9 @@ import pytest
 
 from python.execd import ExecutiveState, SessionError
 from python import trace_format
+from python.valcmd import float_to_f16
+from python import hsx_value_constants as val_const
+from python import hsx_command_constants as cmd_const
 
 
 class DummyVM:
@@ -113,6 +116,162 @@ def make_task_state_env() -> tuple[ExecutiveState, TaskStateVM]:
     state = ExecutiveState(vm, step_batch=1)
     state.enforce_context_isolation = False
     return state, vm
+
+
+def test_value_events_update_registry():
+    state = make_state()
+    state.value_registry.clear()
+
+    register_event = {
+        "type": "value_registered",
+        "pid": 10,
+        "oid": 0x0102,
+        "group_id": 1,
+        "value_id": 2,
+        "flags": 0x05,
+        "auth_level": 2,
+        "caller_pid": 10,
+        "owner_pid": 10,
+    }
+    state._process_vm_events([register_event])
+    entry = state.value_registry[10][(1, 2)]
+    assert entry["oid"] == 0x0102
+    assert entry["flags"] == 0x05
+    assert entry["auth_level"] == 2
+    assert entry["registered_ts"] <= time.time()
+
+    change_event = {
+        "type": "value_changed",
+        "pid": 10,
+        "oid": 0x0102,
+        "group_id": 1,
+        "value_id": 2,
+        "old_f16": float_to_f16(1.0),
+        "new_f16": float_to_f16(2.5),
+    }
+    state._process_vm_events([change_event])
+    entry = state.value_registry[10][(1, 2)]
+    assert entry["last_f16"] == float_to_f16(2.5)
+    assert entry["last_value"] == pytest.approx(2.5)
+    assert entry["prev_value"] == pytest.approx(1.0)
+    assert entry["change_count"] == 1
+
+
+def test_command_events_update_registry():
+    state = make_state()
+    state.command_registry.clear()
+
+    invoked_event = {
+        "type": "cmd_invoked",
+        "pid": 20,
+        "oid": 0x0203,
+        "group_id": 2,
+        "cmd_id": 3,
+        "flags": 0x01,
+        "auth_level": 1,
+        "caller_pid": 20,
+        "owner_pid": 21,
+    }
+    state._process_vm_events([invoked_event])
+    entry = state.command_registry[20][(2, 3)]
+    assert entry["oid"] == 0x0203
+    assert entry["flags"] == 0x01
+    assert entry["owner_pid"] == 21
+    assert entry["last_invoked_ts"] <= time.time()
+
+    completed_event = {
+        "type": "cmd_completed",
+        "pid": 20,
+        "oid": 0x0203,
+        "group_id": 2,
+        "cmd_id": 3,
+        "status": 0,
+        "result": "ok",
+    }
+    state._process_vm_events([completed_event])
+    entry = state.command_registry[20][(2, 3)]
+    assert entry["last_status"] == 0
+    assert entry["last_result"] == "ok"
+    assert entry["last_completed_ts"] <= time.time()
+
+
+class ValCmdClient:
+    def __init__(self) -> None:
+        self.list_calls: list[dict] = []
+
+    def val_list(self, *, pid=None, group=None, oid=None, name=None):
+        self.list_calls.append({"pid": pid, "group": group, "oid": oid, "name": name})
+        return [
+            {
+                "oid": 0x0101,
+                "group_id": 1,
+                "value_id": 1,
+                "owner_pid": pid or 1,
+                "name": "rpm",
+                "group_name": "telemetry",
+                "last_value": 12.5,
+                "last_f16": float_to_f16(12.5),
+            }
+        ]
+
+    def val_get(self, oid, *, pid=None):
+        return {
+            "status": val_const.HSX_VAL_STATUS_OK,
+            "value": 7.5,
+            "f16": float_to_f16(7.5),
+            "pid": pid or 1,
+        }
+
+    def val_set(self, oid, value, *, pid=None):
+        return {
+            "status": val_const.HSX_VAL_STATUS_OK,
+            "value": float(value),
+            "f16": float_to_f16(float(value)),
+            "pid": pid or 1,
+        }
+
+    def cmd_list(self, *, pid=None, group=None, oid=None, name=None):
+        return [
+            {
+                "oid": 0x0202,
+                "group_id": 2,
+                "cmd_id": 2,
+                "owner_pid": pid or 1,
+                "name": "reset",
+                "help": "reset board",
+            }
+        ]
+
+    def cmd_call(self, oid, *, pid=None, async_call=False):
+        return {
+            "status": cmd_const.HSX_CMD_STATUS_OK,
+            "result": "ok",
+            "pid": pid or 1,
+        }
+
+
+def test_executive_state_val_api_merges_cache():
+    client = ValCmdClient()
+    state = ExecutiveState(client, step_batch=1)
+    values = state.val_list(pid=1)
+    assert values[0]["name"] == "rpm"
+    result = state.val_get(0x0101, pid=1)
+    assert result["status"] == val_const.HSX_VAL_STATUS_OK
+    set_result = state.val_set(0x0101, 3.14, pid=1)
+    assert set_result["status"] == val_const.HSX_VAL_STATUS_OK
+    registry_entry = state.value_registry[1][(1, 1)]
+    assert registry_entry["last_value"] == pytest.approx(3.14)
+
+
+def test_executive_state_cmd_api_merges_cache():
+    client = ValCmdClient()
+    state = ExecutiveState(client, step_batch=1)
+    commands = state.cmd_list(pid=1)
+    assert commands[0]["name"] == "reset"
+    result = state.cmd_call(0x0202, pid=1)
+    assert result["status"] == cmd_const.HSX_CMD_STATUS_OK
+    entry = state.command_registry[1][(2, 2)]
+    assert entry["last_result"] == "ok"
 
 
 def test_session_open_records_pid_lock_and_warnings():
@@ -1157,4 +1316,3 @@ def test_disasm_read_basic():
     assert cached_first["cached"] is False
     cached_second = state.disasm_read(1, address=base, count=3, mode="cached")
     assert cached_second["cached"] is True
-

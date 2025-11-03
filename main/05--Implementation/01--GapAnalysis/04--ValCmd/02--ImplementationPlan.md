@@ -475,17 +475,17 @@ Design specifies event emission for debugger/tooling (section 5.2). System/ValCm
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.04--ValCmd](../../../04--Design/04.04--ValCmd.md)
-- [ ] Define value_changed event schema (seq, ts, pid, oid, old_f16, new_f16)
-- [ ] Define value_registered event schema (seq, ts, pid, oid, group_id, value_id)
-- [ ] Define cmd_invoked event schema (seq, ts, pid, oid, group_id, cmd_id)
-- [ ] Define cmd_completed event schema (seq, ts, pid, oid, rc)
-- [ ] Integrate with executive event streaming (emit_event)
-- [ ] Emit value_changed on VALUE_SET
-- [ ] Emit value_registered on VALUE_REGISTER
-- [ ] Emit cmd_invoked on CMD_CALL start
-- [ ] Emit cmd_completed on CMD_CALL finish
-- [ ] Add event emission tests
-- [ ] Document event schema in `docs/executive_protocol.md`
+- [x] Define value_changed event schema (seq, ts, pid, oid, old_f16, new_f16)
+- [x] Define value_registered event schema (seq, ts, pid, oid, group_id, value_id)
+- [x] Define cmd_invoked event schema (seq, ts, pid, oid, group_id, cmd_id)
+- [x] Define cmd_completed event schema (seq, ts, pid, oid, rc)
+- [x] Integrate with executive event streaming (emit_event)
+- [x] Emit value_changed on VALUE_SET
+- [x] Emit value_registered on VALUE_REGISTER
+- [x] Emit cmd_invoked on CMD_CALL start
+- [x] Emit cmd_completed on CMD_CALL finish
+- [x] Add event emission tests
+- [x] Document event schema in `docs/executive_protocol.md`
 
 ---
 
@@ -500,15 +500,15 @@ Design specifies RPC commands for shell/tooling (section 5.3). System/ValCmd.md 
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.04--ValCmd](../../../04--Design/04.04--ValCmd.md)
-- [ ] Implement `val.list` RPC command (enumerate values)
-- [ ] Implement `val.get(oid)` RPC command (read value)
-- [ ] Implement `val.set(oid, f16)` RPC command (write value)
-- [ ] Implement `cmd.list` RPC command (enumerate commands)
-- [ ] Implement `cmd.call(oid)` RPC command (invoke command)
-- [ ] Add JSON-RPC protocol handlers
-- [ ] Support both numeric OID and named access
-- [ ] Add RPC command tests
-- [ ] Update `docs/executive_protocol.md` with ValCmd RPC commands
+- [x] Implement `val.list` RPC command (enumerate values)
+- [x] Implement `val.get(oid)` RPC command (read value)
+- [x] Implement `val.set(oid, f16)` RPC command (write value)
+- [x] Implement `cmd.list` RPC command (enumerate commands)
+- [x] Implement `cmd.call(oid)` RPC command (invoke command)
+- [x] Add JSON-RPC protocol handlers
+- [x] Support both numeric OID and named access
+- [x] Add RPC command tests
+- [x] Update `docs/executive_protocol.md` with ValCmd RPC commands
 
 ---
 

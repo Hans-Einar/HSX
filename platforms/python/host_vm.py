@@ -2124,6 +2124,108 @@ class VMController:
         if self.vm:
             self.vm.emit_event({'type': event_type, **kwargs})
 
+    def val_snapshot(
+        self,
+        *,
+        pid: Optional[int] = None,
+        group: Optional[int] = None,
+        oid: Optional[int] = None,
+        name: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        values = self.valcmd.describe_values(pid)
+        group_id = int(group) & 0xFF if group is not None else None
+        target_oid = int(oid) & 0xFFFF if oid is not None else None
+        name_token = str(name) if name else None
+        results: List[Dict[str, Any]] = []
+        for info in values:
+            if group_id is not None and info.get("group_id") != group_id:
+                continue
+            if target_oid is not None and info.get("oid") != target_oid:
+                continue
+            if name_token and info.get("name") != name_token:
+                continue
+            results.append(dict(info))
+        return results
+
+    def val_get(self, oid: int, *, pid: Optional[int] = None) -> Dict[str, Any]:
+        entry = self.valcmd.get_value_entry(oid)
+        if entry is None:
+            return {"status": val_const.HSX_VAL_STATUS_ENOENT}
+        caller_pid = int(pid) if pid is not None else entry.owner_pid
+        status, value = self.valcmd.value_get(oid, caller_pid=caller_pid)
+        result: Dict[str, Any] = {"status": status}
+        if status == val_const.HSX_VAL_STATUS_OK:
+            result.update({
+                "value": value,
+                "f16": float_to_f16(value),
+                "pid": caller_pid,
+            })
+        return result
+
+    def val_set(self, oid: int, value: Any, *, pid: Optional[int] = None) -> Dict[str, Any]:
+        entry = self.valcmd.get_value_entry(oid)
+        if entry is None:
+            return {"status": val_const.HSX_VAL_STATUS_ENOENT}
+        caller_pid = int(pid) if pid is not None else entry.owner_pid
+        try:
+            new_value = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("val_set requires numeric 'value'") from exc
+        status = self.valcmd.value_set(
+            oid,
+            new_value,
+            caller_pid=caller_pid,
+            current_time=time.monotonic(),
+        )
+        result: Dict[str, Any] = {"status": status}
+        if status == val_const.HSX_VAL_STATUS_OK:
+            updated = self.valcmd.get_value_entry(oid)
+            if updated is not None:
+                result.update({
+                    "value": updated.last_value,
+                    "f16": updated.last_f16_raw,
+                    "pid": caller_pid,
+                })
+        return result
+
+    def cmd_snapshot(
+        self,
+        *,
+        pid: Optional[int] = None,
+        group: Optional[int] = None,
+        oid: Optional[int] = None,
+        name: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        commands = self.valcmd.describe_commands(pid)
+        group_id = int(group) & 0xFF if group is not None else None
+        target_oid = int(oid) & 0xFFFF if oid is not None else None
+        name_token = str(name) if name else None
+        results: List[Dict[str, Any]] = []
+        for info in commands:
+            if group_id is not None and info.get("group_id") != group_id:
+                continue
+            if target_oid is not None and info.get("oid") != target_oid:
+                continue
+            if name_token and info.get("name") != name_token:
+                continue
+            results.append(dict(info))
+        return results
+
+    def cmd_call(self, oid: int, *, pid: Optional[int] = None, async_call: bool = False) -> Dict[str, Any]:
+        entry = self.valcmd.get_command_entry(oid)
+        if entry is None:
+            return {"status": cmd_const.HSX_CMD_STATUS_ENOENT, "result": None}
+        caller_pid = int(pid) if pid is not None else entry.owner_pid
+        if async_call:
+            status, result = self.valcmd.command_call_async(oid, caller_pid=caller_pid)
+        else:
+            status, result = self.valcmd.command_call(oid, caller_pid=caller_pid)
+        return {
+            "status": status,
+            "result": result,
+            "pid": caller_pid,
+        }
+
     def _handle_mailbox_manager_event(self, event: Dict[str, Any]) -> None:
         if not isinstance(event, dict):
             return
@@ -4650,6 +4752,72 @@ class VMController:
                 handle = int(request.get("handle"))
                 enable = bool(int(request.get("enable", 1)))
                 return self.mailbox_tap(pid, handle, enable=enable)
+            if cmd == "val_list":
+                pid_filter = request.get("pid")
+                group_filter = request.get("group")
+                name_filter = request.get("name")
+                oid_filter = request.get("oid")
+                pid_int = int(pid_filter) if pid_filter is not None else None
+                group_int = None
+                if group_filter is not None:
+                    group_int = int(group_filter, 0) if isinstance(group_filter, str) else int(group_filter)
+                oid_int = None
+                if oid_filter is not None:
+                    oid_int = int(oid_filter, 0) if isinstance(oid_filter, str) else int(oid_filter)
+                name_token = str(name_filter) if name_filter is not None else None
+                values = self.val_snapshot(pid=pid_int, group=group_int, oid=oid_int, name=name_token)
+                return {"status": "ok", "values": values}
+            if cmd == "val_get":
+                oid_value = request.get("oid")
+                if oid_value is None:
+                    raise ValueError("val_get requires 'oid'")
+                oid_int = int(oid_value, 0) if isinstance(oid_value, str) else int(oid_value)
+                pid_value = request.get("pid")
+                pid_int = int(pid_value) if pid_value is not None else None
+                result = self.val_get(oid_int, pid=pid_int)
+                return {"status": "ok", "value": result}
+            if cmd == "val_set":
+                oid_value = request.get("oid")
+                if oid_value is None:
+                    raise ValueError("val_set requires 'oid'")
+                oid_int = int(oid_value, 0) if isinstance(oid_value, str) else int(oid_value)
+                if "value" not in request:
+                    raise ValueError("val_set requires 'value'")
+                pid_value = request.get("pid")
+                pid_int = int(pid_value) if pid_value is not None else None
+                result = self.val_set(oid_int, request.get("value"), pid=pid_int)
+                return {"status": "ok", "value": result}
+            if cmd == "cmd_list":
+                pid_filter = request.get("pid")
+                group_filter = request.get("group")
+                name_filter = request.get("name")
+                oid_filter = request.get("oid")
+                pid_int = int(pid_filter) if pid_filter is not None else None
+                group_int = None
+                if group_filter is not None:
+                    group_int = int(group_filter, 0) if isinstance(group_filter, str) else int(group_filter)
+                oid_int = None
+                if oid_filter is not None:
+                    oid_int = int(oid_filter, 0) if isinstance(oid_filter, str) else int(oid_filter)
+                name_token = str(name_filter) if name_filter is not None else None
+                commands = self.cmd_snapshot(pid=pid_int, group=group_int, oid=oid_int, name=name_token)
+                return {"status": "ok", "commands": commands}
+            if cmd == "cmd_call":
+                oid_value = request.get("oid")
+                if oid_value is None:
+                    raise ValueError("cmd_call requires 'oid'")
+                oid_int = int(oid_value, 0) if isinstance(oid_value, str) else int(oid_value)
+                pid_value = request.get("pid")
+                pid_int = int(pid_value) if pid_value is not None else None
+                async_value = request.get("async")
+                if isinstance(async_value, str):
+                    async_call = async_value.strip().lower() in {"1", "true", "yes", "on"}
+                elif isinstance(async_value, (int, bool)):
+                    async_call = bool(async_value)
+                else:
+                    async_call = False
+                result = self.cmd_call(oid_int, pid=pid_int, async_call=async_call)
+                return {"status": "ok", "command": result}
             if cmd == "restart":
                 targets = request.get("targets")
                 if isinstance(targets, str):

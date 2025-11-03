@@ -18,6 +18,18 @@ try:
     from . import trace_format
 except ImportError:
     import trace_format
+try:
+    from .valcmd import f16_to_float, float_to_f16
+except ImportError:
+    from valcmd import f16_to_float, float_to_f16
+try:
+    from . import hsx_value_constants as val_const
+except ImportError:
+    import hsx_value_constants as val_const
+try:
+    from . import hsx_command_constants as cmd_const
+except ImportError:
+    import hsx_command_constants as cmd_const
 
 """HSX executive daemon.
 
@@ -811,6 +823,17 @@ class ExecutiveState:
         try:
             return ExecutiveState._coerce_int(value)
         except (ValueError, TypeError):
+            return None
+
+    @staticmethod
+    def _coerce_float(value: Any) -> Optional[float]:
+        if value is None:
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        try:
+            return float(value)
+        except (TypeError, ValueError):
             return None
 
     def _vm_debug(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -3366,6 +3389,262 @@ class ExecutiveState:
             return "fanout"
         return "off"
 
+    def _update_value_registry_from_event(
+        self, pid: Optional[int], event: Dict[str, Any], payload: Dict[str, Any]
+    ) -> None:
+        if pid is None:
+            return
+        group_raw = payload.get("group_id")
+        value_raw = payload.get("value_id")
+        if group_raw is None or value_raw is None:
+            return
+        try:
+            group_id = int(group_raw) & 0xFF
+            value_id = int(value_raw) & 0xFF
+        except (TypeError, ValueError):
+            return
+        table = self.value_registry.setdefault(pid, {})
+        key = (group_id, value_id)
+        entry = dict(table.get(key) or {})
+        entry.setdefault("group_id", group_id)
+        entry.setdefault("value_id", value_id)
+        oid_raw = payload.get("oid")
+        try:
+            oid = int(oid_raw) & 0xFFFF if oid_raw is not None else ((group_id << 8) | value_id)
+        except (TypeError, ValueError):
+            oid = (group_id << 8) | value_id
+        entry["oid"] = oid
+        flags_raw = payload.get("flags")
+        if flags_raw is not None:
+            try:
+                entry["flags"] = int(flags_raw) & 0xFF
+            except (TypeError, ValueError):
+                pass
+        auth_raw = payload.get("auth_level")
+        if auth_raw is not None:
+            try:
+                entry["auth_level"] = int(auth_raw) & 0xFF
+            except (TypeError, ValueError):
+                pass
+        owner_raw = payload.get("owner_pid")
+        if owner_raw is not None:
+            try:
+                entry["owner_pid"] = int(owner_raw)
+            except (TypeError, ValueError):
+                pass
+        caller_raw = payload.get("caller_pid")
+        if caller_raw is not None:
+            try:
+                entry["last_caller_pid"] = int(caller_raw)
+            except (TypeError, ValueError):
+                pass
+        ts = event.get("ts") or time.time()
+        etype = event.get("type")
+        if etype == "value_registered":
+            entry["registered_ts"] = ts
+            if payload.get("desc_head") is not None:
+                try:
+                    entry["desc_head"] = int(payload["desc_head"])
+                except (TypeError, ValueError):
+                    pass
+        elif etype == "value_changed":
+            entry["last_update_ts"] = ts
+            new_value = payload.get("new_value")
+            new_f16 = payload.get("new_f16")
+            if new_value is None and new_f16 is not None:
+                try:
+                    new_value = f16_to_float(int(new_f16))
+                except (TypeError, ValueError):
+                    new_value = None
+            if new_f16 is not None:
+                try:
+                    entry["last_f16"] = int(new_f16) & 0xFFFF
+                except (TypeError, ValueError):
+                    pass
+            coerced_new = self._coerce_float(new_value)
+            if coerced_new is not None:
+                entry["last_value"] = coerced_new
+            old_value = payload.get("old_value")
+            old_f16 = payload.get("old_f16")
+            if old_value is None and old_f16 is not None:
+                try:
+                    old_value = f16_to_float(int(old_f16))
+                except (TypeError, ValueError):
+                    old_value = None
+            if old_f16 is not None:
+                try:
+                    entry["prev_f16"] = int(old_f16) & 0xFFFF
+                except (TypeError, ValueError):
+                    pass
+            coerced_old = self._coerce_float(old_value)
+            if coerced_old is not None:
+                entry["prev_value"] = coerced_old
+            entry["change_count"] = int(entry.get("change_count", 0)) + 1
+        table[key] = entry
+
+    def _update_command_registry_from_event(
+        self, pid: Optional[int], event: Dict[str, Any], payload: Dict[str, Any]
+    ) -> None:
+        if pid is None:
+            return
+        group_raw = payload.get("group_id")
+        cmd_raw = payload.get("cmd_id")
+        if group_raw is None or cmd_raw is None:
+            return
+        try:
+            group_id = int(group_raw) & 0xFF
+            cmd_id = int(cmd_raw) & 0xFF
+        except (TypeError, ValueError):
+            return
+        table = self.command_registry.setdefault(pid, {})
+        key = (group_id, cmd_id)
+        entry = dict(table.get(key) or {})
+        entry.setdefault("group_id", group_id)
+        entry.setdefault("cmd_id", cmd_id)
+        oid_raw = payload.get("oid")
+        try:
+            oid = int(oid_raw) & 0xFFFF if oid_raw is not None else ((group_id << 8) | cmd_id)
+        except (TypeError, ValueError):
+            oid = (group_id << 8) | cmd_id
+        entry["oid"] = oid
+        flags_raw = payload.get("flags")
+        if flags_raw is not None:
+            try:
+                entry["flags"] = int(flags_raw) & 0xFF
+            except (TypeError, ValueError):
+                pass
+        auth_raw = payload.get("auth_level")
+        if auth_raw is not None:
+            try:
+                entry["auth_level"] = int(auth_raw) & 0xFF
+            except (TypeError, ValueError):
+                pass
+        owner_raw = payload.get("owner_pid")
+        if owner_raw is not None:
+            try:
+                entry["owner_pid"] = int(owner_raw)
+            except (TypeError, ValueError):
+                pass
+        caller_raw = payload.get("caller_pid")
+        if caller_raw is not None:
+            try:
+                entry["last_caller_pid"] = int(caller_raw)
+            except (TypeError, ValueError):
+                pass
+        ts = event.get("ts") or time.time()
+        etype = event.get("type")
+        if etype == "cmd_invoked":
+            entry["last_invoked_ts"] = ts
+        elif etype == "cmd_completed":
+            entry["last_completed_ts"] = ts
+            entry["last_status"] = payload.get("status")
+            if "result" in payload:
+                entry["last_result"] = payload.get("result")
+        table[key] = entry
+
+    def _merge_value_snapshot(self, snapshot: Dict[str, Any]) -> None:
+        pid_raw = snapshot.get("owner_pid", snapshot.get("pid"))
+        if pid_raw is None:
+            return
+        try:
+            pid = int(pid_raw)
+        except (TypeError, ValueError):
+            return
+        group_raw = snapshot.get("group_id")
+        value_raw = snapshot.get("value_id")
+        if group_raw is None or value_raw is None:
+            return
+        try:
+            group_id = int(group_raw) & 0xFF
+            value_id = int(value_raw) & 0xFF
+        except (TypeError, ValueError):
+            return
+        table = self.value_registry.setdefault(pid, {})
+        key = (group_id, value_id)
+        entry = dict(table.get(key) or {})
+        entry.update(
+            {
+                "group_id": group_id,
+                "value_id": value_id,
+                "oid": int(snapshot.get("oid", (group_id << 8) | value_id)) & 0xFFFF,
+                "flags": int(snapshot.get("flags", entry.get("flags", 0))) & 0xFF,
+                "auth_level": int(snapshot.get("auth_level", entry.get("auth_level", 0))) & 0xFF,
+                "owner_pid": pid,
+            }
+        )
+        if snapshot.get("name"):
+            entry["name"] = snapshot.get("name")
+        if snapshot.get("group_name"):
+            entry["group_name"] = snapshot.get("group_name")
+        if snapshot.get("unit"):
+            entry["unit"] = snapshot.get("unit")
+            entry["unit_code"] = snapshot.get("unit_code")
+        if snapshot.get("epsilon") is not None:
+            entry["epsilon"] = snapshot.get("epsilon")
+            entry["epsilon_f16"] = snapshot.get("epsilon_f16")
+        if snapshot.get("rate_ms") is not None:
+            entry["rate_ms"] = snapshot.get("rate_ms")
+        if snapshot.get("min") is not None:
+            entry["min"] = snapshot.get("min")
+            entry["min_f16"] = snapshot.get("min_f16")
+        if snapshot.get("max") is not None:
+            entry["max"] = snapshot.get("max")
+            entry["max_f16"] = snapshot.get("max_f16")
+        if snapshot.get("persist_key") is not None:
+            entry["persist_key"] = snapshot.get("persist_key")
+            entry["debounce_ms"] = snapshot.get("debounce_ms")
+        last_value = snapshot.get("last_value")
+        coerced_last = self._coerce_float(last_value)
+        if coerced_last is not None:
+            entry["last_value"] = coerced_last
+        if snapshot.get("last_f16") is not None:
+            try:
+                entry["last_f16"] = int(snapshot.get("last_f16")) & 0xFFFF
+            except (TypeError, ValueError):
+                pass
+        table[key] = entry
+
+    def _merge_command_snapshot(self, snapshot: Dict[str, Any]) -> None:
+        pid_raw = snapshot.get("owner_pid", snapshot.get("pid"))
+        if pid_raw is None:
+            return
+        try:
+            pid = int(pid_raw)
+        except (TypeError, ValueError):
+            return
+        group_raw = snapshot.get("group_id")
+        cmd_raw = snapshot.get("cmd_id")
+        if group_raw is None or cmd_raw is None:
+            return
+        try:
+            group_id = int(group_raw) & 0xFF
+            cmd_id = int(cmd_raw) & 0xFF
+        except (TypeError, ValueError):
+            return
+        table = self.command_registry.setdefault(pid, {})
+        key = (group_id, cmd_id)
+        entry = dict(table.get(key) or {})
+        entry.update(
+            {
+                "group_id": group_id,
+                "cmd_id": cmd_id,
+                "oid": int(snapshot.get("oid", (group_id << 8) | cmd_id)) & 0xFFFF,
+                "flags": int(snapshot.get("flags", entry.get("flags", 0))) & 0xFF,
+                "auth_level": int(snapshot.get("auth_level", entry.get("auth_level", 0))) & 0xFF,
+                "owner_pid": pid,
+            }
+        )
+        if snapshot.get("name"):
+            entry["name"] = snapshot.get("name")
+        if snapshot.get("help"):
+            entry["help"] = snapshot.get("help")
+        if snapshot.get("handler_ref") is not None:
+            try:
+                entry["handler_ref"] = int(snapshot.get("handler_ref"))
+            except (TypeError, ValueError):
+                pass
+        table[key] = entry
+
     @staticmethod
     def _parse_stdio_pid(value: Any) -> Optional[int]:
         if value is None:
@@ -3404,6 +3683,10 @@ class ExecutiveState:
             pid = int(pid_value) if pid_value is not None else None
             payload = {k: v for k, v in event.items() if k not in {"type", "pid", "ts", "seq"}}
             event_type = str(etype or "vm")
+            if etype in {"value_registered", "value_changed"}:
+                self._update_value_registry_from_event(pid, event, payload)
+            if etype in {"cmd_invoked", "cmd_completed"}:
+                self._update_command_registry_from_event(pid, event, payload)
             if etype == "trace_step" and pid is not None:
                 self._handle_trace_step_event(pid, payload)
             self.emit_event(event_type, pid=pid, data=payload, ts=event.get("ts"))
@@ -3445,6 +3728,81 @@ class ExecutiveState:
                 )
             else:
                 self.log("debug", "vm event", event=event)
+
+    def val_list(
+        self,
+        *,
+        pid: Optional[int] = None,
+        group: Optional[int] = None,
+        oid: Optional[int] = None,
+        name: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        values = self.vm.val_list(pid=pid, group=group, oid=oid, name=name)
+        for info in values:
+            if isinstance(info, dict):
+                self._merge_value_snapshot(info)
+        return values
+
+    def val_get(self, oid: int, *, pid: Optional[int] = None) -> Dict[str, Any]:
+        result = self.vm.val_get(oid, pid=pid)
+        status = result.get("status") if isinstance(result, dict) else None
+        if status == val_const.HSX_VAL_STATUS_OK and isinstance(result, dict):
+            snapshot = {
+                "oid": oid,
+                "owner_pid": pid if pid is not None else result.get("pid"),
+                "group_id": (oid >> 8) & 0xFF,
+                "value_id": oid & 0xFF,
+                "last_value": result.get("value"),
+                "last_f16": result.get("f16"),
+            }
+            self._merge_value_snapshot(snapshot)
+        return result
+
+    def val_set(self, oid: int, value: Any, *, pid: Optional[int] = None) -> Dict[str, Any]:
+        result = self.vm.val_set(oid, value, pid=pid)
+        status = result.get("status") if isinstance(result, dict) else None
+        if status == val_const.HSX_VAL_STATUS_OK and isinstance(result, dict):
+            snapshot = {
+                "oid": oid,
+                "owner_pid": pid if pid is not None else result.get("pid"),
+                "group_id": (oid >> 8) & 0xFF,
+                "value_id": oid & 0xFF,
+                "last_value": result.get("value"),
+                "last_f16": result.get("f16"),
+            }
+            self._merge_value_snapshot(snapshot)
+        return result
+
+    def cmd_list(
+        self,
+        *,
+        pid: Optional[int] = None,
+        group: Optional[int] = None,
+        oid: Optional[int] = None,
+        name: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        commands = self.vm.cmd_list(pid=pid, group=group, oid=oid, name=name)
+        for info in commands:
+            if isinstance(info, dict):
+                self._merge_command_snapshot(info)
+        return commands
+
+    def cmd_call(self, oid: int, *, pid: Optional[int] = None, async_call: bool = False) -> Dict[str, Any]:
+        result = self.vm.cmd_call(oid, pid=pid, async_call=async_call)
+        status = result.get("status") if isinstance(result, dict) else None
+        if status == cmd_const.HSX_CMD_STATUS_OK and isinstance(result, dict):
+            snapshot = {
+                "oid": oid,
+                "owner_pid": pid if pid is not None else result.get("pid"),
+                "group_id": (oid >> 8) & 0xFF,
+                "cmd_id": oid & 0xFF,
+            }
+            self._merge_command_snapshot(snapshot)
+            entry = self.command_registry.get(snapshot["owner_pid"], {}).get(((oid >> 8) & 0xFF, oid & 0xFF))
+            if entry is not None:
+                entry["last_status"] = status
+                entry["last_result"] = result.get("result")
+        return result
 
     def _mark_task_wait_mailbox(self, pid: int, event: Dict[str, Any]) -> None:
         descriptor = event.get("descriptor")
@@ -3886,6 +4244,82 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 pid_value = request.get("pid")
                 pid = int(pid_value) if pid_value is not None else None
                 return {"version": 1, "status": "ok", "info": self.state.info(pid)}
+            if cmd == "val.list":
+                pid_value = request.get("pid")
+                pid_int = int(pid_value) if pid_value is not None else None
+                if pid_int is not None:
+                    self.state.ensure_pid_access(pid_int, session_id)
+                group_int = None
+                if request.get("group") is not None:
+                    group_int = self.state._optional_int(request.get("group"))
+                oid_int = None
+                if request.get("oid") is not None:
+                    try:
+                        oid_int = int(request.get("oid"), 0) if isinstance(request.get("oid"), str) else int(request.get("oid"))
+                    except (TypeError, ValueError):
+                        raise ValueError("val.list oid must be numeric")
+                name_token = str(request.get("name")) if request.get("name") is not None else None
+                values = self.state.val_list(pid=pid_int, group=group_int, oid=oid_int, name=name_token)
+                return {"version": 1, "status": "ok", "values": values}
+            if cmd == "val.get":
+                oid_value = request.get("oid")
+                if oid_value is None:
+                    raise ValueError("val.get requires 'oid'")
+                oid_int = int(oid_value, 0) if isinstance(oid_value, str) else int(oid_value)
+                pid_value = request.get("pid")
+                pid_int = int(pid_value) if pid_value is not None else None
+                if pid_int is not None:
+                    self.state.ensure_pid_access(pid_int, session_id)
+                value = self.state.val_get(oid_int, pid=pid_int)
+                return {"version": 1, "status": "ok", "value": value}
+            if cmd == "val.set":
+                oid_value = request.get("oid")
+                if oid_value is None:
+                    raise ValueError("val.set requires 'oid'")
+                if "value" not in request:
+                    raise ValueError("val.set requires 'value'")
+                oid_int = int(oid_value, 0) if isinstance(oid_value, str) else int(oid_value)
+                pid_value = request.get("pid")
+                pid_int = int(pid_value) if pid_value is not None else None
+                if pid_int is not None:
+                    self.state.ensure_pid_access(pid_int, session_id)
+                value = self.state.val_set(oid_int, request.get("value"), pid=pid_int)
+                return {"version": 1, "status": "ok", "value": value}
+            if cmd == "cmd.list":
+                pid_value = request.get("pid")
+                pid_int = int(pid_value) if pid_value is not None else None
+                if pid_int is not None:
+                    self.state.ensure_pid_access(pid_int, session_id)
+                group_int = None
+                if request.get("group") is not None:
+                    group_int = self.state._optional_int(request.get("group"))
+                oid_int = None
+                if request.get("oid") is not None:
+                    try:
+                        oid_int = int(request.get("oid"), 0) if isinstance(request.get("oid"), str) else int(request.get("oid"))
+                    except (TypeError, ValueError):
+                        raise ValueError("cmd.list oid must be numeric")
+                name_token = str(request.get("name")) if request.get("name") is not None else None
+                commands = self.state.cmd_list(pid=pid_int, group=group_int, oid=oid_int, name=name_token)
+                return {"version": 1, "status": "ok", "commands": commands}
+            if cmd == "cmd.call":
+                oid_value = request.get("oid")
+                if oid_value is None:
+                    raise ValueError("cmd.call requires 'oid'")
+                oid_int = int(oid_value, 0) if isinstance(oid_value, str) else int(oid_value)
+                pid_value = request.get("pid")
+                pid_int = int(pid_value) if pid_value is not None else None
+                if pid_int is not None:
+                    self.state.ensure_pid_access(pid_int, session_id)
+                async_value = request.get("async")
+                if isinstance(async_value, str):
+                    async_call = async_value.strip().lower() in {"1", "true", "yes", "on"}
+                elif isinstance(async_value, (int, bool)):
+                    async_call = bool(async_value)
+                else:
+                    async_call = False
+                result = self.state.cmd_call(oid_int, pid=pid_int, async_call=async_call)
+                return {"version": 1, "status": "ok", "command": result}
             if cmd == "attach":
                 info = self.state.attach()
                 return {"version": 1, "status": "ok", "info": info}

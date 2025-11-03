@@ -334,15 +334,51 @@ class TestValCmdSVCIntegration:
     def test_valcmd_stats(self):
         """Test valcmd statistics reporting."""
         controller = VMController()
-        
+
         # Register some resources
         controller.valcmd.value_register(1, 1, 0, 0, 100)
         controller.valcmd.value_register(1, 2, 0, 0, 100)
         controller.valcmd.command_register(1, 1, 0, 0, 100)
-        
+
         stats = controller.valcmd.get_stats()
-        
+
         assert stats['values']['count'] == 2
         assert stats['commands']['count'] == 1
         assert stats['values']['usage_pct'] > 0
         assert stats['commands']['usage_pct'] > 0
+
+    def test_controller_value_and_command_snapshot(self):
+        controller, vm = self._make_controller()
+        value_specs = [
+            {"type": "group", "name": "telemetry"},
+            {"type": "name", "name": "rpm"},
+            {"type": "unit", "unit": "rpm", "epsilon": 0.1, "rate_ms": 25},
+        ]
+        status, val_oid = controller.valcmd.value_register(0x01, 0x05, 0, HSX_VAL_AUTH_PUBLIC, owner_pid=1, descriptors=value_specs)
+        assert status == HSX_VAL_STATUS_OK
+        controller.valcmd.value_set(val_oid, 88.0, caller_pid=1)
+
+        values = controller.val_snapshot(pid=1)
+        assert any(v["oid"] == val_oid and v.get("name") == "rpm" for v in values)
+
+        get_result = controller.val_get(val_oid, pid=1)
+        assert get_result["status"] == HSX_VAL_STATUS_OK
+        assert get_result["value"] == pytest.approx(88.0)
+
+        set_result = controller.val_set(val_oid, 99.0, pid=1)
+        assert set_result["status"] == HSX_VAL_STATUS_OK
+        assert set_result["value"] == pytest.approx(99.0)
+
+        def handler():
+            return 123
+
+        cmd_specs = [{"type": "name", "name": "reset", "help": "reset board"}]
+        status, cmd_oid = controller.valcmd.command_register(0x02, 0x07, 0, HSX_VAL_AUTH_PUBLIC, owner_pid=1, handler_ref=handler, descriptors=cmd_specs)
+        assert status == HSX_CMD_STATUS_OK
+
+        commands = controller.cmd_snapshot(pid=1)
+        assert any(c["oid"] == cmd_oid and c.get("name") == "reset" for c in commands)
+
+        call_result = controller.cmd_call(cmd_oid, pid=1)
+        assert call_result["status"] == HSX_CMD_STATUS_OK
+        assert call_result["result"] == 123

@@ -680,10 +680,14 @@ class ValCmdRegistry:
         self._values[oid] = entry
         self._emit_event(
             "value_registered",
+            pid=owner_pid,
+            caller_pid=owner_pid,
             oid=oid,
             group_id=group_id,
             value_id=value_id,
-            owner_pid=owner_pid,
+            flags=flags,
+            auth_level=auth_level,
+            desc_head=desc_head,
         )
         return (HSX_VAL_STATUS_OK, oid)
 
@@ -730,18 +734,27 @@ class ValCmdRegistry:
             if entry.last_change_time != 0.0 and elapsed_ms < rate_ms:
                 return HSX_VAL_STATUS_EBUSY
 
-        old_value = entry.last_value
+        old_raw = entry.last_f16_raw
+        old_value = f16_to_float(old_raw)
         if epsilon and abs(new_value - old_value) < epsilon:
             return HSX_VAL_STATUS_OK
 
         entry.set_value(new_value)
         entry.last_change_time = current_time
+        new_raw = entry.last_f16_raw
         self._emit_event(
             "value_changed",
+            pid=entry.owner_pid,
+            caller_pid=caller_pid,
             oid=oid,
-            old_f16=float_to_f16(old_value),
-            new_f16=float_to_f16(new_value),
-            owner_pid=entry.owner_pid,
+            group_id=entry.group_id,
+            value_id=entry.value_id,
+            old_f16=old_raw,
+            new_f16=new_raw,
+            old_value=old_value,
+            new_value=new_value,
+            flags=entry.flags,
+            auth_level=entry.auth_level,
         )
         return HSX_VAL_STATUS_OK
 
@@ -771,6 +784,9 @@ class ValCmdRegistry:
 
     def get_value_entry(self, oid: int) -> Optional[ValueEntry]:
         return self._values.get(oid)
+
+    def get_command_entry(self, oid: int) -> Optional[CommandEntry]:
+        return self._commands.get(oid)
 
     def value_persist(self, oid: int, mode: int, caller_pid: int) -> int:
         entry = self._values.get(oid)
@@ -842,13 +858,6 @@ class ValCmdRegistry:
             desc_head=desc_head,
         )
         self._commands[oid] = entry
-        self._emit_event(
-            "command_registered",
-            oid=oid,
-            group_id=group_id,
-            cmd_id=cmd_id,
-            owner_pid=owner_pid,
-        )
         return (HSX_CMD_STATUS_OK, oid)
 
     def command_lookup(self, group_id: int, cmd_id: int) -> Tuple[int, int]:
@@ -864,7 +873,17 @@ class ValCmdRegistry:
         if caller_auth < entry.auth_level:
             return (HSX_CMD_STATUS_EPERM, None)
 
-        self._emit_event("cmd_invoked", oid=oid, caller_pid=caller_pid)
+        self._emit_event(
+            "cmd_invoked",
+            pid=caller_pid,
+            caller_pid=caller_pid,
+            oid=oid,
+            group_id=entry.group_id,
+            cmd_id=entry.cmd_id,
+            owner_pid=entry.owner_pid,
+            flags=entry.flags,
+            auth_level=entry.auth_level,
+        )
 
         result: Any = None
         status = HSX_CMD_STATUS_OK
@@ -876,7 +895,19 @@ class ValCmdRegistry:
                 status = HSX_CMD_STATUS_EFAIL
                 result = str(exc)
 
-        self._emit_event("cmd_completed", oid=oid, status=status, result=result)
+        self._emit_event(
+            "cmd_completed",
+            pid=caller_pid,
+            caller_pid=caller_pid,
+            oid=oid,
+            group_id=entry.group_id,
+            cmd_id=entry.cmd_id,
+            status=status,
+            result=result,
+            owner_pid=entry.owner_pid,
+            flags=entry.flags,
+            auth_level=entry.auth_level,
+        )
         return (status, result)
 
     def command_call_async(self, oid: int, caller_pid: int, caller_auth: int = HSX_VAL_AUTH_PUBLIC) -> Tuple[int, Any]:
@@ -896,6 +927,102 @@ class ValCmdRegistry:
                 continue
             oids.append(oid)
         return oids
+
+    def _summarize_value_descriptors(self, entry: ValueEntry) -> Dict[str, Any]:
+        summary: Dict[str, Any] = {}
+        for record in self._iter_value_descriptors(entry):
+            if isinstance(record, GroupDescriptorRecord):
+                group_name = self._string_table.get(record.name_offset)
+                if group_name:
+                    summary["group_name"] = group_name
+            elif isinstance(record, NameDescriptorRecord):
+                name = self._string_table.get(record.name_offset)
+                if name:
+                    summary["name"] = name
+            elif isinstance(record, UnitDescriptorRecord):
+                summary["unit_code"] = record.unit_code
+                summary["unit"] = decode_unit_code(record.unit_code)
+                summary["epsilon_f16"] = record.epsilon_raw
+                summary["epsilon"] = record.epsilon
+                summary["rate_ms"] = record.rate_ms
+            elif isinstance(record, RangeDescriptorRecord):
+                summary["min_f16"] = record.min_raw
+                summary["max_f16"] = record.max_raw
+                summary["min"] = record.min_value
+                summary["max"] = record.max_value
+            elif isinstance(record, PersistDescriptorRecord):
+                summary["persist_key"] = record.persist_key
+                summary["debounce_ms"] = record.debounce_ms
+        return summary
+
+    def _summarize_command_descriptors(self, entry: CommandEntry) -> Dict[str, Any]:
+        summary: Dict[str, Any] = {}
+        for record in self._iter_command_descriptors(entry):
+            if isinstance(record, CommandNameDescriptorRecord):
+                name = self._string_table.get(record.name_offset)
+                help_text = self._string_table.get(record.help_offset)
+                if name:
+                    summary["name"] = name
+                if help_text:
+                    summary["help"] = help_text
+        return summary
+
+    def describe_value(self, oid: int) -> Optional[Dict[str, Any]]:
+        entry = self._values.get(oid)
+        if entry is None:
+            return None
+        info: Dict[str, Any] = {
+            "oid": oid,
+            "group_id": entry.group_id,
+            "value_id": entry.value_id,
+            "flags": entry.flags,
+            "auth_level": entry.auth_level,
+            "owner_pid": entry.owner_pid,
+            "last_f16": entry.last_f16_raw,
+            "last_value": entry.last_value,
+            "desc_head": entry.desc_head,
+        }
+        info.update(self._summarize_value_descriptors(entry))
+        return info
+
+    def describe_values(self, pid: Optional[int] = None) -> List[Dict[str, Any]]:
+        results: List[Dict[str, Any]] = []
+        for oid, entry in self._values.items():
+            if pid is not None and entry.owner_pid != pid:
+                continue
+            info = self.describe_value(oid)
+            if info is not None:
+                results.append(info)
+        results.sort(key=lambda item: item.get("oid", 0))
+        return results
+
+    def describe_command(self, oid: int) -> Optional[Dict[str, Any]]:
+        entry = self._commands.get(oid)
+        if entry is None:
+            return None
+        info: Dict[str, Any] = {
+            "oid": oid,
+            "group_id": entry.group_id,
+            "cmd_id": entry.cmd_id,
+            "flags": entry.flags,
+            "auth_level": entry.auth_level,
+            "owner_pid": entry.owner_pid,
+            "handler_ref": entry.handler_ref,
+            "desc_head": entry.desc_head,
+        }
+        info.update(self._summarize_command_descriptors(entry))
+        return info
+
+    def describe_commands(self, pid: Optional[int] = None) -> List[Dict[str, Any]]:
+        results: List[Dict[str, Any]] = []
+        for oid, entry in self._commands.items():
+            if pid is not None and entry.owner_pid != pid:
+                continue
+            info = self.describe_command(oid)
+            if info is not None:
+                results.append(info)
+        results.sort(key=lambda item: item.get("oid", 0))
+        return results
 
     def command_help_text(self, oid: int) -> Optional[str]:
         entry = self._commands.get(oid)

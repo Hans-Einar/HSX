@@ -158,7 +158,26 @@ Append sessions chronologically and ensure every entry references the relevant d
 
 ### Next Steps
 - Follow-ups / blockers:
-  - Extend VALUE_LIST/VALUE_SUB coverage via integration tests to exercise buffer writes and mailbox wiring.
-  - Begin Phase 4 event/RPC integration once SVC paths settle.
+- Extend VALUE_LIST/VALUE_SUB coverage via integration tests to exercise buffer writes and mailbox wiring.
+- Begin Phase 4 event/RPC integration once SVC paths settle.
 - Reviews or coordination required:
   - Request implementation review of the updated SVC handlers.
+
+## 2025-11-06 - Codex (Session 5)
+
+### Scope
+- Plan item / phase addressed: Phase 4.1 (event emission) & Phase 4.2 (executive RPC commands)
+- Design sections reviewed: 04.04--ValCmd.md §5.2-5.3, docs/executive_protocol.md event/RPC guidance
+
+### Work Summary
+- Added structured ValCmd events (`value_registered`, `value_changed`, `cmd_invoked`, `cmd_completed`) with ExecState cache integration and updated docs/executive_protocol.md.
+- Exposed registry snapshots/RPC helpers on VMController + VMServer (`val_list/get/set`, `cmd_list/call`) and wired JSON-RPC handlers in execd.
+- Extended ValCmdRegistry/ExecutiveState unit tests and integration tests to cover snapshots, RPC flows, and cache merging.
+- Checked off Phase 4.1/4.2 plan items and refreshed documentation to include new event schemas and RPC command usage.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_valcmd_registry.py python/tests/test_valcmd_svc_integration.py python/tests/test_executive_sessions.py -k "describe or snapshot or val_api or cmd_api"`
+
+### Next Steps
+- Phase 4.3 resource tracking RPC (`val.stats`/`cmd.stats`) and persistence follow-ups.
+- Schedule implementation review for new ValCmd Executive interfaces and update design leverage if async payloads evolve.

@@ -199,6 +199,64 @@ class VMClient:
             payload["default_only"] = 1
         return _check_ok(self.request(payload)).get("summary", {})
 
+    def val_list(
+        self,
+        *,
+        pid: int | None = None,
+        group: int | None = None,
+        oid: int | None = None,
+        name: str | None = None,
+    ) -> list[dict]:
+        payload: Dict[str, Any] = {"cmd": "val_list"}
+        if pid is not None:
+            payload["pid"] = pid
+        if group is not None:
+            payload["group"] = group
+        if oid is not None:
+            payload["oid"] = oid
+        if name is not None:
+            payload["name"] = name
+        return _check_ok(self.request(payload)).get("values", [])
+
+    def val_get(self, oid: int, *, pid: int | None = None) -> dict:
+        payload: Dict[str, Any] = {"cmd": "val_get", "oid": oid}
+        if pid is not None:
+            payload["pid"] = pid
+        return _check_ok(self.request(payload)).get("value", {})
+
+    def val_set(self, oid: int, value: Any, *, pid: int | None = None) -> dict:
+        payload: Dict[str, Any] = {"cmd": "val_set", "oid": oid, "value": value}
+        if pid is not None:
+            payload["pid"] = pid
+        return _check_ok(self.request(payload)).get("value", {})
+
+    def cmd_list(
+        self,
+        *,
+        pid: int | None = None,
+        group: int | None = None,
+        oid: int | None = None,
+        name: str | None = None,
+    ) -> list[dict]:
+        payload: Dict[str, Any] = {"cmd": "cmd_list"}
+        if pid is not None:
+            payload["pid"] = pid
+        if group is not None:
+            payload["group"] = group
+        if oid is not None:
+            payload["oid"] = oid
+        if name is not None:
+            payload["name"] = name
+        return _check_ok(self.request(payload)).get("commands", [])
+
+    def cmd_call(self, oid: int, *, pid: int | None = None, async_call: bool = False) -> dict:
+        payload: Dict[str, Any] = {"cmd": "cmd_call", "oid": oid}
+        if pid is not None:
+            payload["pid"] = pid
+        if async_call:
+            payload["async"] = 1
+        return _check_ok(self.request(payload)).get("command", {})
+
     def mailbox_send(self, pid: int, handle: int, *, data: str | None = None, data_hex: str | None = None, flags: int = 0, channel: int = 0) -> dict:
         payload: Dict[str, Any] = {"cmd": "mailbox_send", "pid": pid, "handle": handle, "flags": flags, "channel": channel}
         if data_hex is not None:

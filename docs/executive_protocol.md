@@ -59,6 +59,11 @@ The `step`/`clock step` responses include an optional `trace_last` object mirror
 | `vm_reg_set` | `{ "version": 1, "cmd": "vm_reg_set", "reg": 7, "value": 305419896 [, "pid": 1] }` | `{ "version": 1, "status": "ok", "pid": 1, "reg": 7, "value": 305419896 }` | Writes a single register via the VM controller; honours PID argument like `vm_reg_get`. |
 | `peek` | `{ "version": 1, "cmd": "peek", "pid": 1, "addr": 0x200, "length": 32 }` | `{ "version": 1, "status": "ok", "data": "...hex..." }` | Reads memory from task snapshot (hex string). |
 | `poke` | `{ "version": 1, "cmd": "poke", "pid": 1, "addr": 0x200, "data": "0011" }` | `{ "version": 1, "status": "ok" }` | Writes memory into task snapshot. |
+| `val.list` | `{ "version": 1, "cmd": "val.list" [, "pid": 1, "group": 0x02, "oid": 0x0201, "name": "rpm" ] }` | `{ "version": 1, "status": "ok", "values": [ { "oid": 513, "group_id": 2, "value_id": 1, "owner_pid": 1, "flags": 0, "auth_level": 0, "name": "rpm", "unit": "rpm", "last_value": 12.5, "last_f16": 16672 } ] }` | Enumerates registered values. Optional filters narrow the result set; supplying `pid` requires a matching session `pid_lock`. |
+| `val.get` | `{ "version": 1, "cmd": "val.get", "oid": 0x0201 [, "pid": 1] }` | `{ "version": 1, "status": "ok", "value": { "status": 0, "value": 12.5, "f16": 16672, "pid": 1 } }` | Reads the current value from the executive registry. When `pid` omitted the owner PID is used. |
+| `val.set` | `{ "version": 1, "cmd": "val.set", "oid": 0x0201, "value": 15.0 [, "pid": 1] }` | `{ "version": 1, "status": "ok", "value": { "status": 0, "value": 15.0, "f16": 16896, "pid": 1 } }` | Writes a new value through the registry (emits `value_changed` events and notifies subscribers). PID defaults to the owner. |
+| `cmd.list` | `{ "version": 1, "cmd": "cmd.list" [, "pid": 1, "group": 0x03, "oid": 0x0304, "name": "reset" ] }` | `{ "version": 1, "status": "ok", "commands": [ { "oid": 772, "group_id": 3, "cmd_id": 4, "owner_pid": 1, "flags": 1, "auth_level": 0, "name": "reset", "help": "Reset motor" } ] }` | Enumerates registered commands with optional filters. |
+| `cmd.call` | `{ "version": 1, "cmd": "cmd.call", "oid": 0x0304 [, "pid": 1, "async": true] }` | `{ "version": 1, "status": "ok", "command": { "status": 0, "result": "ok", "pid": 1 } }` | Executes a command handler. `async:true` routes through the async SVC path; synchronous calls return handler result inline. |
 | `sched` | `{ "version": 1, "cmd": "sched", "pid": 1, "priority": 5, "quantum": 2000 }` | `{ "version": 1, "status": "ok", "task": { ... } }` | Updates per-task priority and/or quantum slice. |
 | `restart` | `{ "version": 1, "cmd": "restart", "targets": ["vm","exec"] }` | `{ "version": 1, "status": "ok", "restart": { ... } }` | Requests restart of VM and/or exec processes (defaults to both when omitted). |
 | `shutdown` | `{ "version": 1, "cmd": "shutdown" }` | `{ "version": 1, "status": "ok" }` | Asks executive server to exit. |
@@ -387,7 +392,7 @@ Disassembly
 |-------|------|-------------|
 | `seq` | uint64 | Monotonic sequence number (per executive instance). Values never repeat within a process lifetime. |
 | `ts` | float | Seconds since epoch (UTC). |
-| `type` | string | Event category (`trace_step`, `debug_break`, `scheduler`, `mailbox_send`, `mailbox_recv`, `mailbox_exhausted`, `mailbox_backpressure`, `watch_update`, `stdout`, `stderr`, `warning`, etc.). |
+| `type` | string | Event category (`trace_step`, `debug_break`, `scheduler`, `mailbox_send`, `mailbox_recv`, `mailbox_exhausted`, `mailbox_backpressure`, `value_registered`, `value_changed`, `cmd_invoked`, `cmd_completed`, `watch_update`, `stdout`, `stderr`, `warning`, etc.). |
 | `pid` | int or `null` | PID associated with the event (`null` for global events). |
 | _additional fields_ | varies | Event-specific keys (see below). Consumers MUST ignore unknown fields for forward compatibility. |
 
@@ -406,6 +411,10 @@ Typical payloads:
 - `mailbox_backpressure`: `{ "descriptor": <int>, "policy": "single" | "fanout_block" | "fanout_drop", "capacity": <int>, "bytes_used": <int>, "requested": <int> }`
 - `mailbox_error`: `{ "fn": <int>, "error": <string>, "status": <uint16?> }`
 - `watch_update`: `{ "watch_id": <string>, "value": <string>, "formatted": <string?> }`
+- `value_registered`: `{ "oid": <uint16>, "group_id": <uint8>, "value_id": <uint8>, "flags": <uint8>, "auth_level": <uint8>, "owner_pid": <int>, "caller_pid": <int>, "name"?: <string>, "group_name"?: <string> }`
+- `value_changed`: `{ "oid": <uint16>, "group_id": <uint8>, "value_id": <uint8>, "caller_pid": <int>, "owner_pid": <int>, "old_f16": <uint16>, "new_f16": <uint16>, "old_value": <float>, "new_value": <float> }`
+- `cmd_invoked`: `{ "oid": <uint16>, "group_id": <uint8>, "cmd_id": <uint8>, "caller_pid": <int>, "owner_pid": <int> }`
+- `cmd_completed`: `{ "oid": <uint16>, "group_id": <uint8>, "cmd_id": <uint8>, "caller_pid": <int>, "status": <uint16>, "result": <int|string|null> }`
 - `stdout` / `stderr`: `{ "text": <string> }`
 - `warning`: `{ "message": <string>, "category": <string> }`
 

@@ -13,6 +13,7 @@ from python.valcmd import (
     CommandNameDescriptor,
     StringTable,
     float_to_f16,
+    f16_to_float,
 )
 from python.hsx_value_constants import (
     HSX_VAL_STATUS_OK,
@@ -475,13 +476,56 @@ class TestValCmdRegistry:
         # Register value should emit event
         registry.value_register(1, 1, 0, HSX_VAL_AUTH_PUBLIC, 100)
         assert len(events) == 1
-        assert events[0][0] == 'value_registered'
-        
+        event_type, payload = events[0]
+        assert event_type == 'value_registered'
+        assert payload['pid'] == 100
+        assert payload['caller_pid'] == 100
+        assert payload['group_id'] == 1
+        assert payload['value_id'] == 1
+        assert payload['oid'] == 0x0101
+
         # Set value should emit event
         oid = 0x0101
         registry.value_set(oid, 42.0, caller_pid=100)
         assert len(events) == 2
-        assert events[1][0] == 'value_changed'
+        event_type, payload = events[1]
+        assert event_type == 'value_changed'
+        assert payload['pid'] == 100
+        assert payload['caller_pid'] == 100
+        assert payload['group_id'] == 1
+        assert payload['value_id'] == 1
+        assert payload['new_f16'] == float_to_f16(42.0)
+        assert payload['new_value'] == pytest.approx(42.0)
+        assert payload['old_value'] == pytest.approx(0.0)
+
+    def test_describe_value_and_command(self):
+        registry = ValCmdRegistry()
+
+        value_specs = [
+            {"type": "group", "name": "telemetry"},
+            {"type": "name", "name": "rpm"},
+            {"type": "unit", "unit": "rpm", "epsilon": 0.1, "rate_ms": 50},
+            {"type": "range", "min": 0.0, "max": 5000.0},
+        ]
+        status, oid = registry.value_register(1, 1, 0, HSX_VAL_AUTH_PUBLIC, 10, descriptors=value_specs)
+        assert status == HSX_VAL_STATUS_OK
+        registry.value_set(oid, 1234.5, caller_pid=10)
+        value_info = registry.describe_value(oid)
+        assert value_info is not None
+        assert value_info["oid"] == oid
+        assert value_info["name"] == "rpm"
+        assert value_info["group_name"] == "telemetry"
+        assert value_info["unit"] == "rpm"
+        expected_value = f16_to_float(value_info["last_f16"])
+        assert value_info["last_value"] == pytest.approx(expected_value)
+
+        command_specs = [{"type": "name", "name": "reset", "help": "reset motor"}]
+        status, cmd_oid = registry.command_register(2, 3, 0, HSX_VAL_AUTH_PUBLIC, 10, descriptors=command_specs)
+        assert status == HSX_CMD_STATUS_OK
+        command_info = registry.describe_command(cmd_oid)
+        assert command_info is not None
+        assert command_info["name"] == "reset"
+        assert command_info["help"] == "reset motor"
     
     def test_cleanup_pid(self):
         """Test PID cleanup on task termination."""
