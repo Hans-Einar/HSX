@@ -105,3 +105,21 @@ Append sessions chronologically and ensure every entry references the relevant d
 
 ### Next Steps
 - Implement the `--emit-debug` flag to persist the collected metadata into `.dbg` sidecar files (Phase 3.2).
+
+## 2025-11-07 - Codex (Session 5)
+
+### Scope
+- Plan item / phase addressed: Phase 3.2 `--emit-debug` flag / .dbg generation
+- Design sections reviewed: 04.05--Toolchain.md §4.2.1, toolchain/debug-metadata.md schema
+
+### Work Summary
+- Added a module-level debug metadata cache in `hsx-llc.py` and enriched `compile_ll_to_mvasm` to track MVASM line spans per function.
+- Introduced the `--emit-debug` CLI flag writing a `.dbg` JSON file (versioned payload with `files`/`functions` arrays) and added helpers/tests verifying both direct usage and CLI invocation.
+- Documented emitted fields (including `mvasm_start_line`/`mvasm_end_line`) in the debug metadata guide.
+
+### Testing
+- `python -m pytest python/tests/test_hsx_llc_debug.py`
+- `python -m pytest python/tests/test_hsx_llc_mailbox.py python/tests/test_vm_stream_loader.py python/tests/test_linker.py python/tests/test_linker_dupdef.py python/tests/test_import_unresolved.py python/tests/test_asm_sections.py python/tests/test_valcmd_registry.py`
+
+### Next Steps
+- Phase 3.3: capture instruction-level mappings (`!DILocation`) and extend `.dbg` / `.sym` outputs accordingly.

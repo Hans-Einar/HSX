@@ -307,12 +307,12 @@ Design specifies --emit-debug flag to generate .dbg JSON files (section 4.2.1).
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Add `--emit-debug` flag to `python/hsx-llc.py`
-- [ ] Design .dbg JSON schema (functions, files, line mappings)
-- [ ] Implement .dbg file generation
-- [ ] Write function metadata to .dbg file
-- [ ] Add --emit-debug tests
-- [ ] Document .dbg file format
+- [x] Add `--emit-debug` flag to `python/hsx-llc.py`
+- [x] Design .dbg JSON schema (functions, files, line mappings)
+- [x] Implement .dbg file generation
+- [x] Write function metadata to .dbg file
+- [x] Add --emit-debug tests
+- [x] Document .dbg file format
 - [ ] Integrate with unified build script
 
 ---

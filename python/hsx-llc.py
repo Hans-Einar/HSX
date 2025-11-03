@@ -10,6 +10,7 @@ Usage:
 import argparse, json, re, sys
 import struct
 from collections import defaultdict
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 try:
@@ -72,6 +73,8 @@ COMMAND_AUTH_ALIASES = {
     "ADMIN": cmd_const.HSX_CMD_AUTH_ADMIN,
     "FACTORY": cmd_const.HSX_CMD_AUTH_FACTORY,
 }
+
+LAST_DEBUG_INFO: Optional[Dict[str, Any]] = None
 
 
 # ---------------------------------------------------------------------------
@@ -2226,6 +2229,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
     return asm, spill_data_lines
 
 def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
+    global LAST_DEBUG_INFO
     _reset_global_name_cache()
     ir_text = _preprocess_ir_text(ir_text)
     ir = parse_ir(ir_text.splitlines())
@@ -2236,7 +2240,9 @@ def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
     imports = set()
     out: List[str] = []
     spill_data_all: List[str] = []
+    function_spans: List[Tuple[str, int, int]] = []
     for fn in ir['functions']:
+        start_line = len(out)
         fn_asm, fn_spill_data = lower_function(
             fn,
             trace=trace,
@@ -2246,6 +2252,8 @@ def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
             type_info=ir.get('types', {}),
         )
         out += fn_asm
+        end_line = len(out)
+        function_spans.append((fn["name"], start_line, end_line))
         if fn_spill_data:
             spill_data_all.extend(fn_spill_data)
     data_section = render_globals(globals_list)
@@ -2282,9 +2290,64 @@ def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
             header += data_section
         header.append('.text')
         out = header + out
+        header_len = len(header)
+        function_spans = [(name, start + header_len, end + header_len) for (name, start, end) in function_spans]
         if enable_opt and not trace:
             out = optimize_movs(out)
+    else:
+        header_len = 0
+
+    debug_info = ir.get("debug", {"files": {}, "subprograms": {}, "functions": []})
+    files = debug_info.get("files", {})
+    functions_meta = debug_info.get("functions", [])
+    span_map = {name: (start, end) for name, start, end in function_spans}
+    files_list: List[Dict[str, Any]] = []
+    for meta_id, info in files.items():
+        files_list.append(
+            {
+                "id": meta_id,
+                "filename": info.get("filename"),
+                "directory": info.get("directory"),
+            }
+        )
+    functions_list: List[Dict[str, Any]] = []
+    for entry in functions_meta:
+        name = entry.get("function")
+        start_end = span_map.get(name)
+        if start_end:
+            start_line = start_end[0] + 1  # convert to 1-based
+            if start_end[1] > start_end[0]:
+                end_line = start_end[1]
+            else:
+                end_line = start_line
+        else:
+            start_line = None
+            end_line = None
+        functions_list.append(
+            {
+                "function": name,
+                "name": entry.get("name"),
+                "linkage_name": entry.get("linkage_name"),
+                "file": entry.get("file"),
+                "line": entry.get("line"),
+                "mvasm_start_line": start_line,
+                "mvasm_end_line": end_line,
+            }
+        )
+    LAST_DEBUG_INFO = {
+        "version": 1,
+        "files": files_list,
+        "functions": functions_list,
+    }
     return "\n".join(out) + "\n"
+
+
+def _write_debug_file(path: str, payload: Optional[Dict[str, Any]]) -> None:
+    data = payload or {"version": 1, "files": [], "functions": []}
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("w", encoding="utf-8") as fp:
+        json.dump(data, fp, indent=2, sort_keys=True)
 
 
 def main():
@@ -2293,11 +2356,14 @@ def main():
     ap.add_argument("-o","--output", required=True)
     ap.add_argument("--trace", action="store_true")
     ap.add_argument("--no-opt", action="store_true", help="disable MOV optimization pass")
+    ap.add_argument("--emit-debug", help="write debug metadata JSON to file")
     args = ap.parse_args()
     txt = open(args.input,"r",encoding="utf-8").read()
     asm = compile_ll_to_mvasm(txt, trace=args.trace, enable_opt=not args.no_opt)
     with open(args.output,"w",encoding="utf-8") as f:
         f.write(asm)
+    if args.emit_debug:
+        _write_debug_file(args.emit_debug, LAST_DEBUG_INFO)
     print(f"Wrote {args.output}")
 if __name__ == "__main__":
     main()

@@ -1,5 +1,8 @@
 import importlib.util
+import json
+import subprocess
 import textwrap
+import sys
 from pathlib import Path
 
 
@@ -67,3 +70,67 @@ def test_parse_ir_captures_debug_metadata():
     assert debug_entry["function"] == "foo"
     assert debug_entry["line"] == 5
     assert debug_entry["file"]["filename"] == "sample.c"
+
+
+def test_compile_records_last_debug_info():
+    llvm_ir = textwrap.dedent(
+        """
+        define dso_local i32 @foo() !dbg !1 {
+        entry:
+          ret i32 0, !dbg !2
+        }
+
+        !1 = distinct !DISubprogram(name: "foo", linkageName: "foo", file: !3, line: 4, scopeLine: 4, unit: !0, retainedNodes: !{})
+        !2 = !DILocation(line: 5, column: 3, scope: !1)
+        !3 = !DIFile(filename: "sample.c", directory: "/tmp/project")
+        """
+    ).strip("\n")
+
+    HSX_LLC.compile_ll_to_mvasm(llvm_ir, trace=False)
+    debug_info = HSX_LLC.LAST_DEBUG_INFO
+    assert debug_info is not None
+    assert debug_info.get("version") == 1
+    assert debug_info["functions"]
+    func = debug_info["functions"][0]
+    assert func["function"] == "foo"
+    assert isinstance(func["mvasm_start_line"], int) and func["mvasm_start_line"] >= 1
+    assert isinstance(func["mvasm_end_line"], int) and func["mvasm_end_line"] >= func["mvasm_start_line"]
+
+
+def test_emit_debug_flag_writes_json(tmp_path):
+    llvm_ir = textwrap.dedent(
+        """
+        define dso_local i32 @foo() !dbg !1 {
+        entry:
+          ret i32 0, !dbg !2
+        }
+
+        !1 = distinct !DISubprogram(name: "foo", linkageName: "foo", file: !3, line: 4, scopeLine: 4, unit: !0, retainedNodes: !{})
+        !2 = !DILocation(line: 5, column: 3, scope: !1)
+        !3 = !DIFile(filename: "sample.c", directory: "/tmp/project")
+        """
+    ).strip("\n")
+
+    root = Path(__file__).resolve().parents[1]
+    ir_path = tmp_path / "input.ll"
+    asm_path = tmp_path / "output.asm"
+    dbg_path = tmp_path / "output.dbg.json"
+    ir_path.write_text(llvm_ir, encoding="utf-8")
+    cmd = [
+        sys.executable,
+        str(root / "hsx-llc.py"),
+        str(ir_path),
+        "-o",
+        str(asm_path),
+        "--emit-debug",
+        str(dbg_path),
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr or result.stdout
+    dbg_data = json.loads(dbg_path.read_text(encoding="utf-8"))
+    assert dbg_data["version"] == 1
+    assert dbg_data["functions"]
+    emitted = dbg_data["functions"][0]
+    assert emitted["function"] == "foo"
+    assert isinstance(emitted["mvasm_start_line"], int) and emitted["mvasm_start_line"] >= 1
+    assert isinstance(emitted["mvasm_end_line"], int) and emitted["mvasm_end_line"] >= emitted["mvasm_start_line"]

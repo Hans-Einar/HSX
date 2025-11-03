@@ -12,6 +12,8 @@ def test_half_main_runs():
     if shutil.which("clang") is None:
         pytest.skip("clang not installed; C integration tests require clang")
     repo_root = pathlib.Path(__file__).resolve().parents[2]
+    if os.name == "nt" and str(repo_root).startswith("\\\\wsl."):
+        pytest.skip("make-based integration test not supported from UNC WSL share on Windows host")
     examples_dir = repo_root / "examples" / "tests"
     env = os.environ.copy()
     env.setdefault("PYTHON", sys.executable)
