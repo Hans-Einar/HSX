@@ -389,7 +389,7 @@ Disassembly
 | `ts` | float | Seconds since epoch (UTC). |
 | `type` | string | Event category (`trace_step`, `debug_break`, `scheduler`, `mailbox_send`, `mailbox_recv`, `mailbox_exhausted`, `mailbox_backpressure`, `watch_update`, `stdout`, `stderr`, `warning`, etc.). |
 | `pid` | int or `null` | PID associated with the event (`null` for global events). |
-| `data` | object | Event payload (schema depends on `type`). Unknown keys must be ignored for forward compatibility. |
+| _additional fields_ | varies | Event-specific keys (see below). Consumers MUST ignore unknown fields for forward compatibility. |
 
 Typical payloads:
 
@@ -411,6 +411,25 @@ Typical payloads:
 
 `trace_step.data.changed_regs` is optional and, when present, lists the architectural registers that changed relative to the previous step for the same PID. Register names follow the `R<N>` convention with `PSW` used for the processor status word; the program counter is omitted (it advances on every instruction) so consumers can focus on meaningful state deltas without post-filtering. Clients may use the list to highlight deltas without diffing the full register file.
 `trace_step.data.mem_access` (when present) captures the last memory transaction performed by the instruction, including the resolved address, width in bytes, and the value read or written.
+
+#### Mailbox event example
+
+Example sequence emitted when PID 5 polls stdout (`svc:stdio.out@5`), blocks, then receives data:
+
+```json
+[
+  {"seq": 120, "ts": 1730684330.102, "type": "mailbox_send", "pid": 5,
+   "data": {"descriptor": 17, "handle": 3, "length": 5, "flags": 1, "channel": 0, "src_pid": 5}},
+  {"seq": 121, "ts": 1730684330.103, "type": "mailbox_wait", "pid": 5,
+   "data": {"descriptor": 18, "handle": 4, "timeout": 65535, "deadline": null}},
+  {"seq": 122, "ts": 1730684330.204, "type": "mailbox_wake", "pid": 5,
+   "data": {"descriptor": 18, "handle": 4, "status": 0, "length": 5, "flags": 1, "channel": 0, "src_pid": 5}},
+  {"seq": 123, "ts": 1730684330.205, "type": "mailbox_recv", "pid": 5,
+   "data": {"descriptor": 18, "handle": 4, "length": 5, "flags": 1, "channel": 0, "src_pid": 5}}
+]
+```
+
+Clients can correlate the wait/wake pair by `descriptor`/`handle` to determine latency, and use the follow-up `mailbox_recv` to inspect message metadata (`flags`, `channel`, `src_pid`). Similar sequences occur for timeouts (`mailbox_timeout`) or overrun/drop conditions (`mailbox_overrun`, `mailbox_backpressure`).
 
 `scheduler` events fire whenever the executive hands control to a different PID (including transitions to `null` when the run queue empties). The `reason` field enumerates the cause: `quantum_expired` (round-robin rotation), `sleep` (task issued a sleep request), `wait_mbx` (blocking mailbox call), `paused` (user or debugger intervention), and `killed` (task exited or was forcibly removed). When a task shuts down cleanly the event still uses `killed`; `post_state` reports `terminated` or is omitted if the PID disappears entirely. `quantum_remaining` reflects the unused portion of the outgoing PID's configured quantum. `prev_state` mirrors the scheduler state before the switch, `post_state` captures the new state assigned to the outgoing PID, and `next_state` reports the incoming PID's state snapshot. `executed` records the instruction count the VM reported for the triggering step and `source` indicates whether the tick came from the auto-runner or a manual `step/clock`. Additional diagnostic fields may appear under `details`; clients must ignore keys they do not understand.
 

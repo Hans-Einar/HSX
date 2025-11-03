@@ -513,14 +513,14 @@ Mailbox event types need formal documentation in protocol specification. Enables
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.03--Mailbox](../../../04--Design/04.03--Mailbox.md)
-- [ ] Document mailbox_send event schema in `docs/executive_protocol.md`
-- [ ] Document mailbox_recv event schema
-- [ ] Document mailbox_wait event schema
-- [ ] Document mailbox_wake event schema
-- [ ] Document mailbox_timeout event schema
-- [ ] Document mailbox_overrun event schema
-- [ ] Provide event usage examples
-- [ ] Add event schema validation tests
+- [x] Document mailbox_send event schema in `docs/executive_protocol.md`
+- [x] Document mailbox_recv event schema
+- [x] Document mailbox_wait event schema
+- [x] Document mailbox_wake event schema
+- [x] Document mailbox_timeout event schema
+- [x] Document mailbox_overrun event schema
+- [x] Provide event usage examples
+- [x] Add event schema validation tests
 
 ---
 
@@ -728,7 +728,7 @@ This implementation is considered complete when all of the following criteria ar
 - [ ] Resource management documented
 
 ### Phase 5 Completion
-- [ ] Event schema documented in executive protocol
+- [x] Event schema documented in executive protocol
 - [ ] HXE section examples provided
 - [ ] Usage pattern documentation complete
 - [ ] Test coverage expanded (>80% for mailbox subsystem)

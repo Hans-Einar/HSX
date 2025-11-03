@@ -831,3 +831,23 @@ esource_stats() on the mailbox manager and exposed aggregated metrics (capacity,
   - `PYTHONPATH=. pytest python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_shell_client.py` (pass).
 - Follow-up actions / hand-off notes:
   - Review gate for Phase 4 still outstanding; capture result once rate-limiting changes are reviewed.
+
+
+## 2025-11-03 - Codex (Session 19)
+
+### Focus
+- Task(s) tackled: Phase 5.1 mailbox event schema documentation and validation.
+- Dependencies touched: `docs/executive_protocol.md`, `python/tests/test_mailbox_svc_runtime.py`, implementation plan.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions:
+  - Documented all mailbox event payloads (`mailbox_send/recv/wait/wake/timeout/overrun/exhausted/backpressure`) and added a worked example to `docs/executive_protocol.md`.
+  - Added integration test coverage that exercises the event stream and asserts payload fields match the documented schema.
+  - Updated implementation plan checkboxes to mark Phase 5.1 tasks as complete.
+- Tests run (commands + result):
+  - `PYTHONPATH=. pytest python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_shell_client.py` (pass).
+- Follow-up actions / hand-off notes:
+  - Continue with Phase 5.2 (`.mailbox` examples) after review.

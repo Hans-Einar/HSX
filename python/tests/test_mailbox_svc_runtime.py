@@ -618,3 +618,139 @@ def test_mailbox_overrun_event_payload():
     assert event["descriptor"] == desc.descriptor_id
     assert event["reason"] == "fanout_drop"
     assert event["dropped_length"] == len(first_payload)
+    assert {"descriptor", "pid", "dropped_seq", "dropped_length", "dropped_flags", "channel", "reason", "queue_depth"} <= set(event.keys())
+
+
+def test_mailbox_event_payload_shapes():
+    controller = _make_controller_with_tasks(1, 2)
+
+    vm_sender = _attach_vm(controller, 1)
+    vm_receiver = _attach_vm(controller, 2)
+
+    event_log: List[Dict[str, Any]] = []
+
+    def snapshot() -> None:
+        for vm in (vm_sender, vm_receiver):
+            events = vm.consume_events()
+            if events:
+                event_log.extend(events)
+
+    def events_of(event_type: str) -> List[Dict[str, Any]]:
+        return [evt for evt in event_log if evt.get("type") == event_type]
+
+    target = "app:event_schema"
+    controller.vm = vm_sender
+    controller.current_pid = 1
+    _write_c_string(vm_sender, 0x0700, target)
+    vm_sender.regs[1] = 0x0700
+    vm_sender.regs[2] = 0
+    controller._svc_mailbox_controller(vm_sender, mbx_const.HSX_MBX_FN_OPEN)
+    snapshot()
+    send_handle = vm_sender.regs[1]
+
+    controller.vm = vm_receiver
+    controller.current_pid = 2
+    _write_c_string(vm_receiver, 0x0700, target)
+    vm_receiver.regs[1] = 0x0700
+    vm_receiver.regs[2] = 0
+    controller._svc_mailbox_controller(vm_receiver, mbx_const.HSX_MBX_FN_OPEN)
+    snapshot()
+    recv_handle = vm_receiver.regs[1]
+
+    payload = b"hello"
+    send_ptr = 0x0720
+    vm_sender.mem[send_ptr : send_ptr + len(payload)] = payload
+    vm_sender.regs[1] = send_handle
+    vm_sender.regs[2] = send_ptr
+    vm_sender.regs[3] = len(payload)
+    vm_sender.regs[4] = 0
+    vm_sender.regs[5] = 0
+    controller.vm = vm_sender
+    controller.current_pid = 1
+    controller._svc_mailbox_controller(vm_sender, mbx_const.HSX_MBX_FN_SEND)
+    snapshot()
+    send_events = events_of("mailbox_send")
+    assert send_events
+    send_event = send_events[-1]
+    assert {"descriptor", "handle", "length", "flags", "channel", "src_pid"} <= set(send_event.keys())
+    descriptor_id = send_event["descriptor"]
+    controller.mailboxes.recv(pid=2, handle=recv_handle, record_waiter=False)
+
+    recv_ptr = 0x0740
+    vm_receiver.mem[recv_ptr : recv_ptr + 16] = b"\x00" * 16
+    vm_receiver.regs[1] = recv_handle
+    vm_receiver.regs[2] = recv_ptr
+    vm_receiver.regs[3] = 16
+    vm_receiver.regs[4] = mbx_const.HSX_MBX_TIMEOUT_INFINITE
+    vm_receiver.regs[5] = 0
+    controller.vm = vm_receiver
+    controller.current_pid = 2
+    controller._svc_mailbox_controller(vm_receiver, mbx_const.HSX_MBX_FN_RECV)
+    snapshot()
+    wait_events = events_of("mailbox_wait")
+    assert wait_events
+    wait_event = wait_events[-1]
+    assert {"descriptor", "handle", "timeout", "deadline"} <= set(wait_event.keys())
+
+    controller.vm = vm_sender
+    controller.current_pid = 1
+    vm_sender.mem[send_ptr : send_ptr + len(payload)] = payload
+    vm_sender.regs[1] = send_handle
+    vm_sender.regs[2] = send_ptr
+    vm_sender.regs[3] = len(payload)
+    vm_sender.regs[4] = 0
+    vm_sender.regs[5] = 0
+    controller._svc_mailbox_controller(vm_sender, mbx_const.HSX_MBX_FN_SEND)
+    snapshot()
+    controller.vm = vm_receiver
+    controller.current_pid = 2
+    controller._deliver_mailbox_messages(descriptor_id)
+    snapshot()
+    wake_events = events_of("mailbox_wake")
+    assert wake_events
+    wake_event = wake_events[-1]
+    assert {"descriptor", "handle", "status", "length", "flags", "channel", "src_pid"} <= set(wake_event.keys())
+
+    vm_receiver.regs[1] = recv_handle
+    vm_receiver.regs[2] = recv_ptr
+    vm_receiver.regs[3] = 16
+    vm_receiver.regs[4] = 10
+    vm_receiver.regs[5] = 0
+    controller._svc_mailbox_controller(vm_receiver, mbx_const.HSX_MBX_FN_RECV)
+    snapshot()
+    wait_info = controller.waiting_tasks[2]
+    wait_info["deadline"] = time.monotonic() - 0.1
+    controller._check_mailbox_timeouts()
+    snapshot()
+    timeout_events = events_of("mailbox_timeout")
+    assert timeout_events
+    timeout_event = timeout_events[-1]
+    assert {"descriptor", "handle", "status", "length", "flags", "channel", "src_pid"} <= set(timeout_event.keys())
+
+    # Immediate receive path (poll) emits mailbox_recv
+    vm_receiver.mem[recv_ptr : recv_ptr + 16] = b"\x00" * 16
+    controller.vm = vm_sender
+    controller.current_pid = 1
+    vm_sender.mem[send_ptr : send_ptr + len(payload)] = payload
+    vm_sender.regs[1] = send_handle
+    vm_sender.regs[2] = send_ptr
+    vm_sender.regs[3] = len(payload)
+    vm_sender.regs[4] = 0
+    vm_sender.regs[5] = 0
+    controller._svc_mailbox_controller(vm_sender, mbx_const.HSX_MBX_FN_SEND)
+    snapshot()
+
+    controller.vm = vm_receiver
+    controller.current_pid = 2
+    vm_receiver.regs[1] = recv_handle
+    vm_receiver.regs[2] = recv_ptr
+    vm_receiver.regs[3] = 16
+    vm_receiver.regs[4] = mbx_const.HSX_MBX_TIMEOUT_POLL
+    vm_receiver.regs[5] = 0
+    controller._svc_mailbox_controller(vm_receiver, mbx_const.HSX_MBX_FN_RECV)
+    snapshot()
+
+    recv_events = events_of("mailbox_recv")
+    assert recv_events
+    recv_event = recv_events[-1]
+    assert {"descriptor", "handle", "length", "flags", "channel", "src_pid"} <= set(recv_event.keys())
