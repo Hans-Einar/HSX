@@ -76,3 +76,61 @@ Append sessions chronologically and ensure every entry references the relevant d
 - Reviews or coordination required:
   - Coordinate with mailbox team for VALUE_SUB notification delivery
   - No merge conflicts with mailbox work (all new files except host_vm.py which had additive changes)
+
+
+## 2025-11-05 - Codex (Session 2)
+
+### Scope
+- Plan item / phase addressed: Phases 1-3 design conformance review
+- Design sections reviewed: 04.04--ValCmd.md (§4.2 data structures, §4.3 registry, §4.4 SVC behavior)
+
+### Work Summary
+- Key decisions & code changes:
+  - No code changes yet; performed design audit of existing Phase 1-3 implementation.
+  - Identified gaps: `include/hsx_value.h` / `include/hsx_command.h` lack packed entry/descriptor structs; Python registry stores Python objects instead of raw f16 + offsets; string table returns list indices instead of byte offsets; SVC handlers ignore descriptor pointers, auth tokens, output buffers, and async mailbox semantics.
+  - Updated implementation plan to explicitly call out required rework (packed structs, descriptor parsing, string-table layout, SVC ABI compliance).
+- Design updates filed/applied:
+  - None yet; plan adjustments documented required alignment before implementation proceeds.
+
+### Testing
+- Commands executed + results:
+  - (none, review-only session)
+- Issues encountered:
+  - Confirmed divergence between current implementation and design specification; remediation tasks captured in plan.
+
+### Next Steps
+- Follow-ups / blockers:
+  - Rework headers and registry structures to match 04.04 spec.
+  - Implement descriptor parsing + string table offsets during VALUE_/CMD_REGISTER.
+  - Flesh out VALUE/COMMAND SVC handlers to honour ABI (buffers, auth, async, persistence).
+- Reviews or coordination required:
+  - Schedule design review once rework lands to validate adherence to spec.
+
+
+## 2025-11-05 - Codex (Session 3)
+
+### Scope
+- Plan item / phase addressed: Phase 1 struct/layout alignment, Phase 2 registry refactor.
+- Design sections reviewed: 04.04--ValCmd.md (§4.2 data structures, §4.4 operational behavior).
+
+### Work Summary
+- Key decisions & code changes:
+  - Expanded `include/hsx_value.h` and `include/hsx_command.h` with packed entry structs, descriptor records, and sentinel constants to mirror the design tables.
+  - Rebuilt `python/valcmd.py` around raw f16 storage, byte-backed string tables, and a descriptor pool tracked by 16-bit offsets; introduced legacy descriptor shims for existing callers.
+  - Updated registry logic (value set/list/persist, command call) to consume the new representation and emit events accordingly.
+- Design updates filed/applied:
+  - None yet; implementation now follows the documented layouts, but descriptor parsing from VM memory remains outstanding.
+
+### Testing
+- Commands executed + results:
+  - `PYTHONPATH=. pytest python/tests/test_valcmd_registry.py` (pass)
+  - `PYTHONPATH=. pytest python/tests/test_valcmd_svc_integration.py` (pass)
+- Issues encountered:
+  - Existing tests assumed index-based string offsets and constructor arguments; resolved via compatibility helpers and test updates.
+
+### Next Steps
+- Follow-ups / blockers:
+  - Implement descriptor parsing for VALUE_/CMD_REGISTER SVC handlers to consume raw metadata from VM memory.
+  - Wire mailbox notifications/persistence to the new descriptor pool during SVC rework.
+- Reviews or coordination required:
+  - Schedule design review after SVC handler rework to confirm ABI compliance.

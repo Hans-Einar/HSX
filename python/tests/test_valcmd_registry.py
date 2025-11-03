@@ -10,7 +10,9 @@ from python.valcmd import (
     UnitDescriptor,
     RangeDescriptor,
     PersistDescriptor,
+    CommandNameDescriptor,
     StringTable,
+    float_to_f16,
 )
 from python.hsx_value_constants import (
     HSX_VAL_STATUS_OK,
@@ -23,6 +25,8 @@ from python.hsx_value_constants import (
     HSX_VAL_FLAG_PERSIST,
     HSX_VAL_AUTH_PUBLIC,
     HSX_VAL_AUTH_USER,
+    HSX_VAL_DESC_INVALID,
+    HSX_VAL_DESC_NAME,
 )
 from python.hsx_command_constants import (
     HSX_CMD_STATUS_OK,
@@ -30,6 +34,8 @@ from python.hsx_command_constants import (
     HSX_CMD_STATUS_ENOSPC,
     HSX_CMD_STATUS_EEXIST,
     HSX_CMD_FLAG_ASYNC,
+    HSX_CMD_DESC_INVALID,
+    HSX_CMD_DESC_NAME,
 )
 
 
@@ -44,7 +50,7 @@ class TestStringTable:
         assert offset1 == 0
         
         offset2 = table.insert("world")
-        assert offset2 == 1
+        assert offset2 == len("hello") + 1
         
         # Deduplication - same string returns same offset
         offset3 = table.insert("hello")
@@ -142,7 +148,7 @@ class TestValueEntry:
             flags=0,
             auth_level=HSX_VAL_AUTH_PUBLIC,
             owner_pid=100,
-            last_f16=0.0
+            last_f16_raw=float_to_f16(0.0),
         )
         assert entry.oid == 0x1234
     
@@ -154,7 +160,7 @@ class TestValueEntry:
             flags=HSX_VAL_FLAG_RO | HSX_VAL_FLAG_PERSIST,
             auth_level=HSX_VAL_AUTH_PUBLIC,
             owner_pid=100,
-            last_f16=0.0
+            last_f16_raw=float_to_f16(0.0),
         )
         assert entry.is_readonly is True
         assert entry.is_persistent is True
@@ -200,6 +206,36 @@ class TestValCmdRegistry:
         stats = registry.get_stats()
         assert stats['values']['count'] == 0
         assert stats['commands']['count'] == 0
+
+    def test_parse_value_descriptors_from_memory(self):
+        registry = ValCmdRegistry()
+        mem = bytearray(128)
+        ptr = 0x10
+        mem[ptr] = HSX_VAL_DESC_NAME
+        mem[ptr + 1] = 0
+        mem[ptr + 2:ptr + 4] = HSX_VAL_DESC_INVALID.to_bytes(2, 'little')
+        mem[ptr + 4:ptr + 6] = (0x40).to_bytes(2, 'little')
+        mem[0x40:0x45] = b'Temp\x00'
+
+        ok, specs = registry.parse_value_descriptors_from_memory(mem, ptr)
+        assert ok is True
+        assert specs == [{'type': 'name', 'name': 'Temp'}]
+
+    def test_parse_command_descriptors_from_memory(self):
+        registry = ValCmdRegistry()
+        mem = bytearray(160)
+        ptr = 0x20
+        mem[ptr] = HSX_CMD_DESC_NAME
+        mem[ptr + 1] = 0
+        mem[ptr + 2:ptr + 4] = HSX_CMD_DESC_INVALID.to_bytes(2, 'little')
+        mem[ptr + 4:ptr + 6] = (0x60).to_bytes(2, 'little')
+        mem[ptr + 6:ptr + 8] = (0x80).to_bytes(2, 'little')
+        mem[0x60:0x65] = b'Reset\x00'
+        mem[0x80:0x8c] = b'Reset motor\x00'
+
+        ok, specs = registry.parse_command_descriptors_from_memory(mem, ptr)
+        assert ok is True
+        assert specs == [{'type': 'name', 'name': 'Reset', 'help': 'Reset motor'}]
     
     def test_value_register(self):
         """Test value registration."""

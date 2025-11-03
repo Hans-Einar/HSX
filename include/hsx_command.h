@@ -41,6 +41,35 @@
 /* Registry size limits */
 #define HSX_CMD_MAX_COMMANDS      256     /* Maximum command entries */
 
+#define HSX_CMD_DESC_NAME         0x10    /* Command name/help descriptor */
+#define HSX_CMD_DESC_INVALID      0xFFFF
+
+/*
+ * Compact command entry stored in the executive registry.
+ * Handler references and descriptor chains are addressed via 16-bit offsets.
+ */
+#pragma pack(push, 1)
+typedef struct hsx_cmd_entry {
+    uint8_t  group_id;
+    uint8_t  cmd_id;
+    uint8_t  flags;
+    uint8_t  auth_level;
+    uint16_t owner_pid;
+    uint16_t handler_ref;    /* Offset or index to handler entry (implementation-defined) */
+    uint16_t desc_head;      /* Offset to first descriptor or HSX_CMD_DESC_INVALID */
+} hsx_cmd_entry_t;
+
+typedef struct hsx_cmd_name_desc {
+    uint8_t  desc_type;      /* HSX_CMD_DESC_NAME */
+    uint8_t  reserved;
+    uint16_t next;
+    uint16_t name_offset;    /* Offset into string table */
+    uint16_t help_offset;    /* Offset into string table */
+} hsx_cmd_name_desc_t;
+#pragma pack(pop)
+
+_Static_assert(sizeof(hsx_cmd_entry_t) == 10, "hsx_cmd_entry_t must remain packed (10 bytes)");
+
 /*
  * COMMAND SVC calling convention (ABI summary)
  *

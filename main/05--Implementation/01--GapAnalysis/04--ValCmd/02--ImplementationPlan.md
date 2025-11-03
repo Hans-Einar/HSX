@@ -69,13 +69,14 @@ Design references `include/hsx_value.h` and `include/hsx_command.h` but these do
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.04--ValCmd](../../../04--Design/04.04--ValCmd.md)
 - [ ] Create `include/hsx_value.h` with status codes, flags, data structures
 - [ ] Create `include/hsx_command.h` with status codes, flags, data structures
+- [ ] Define `hsx_val_entry`, `hsx_cmd_entry`, and descriptor structs with packed layouts matching 04.04 §4.2 (including reserved fields)
 - [ ] Define `HSX_VAL_*` status codes (SUCCESS, ENOENT, EPERM, ENOSPC, etc.)
 - [ ] Define `HSX_CMD_*` status codes
 - [ ] Define value flags (RO, PERSIST, STICKY, PIN, BOOL)
 - [ ] Define command flags (PIN, ASYNC_ALLOWED)
 - [ ] Define auth levels (PUBLIC, USER, ADMIN, FACTORY)
 - [ ] Add header guards and documentation comments
-- [ ] Create Python constants file mirroring C headers
+- [ ] Create Python constants file mirroring C headers (including struct field order comments)
 
 ---
 
@@ -90,10 +91,10 @@ Design specifies 8-byte `hsx_val_entry` structure (section 4.2). Core data struc
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.04--ValCmd](../../../04--Design/04.04--ValCmd.md)
-- [ ] Define `hsx_val_entry` struct (group_id, value_id, flags, auth_level, owner_pid, last_f16, desc_head)
-- [ ] Implement struct packing to achieve 8-byte size
+- [ ] Define `hsx_val_entry` struct (group_id, value_id, flags, auth_level, owner_pid, last_f16 raw f16, desc_head offset)
+- [ ] Implement struct packing/alignment to achieve 8-byte size
 - [ ] Add OID calculation from (group_id, value_id)
-- [ ] Implement value entry initialization
+- [ ] Implement value entry initialization with helper to convert to/from IEEE754 half
 - [ ] Implement value entry validation
 - [ ] Add unit tests for value entry structure
 - [ ] Document value entry format
@@ -111,10 +112,10 @@ Similar to value entry, commands need compact storage structure (section 4.2). E
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.04--ValCmd](../../../04--Design/04.04--ValCmd.md)
-- [ ] Define `hsx_cmd_entry` struct (group_id, cmd_id, flags, auth_level, owner_pid, handler_ref, desc_head)
+- [ ] Define `hsx_cmd_entry` struct (group_id, cmd_id, flags, auth_level, owner_pid, handler_ref, desc_head offset)
 - [ ] Implement struct packing for compact storage
 - [ ] Add OID calculation for commands
-- [ ] Implement command entry initialization
+- [ ] Implement command entry initialization (handler reference indirection, async flags)
 - [ ] Implement command entry validation
 - [ ] Add unit tests for command entry structure
 - [ ] Document command entry format
@@ -133,11 +134,12 @@ Design specifies mix-in descriptor pattern for metadata (sections 4.2.2-4.2.4). 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.04--ValCmd](../../../04--Design/04.04--ValCmd.md)
 - [ ] Define descriptor base type with type tag and next pointer
-- [ ] Implement Group descriptor (group_id, name_offset)
-- [ ] Implement Name descriptor (name_offset)
-- [ ] Implement Unit descriptor (unit_offset)
-- [ ] Implement Range descriptor (min_f16, max_f16, default_f16)
-- [ ] Implement Persist descriptor (debounce_ms, persist_addr)
+- [ ] Implement Group descriptor (group_id, name_offset) with deduplication
+- [ ] Implement Name descriptor (name_offset) for values/commands
+- [ ] Implement Unit descriptor (unit_code, epsilon_f16, rate_ms)
+- [ ] Implement Range descriptor (min_f16, max_f16)
+- [ ] Implement Persist descriptor (persist_key, debounce_ms)
+- [ ] Implement Command Name/Help descriptor (`hsx_cmd_name_desc`) per design §4.2.5
 - [ ] Implement descriptor chain building
 - [ ] Implement descriptor chain traversal
 - [ ] Add descriptor tests (build chains, query metadata)
@@ -156,10 +158,10 @@ Design specifies deduplicated null-terminated string storage (section 4.2.6). Op
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.04--ValCmd](../../../04--Design/04.04--ValCmd.md)
-- [ ] Implement string table with fixed size pool
+- [ ] Implement string table with contiguous byte pool + null terminators
 - [ ] Implement string deduplication (hash-based lookup)
-- [ ] Implement string insertion (returns offset)
-- [ ] Implement string retrieval by offset
+- [ ] Implement string insertion (returns byte offset)
+- [ ] Implement string retrieval by byte offset
 - [ ] Add string table overflow handling
 - [ ] Track string table usage metrics
 - [ ] Add string table tests
@@ -182,6 +184,7 @@ Design specifies fixed-size value/command tables with OID-based lookup (section 
 - [ ] Implement command registry with configurable table size
 - [ ] Implement OID-based lookup (hash table or linear scan)
 - [ ] Implement registration slot allocation
+- [ ] Ensure registry stores descriptor offsets / string offsets rather than Python objects
 - [ ] Implement registry cleanup on task termination
 - [ ] Add registry capacity tracking
 - [ ] Add registry initialization tests
@@ -205,8 +208,8 @@ First VALUE SVC to implement. Design specifies registration with PID capture and
 - [ ] Implement VALUE_REGISTER SVC handler (0x0700)
 - [ ] Capture caller PID automatically
 - [ ] Allocate value entry in registry
-- [ ] Parse descriptor pointer from R4
-- [ ] Build descriptor chain from metadata
+- [ ] Parse descriptor pointer from R4 (walk HXE descriptor records per 04.04 §4.2.3)
+- [ ] Build descriptor chain using string table offsets (no inline Python strings)
 - [ ] Validate group_id and value_id uniqueness
 - [ ] Return OID on success or error code
 - [ ] Handle registry exhaustion (ENOSPC)
@@ -248,7 +251,7 @@ Core read operation. Design specifies PID verification and auth_level checks (se
 - [ ] Implement VALUE_GET SVC handler (0x0702)
 - [ ] Lookup value by OID
 - [ ] Verify caller owns value (PID check) or auth_level allows access
-- [ ] Return f16 value in R0 low 16 bits
+- [ ] Return f16 value in R0 low 16 bits (convert stored half -> register format)
 - [ ] Return ENOENT if OID not found
 - [ ] Return EPERM if PID/auth check fails
 - [ ] Add VALUE_GET tests (owned, external, auth levels)
@@ -273,7 +276,7 @@ Core write operation. Design specifies epsilon threshold, rate limiting, notific
 - [ ] Check read-only flag (return EPERM if set)
 - [ ] Apply epsilon threshold (skip if change below threshold)
 - [ ] Apply rate limiting (skip if too frequent)
-- [ ] Update value entry with new f16
+- [ ] Update value entry with new f16 (store as raw half, update last_change timestamp)
 - [ ] Trigger mailbox notifications to subscribers
 - [ ] Mark persistence dirty if PERSIST flag set
 - [ ] Add VALUE_SET tests (epsilon, rate limit, notifications)
@@ -295,7 +298,7 @@ Enumeration support for tooling. System/ValCmd.md notes this is SVC 0x0704.
 - [ ] Implement VALUE_LIST SVC handler (0x0704)
 - [ ] Filter by group_id (0xFF for all groups)
 - [ ] Filter by caller PID (only show owned values)
-- [ ] Write OID list to output buffer
+- [ ] Write OID list to output buffer in VM memory (little-endian 16-bit entries)
 - [ ] Respect max_items limit
 - [ ] Return actual count
 - [ ] Handle buffer too small gracefully
@@ -317,7 +320,7 @@ Subscribe to value changes via mailbox (section 4.4.3). System/ValCmd.md notes t
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.04--ValCmd](../../../04--Design/04.04--ValCmd.md)
 - [ ] Implement VALUE_SUB SVC handler (0x0705)
 - [ ] Lookup value by OID
-- [ ] Verify mailbox target is valid
+- [ ] Verify mailbox target is valid (resolve handle via mailbox manager)
 - [ ] Register subscriber in value entry's subscription list
 - [ ] Handle duplicate subscriptions
 - [ ] Add VALUE_SUB tests
@@ -340,7 +343,7 @@ Toggle persistence mode for values (section 4.4.4). System/ValCmd.md notes this 
 - [ ] Lookup value by OID
 - [ ] Verify caller owns value
 - [ ] Update persist mode (0=volatile, 1=load, 2=load+save)
-- [ ] Add/update Persist descriptor
+- [ ] Add/update Persist descriptor (persist_key, debounce) in descriptor chain
 - [ ] Add VALUE_PERSIST tests
 - [ ] Document persistence modes
 
@@ -362,8 +365,8 @@ Command registration similar to VALUE_REGISTER (section 4.4.1). System/ValCmd.md
 - [ ] Implement CMD_REGISTER SVC handler (0x0800)
 - [ ] Capture caller PID automatically
 - [ ] Allocate command entry in registry
-- [ ] Parse descriptor pointer from R4
-- [ ] Build descriptor chain from metadata
+- [ ] Parse descriptor pointer from R4 (Name/Help etc.)
+- [ ] Build descriptor chain from metadata using string table offsets
 - [ ] Store handler reference (callback address)
 - [ ] Return OID on success or error code
 - [ ] Handle registry exhaustion (ENOSPC)
@@ -407,7 +410,7 @@ Synchronous command invocation with auth checks (section 4.4.5). System/ValCmd.m
 - [ ] Verify auth_level allows access
 - [ ] Verify PIN token if PIN flag set
 - [ ] Invoke command handler (VM callback)
-- [ ] Return command result status
+- [ ] Return command result status/value in registers per ABI (f16/int conversions as needed)
 - [ ] Emit cmd_invoked event
 - [ ] Emit cmd_completed event
 - [ ] Add CMD_CALL tests (auth, PIN, handler invocation)
@@ -431,7 +434,7 @@ Asynchronous command invocation with mailbox result posting. System/ValCmd.md no
 - [ ] Verify ASYNC_ALLOWED flag set
 - [ ] Verify auth_level and PIN token
 - [ ] Schedule command execution (async)
-- [ ] Post (oid, rc) result to mailbox when complete
+- [ ] Post (oid, rc) result to mailbox when complete (using mbox_ptr buffer)
 - [ ] Add CMD_CALL_ASYNC tests
 - [ ] Document async semantics
 

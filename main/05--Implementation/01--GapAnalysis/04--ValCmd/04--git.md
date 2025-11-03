@@ -11,6 +11,8 @@
 ## Commit Log
 | Date | Commit hash | Message | Author | Notes |
 | --- | --- | --- | --- | --- |
+| 2025-11-05 | `<pending>` | `valcmd: design audit + plan reset` | Codex | Tests: `(not run; review-only)` |
+| 2025-11-05 | `<pending>` | `valcmd: align registry with packed structs` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_valcmd_registry.py python/tests/test_valcmd_svc_integration.py` |
 | <YYYY-MM-DD> | <commit-hash> | <short message> | <author> | Tests: `<command>` |
 
 ## Pull Request

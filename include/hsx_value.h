@@ -61,6 +61,81 @@
 #define HSX_VAL_MAX_VALUES        256     /* Maximum value entries */
 #define HSX_VAL_STRING_TABLE_SIZE 4096    /* String table size in bytes */
 
+/* Descriptor helpers */
+#define HSX_VAL_DESC_INVALID      0xFFFF  /* Invalid descriptor offset */
+
+/* Forward declarations */
+struct hsx_val_descriptor;
+
+/*
+ * Compact value entry stored in the executive registry.
+ * Descriptors are addressed using 16-bit offsets into the descriptor pool.
+ */
+#pragma pack(push, 1)
+typedef struct hsx_val_entry {
+    uint8_t  group_id;
+    uint8_t  value_id;
+    uint8_t  flags;
+    uint8_t  auth_level;
+    uint16_t owner_pid;
+    uint16_t last_f16;       /* Raw IEEE754 half-precision bits */
+    uint16_t desc_head;      /* Offset to first descriptor (HSX_VAL_DESC_INVALID if none) */
+} hsx_val_entry_t;
+#pragma pack(pop)
+
+/*
+ * Descriptor base (shared layout for all descriptors).
+ * Each descriptor resides in a packed pool; offsets are 16-bit.
+ */
+#pragma pack(push, 1)
+typedef struct hsx_val_descriptor {
+    uint8_t  desc_type;
+    uint8_t  reserved;
+    uint16_t next;           /* Offset to next descriptor or HSX_VAL_DESC_INVALID */
+} hsx_val_descriptor_t;
+
+typedef struct hsx_group_desc {
+    uint8_t  desc_type;      /* HSX_VAL_DESC_GROUP */
+    uint8_t  group_id;
+    uint16_t next;
+    uint16_t name_offset;    /* Offset into string table */
+} hsx_group_desc_t;
+
+typedef struct hsx_name_desc {
+    uint8_t  desc_type;      /* HSX_VAL_DESC_NAME */
+    uint8_t  reserved;
+    uint16_t next;
+    uint16_t name_offset;    /* Offset into string table */
+} hsx_name_desc_t;
+
+typedef struct hsx_unit_desc {
+    uint8_t  desc_type;      /* HSX_VAL_DESC_UNIT */
+    uint8_t  reserved;
+    uint16_t next;
+    uint32_t unit_code;      /* Packed 4-char code */
+    uint16_t epsilon_f16;    /* IEEE754 half-precision */
+    uint16_t rate_ms;
+} hsx_unit_desc_t;
+
+typedef struct hsx_range_desc {
+    uint8_t  desc_type;      /* HSX_VAL_DESC_RANGE */
+    uint8_t  reserved;
+    uint16_t next;
+    uint16_t min_f16;        /* IEEE754 half-precision */
+    uint16_t max_f16;        /* IEEE754 half-precision */
+} hsx_range_desc_t;
+
+typedef struct hsx_persist_desc {
+    uint8_t  desc_type;      /* HSX_VAL_DESC_PERSIST */
+    uint8_t  reserved;
+    uint16_t next;
+    uint16_t persist_key;
+    uint16_t debounce_ms;
+} hsx_persist_desc_t;
+#pragma pack(pop)
+
+_Static_assert(sizeof(hsx_val_entry_t) == 10, "hsx_val_entry_t must remain packed (10 bytes)");
+
 /*
  * VALUE SVC calling convention (ABI summary)
  *
