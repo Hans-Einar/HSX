@@ -1,6 +1,8 @@
 """Tests for the ValCmd Registry Manager."""
 
 import logging
+from typing import Any, Callable, Tuple
+
 import pytest
 from python.valcmd import (
     ValCmdRegistry,
@@ -35,7 +37,9 @@ from python.hsx_command_constants import (
     HSX_CMD_STATUS_ENOENT,
     HSX_CMD_STATUS_ENOSPC,
     HSX_CMD_STATUS_EEXIST,
+    HSX_CMD_STATUS_EPERM,
     HSX_CMD_FLAG_ASYNC,
+    HSX_CMD_FLAG_PIN,
     HSX_CMD_DESC_INVALID,
     HSX_CMD_DESC_NAME,
 )
@@ -500,7 +504,7 @@ class TestValCmdRegistry:
     def test_command_call(self):
         """Test command invocation."""
         registry = ValCmdRegistry()
-        
+
         # Register command with handler
         call_count = [0]
         
@@ -518,6 +522,71 @@ class TestValCmdRegistry:
         assert status == HSX_CMD_STATUS_OK
         assert result == "success"
         assert call_count[0] == 1
+
+    def test_command_call_requires_owner(self):
+        registry = ValCmdRegistry()
+        status, oid = registry.command_register(1, 2, 0, HSX_VAL_AUTH_PUBLIC, 50)
+        assert status == HSX_CMD_STATUS_OK
+        status, _ = registry.command_call(oid, caller_pid=99)
+        assert status == HSX_CMD_STATUS_EPERM
+
+    def test_command_call_requires_pin_token(self):
+        registry = ValCmdRegistry()
+        registry.set_token_validator(lambda entry, token, pid: token == b"1234")
+        call_count = [0]
+
+        def handler():
+            call_count[0] += 1
+            return "ok"
+
+        status, oid = registry.command_register(
+            2,
+            3,
+            HSX_CMD_FLAG_PIN,
+            HSX_VAL_AUTH_PUBLIC,
+            owner_pid=7,
+            handler_ref=handler,
+        )
+        assert status == HSX_CMD_STATUS_OK
+
+        status, _ = registry.command_call(oid, caller_pid=7)
+        assert status == HSX_CMD_STATUS_EPERM
+        status, _ = registry.command_call(oid, caller_pid=7, token=b"bad")
+        assert status == HSX_CMD_STATUS_EPERM
+        status, result = registry.command_call(oid, caller_pid=7, token=b"1234")
+        assert status == HSX_CMD_STATUS_OK
+        assert result == "ok"
+        assert call_count[0] == 1
+
+    def test_command_call_async_uses_executor(self):
+        registry = ValCmdRegistry()
+        captured: list[Callable[[], None]] = []
+        registry.set_async_executor(lambda fn: captured.append(fn))
+        events: list[str] = []
+        registry.set_event_hook(lambda event_type, **_: events.append(event_type))
+
+        status, oid = registry.command_register(
+            4,
+            1,
+            HSX_CMD_FLAG_ASYNC,
+            HSX_VAL_AUTH_PUBLIC,
+            owner_pid=88,
+            handler_ref=lambda: 42,
+        )
+        assert status == HSX_CMD_STATUS_OK
+
+        results: list[Tuple[int, Any]] = []
+        status, _ = registry.command_call_async(
+            oid,
+            caller_pid=88,
+            on_complete=lambda s, r: results.append((s, r)),
+        )
+        assert status == HSX_CMD_STATUS_OK
+        assert len(captured) == 1
+        captured[0]()
+        assert results == [(HSX_CMD_STATUS_OK, 42)]
+        assert events.count("cmd_invoked") == 1
+        assert events.count("cmd_completed") == 1
     
     def test_command_list(self):
         """Test command enumeration."""

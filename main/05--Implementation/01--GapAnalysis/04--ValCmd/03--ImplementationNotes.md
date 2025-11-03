@@ -195,9 +195,34 @@ Append sessions chronologically and ensure every entry references the relevant d
 - Added pytest coverage for stats/warning behaviour (`python/tests/test_valcmd_registry.py`, `python/tests/test_valcmd_svc_integration.py`, `python/tests/test_executive_sessions.py`) validating logging thresholds, high-water reporting, and RPC plumbing.
 
 ### Testing
-- Intended: `PYTHONPATH=. python -m pytest python/tests/test_valcmd_registry.py python/tests/test_valcmd_svc_integration.py python/tests/test_executive_sessions.py -k stats -v`
-- Result: Fails early (`No module named pytest`) because the current environment is missing the pytest dependency.
+- `python -m pytest python/tests/test_valcmd_registry.py -k stats -v`
+- `python -m pytest python/tests/test_valcmd_svc_integration.py -k stats -v`
+- `python -m pytest python/tests/test_executive_sessions.py -k stats -v`
+- `python -m pytest python/tests/test_host_vm_cli.py`
+- `python -m pytest python/tests/test_ir_half_main.py`
 
 ### Next Steps
 - Confirm pytest availability for future sessions (install into the WSL env or document alternative).
 - Proceed to Phase 4.4 persistence follow-ups once regressions from the new stats plumbing are cleared.
+
+## 2025-11-06 - Codex (Session 7)
+
+### Scope
+- Plan item / phase addressed: Phase 3.3 (CMD_CALL) & Phase 3.4 (CMD_CALL_ASYNC)
+- Design sections reviewed: 04.04--ValCmd.md (§4.4.5 command invocation), include/hsx_command.h token/async ABI, docs/abi_syscalls.md command table
+
+### Work Summary
+- Added owner/PID enforcement and PIN token validation hooks to `python/valcmd.py`, including an injectable token validator and async executor. Synchronous and async calls now share a common preparation path with consistent event emission.
+- Reworked `command_call_async` to dispatch handlers on the provided executor and deliver results through an `on_complete` callback; default executor runs on a daemon thread.
+- Updated the Python VM controller SVC handlers to read PIN tokens from guest memory, enforce secure-command checks, and perform true async mailbox delivery instead of immediate execution. Mailbox failures now close handles gracefully.
+- Documented the updated RPC behaviour (token argument + async payload) in `docs/executive_protocol.md`.
+
+### Testing
+- `python -m pytest python/tests/test_valcmd_registry.py -k command_call -v`
+- `python -m pytest python/tests/test_valcmd_svc_integration.py -v`
+- `python -m pytest python/tests/test_host_vm_cli.py`
+- `python -m pytest python/tests/test_ir_half_main.py`
+
+### Next Steps
+- Phase 5.1 declarative registration parser.
+- Begin planning for auth hierarchy (Phase 9.2) once registry hooks are stable.

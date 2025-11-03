@@ -408,13 +408,13 @@ Synchronous command invocation with auth checks (section 4.4.5). System/ValCmd.m
 - [x] Implement CMD_CALL SVC handler (0x0802)
 - [x] Lookup command by OID
 - [x] Verify auth_level allows access
-- [ ] Verify PIN token if PIN flag set
+- [x] Verify PIN token if PIN flag set
 - [x] Invoke command handler (VM callback)
 - [x] Return command result status/value in registers per ABI (f16/int conversions as needed)
 - [x] Emit cmd_invoked event
 - [x] Emit cmd_completed event
 - [x] Add CMD_CALL tests (auth, PIN, handler invocation)
-- [ ] Document CMD_CALL behavior
+- [x] Document CMD_CALL behavior
 
 ---
 
@@ -432,11 +432,11 @@ Asynchronous command invocation with mailbox result posting. System/ValCmd.md no
 - [x] Implement CMD_CALL_ASYNC SVC handler (0x0803)
 - [x] Lookup command by OID
 - [x] Verify ASYNC_ALLOWED flag set
-- [ ] Verify auth_level and PIN token
-- [ ] Schedule command execution (async)
+- [x] Verify auth_level and PIN token
+- [x] Schedule command execution (async)
 - [x] Post (oid, rc) result to mailbox when complete (using mbox_ptr buffer)
-- [ ] Add CMD_CALL_ASYNC tests
-- [ ] Document async semantics
+- [x] Add CMD_CALL_ASYNC tests
+- [x] Document async semantics
 
 ---
 

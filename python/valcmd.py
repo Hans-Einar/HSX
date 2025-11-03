@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import logging
 import struct
+import threading
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 from python.hsx_value_constants import (
@@ -545,6 +546,8 @@ class ValCmdRegistry:
         self._event_hook: Optional[Callable[..., None]] = None
         self._command_handlers: Dict[int, Callable[[], Any]] = {}
         self._next_handler_ref: int = 1
+        self._token_validator: Optional[Callable[[CommandEntry, Optional[bytes], int], bool]] = None
+        self._async_executor: Callable[[Callable[[], None]], None] = self._default_async_executor
         self._value_high_water = 0
         self._command_high_water = 0
         self._value_warn_active = False
@@ -559,6 +562,21 @@ class ValCmdRegistry:
     def _emit_event(self, event_type: str, **payload: Any) -> None:
         if self._event_hook:
             self._event_hook(event_type, **payload)
+
+    def set_token_validator(
+        self, validator: Optional[Callable[[CommandEntry, Optional[bytes], int], bool]]
+    ) -> None:
+        """Install callback to validate PIN tokens for secure commands."""
+        self._token_validator = validator
+
+    def set_async_executor(self, executor: Optional[Callable[[Callable[[], None]], None]]) -> None:
+        """Override the async executor used for CMD_CALL_ASYNC."""
+        self._async_executor = executor or self._default_async_executor
+
+    @staticmethod
+    def _default_async_executor(runnable: Callable[[], None]) -> None:
+        thread = threading.Thread(target=runnable, name="hsx-valcmd-async", daemon=True)
+        thread.start()
 
     def parse_value_descriptors_from_memory(
         self, memory: Union[bytes, bytearray, memoryview], head_ptr: int
@@ -947,13 +965,34 @@ class ValCmdRegistry:
             return (HSX_CMD_STATUS_OK, oid)
         return (HSX_CMD_STATUS_ENOENT, 0)
 
-    def command_call(self, oid: int, caller_pid: int, caller_auth: int = HSX_VAL_AUTH_PUBLIC) -> Tuple[int, Any]:
+    def _prepare_command_call(
+        self,
+        oid: int,
+        caller_pid: int,
+        caller_auth: int,
+        token: Optional[bytes],
+    ) -> Tuple[int, Optional[CommandEntry], Optional[Callable[[], Any]]]:
         entry = self._commands.get(oid)
         if entry is None:
-            return (HSX_CMD_STATUS_ENOENT, None)
+            return (HSX_CMD_STATUS_ENOENT, None, None)
+        if entry.owner_pid != caller_pid:
+            return (HSX_CMD_STATUS_EPERM, entry, None)
         if caller_auth < entry.auth_level:
-            return (HSX_CMD_STATUS_EPERM, None)
+            return (HSX_CMD_STATUS_EPERM, entry, None)
+        if entry.requires_pin:
+            validator = self._token_validator
+            if validator is None or not validator(entry, token, caller_pid):
+                return (HSX_CMD_STATUS_EPERM, entry, None)
+        handler = self._command_handlers.get(entry.handler_ref)
+        return (HSX_CMD_STATUS_OK, entry, handler)
 
+    def _run_command_handler(
+        self,
+        entry: CommandEntry,
+        handler: Optional[Callable[[], Any]],
+        caller_pid: int,
+    ) -> Tuple[int, Any]:
+        oid = entry.oid
         self._emit_event(
             "cmd_invoked",
             pid=caller_pid,
@@ -968,7 +1007,6 @@ class ValCmdRegistry:
 
         result: Any = None
         status = HSX_CMD_STATUS_OK
-        handler = self._command_handlers.get(entry.handler_ref)
         if handler:
             try:
                 result = handler()
@@ -991,13 +1029,60 @@ class ValCmdRegistry:
         )
         return (status, result)
 
-    def command_call_async(self, oid: int, caller_pid: int, caller_auth: int = HSX_VAL_AUTH_PUBLIC) -> Tuple[int, Any]:
+    def command_call_with_token(
+        self,
+        oid: int,
+        caller_pid: int,
+        caller_auth: int = HSX_VAL_AUTH_PUBLIC,
+        token: Optional[bytes] = None,
+    ) -> Tuple[int, Any]:
+        status, entry, handler = self._prepare_command_call(oid, caller_pid, caller_auth, token)
+        if status != HSX_CMD_STATUS_OK or entry is None:
+            return (status, None)
+        return self._run_command_handler(entry, handler, caller_pid)
+
+    def command_call(
+        self,
+        oid: int,
+        caller_pid: int,
+        caller_auth: int = HSX_VAL_AUTH_PUBLIC,
+        token: Optional[bytes] = None,
+    ) -> Tuple[int, Any]:
+        return self.command_call_with_token(oid, caller_pid, caller_auth, token)
+
+    def command_call_async(
+        self,
+        oid: int,
+        caller_pid: int,
+        caller_auth: int = HSX_VAL_AUTH_PUBLIC,
+        token: Optional[bytes] = None,
+        on_complete: Optional[Callable[[int, Any], None]] = None,
+    ) -> Tuple[int, Any]:
         entry = self._commands.get(oid)
         if entry is None:
             return (HSX_CMD_STATUS_ENOENT, None)
         if not entry.allows_async:
             return (HSX_CMD_STATUS_ENOASYNC, None)
-        return self.command_call(oid, caller_pid, caller_auth)
+
+        status, prepared_entry, handler = self._prepare_command_call(oid, caller_pid, caller_auth, token)
+        if status != HSX_CMD_STATUS_OK or prepared_entry is None:
+            return (status, None)
+        if on_complete is None:
+            raise ValueError("on_complete callback required for async command call")
+
+        def runner() -> None:
+            status_out, result_out = self._run_command_handler(prepared_entry, handler, caller_pid)
+            try:
+                on_complete(status_out, result_out)
+            except Exception:  # pylint: disable=broad-except
+                _LOGGER.exception("cmd_async_callback_failed", extra={"oid": prepared_entry.oid})
+
+        try:
+            self._async_executor(runner)
+        except Exception:  # pylint: disable=broad-except
+            _LOGGER.exception("cmd_async_executor_failed", extra={"oid": prepared_entry.oid})
+            return (HSX_CMD_STATUS_EFAIL, None)
+        return (HSX_CMD_STATUS_OK, None)
 
     def command_list(self, group_filter: int = 0xFF, caller_pid: Optional[int] = None) -> List[int]:
         oids: List[int] = []

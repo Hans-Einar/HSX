@@ -2051,6 +2051,18 @@ class VMController:
             return "custom", dict(resolved)
         raise TypeError("mailbox_profile must be None, str, or dict")
 
+    @staticmethod
+    def _read_token_bytes(vm: MiniVM, ptr: int) -> Optional[bytes]:
+        if ptr == 0:
+            return None
+        try:
+            text = vm._read_c_string(ptr)
+        except Exception:  # pylint: disable=broad-except
+            return None
+        if text is None:
+            return None
+        return text.encode("utf-8")
+
     def __init__(
         self,
         *,
@@ -2224,7 +2236,12 @@ class VMController:
             return {"status": cmd_const.HSX_CMD_STATUS_ENOENT, "result": None}
         caller_pid = int(pid) if pid is not None else entry.owner_pid
         if async_call:
-            status, result = self.valcmd.command_call_async(oid, caller_pid=caller_pid)
+            status, _ = self.valcmd.command_call_async(
+                oid,
+                caller_pid=caller_pid,
+                on_complete=lambda _status, _result: None,
+            )
+            result = None
         else:
             status, result = self.valcmd.command_call(oid, caller_pid=caller_pid)
         return {
@@ -3435,7 +3452,9 @@ class VMController:
 
             if fn == cmd_const.HSX_CMD_FN_CALL:
                 oid = vm.regs[1] & 0xFFFF
-                status, result = self.valcmd.command_call(oid, caller_pid=pid)
+                token_ptr = vm.regs[2] & 0xFFFF
+                token_bytes = self._read_token_bytes(vm, token_ptr)
+                status, result = self.valcmd.command_call(oid, caller_pid=pid, token=token_bytes)
                 vm.regs[0] = status & 0xFFFF
                 if result is not None:
                     vm.regs[1] = int(result) if isinstance(result, (int, float)) else 0
@@ -3443,7 +3462,10 @@ class VMController:
 
             if fn == cmd_const.HSX_CMD_FN_CALL_ASYNC:
                 oid = vm.regs[1] & 0xFFFF
-                target = vm._read_c_string(vm.regs[3])
+                token_ptr = vm.regs[2] & 0xFFFF
+                token_bytes = self._read_token_bytes(vm, token_ptr)
+                target_ptr = vm.regs[3] & 0xFFFF
+                target = vm._read_c_string(target_ptr)
                 if not target:
                     vm.regs[0] = cmd_const.HSX_CMD_STATUS_EINVAL
                     return
@@ -3452,15 +3474,47 @@ class VMController:
                 except MailboxError:
                     vm.regs[0] = cmd_const.HSX_CMD_STATUS_EINVAL
                     return
-                status, result = self.valcmd.command_call(oid, caller_pid=pid)
+                def _async_complete(status_out: int, result_out: Any) -> None:
+                    payload = struct.pack("<HH", oid & 0xFFFF, status_out & 0xFFFF)
+                    if isinstance(result_out, (int, float)):
+                        payload += struct.pack("<I", int(result_out) & 0xFFFFFFFF)
+                    try:
+                        self.mailboxes.send(pid=pid, handle=handle, payload=payload, flags=0, channel=0)
+                    except MailboxError:
+                        self.log(
+                            "error",
+                            "cmd_async_mailbox_send_failed",
+                            pid=pid,
+                            handle=handle,
+                        )
+                        try:
+                            self.mailboxes.close(pid=pid, handle=handle)
+                        except MailboxError:
+                            self.log(
+                                "debug",
+                                "cmd_async_mailbox_close_failed",
+                                pid=pid,
+                                handle=handle,
+                            )
+
+                status, _ = self.valcmd.command_call_async(
+                    oid,
+                    caller_pid=pid,
+                    token=token_bytes,
+                    on_complete=_async_complete,
+                )
                 vm.regs[0] = status & 0xFFFF
-                payload = struct.pack("<HH", oid & 0xFFFF, status & 0xFFFF)
-                if isinstance(result, (int, float)):
-                    payload += struct.pack("<I", int(result) & 0xFFFFFFFF)
-                try:
-                    self.mailboxes.send(pid=pid, handle=handle, payload=payload, flags=0, channel=0)
-                except MailboxError:
-                    pass
+                if status != cmd_const.HSX_CMD_STATUS_OK:
+                    try:
+                        self.mailboxes.close(pid=pid, handle=handle)
+                    except MailboxError:
+                        self.log(
+                            "debug",
+                            "cmd_async_mailbox_close_failed",
+                            pid=pid,
+                            handle=handle,
+                        )
+                    return
                 vm.regs[1] = handle
                 return
 
@@ -4999,7 +5053,7 @@ def load_hxe(path, *, verbose: bool = False):
 
 def main():
     ap = argparse.ArgumentParser(description="HSX Python VM")
-    ap.add_argument("program", nargs="x", help=".hxe image produced by asm.py")
+    ap.add_argument("program", nargs="?", help=".hxe image produced by asm.py")
     ap.add_argument("--trace", action="store_true", help="print executed instructions")
     ap.add_argument("--trace-file", help="append trace output to a file")
     ap.add_argument("--svc-trace", action="store_true", help="log SVC invocations")

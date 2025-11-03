@@ -1,10 +1,12 @@
 """Tests for ValCmd SVC integration with VMController."""
 
-import pytest
-import sys
-from pathlib import Path
 import struct
+import sys
+import time
+from pathlib import Path
 from typing import Tuple
+
+import pytest
 
 # Add repo root to path
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -28,11 +30,14 @@ from python.hsx_value_constants import (
 from python.hsx_command_constants import (
     HSX_CMD_STATUS_OK,
     HSX_CMD_STATUS_ENOENT,
+    HSX_CMD_STATUS_EPERM,
     HSX_CMD_FN_REGISTER,
     HSX_CMD_FN_LOOKUP,
     HSX_CMD_FN_CALL,
     HSX_CMD_FN_CALL_ASYNC,
     HSX_CMD_FN_HELP,
+    HSX_CMD_FLAG_PIN,
+    HSX_CMD_FLAG_ASYNC,
     HSX_CMD_DESC_NAME,
     HSX_CMD_DESC_INVALID,
 )
@@ -336,22 +341,116 @@ class TestValCmdSVCIntegration:
         def handler():
             return 7
 
-        controller.valcmd.command_register(0x01, 0x01, 0, HSX_VAL_AUTH_PUBLIC, 1, handler_ref=handler)
+        controller.valcmd.command_register(
+            0x01,
+            0x01,
+            HSX_CMD_FLAG_ASYNC,
+            HSX_VAL_AUTH_PUBLIC,
+            1,
+            handler_ref=handler,
+        )
 
         target_ptr = 0x0640
         vm.mem[target_ptr:target_ptr + 8] = b"app:cmd\x00"
         vm.regs[1] = 0x0101
+        vm.regs[2] = 0
         vm.regs[3] = target_ptr
         controller._svc_command_controller(vm, HSX_CMD_FN_CALL_ASYNC)
         assert vm.regs[0] == HSX_CMD_STATUS_OK
         handle = vm.regs[1]
-        msg = controller.mailboxes.recv(pid=1, handle=handle, record_waiter=False)
+        msg = None
+        for _ in range(50):
+            msg = controller.mailboxes.recv(pid=1, handle=handle, record_waiter=False)
+            if msg is not None:
+                break
+            time.sleep(0.01)
         assert msg is not None
         data = msg.payload
         oid, status = struct.unpack_from("<HH", data)
         assert oid == 0x0101
         assert status == HSX_CMD_STATUS_OK
-    
+
+    def test_command_call_requires_pin_token_via_svc(self):
+        controller, vm = self._make_controller()
+        controller.valcmd.set_token_validator(lambda entry, token, pid: token == b"4321")
+
+        call_count = [0]
+
+        def handler():
+            call_count[0] += 1
+            return 5
+
+        status, oid = controller.valcmd.command_register(
+            0x02,
+            0x02,
+            HSX_CMD_FLAG_PIN,
+            HSX_VAL_AUTH_PUBLIC,
+            owner_pid=1,
+            handler_ref=handler,
+        )
+        assert status == HSX_CMD_STATUS_OK
+
+        vm.regs[1] = oid
+        vm.regs[2] = 0
+        controller._svc_command_controller(vm, HSX_CMD_FN_CALL)
+        assert vm.regs[0] == HSX_CMD_STATUS_EPERM
+        assert call_count[0] == 0
+
+        token_ptr = 0x0700
+        vm.mem[token_ptr:token_ptr + 6] = b"4321\x00"
+        vm.regs[1] = oid
+        vm.regs[2] = token_ptr
+        controller._svc_command_controller(vm, HSX_CMD_FN_CALL)
+        assert vm.regs[0] == HSX_CMD_STATUS_OK
+        assert vm.regs[1] == 5
+        assert call_count[0] == 1
+
+    def test_command_call_async_requires_pin_token(self):
+        controller, vm = self._make_controller()
+        controller.mailboxes.bind_target(pid=1, target="app:secure")
+        controller.valcmd.set_token_validator(lambda entry, token, pid: token == b"999")
+
+        def handler():
+            return 11
+
+        status, oid = controller.valcmd.command_register(
+            0x03,
+            0x04,
+            HSX_CMD_FLAG_ASYNC | HSX_CMD_FLAG_PIN,
+            HSX_VAL_AUTH_PUBLIC,
+            owner_pid=1,
+            handler_ref=handler,
+        )
+        assert status == HSX_CMD_STATUS_OK
+
+        target_ptr = 0x0720
+        vm.mem[target_ptr:target_ptr + 12] = b"app:secure\x00"
+
+        vm.regs[1] = oid
+        vm.regs[2] = 0
+        vm.regs[3] = target_ptr
+        controller._svc_command_controller(vm, HSX_CMD_FN_CALL_ASYNC)
+        assert vm.regs[0] == HSX_CMD_STATUS_EPERM
+
+        token_ptr = 0x0750
+        vm.mem[token_ptr:token_ptr + 4] = b"999\x00"
+        vm.regs[1] = oid
+        vm.regs[2] = token_ptr
+        vm.regs[3] = target_ptr
+        controller._svc_command_controller(vm, HSX_CMD_FN_CALL_ASYNC)
+        assert vm.regs[0] == HSX_CMD_STATUS_OK
+        handle = vm.regs[1]
+        msg = None
+        for _ in range(50):
+            msg = controller.mailboxes.recv(pid=1, handle=handle, record_waiter=False)
+            if msg is not None:
+                break
+            time.sleep(0.01)
+        assert msg is not None
+        oid_value, status_value = struct.unpack_from("<HH", msg.payload)
+        assert oid_value == oid
+        assert status_value == HSX_CMD_STATUS_OK
+
     def test_valcmd_cleanup_on_pid_termination(self):
         """Test that valcmd cleans up on PID termination."""
         controller = VMController()
