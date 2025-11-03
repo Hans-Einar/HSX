@@ -676,13 +676,17 @@ class TestValCmdRegistry:
         expected_value = f16_to_float(value_info["last_f16"])
         assert value_info["last_value"] == pytest.approx(expected_value)
 
-        command_specs = [{"type": "name", "name": "reset", "help": "reset motor"}]
+        command_specs = [
+            {"type": "group", "name": "maintenance"},
+            {"type": "name", "name": "reset", "help": "reset motor"},
+        ]
         status, cmd_oid = registry.command_register(2, 3, 0, HSX_VAL_AUTH_PUBLIC, 10, descriptors=command_specs)
         assert status == HSX_CMD_STATUS_OK
         command_info = registry.describe_command(cmd_oid)
         assert command_info is not None
         assert command_info["name"] == "reset"
         assert command_info["help"] == "reset motor"
+        assert command_info.get("group_name") == "maintenance"
     
     def test_cleanup_pid(self):
         """Test PID cleanup on task termination."""

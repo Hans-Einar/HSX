@@ -93,7 +93,7 @@ Defines values to be registered by executive before VM execution. Each entry:
 | 0x0C   | 2    | `min_val` | Range minimum (f16). |
 | 0x0E   | 2    | `max_val` | Range maximum (f16). |
 | 0x10   | 2    | `persist_key` | FRAM key (0=no persistence). |
-| 0x12   | 2    | `reserved` | Reserved for future use. |
+| 0x12   | 2    | `group_name_offset` | Offset to group name string (0 = none). |
 
 **Entry size: 20 bytes**
 
@@ -113,7 +113,7 @@ Defines commands to be registered. Each entry:
 | 0x04   | 4    | `handler_offset` | Code offset to handler function. |
 | 0x08   | 2    | `name_offset` | Offset to name string (0=none). |
 | 0x0A   | 2    | `help_offset` | Offset to help text (0=none). |
-| 0x0C   | 4    | `reserved` | Reserved for future use. |
+| 0x0C   | 4    | `reserved_hi:group_name_offset` | Lower 16 bits: group name string offset (0 = none). Upper 16 bits reserved. |
 
 **Entry size: 16 bytes**
 

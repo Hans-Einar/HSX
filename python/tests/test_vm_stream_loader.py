@@ -83,6 +83,7 @@ def _build_value_cmd_hxe_bytes(tmp_path: Path) -> bytes:
             {
                 "group": 1,
                 "value": 2,
+                "group_name": "sensors",
                 "flags": HSX_VAL_FLAG_PERSIST,
                 "auth": HSX_VAL_AUTH_PUBLIC,
                 "init": 12.5,
@@ -98,6 +99,7 @@ def _build_value_cmd_hxe_bytes(tmp_path: Path) -> bytes:
             {
                 "group": 1,
                 "cmd": 7,
+                "group_name": "control",
                 "flags": HSX_CMD_FLAG_PIN,
                 "auth": HSX_VAL_AUTH_USER,
                 "handler": 0x100,
@@ -213,11 +215,13 @@ def test_value_command_metadata_roundtrip(tmp_path):
     assert value_entry["unit"] == "degC"
     assert value_entry["persist_key"] == 17
     assert f16_to_float(value_entry["init_raw"]) == pytest.approx(12.5, rel=1e-3)
+    assert value_entry["group_name"] == "sensors"
     command_entry = metadata["commands"][0]
     assert command_entry["group_id"] == 1
     assert command_entry["cmd_id"] == 7
     assert command_entry["name"] == "reset"
     assert command_entry["help"] == "Soft reset"
+    assert command_entry["group_name"] == "control"
     controller = VMController()
     pid, result = _stream_load(controller, image, label="value_cmd_meta")
     assert result["status"] == "ok"
@@ -228,10 +232,12 @@ def test_value_command_metadata_roundtrip(tmp_path):
     assert meta_value["group_id"] == 1
     assert meta_value["value_id"] == 2
     assert meta_value["init_value"] == pytest.approx(12.5, rel=1e-3)
+    assert meta_value["group_name"] == "sensors"
     meta_command = meta_obj.commands[0]
     assert meta_command["group_id"] == 1
     assert meta_command["cmd_id"] == 7
     assert meta_command["handler_offset"] == 0x100
+    assert meta_command["group_name"] == "control"
     value_oid = (1 << 8) | 2
     status, value = controller.valcmd.value_get(value_oid, caller_pid=pid)
     assert status == HSX_VAL_STATUS_OK
@@ -240,6 +246,8 @@ def test_value_command_metadata_roundtrip(tmp_path):
     assert value_entry is not None
     assert value_entry.flags & HSX_VAL_FLAG_PERSIST
     assert value_entry.owner_pid == pid
+    described_value = controller.valcmd.describe_value(value_oid)
+    assert described_value is not None and described_value.get("group_name") == "sensors"
     status, cmd_oid = controller.valcmd.command_lookup(1, 7)
     assert status == HSX_CMD_STATUS_OK
     status, _ = controller.valcmd.command_call(cmd_oid, caller_pid=pid)
@@ -247,6 +255,8 @@ def test_value_command_metadata_roundtrip(tmp_path):
     command_entry = controller.valcmd.get_command_entry(cmd_oid)
     assert command_entry is not None
     assert command_entry.owner_pid == pid
+    described_command = controller.valcmd.describe_command(cmd_oid)
+    assert described_command is not None and described_command.get("group_name") == "control"
 
 
 def test_linker_rejects_duplicate_value_metadata(tmp_path):

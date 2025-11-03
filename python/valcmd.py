@@ -699,7 +699,17 @@ class ValCmdRegistry:
         next_offset = HSX_CMD_DESC_INVALID
         for spec in reversed(list(specs)):
             dtype = spec.get("type")
-            if dtype == "name":
+            if dtype == "group":
+                name_offset = self._string_table.insert(spec.get("name", ""))
+                if name_offset is None:
+                    return (False, HSX_CMD_DESC_INVALID)
+                record = GroupDescriptorRecord(
+                    desc_type=HSX_VAL_DESC_GROUP,
+                    next_offset=next_offset,
+                    group_id=int(spec.get("group_id", 0)),
+                    name_offset=name_offset,
+                )
+            elif dtype == "name":
                 name_offset = self._string_table.insert(spec.get("name", ""))
                 help_offset = self._string_table.insert(spec.get("help", ""))
                 if name_offset is None or help_offset is None:
@@ -1166,7 +1176,11 @@ class ValCmdRegistry:
     def _summarize_command_descriptors(self, entry: CommandEntry) -> Dict[str, Any]:
         summary: Dict[str, Any] = {}
         for record in self._iter_command_descriptors(entry):
-            if isinstance(record, CommandNameDescriptorRecord):
+            if isinstance(record, GroupDescriptorRecord):
+                group_name = self._string_table.get(record.name_offset)
+                if group_name:
+                    summary["group_name"] = group_name
+            elif isinstance(record, CommandNameDescriptorRecord):
                 name = self._string_table.get(record.name_offset)
                 help_text = self._string_table.get(record.help_offset)
                 if name:

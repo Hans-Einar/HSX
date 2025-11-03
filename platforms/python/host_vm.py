@@ -151,7 +151,7 @@ def _parse_value_metadata(section: bytes, entry_count: int) -> List[Dict[str, An
             min_raw,
             max_raw,
             persist_key,
-            reserved,
+            group_name_offset,
         ) = VALUE_ENTRY_STRUCT.unpack_from(section, start)
         entry = {
             "group_id": group_id,
@@ -169,7 +169,7 @@ def _parse_value_metadata(section: bytes, entry_count: int) -> List[Dict[str, An
             "max_raw": max_raw,
             "max": f16_to_f32(max_raw),
             "persist_key": persist_key,
-            "reserved": reserved,
+            "group_name": _decode_metadata_string(section, group_name_offset),
         }
         entries.append(entry)
     return entries
@@ -193,6 +193,8 @@ def _parse_command_metadata(section: bytes, entry_count: int) -> List[Dict[str, 
             help_offset,
             reserved,
         ) = CMD_ENTRY_STRUCT.unpack_from(section, start)
+        group_name_offset = reserved & 0xFFFF
+        reserved_high = (reserved >> 16) & 0xFFFF
         entry = {
             "group_id": group_id,
             "cmd_id": cmd_id,
@@ -201,7 +203,8 @@ def _parse_command_metadata(section: bytes, entry_count: int) -> List[Dict[str, 
             "handler_offset": handler_offset,
             "name": _decode_metadata_string(section, name_offset),
             "help": _decode_metadata_string(section, help_offset),
-            "reserved": reserved,
+            "group_name": _decode_metadata_string(section, group_name_offset),
+            "reserved": reserved_high,
         }
         entries.append(entry)
     return entries
@@ -2156,12 +2159,7 @@ class VMController:
             raise ValueError(f"{name} must be within 0..65535")
         return num
 
-    def _register_metadata_values(
-        self,
-        pid: int,
-        entries: List[Dict[str, Any]],
-        metadata_dict: Dict[str, Any],
-    ) -> None:
+    def _register_metadata_values(self, pid: int, entries: List[Dict[str, Any]], metadata_dict: Dict[str, Any]) -> None:
         if not entries:
             return
         value_meta_list = metadata_dict.get("values")
@@ -2193,6 +2191,9 @@ class VMController:
             if max_value is None:
                 max_value = f16_to_float(int(max_raw or 0) & 0xFFFF)
             specs: List[Dict[str, Any]] = []
+            group_name = entry.get("group_name")
+            if group_name:
+                specs.append({"type": "group", "name": group_name, "group_id": group_id})
             name_value = entry.get("name")
             if name_value:
                 specs.append({"type": "name", "name": name_value})
@@ -2231,12 +2232,7 @@ class VMController:
             raise ValueError(f"{name} must be within 0..4294967295")
         return num & 0xFFFFFFFF
 
-    def _register_metadata_commands(
-        self,
-        pid: int,
-        entries: List[Dict[str, Any]],
-        metadata_dict: Dict[str, Any],
-    ) -> None:
+    def _register_metadata_commands(self, pid: int, entries: List[Dict[str, Any]], metadata_dict: Dict[str, Any]) -> None:
         if not entries:
             return
         command_meta_list = metadata_dict.get("commands")
@@ -2247,6 +2243,9 @@ class VMController:
             auth_level = self._metadata_u8("command metadata auth_level", entry.get("auth_level", entry.get("auth", 0)))
             handler_offset = self._metadata_u32("command metadata handler_offset", entry.get("handler_offset", entry.get("handler", 0)))
             specs: List[Dict[str, Any]] = []
+            group_name = entry.get("group_name")
+            if group_name:
+                specs.append({"type": "group", "name": group_name, "group_id": group_id})
             name_value = entry.get("name")
             if name_value or entry.get("help"):
                 specs.append({"type": "name", "name": name_value or "", "help": entry.get("help", "")})

@@ -568,13 +568,6 @@ Design specifies registering all values/commands before VM execution (section 1.
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.04--ValCmd](../../../04--Design/04.04--ValCmd.md)
-- [ ] Implement metadata preprocessing during task load
-- [ ] Call VALUE_REGISTER for each .value entry
-- [ ] Call CMD_REGISTER for each .cmd entry
-- [ ] Build descriptor chains from metadata
-- [ ] Handle registration failures
-- [ ] Add preprocessed registration tests
-- [ ] Document preprocessing behavior
  - [x] Implement metadata preprocessing during task load
  - [x] Call VALUE_REGISTER for each .value entry
  - [x] Call CMD_REGISTER for each .cmd entry
@@ -605,6 +598,15 @@ Construct descriptor chains from section metadata. Enables rich metadata without
 - [ ] Link descriptors into chains
 - [ ] Add descriptor building tests
 - [ ] Document descriptor metadata format
+ - [x] Parse descriptor metadata from .value/.cmd sections
+ - [x] Build Group descriptors
+ - [x] Build Name descriptors
+ - [x] Build Unit descriptors
+ - [x] Build Range descriptors
+ - [x] Build Persist descriptors
+ - [x] Link descriptors into chains
+ - [x] Add descriptor building tests
+ - [x] Document descriptor metadata format
 
 ---
 

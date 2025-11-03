@@ -124,6 +124,7 @@ def _encode_value_metadata(entries: List[Dict[str, Any]]) -> tuple[bytes, int]:
             max_raw = _float_to_f16(max_value)
         persist_key = _normalise_uint16("value metadata persist_key", raw.get("persist_key", 0))
         reserved = _normalise_uint16("value metadata reserved", raw.get("reserved", 0))
+        group_name = raw.get("group_name", raw.get("groupName"))
         normalised.append(
             {
                 "group_id": group_id,
@@ -131,6 +132,7 @@ def _encode_value_metadata(entries: List[Dict[str, Any]]) -> tuple[bytes, int]:
                 "flags": flags,
                 "auth_level": auth_level,
                 "init_raw": init_raw & 0xFFFF,
+                "group_name": group_name,
                 "name": raw.get("name"),
                 "unit": raw.get("unit"),
                 "epsilon_raw": epsilon_raw & 0xFFFF,
@@ -149,6 +151,7 @@ def _encode_value_metadata(entries: List[Dict[str, Any]]) -> tuple[bytes, int]:
         base_offset = len(normalised) * entry_size
         name_offset = _intern_string(string_offsets, string_table, base_offset, entry.get("name"))
         unit_offset = _intern_string(string_offsets, string_table, base_offset, entry.get("unit"))
+        group_name_offset = _intern_string(string_offsets, string_table, base_offset, entry.get("group_name"))
         VALUE_ENTRY_STRUCT.pack_into(
             entries_blob,
             index * entry_size,
@@ -163,7 +166,7 @@ def _encode_value_metadata(entries: List[Dict[str, Any]]) -> tuple[bytes, int]:
             entry["min_raw"],
             entry["max_raw"],
             entry["persist_key"],
-            entry["reserved"],
+            group_name_offset,
         )
     return bytes(entries_blob + string_table), len(normalised)
 
@@ -184,6 +187,7 @@ def _encode_command_metadata(entries: List[Dict[str, Any]]) -> tuple[bytes, int]
         auth_level = _normalise_uint8("command metadata auth_level", raw.get("auth", raw.get("auth_level", 0)))
         handler_offset = _normalise_uint32("command metadata handler_offset", raw.get("handler", raw.get("handler_offset", 0)))
         reserved = _normalise_uint32("command metadata reserved", raw.get("reserved", 0))
+        group_name = raw.get("group_name", raw.get("groupName"))
         normalised.append(
             {
                 "group_id": group_id,
@@ -191,6 +195,7 @@ def _encode_command_metadata(entries: List[Dict[str, Any]]) -> tuple[bytes, int]
                 "flags": flags,
                 "auth_level": auth_level,
                 "handler_offset": handler_offset & 0xFFFFFFFF,
+                "group_name": group_name,
                 "name": raw.get("name"),
                 "help": raw.get("help"),
                 "reserved": reserved,
@@ -205,6 +210,8 @@ def _encode_command_metadata(entries: List[Dict[str, Any]]) -> tuple[bytes, int]
         base_offset = len(normalised) * entry_size
         name_offset = _intern_string(string_offsets, string_table, base_offset, entry.get("name"))
         help_offset = _intern_string(string_offsets, string_table, base_offset, entry.get("help"))
+        group_name_offset = _intern_string(string_offsets, string_table, base_offset, entry.get("group_name"))
+        combined_reserved = ((entry.get("reserved", 0) & 0xFFFF) << 16) | (group_name_offset & 0xFFFF)
         CMD_ENTRY_STRUCT.pack_into(
             entries_blob,
             index * entry_size,
@@ -215,7 +222,7 @@ def _encode_command_metadata(entries: List[Dict[str, Any]]) -> tuple[bytes, int]
             entry["handler_offset"],
             name_offset,
             help_offset,
-            entry["reserved"],
+            combined_reserved,
         )
     return bytes(entries_blob + string_table), len(normalised)
 

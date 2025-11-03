@@ -247,17 +247,18 @@ Append sessions chronologically and ensure every entry references the relevant d
 ## 2025-11-06 - Codex (Session 9)
 
 ### Scope
-- Plan item / phase addressed: Phase 5.2 Metadata Preprocessing
+- Plan item / phase addressed: Phase 5.2 Metadata Preprocessing & Phase 5.3 Descriptor Building
 - Design sections reviewed: 04.04--ValCmd (§4.4.1 declarative registration), docs/hxe_format.md metadata table
 
 ### Work Summary
-- During VM load, consumed HXE metadata to auto-register declarative values/commands via `ValCmdRegistry`, synthesising descriptors (name/unit/range/persist/help) and initialising values with their `init_value`.
+- During VM load, consumed HXE metadata to auto-register declarative values/commands via `ValCmdRegistry`, synthesising descriptors (group/name/unit/range/persist/help) and initialising values with their `init_value`.
 - Propagated generated OIDs back into metadata summaries and ensured registration failures abort loading with descriptive errors.
-- Added integration tests (`python/tests/test_vm_stream_loader.py`) validating round-trip registration and duplicate detection; documented pre-registration semantics in `docs/hxe_format.md`.
+- Added integration tests (`python/tests/test_vm_stream_loader.py`) validating round-trip registration, descriptor chaining, and duplicate detection; documented pre-registration semantics and descriptor layout in `docs/hxe_format.md`.
 
 ### Testing
 - `python -m pytest python/tests/test_vm_stream_loader.py`
-- `python -m pytest python/tests/test_valcmd_registry.py -k command_call -v`
+- `python -m pytest python/tests/test_valcmd_registry.py`
+- `python -m pytest python/tests/test_valcmd_svc_integration.py`
 
 ### Next Steps
 - Phase 5.3: build descriptor chains for richer metadata (group names, units) and ensure runtime exposes them through inspection APIs.
