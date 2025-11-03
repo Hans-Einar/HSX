@@ -593,6 +593,7 @@ class ValCmdRegistry:
         self._token_validator: Optional[Callable[[CommandEntry, Optional[bytes], int], bool]] = None
         self._async_executor: Callable[[Callable[[], None]], None] = self._default_async_executor
         self._persist_backend: Optional[Any] = None
+        self._mailbox_dispatcher: Optional[Callable[[Any, int, int, int], bool]] = None
         self._value_high_water = 0
         self._command_high_water = 0
         self._value_warn_active = False
@@ -625,6 +626,10 @@ class ValCmdRegistry:
             return
         for entry in self._values.values():
             self._apply_persisted_value(entry)
+
+    def set_mailbox_dispatcher(self, dispatcher: Optional[Callable[[Any, int, int, int], bool]]) -> None:
+        """Install dispatcher used to forward value change notifications."""
+        self._mailbox_dispatcher = dispatcher
 
     @staticmethod
     def _default_async_executor(runnable: Callable[[], None]) -> None:
@@ -762,6 +767,28 @@ class ValCmdRegistry:
         if raw is None:
             return
         entry.last_f16_raw = int(raw) & 0xFFFF
+
+    def _dispatch_value_notification(self, entry: ValueEntry, oid: int, old_raw: int, new_raw: int) -> None:
+        if not entry.subscribers or not self._mailbox_dispatcher:
+            return
+        dispatcher = self._mailbox_dispatcher
+        survivors: List[Any] = []
+        modified = False
+        for subscriber in list(entry.subscribers):
+            keep = False
+            try:
+                keep = bool(dispatcher(subscriber, oid, old_raw, new_raw))
+            except Exception:  # pylint: disable=broad-except
+                _LOGGER.exception(
+                    "value_mailbox_dispatch_failed",
+                    extra={"oid": oid, "subscriber": subscriber},
+                )
+            if keep:
+                survivors.append(subscriber)
+            else:
+                modified = True
+        if modified:
+            entry.subscribers = survivors
 
     def _observe_string_usage(self) -> None:
         used, total = self._string_table.usage
@@ -934,6 +961,7 @@ class ValCmdRegistry:
                 new_raw,
                 entry.persist_debounce_ms,
             )
+        self._dispatch_value_notification(entry, oid, old_raw, new_raw)
         return HSX_VAL_STATUS_OK
 
     def value_list(self, group_filter: int = 0xFF, caller_pid: Optional[int] = None) -> List[int]:

@@ -2136,12 +2136,34 @@ class VMController:
         registry = ValCmdRegistry()
         registry.set_event_hook(self._handle_valcmd_event)
         registry.set_persistence_backend(self.persistence_store)
+        registry.set_mailbox_dispatcher(self._dispatch_value_notification)
         return registry
 
     def _handle_valcmd_event(self, event_type: str, **kwargs):
         """Handle ValCmd events by emitting them to the VM event stream."""
         if self.vm:
             self.vm.emit_event({'type': event_type, **kwargs})
+
+    def _dispatch_value_notification(self, subscriber: Any, oid: int, old_raw: int, new_raw: int) -> bool:
+        try:
+            sub_pid, handle, _target = subscriber
+        except (ValueError, TypeError):
+            try:
+                sub_pid, handle = subscriber  # tolerate (pid, handle)
+            except (ValueError, TypeError):
+                return False
+        payload = struct.pack("<HHH", oid & 0xFFFF, old_raw & 0xFFFF, new_raw & 0xFFFF)
+        try:
+            ok, _ = self.mailboxes.send(pid=int(sub_pid), handle=int(handle), payload=payload, flags=0, channel=0)
+        except MailboxError:
+            ok = False
+        if not ok:
+            try:
+                self.mailboxes.close(pid=int(sub_pid), handle=int(handle))
+            except MailboxError:
+                pass
+            return False
+        return True
 
     @staticmethod
     def _metadata_u8(name: str, value: Any) -> int:

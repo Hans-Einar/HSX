@@ -78,6 +78,8 @@ The `step`/`clock step` responses include an optional `trace_last` object mirror
 
 Asynchronous command invocations (`cmd.call` with `async:true` or the lower-level `CMD_CALL_ASYNC` SVC) return a mailbox handle; completions are emitted as the little-endian payload `<uint16 oid><uint16 status>[<uint32 result>]`, where the optional result word is present when the handler returns an integer value.
 
+`VALUE_SUB` notifications use the payload `<uint16 oid><uint16 old_f16><uint16 new_f16>` (little-endian). Clients should tolerate duplicate callbacks and recover gracefully from dropped subscriptions.
+
 Clock status payloads expose additional telemetry beyond the base running flag:
 
 - `mode`: qualitative state of the auto-loop (`active`, `rate`, `sleep`, `throttled`, `idle`, `paused`, `stopped`).

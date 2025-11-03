@@ -614,14 +614,14 @@ Design specifies load-on-boot and debounced writes (section 4.4.4). System/ValCm
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.04--ValCmd](../../../04--Design/04.04--ValCmd.md)
-- [ ] Design FRAM layout for persisted values
-- [ ] Implement value load from FRAM at boot
-- [ ] Implement debounced value write to FRAM
-- [ ] Track which values need persistence
-- [ ] Implement FRAM write queue with debounce timer
-- [ ] Handle FRAM write failures gracefully
-- [ ] Add FRAM persistence tests
-- [ ] Document FRAM layout in `docs/persistence_layout.md`
+- [x] Design FRAM layout for persisted values
+- [x] Implement value load from FRAM at boot
+- [x] Implement debounced value write to FRAM
+- [x] Track which values need persistence
+- [x] Implement FRAM write queue with debounce timer
+- [x] Handle FRAM write failures gracefully
+- [x] Add FRAM persistence tests
+- [x] Document FRAM layout in `docs/persistence_layout.md`
 
 ---
 
@@ -636,13 +636,13 @@ Design specifies delivering value change notifications to subscribers (section 4
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.04--ValCmd](../../../04--Design/04.04--ValCmd.md)
-- [ ] Implement notification dispatch on VALUE_SET
-- [ ] Format notification message (oid, old_f16, new_f16)
-- [ ] Send notification to each subscriber's mailbox
-- [ ] Handle mailbox send failures (subscriber gone)
-- [ ] Remove dead subscribers from lists
-- [ ] Add notification tests (single/multiple subscribers)
-- [ ] Document notification message format
+- [x] Implement notification dispatch on VALUE_SET
+- [x] Format notification message (oid, old_f16, new_f16)
+- [x] Send notification to each subscriber's mailbox
+- [x] Handle mailbox send failures (subscriber gone)
+- [x] Remove dead subscribers from lists
+- [x] Add notification tests (single/multiple subscribers)
+- [x] Document notification message format
 
 ---
 

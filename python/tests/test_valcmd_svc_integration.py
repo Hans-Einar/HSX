@@ -298,9 +298,10 @@ class TestValCmdSVCIntegration:
 
         msg = controller.mailboxes.recv(pid=1, handle=handle, record_waiter=False)
         assert msg is not None
-        oid, raw = struct.unpack_from("<HH", msg.payload)
+        oid, old_raw, new_raw = struct.unpack_from("<HHH", msg.payload)
         assert oid == 0x0101
-        assert raw == 0x3C00
+        assert old_raw == 0x0000
+        assert new_raw == 0x3C00
 
     def test_command_register_and_help_via_svc(self):
         controller, vm = self._make_controller()

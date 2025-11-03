@@ -20,6 +20,7 @@
 | 2025-11-06 | `<commit-1f7c2de>` | `linker: emit .value/.cmd metadata sections` | Codex | Tests: `python -m pytest python/tests/test_vm_stream_loader.py` |
 | 2025-11-06 | `<commit-a4c5871>` | `valcmd: preload declarative metadata` | Codex | Tests: `python -m pytest python/tests/test_vm_stream_loader.py`, `python -m pytest python/tests/test_valcmd_registry.py -k command_call -v` |
 | 2025-11-06 | `<commit-7b82e2c>` | `valcmd: metadata descriptor chains` | Codex | Tests: `python -m pytest python/tests/test_vm_stream_loader.py`, `python -m pytest python/tests/test_valcmd_registry.py`, `python -m pytest python/tests/test_valcmd_svc_integration.py` |
+| 2025-11-06 | _pending_ | `valcmd: persistence backend + FRAM load/save` | Codex | Tests: `python -m pytest python/tests/test_vm_stream_loader.py python/tests/test_valcmd_registry.py python/tests/test_valcmd_svc_integration.py` |
 | <YYYY-MM-DD> | <commit-hash> | <short message> | <author> | Tests: `<command>` |
 
 ## Pull Request

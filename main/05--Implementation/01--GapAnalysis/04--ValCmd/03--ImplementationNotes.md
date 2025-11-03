@@ -262,3 +262,22 @@ Append sessions chronologically and ensure every entry references the relevant d
 
 ### Next Steps
 - Phase 5.3: build descriptor chains for richer metadata (group names, units) and ensure runtime exposes them through inspection APIs.
+
+## 2025-11-06 - Codex (Session 10)
+
+### Scope
+- Plan item / phase addressed: Phase 6.1 FRAM Integration & Phase 6.2 Mailbox Notifications
+- Design sections reviewed: 04.04--ValCmd (§4.4.3–§4.4.4), docs/resource_budgets.md persistence notes
+
+### Work Summary
+- Introduced a persistence backend abstraction (`python/persistence.py`) and wired it into `ValCmdRegistry`/`VMController` so persistent values load initial data at boot and schedule debounced writes on change; documented the draft layout in `docs/persistence_layout.md`.
+- Added mailbox dispatch plumbing to `ValCmdRegistry` so `VALUE_SET` pushes `(oid, old_f16, new_f16)` frames to subscribers, removing dead handles on failure; updated metadata loaders to capture persistence/group descriptors.
+- Expanded registry/integration tests to cover persistence loading and mailbox broadcasts, and refreshed plan checkboxes for Phases 6.1–6.2.
+
+### Testing
+- `python -m pytest python/tests/test_vm_stream_loader.py`
+- `python -m pytest python/tests/test_valcmd_registry.py`
+- `python -m pytest python/tests/test_valcmd_svc_integration.py`
+
+### Next Steps
+- Phase 6.3 change detection (epsilon/rate limiting) to avoid excessive notifications and persistence churn.

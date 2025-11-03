@@ -1,7 +1,7 @@
 """Tests for the ValCmd Registry Manager."""
 
 import logging
-from typing import Any, Callable, Optional, Tuple
+from typing import Any, Callable, List, Optional, Tuple
 
 import pytest
 from python.valcmd import (
@@ -623,6 +623,37 @@ class TestValCmdRegistry:
         status = registry.value_set(oid, 7.25, caller_pid=11, current_time=1.0)
         assert status == HSX_VAL_STATUS_OK
         assert backend.last_write == (99, float_to_f16(7.25) & 0xFFFF, 75)
+
+    def test_value_subscribe_dedup_and_failure_cleanup(self):
+        registry = ValCmdRegistry()
+        status, oid = registry.value_register(
+            3,
+            4,
+            0,
+            HSX_VAL_AUTH_PUBLIC,
+            owner_pid=21,
+        )
+        assert status == HSX_VAL_STATUS_OK
+
+        calls: list[Tuple[Any, int, int]] = []
+
+        def dispatcher(subscriber: Any, oid_value: int, old_raw: int, new_raw: int) -> bool:
+            calls.append((subscriber, old_raw, new_raw))
+            return subscriber != (42, 2)
+
+        registry.set_mailbox_dispatcher(dispatcher)
+        registry.value_subscribe(oid, (42, 1))
+        registry.value_subscribe(oid, (42, 1))  # duplicate ignored
+        registry.value_subscribe(oid, (42, 2))
+        subs = registry.get_value_subscribers(oid)
+        assert subs.count((42, 1)) == 1
+        assert subs.count((42, 2)) == 1
+
+        status = registry.value_set(oid, 5.0, caller_pid=21)
+        assert status == HSX_VAL_STATUS_OK
+        assert calls == [((42, 1), 0, float_to_f16(5.0)), ((42, 2), 0, float_to_f16(5.0))]
+        subs = registry.get_value_subscribers(oid)
+        assert subs == [(42, 1)]
     
     def test_command_list(self):
         """Test command enumeration."""
