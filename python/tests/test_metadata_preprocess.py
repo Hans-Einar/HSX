@@ -142,3 +142,63 @@ def test_register_metadata_accepts_legacy_mailbox_format():
     entry = state.mailbox_registry[2]["app:legacy"]
     assert entry["mode"] == mbx_const.HSX_MBX_MODE_RDWR
     assert entry["capacity"] == mbx_const.HSX_MBX_DEFAULT_RING_CAPACITY
+
+
+def test_register_metadata_mailbox_duplicate_last_entry_wins():
+    state = _make_state(MetadataVM())
+    metadata = {
+        "values": [],
+        "commands": [],
+        "mailboxes": [
+            {
+                "target": "app:dup",
+                "capacity": 16,
+                "mode_mask": mbx_const.HSX_MBX_MODE_RDONLY,
+            },
+            {
+                "target": "app:dup",
+                "capacity": 32,
+                "mode_mask": mbx_const.HSX_MBX_MODE_RDWR,
+            },
+        ],
+    }
+    state._register_metadata(1, metadata)
+    entry = state.mailbox_registry[1]["app:dup"]
+    assert entry["capacity"] == 32
+    assert entry["mode"] == mbx_const.HSX_MBX_MODE_RDWR
+
+
+def test_register_metadata_mailbox_bindings_must_be_list():
+    state = _make_state(MetadataVM())
+    metadata = {
+        "values": [],
+        "commands": [],
+        "mailboxes": [
+            {
+                "target": "app:badbindings",
+                "capacity": 0,
+                "mode_mask": mbx_const.HSX_MBX_MODE_RDWR,
+                "bindings": "not-a-list",
+            }
+        ],
+    }
+    with pytest.raises(ValueError, match="metadata_mailbox_bindings:app:badbindings"):
+        state._register_metadata(1, metadata)
+
+
+def test_register_metadata_mailbox_binding_requires_pid():
+    state = _make_state(MetadataVM())
+    metadata = {
+        "values": [],
+        "commands": [],
+        "mailboxes": [
+            {
+                "target": "app:missingpid",
+                "capacity": 0,
+                "mode_mask": mbx_const.HSX_MBX_MODE_RDWR,
+                "bindings": [{}],
+            }
+        ],
+    }
+    with pytest.raises(ValueError, match="metadata_mailbox_binding_pid:app:missingpid:0"):
+        state._register_metadata(1, metadata)

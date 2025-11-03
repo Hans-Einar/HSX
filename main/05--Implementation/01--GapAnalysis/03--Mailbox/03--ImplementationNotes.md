@@ -910,3 +910,79 @@ esource_stats() on the mailbox manager and exposed aggregated metrics (capacity,
   - `PYTHONPATH=. pytest python/tests/test_mailbox_svc_runtime.py -k "poll or snapshot"` (pass)
 - Follow-up actions / hand-off notes:
   - Remaining Phase 5.4 tasks: descriptor exhaustion stress, event cross-checks, scheduler WAIT_MBX assertions, and broader stress/concurrency suites.
+
+
+## 2025-11-05 - Codex (Session 23)
+
+### Focus
+- Task(s) tackled: Phase 5.4 scheduler WAIT_MBX integration and checklist reconciliation.
+- Dependencies touched: `python/tests/test_scheduler_state_machine.py`, implementation plan.
+
+### Status
+- DONE (subset of Phase 5.4)
+
+### Details
+- Summary of code changes / key decisions:
+  - Added regression coverage that feeds `mailbox_wait`, `mailbox_wake`, and `mailbox_timeout` events through `ExecutiveState` to confirm tasks transition into/out of `WAIT_MBX` with wait metadata preserved.
+  - Reviewed existing descriptor exhaustion and mailbox event emission suites (`test_mailbox_svc_runtime.py`) and marked the corresponding Phase 5.4 checklist items as satisfied.
+- Tests run (commands + result):
+  - `PYTHONPATH=. pytest python/tests/test_scheduler_state_machine.py` (pass)
+- Follow-up actions / hand-off notes:
+  - Outstanding items in Phase 5.4: .mailbox section processing, quota enforcement, stress/concurrency scenarios, and coverage reporting/CI wiring.
+
+
+## 2025-11-05 - Codex (Session 24)
+
+### Focus
+- Task(s) tackled: Phase 5.4 `.mailbox` metadata validation and quota checklist updates.
+- Dependencies touched: `python/tests/test_metadata_preprocess.py`, implementation plan.
+
+### Status
+- DONE (subset of Phase 5.4)
+
+### Details
+- Summary of code changes / key decisions:
+  - Extended metadata preprocessing tests to cover duplicate-target overwrite semantics, binding-type validation, and binding PID requirements, exercising the `.mailbox` normalization path.
+  - Marked the plan items for `.mailbox` processing and quota enforcement as complete (quota coverage already supplied via runtime tests).
+- Tests run (commands + result):
+  - `PYTHONPATH=. pytest python/tests/test_metadata_preprocess.py` (pass)
+- Follow-up actions / hand-off notes:
+  - Remaining Phase 5.4 items: stress/concurrency suites, coverage metrics, CI wiring.
+
+
+## 2025-11-05 - Codex (Session 25)
+
+### Focus
+- Task(s) tackled: Phase 5.4 stress and concurrency coverage.
+- Dependencies touched: `python/tests/test_mailbox_stress.py`, implementation plan.
+
+### Status
+- DONE (subset of Phase 5.4)
+
+### Details
+- Summary of code changes / key decisions:
+  - Added a bulk-descriptor stress regression to exercise large descriptor/handle counts and confirm resource statistics remain consistent under load.
+  - Added a fan-out concurrency scenario that validates multi-PID send/receive ordering on shared mailboxes while keeping queues drained.
+- Tests run (commands + result):
+  - `PYTHONPATH=. pytest python/tests/test_mailbox_stress.py` (pass)
+- Follow-up actions / hand-off notes:
+  - Phase 5.4 remaining items: coverage metrics + documentation, CI wiring for the expanded suite.
+
+
+## 2025-11-05 - Codex (Session 26)
+
+### Focus
+- Task(s) tackled: Phase 5.4 coverage metrics capture and CI alignment.
+- Dependencies touched: `python/tests/test_mailbox_manager.py`, `python/tests/test_mailbox_svc_runtime.py`, `python/tests/test_scheduler_state_machine.py`, `python/tests/test_metadata_preprocess.py`, `python/tests/test_mailbox_stress.py`, Makefile, implementation plan.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions:
+  - Installed `coverage`/`pytest-cov` tooling and captured mailbox suite coverage (`python/mailbox.py` 85%, `platforms/python/host_vm.py` 25%) to establish a baseline.
+  - Confirmed the new stress and scheduler suites run under the default `make pytest` target, documenting the command set for CI parity.
+- Tests run (commands + result):
+  - `PYTHONPATH=. pytest python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_scheduler_state_machine.py python/tests/test_metadata_preprocess.py python/tests/test_mailbox_stress.py --cov=python.mailbox --cov=platforms.python.host_vm --cov-report=term` (pass, coverage recorded above)
+- Follow-up actions / hand-off notes:
+  - Integrate coverage targets into release checklist once host_vm refactor completes; consider focused tests to lift host_vm coverage beyond 25%.

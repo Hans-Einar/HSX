@@ -46,6 +46,101 @@ def scheduler_events(state):
     return [event for event in state.event_history if event.get("type") == "scheduler"]
 
 
+def test_mailbox_wait_and_wake_transition():
+    vm = StubVM([make_task(1, "running")])
+    state = ExecutiveState(vm, step_batch=1)
+    state._refresh_tasks()
+    state.event_history.clear()
+
+    # Mailbox wait event should transition task into WAIT_MBX with metadata recorded.
+    state._process_vm_events(
+        [
+            {
+                "type": "mailbox_wait",
+                "pid": 1,
+                "descriptor": 42,
+                "handle": 7,
+                "timeout": 0xFFFF,
+                "deadline": 123.0,
+            }
+        ]
+    )
+    vm.set_tasks(
+        [
+            make_task(
+                1,
+                "waiting_mbx",
+                wait_mailbox=42,
+                wait_handle=7,
+                wait_timeout=0xFFFF,
+                wait_deadline=123.0,
+            )
+        ],
+        current_pid=1,
+    )
+    state._refresh_tasks()
+    entry = state.task_states[1]
+    assert entry["state_enum"] == TaskState.WAIT_MBX
+    ctx = entry["context"]
+    assert ctx["wait_mailbox"] == 42
+    assert ctx["wait_handle"] == 7
+    assert ctx["wait_timeout"] == 0xFFFF
+    assert ctx["wait_deadline"] == 123.0
+
+    # Mailbox wake event should bring the task back to READY and clear wait metadata.
+    state._process_vm_events(
+        [
+            {
+                "type": "mailbox_wake",
+                "pid": 1,
+                "descriptor": 42,
+            }
+        ]
+    )
+    vm.set_tasks([make_task(1, "ready")], current_pid=1)
+    state._refresh_tasks()
+    entry = state.task_states[1]
+    assert entry["state_enum"] == TaskState.READY
+    ctx = entry["context"]
+    assert ctx.get("wait_mailbox") is None
+    assert ctx.get("wait_handle") is None
+    assert ctx.get("wait_timeout") is None
+
+
+def test_mailbox_timeout_transition():
+    vm = StubVM([make_task(1, "running")])
+    state = ExecutiveState(vm, step_batch=1)
+    state._refresh_tasks()
+
+    # Move task into WAIT_MBX first.
+    state._process_vm_events(
+        [
+            {
+                "type": "mailbox_wait",
+                "pid": 1,
+                "descriptor": 10,
+            }
+        ]
+    )
+    vm.set_tasks([make_task(1, "waiting_mbx", wait_mailbox=10)], current_pid=1)
+    state._refresh_tasks()
+
+    # Timeout event should transition back to READY with timeout reason.
+    state._process_vm_events(
+        [
+            {
+                "type": "mailbox_timeout",
+                "pid": 1,
+                "descriptor": 10,
+                "timeout": 5,
+            }
+        ]
+    )
+    vm.set_tasks([make_task(1, "ready")], current_pid=1)
+    state._refresh_tasks()
+    entry = state.task_states[1]
+    assert entry["state_enum"] == TaskState.READY
+
 def test_task_state_transitions_recorded():
     vm = StubVM([make_task(1, "running")])
     state = ExecutiveState(vm, step_batch=1)

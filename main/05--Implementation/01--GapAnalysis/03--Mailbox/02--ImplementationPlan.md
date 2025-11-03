@@ -502,6 +502,12 @@ Design mentions rate limits for tap consumers to prevent starvation (section 6).
 
 ## Phase 5: Documentation and Testing
 
+**Status Snapshot**
+- [x] 5.1 Event schema documentation
+- [x] 5.2 HXE section examples
+- [x] 5.3 Usage pattern documentation
+- [ ] 5.4 Expand test coverage (in progress)
+
 ### 5.1 Event Schema Documentation
 
 **Priority:** MEDIUM  
@@ -578,16 +584,16 @@ Test coverage expansion needed for new features and gap closures. Ensures qualit
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.03--Mailbox](../../../04--Design/04.03--Mailbox.md)
 - [x] Add tests for timeout status code behavior
-- [ ] Add tests for descriptor exhaustion scenarios
-- [ ] Add tests for event emission (all event types)
+- [x] Add tests for descriptor exhaustion scenarios
+- [x] Add tests for event emission (all event types)
 - [x] Add tests for resource monitoring APIs
-- [ ] Add tests for .mailbox section processing
-- [ ] Add tests for scheduler integration (WAIT_MBX state)
-- [ ] Add tests for quota enforcement
-- [ ] Add stress tests (many descriptors, many messages)
-- [ ] Add concurrency tests (multiple tasks, contention)
-- [ ] Measure and document test coverage metrics
-- [ ] Add tests to CI pipeline
+- [x] Add tests for .mailbox section processing
+- [x] Add tests for scheduler integration (WAIT_MBX state)
+- [x] Add tests for quota enforcement
+- [x] Add stress tests (many descriptors, many messages)
+- [x] Add concurrency tests (multiple tasks, contention)
+- [x] Measure and document test coverage metrics
+- [x] Add tests to CI pipeline
 
 ---
 

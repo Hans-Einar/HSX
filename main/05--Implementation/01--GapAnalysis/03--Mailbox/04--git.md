@@ -11,9 +11,12 @@
 ## Commit Log
 | Date | Commit hash | Message | Author | Notes |
 | --- | --- | --- | --- | --- |
-| 2025-11-05 | `<pending>` | `mailbox: extend svc runtime coverage` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_mailbox_svc_runtime.py -k "poll or snapshot"` |
-| 2025-11-05 | `<pending>` | `mailbox: document usage patterns` | Codex | Tests: `(not run; documentation-only)` |
-| 2025-11-05 | `<pending>` | `mailbox: document .mailbox examples` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hxe_v2_metadata.py -k mode` |
+| 2025-11-05 | `<pending>` | `mailbox: coverage baseline + stress updates` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_scheduler_state_machine.py python/tests/test_metadata_preprocess.py python/tests/test_mailbox_stress.py --cov=python.mailbox --cov=platforms.python.host_vm --cov-report=term` |
+| 2025-11-05 | `<pending>` | `mailbox: stress + concurrency regressions` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_mailbox_stress.py` |
+| 2025-11-05 | `<pending>` | `mailbox: metadata preprocessing guards` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_metadata_preprocess.py` |
+| 2025-11-05 | `<pending>` | `mailbox: scheduler wait state regression` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_scheduler_state_machine.py` |
+| 2025-11-05 | `126877e` | `mailbox: usage patterns + svc runtime coverage` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_mailbox_svc_runtime.py -k "poll or snapshot"` |
+| 2025-11-05 | `68a53ab` | `mailbox: document .mailbox examples` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hxe_v2_metadata.py -k mode` |
 | 2025-11-03 | `0a7afaf` | `mailbox: document event schemas` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_shell_client.py` |
 | 2025-11-03 | `683a7f4` | `mailbox: add stdio tap rate limiting` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_shell_client.py` |
 | 2025-11-03 | `f62e0d7` | `mailbox: instrument exhaustion handling` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_shell_client.py` |
