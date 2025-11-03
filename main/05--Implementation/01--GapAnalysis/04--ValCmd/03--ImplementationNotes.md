@@ -226,3 +226,20 @@ Append sessions chronologically and ensure every entry references the relevant d
 ### Next Steps
 - Phase 5.1 declarative registration parser.
 - Begin planning for auth hierarchy (Phase 9.2) once registry hooks are stable.
+
+## 2025-11-06 - Codex (Session 8)
+
+### Scope
+- Plan item / phase addressed: Phase 5.1 Section Parser
+- Design sections reviewed: docs/hxe_format.md (Declarative Registration), 04.04--ValCmd §4.4.1, python/hld.py metadata handling
+
+### Work Summary
+- Extended linker (`python/hld.py`) to encode `.value` and `.cmd` metadata sections with canonical sorting, string-table interning, and duplicate detection across object files.
+- Normalised metadata inputs (uint bounds, float→f16 conversion) and reused the existing parser to expose decoded values/commands through `load_hxe_bytes`.
+- Added round-trip and error tests in `python/tests/test_vm_stream_loader.py` validating metadata capture during load and guarding against duplicate entries.
+
+### Testing
+- `python -m pytest python/tests/test_vm_stream_loader.py`
+
+### Next Steps
+- Phase 5.2: consume metadata entries during VM load to pre-register values/commands.

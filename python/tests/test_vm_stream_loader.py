@@ -1,10 +1,18 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from python import asm as hsx_asm
 from python import hld as hsx_linker
 from python import hsx_mailbox_constants as mbx_const
-from platforms.python.host_vm import HXEMetadata, VMController, load_hxe
+from python.hsx_value_constants import (
+    HSX_VAL_AUTH_PUBLIC,
+    HSX_VAL_AUTH_USER,
+)
+from python.hsx_command_constants import HSX_CMD_FLAG_PIN
+from python.valcmd import f16_to_float
+from platforms.python.host_vm import HXEMetadata, VMController, load_hxe, load_hxe_bytes
 
 
 SAMPLE_HXE = Path(__file__).resolve().parents[2] / "examples" / "tests" / "build" / "test_ir_half_main" / "main.hxe"
@@ -43,6 +51,70 @@ def _build_mailbox_hxe_bytes(tmp_path: Path, mailbox_entry: dict[str, object]) -
         metadata=hsx_asm.LAST_METADATA,
     )
     hxe_path = tmp_path / "mailbox.hxe"
+    hsx_linker.link_objects([hxo_path], hxe_path)
+    return hxe_path.read_bytes()
+
+
+def _build_value_cmd_hxe_bytes(tmp_path: Path) -> bytes:
+    lines = [
+        ".text",
+        ".entry",
+        "RET",
+    ]
+    (
+        code,
+        entry,
+        externs,
+        imports_decl,
+        rodata,
+        relocs,
+        exports,
+        entry_symbol,
+        local_symbols,
+    ) = hsx_asm.assemble(lines, for_object=True)
+    metadata = {
+        "values": [
+            {
+                "group": 1,
+                "value": 2,
+                "flags": 0,
+                "auth": HSX_VAL_AUTH_PUBLIC,
+                "init": 12.5,
+                "name": "temperature",
+                "unit": "degC",
+                "epsilon": 0.1,
+                "min": -40.0,
+                "max": 125.0,
+                "persist_key": 17,
+            }
+        ],
+        "commands": [
+            {
+                "group": 1,
+                "cmd": 7,
+                "flags": HSX_CMD_FLAG_PIN,
+                "auth": HSX_VAL_AUTH_USER,
+                "handler": 0x100,
+                "name": "reset",
+                "help": "Soft reset",
+            }
+        ],
+    }
+    hxo_path = tmp_path / "value_cmd.hxo"
+    hsx_asm.write_hxo_object(
+        hxo_path,
+        code_words=code,
+        rodata=rodata,
+        entry=entry or 0,
+        entry_symbol=entry_symbol,
+        externs=externs,
+        imports_decl=imports_decl,
+        relocs=relocs,
+        exports=exports,
+        local_symbols=local_symbols,
+        metadata=metadata,
+    )
+    hxe_path = tmp_path / "value_cmd.hxe"
     hsx_linker.link_objects([hxo_path], hxe_path)
     return hxe_path.read_bytes()
 
@@ -123,6 +195,73 @@ def test_streaming_loader_precreates_mailboxes(tmp_path):
     assert rebind.descriptor_id == descriptor_id
 
 
+def test_value_command_metadata_roundtrip(tmp_path):
+    image = _build_value_cmd_hxe_bytes(tmp_path)
+    header, _, _ = load_hxe_bytes(image)
+    metadata = header.get("metadata")
+    assert metadata and metadata["values"] and metadata["commands"]
+    value_entry = metadata["values"][0]
+    assert value_entry["group_id"] == 1
+    assert value_entry["value_id"] == 2
+    assert value_entry["name"] == "temperature"
+    assert value_entry["unit"] == "degC"
+    assert value_entry["persist_key"] == 17
+    assert f16_to_float(value_entry["init_raw"]) == pytest.approx(12.5, rel=1e-3)
+    command_entry = metadata["commands"][0]
+    assert command_entry["group_id"] == 1
+    assert command_entry["cmd_id"] == 7
+    assert command_entry["name"] == "reset"
+    assert command_entry["help"] == "Soft reset"
+    controller = VMController()
+    pid, result = _stream_load(controller, image, label="value_cmd_meta")
+    assert result["status"] == "ok"
+    meta_obj = controller.metadata_by_pid.get(pid)
+    assert isinstance(meta_obj, HXEMetadata)
+    assert meta_obj.values and meta_obj.commands
+    meta_value = meta_obj.values[0]
+    assert meta_value["group_id"] == 1
+    assert meta_value["value_id"] == 2
+    assert meta_value["init_value"] == pytest.approx(12.5, rel=1e-3)
+    meta_command = meta_obj.commands[0]
+    assert meta_command["group_id"] == 1
+    assert meta_command["cmd_id"] == 7
+    assert meta_command["handler_offset"] == 0x100
+
+
+def test_linker_rejects_duplicate_value_metadata(tmp_path):
+    lines = [".text", ".entry", "RET"]
+    obj_args = hsx_asm.assemble(lines, for_object=True)
+    metadata = {
+        "values": [
+            {
+                "group": 1,
+                "value": 1,
+                "init": 0.0,
+            }
+        ]
+    }
+    hxo_paths = []
+    for idx in range(2):
+        hxo_path = tmp_path / f"dup_{idx}.hxo"
+        hsx_asm.write_hxo_object(
+            hxo_path,
+            code_words=obj_args[0],
+            rodata=obj_args[4],
+            entry=obj_args[1] or 0,
+            entry_symbol=obj_args[7],
+            externs=obj_args[2],
+            imports_decl=obj_args[3],
+            relocs=obj_args[5],
+            exports=obj_args[6],
+            local_symbols=obj_args[8],
+            metadata=metadata,
+        )
+        hxo_paths.append(hxo_path)
+    hxe_path = tmp_path / "dup.hxe"
+    with pytest.raises(ValueError, match="Duplicate value metadata"):
+        hsx_linker.link_objects(hxo_paths, hxe_path)
+
+
 def test_streaming_loader_rejects_overflow():
     data = SAMPLE_HXE.read_bytes()
     controller = VMController()
@@ -146,4 +285,3 @@ def test_streaming_loader_requires_complete_image():
     assert result["status"] == "error"
     controller.load_stream_abort(pid)
     assert pid not in controller.streaming_sessions
-

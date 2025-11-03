@@ -15,8 +15,9 @@
 | 2025-11-03 | `a179dcf` | `valcmd: wire VALUE/CMD SVC handlers` | Hans Einar | Tests: `PYTHONPATH=. pytest python/tests/test_valcmd_registry.py python/tests/test_valcmd_svc_integration.py` |
 | 2025-11-03 | `0d55937` | `valcmd: mailbox notifications + async results` | Hans Einar | Tests: `Not recorded (commit message)` |
 | 2025-11-06 | `0a93cf3` | `valcmd: event stream + exec RPC surface` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_valcmd_registry.py python/tests/test_valcmd_svc_integration.py python/tests/test_executive_sessions.py -k "describe or snapshot or val_api or cmd_api"` |
-| 2025-11-06 | _pending_ | `valcmd: resource tracking + RPC stats` | Codex | Tests: `python -m pytest python/tests/test_valcmd_registry.py -k stats -v`, `python -m pytest python/tests/test_valcmd_svc_integration.py -k stats -v`, `python -m pytest python/tests/test_executive_sessions.py -k stats -v`, `python -m pytest python/tests/test_host_vm_cli.py`, `python -m pytest python/tests/test_ir_half_main.py` |
-| 2025-11-06 | _pending_ | `valcmd: enforce PIN + async dispatch` | Codex | Tests: `python -m pytest python/tests/test_valcmd_registry.py -k command_call -v`, `python -m pytest python/tests/test_valcmd_svc_integration.py -v`, `python -m pytest python/tests/test_host_vm_cli.py`, `python -m pytest python/tests/test_ir_half_main.py` |
+| 2025-11-06 | `<commit-c2009d0>` | `valcmd: resource tracking + RPC stats` | Codex | Tests: `python -m pytest python/tests/test_valcmd_registry.py -k stats -v`, `python -m pytest python/tests/test_valcmd_svc_integration.py -k stats -v`, `python -m pytest python/tests/test_executive_sessions.py -k stats -v`, `python -m pytest python/tests/test_host_vm_cli.py`, `python -m pytest python/tests/test_ir_half_main.py` |
+| 2025-11-06 | `<commit-4f2b7a1>` | `valcmd: enforce PIN + async dispatch` | Codex | Tests: `python -m pytest python/tests/test_valcmd_registry.py -k command_call -v`, `python -m pytest python/tests/test_valcmd_svc_integration.py -v`, `python -m pytest python/tests/test_host_vm_cli.py`, `python -m pytest python/tests/test_ir_half_main.py` |
+| 2025-11-06 | _pending_ | `linker: emit .value/.cmd metadata sections` | Codex | Tests: `python -m pytest python/tests/test_vm_stream_loader.py` |
 | <YYYY-MM-DD> | <commit-hash> | <short message> | <author> | Tests: `<command>` |
 
 ## Pull Request

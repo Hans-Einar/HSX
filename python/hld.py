@@ -13,7 +13,7 @@ import struct
 import sys
 import zlib
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 try:
     from asm import RODATA_BASE, set_imm12
@@ -29,6 +29,195 @@ METADATA_SECTION_VALUE = 1
 METADATA_SECTION_COMMAND = 2
 METADATA_SECTION_MAILBOX = 3
 CRC_FIELD_OFFSET = 0x1C
+VALUE_ENTRY_STRUCT = struct.Struct(">BBBBHHHHHHHH")
+CMD_ENTRY_STRUCT = struct.Struct(">BBBBIHHI")
+_F16_STRUCT = struct.Struct("<e")
+
+
+def _float_to_f16(value: float) -> int:
+    try:
+        packed = _F16_STRUCT.pack(float(value))
+    except OverflowError:
+        return 0x7C00 if value > 0 else 0xFC00
+    return int.from_bytes(packed, "little")
+
+
+def _normalise_uint8(name: str, value: Any) -> int:
+    try:
+        num = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be an integer") from exc
+    if not (0 <= num <= 0xFF):
+        raise ValueError(f"{name} must be within 0..255")
+    return num
+
+
+def _normalise_uint16(name: str, value: Any) -> int:
+    try:
+        num = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be an integer") from exc
+    if not (0 <= num <= 0xFFFF):
+        raise ValueError(f"{name} must be within 0..65535")
+    return num
+
+
+def _normalise_uint32(name: str, value: Any) -> int:
+    try:
+        num = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be an integer") from exc
+    if not (0 <= num <= 0xFFFFFFFF):
+        raise ValueError(f"{name} must be within 0..4294967295")
+    return num & 0xFFFFFFFF
+
+
+def _intern_string(strings: Dict[str, int], table: bytearray, base_offset: int, text: Optional[str]) -> int:
+    if text is None:
+        return 0
+    if not isinstance(text, str):
+        text = str(text)
+    if text == "":
+        # Preserve empty string explicitly by allocating a null terminator.
+        key = ""
+    else:
+        key = text
+    cached = strings.get(key)
+    if cached is not None:
+        return cached
+    offset = base_offset + len(table)
+    table.extend(text.encode("utf-8"))
+    table.append(0)
+    strings[key] = offset
+    return offset
+
+
+def _encode_value_metadata(entries: List[Dict[str, Any]]) -> tuple[bytes, int]:
+    if not entries:
+        return b"", 0
+    normalised: List[Dict[str, Any]] = []
+    seen: set[tuple[int, int]] = set()
+    for raw in entries:
+        group_id = _normalise_uint8("value metadata group_id", raw.get("group", raw.get("group_id")))
+        value_id = _normalise_uint8("value metadata value_id", raw.get("value", raw.get("value_id")))
+        key = (group_id, value_id)
+        if key in seen:
+            raise ValueError(f"duplicate value metadata entry for ({group_id},{value_id})")
+        seen.add(key)
+        flags = _normalise_uint8("value metadata flags", raw.get("flags", 0))
+        auth_level = _normalise_uint8("value metadata auth_level", raw.get("auth", raw.get("auth_level", 0)))
+        init_raw = raw.get("init_raw")
+        if init_raw is None:
+            init_value = raw.get("init", raw.get("init_value", 0.0))
+            init_raw = _float_to_f16(init_value)
+        epsilon_raw = raw.get("epsilon_raw")
+        if epsilon_raw is None:
+            epsilon_value = raw.get("epsilon", 0.0)
+            epsilon_raw = _float_to_f16(epsilon_value)
+        min_raw = raw.get("min_raw")
+        if min_raw is None:
+            min_value = raw.get("min", 0.0)
+            min_raw = _float_to_f16(min_value)
+        max_raw = raw.get("max_raw")
+        if max_raw is None:
+            max_value = raw.get("max", 0.0)
+            max_raw = _float_to_f16(max_value)
+        persist_key = _normalise_uint16("value metadata persist_key", raw.get("persist_key", 0))
+        reserved = _normalise_uint16("value metadata reserved", raw.get("reserved", 0))
+        normalised.append(
+            {
+                "group_id": group_id,
+                "value_id": value_id,
+                "flags": flags,
+                "auth_level": auth_level,
+                "init_raw": init_raw & 0xFFFF,
+                "name": raw.get("name"),
+                "unit": raw.get("unit"),
+                "epsilon_raw": epsilon_raw & 0xFFFF,
+                "min_raw": min_raw & 0xFFFF,
+                "max_raw": max_raw & 0xFFFF,
+                "persist_key": persist_key,
+                "reserved": reserved,
+            }
+        )
+    normalised.sort(key=lambda item: (item["group_id"], item["value_id"]))
+    entry_size = VALUE_ENTRY_STRUCT.size
+    entries_blob = bytearray(len(normalised) * entry_size)
+    string_table = bytearray()
+    string_offsets: Dict[str, int] = {}
+    for index, entry in enumerate(normalised):
+        base_offset = len(normalised) * entry_size
+        name_offset = _intern_string(string_offsets, string_table, base_offset, entry.get("name"))
+        unit_offset = _intern_string(string_offsets, string_table, base_offset, entry.get("unit"))
+        VALUE_ENTRY_STRUCT.pack_into(
+            entries_blob,
+            index * entry_size,
+            entry["group_id"],
+            entry["value_id"],
+            entry["flags"],
+            entry["auth_level"],
+            entry["init_raw"],
+            name_offset,
+            unit_offset,
+            entry["epsilon_raw"],
+            entry["min_raw"],
+            entry["max_raw"],
+            entry["persist_key"],
+            entry["reserved"],
+        )
+    return bytes(entries_blob + string_table), len(normalised)
+
+
+def _encode_command_metadata(entries: List[Dict[str, Any]]) -> tuple[bytes, int]:
+    if not entries:
+        return b"", 0
+    normalised: List[Dict[str, Any]] = []
+    seen: set[tuple[int, int]] = set()
+    for raw in entries:
+        group_id = _normalise_uint8("command metadata group_id", raw.get("group", raw.get("group_id")))
+        cmd_id = _normalise_uint8("command metadata cmd_id", raw.get("cmd", raw.get("cmd_id")))
+        key = (group_id, cmd_id)
+        if key in seen:
+            raise ValueError(f"duplicate command metadata entry for ({group_id},{cmd_id})")
+        seen.add(key)
+        flags = _normalise_uint8("command metadata flags", raw.get("flags", 0))
+        auth_level = _normalise_uint8("command metadata auth_level", raw.get("auth", raw.get("auth_level", 0)))
+        handler_offset = _normalise_uint32("command metadata handler_offset", raw.get("handler", raw.get("handler_offset", 0)))
+        reserved = _normalise_uint32("command metadata reserved", raw.get("reserved", 0))
+        normalised.append(
+            {
+                "group_id": group_id,
+                "cmd_id": cmd_id,
+                "flags": flags,
+                "auth_level": auth_level,
+                "handler_offset": handler_offset & 0xFFFFFFFF,
+                "name": raw.get("name"),
+                "help": raw.get("help"),
+                "reserved": reserved,
+            }
+        )
+    normalised.sort(key=lambda item: (item["group_id"], item["cmd_id"]))
+    entry_size = CMD_ENTRY_STRUCT.size
+    entries_blob = bytearray(len(normalised) * entry_size)
+    string_table = bytearray()
+    string_offsets: Dict[str, int] = {}
+    for index, entry in enumerate(normalised):
+        base_offset = len(normalised) * entry_size
+        name_offset = _intern_string(string_offsets, string_table, base_offset, entry.get("name"))
+        help_offset = _intern_string(string_offsets, string_table, base_offset, entry.get("help"))
+        CMD_ENTRY_STRUCT.pack_into(
+            entries_blob,
+            index * entry_size,
+            entry["group_id"],
+            entry["cmd_id"],
+            entry["flags"],
+            entry["auth_level"],
+            entry["handler_offset"],
+            name_offset,
+            help_offset,
+            entry["reserved"],
+        )
+    return bytes(entries_blob + string_table), len(normalised)
 
 
 def load_hxo(path: Path) -> Dict:
@@ -90,6 +279,16 @@ def write_hxe_v2(
     rodata_bytes = bytes(rodata or b"")
 
     metadata_sections: List[tuple[int, bytes, int]] = []
+
+    values_meta = metadata.get("values") or []
+    if values_meta:
+        payload, count = _encode_value_metadata(list(values_meta))
+        metadata_sections.append((METADATA_SECTION_VALUE, payload, count))
+
+    commands_meta = metadata.get("commands") or []
+    if commands_meta:
+        payload, count = _encode_command_metadata(list(commands_meta))
+        metadata_sections.append((METADATA_SECTION_COMMAND, payload, count))
 
     mailboxes = metadata.get("mailboxes") or []
     if mailboxes:
@@ -168,10 +367,29 @@ def link_objects(object_paths: List[Path], output: Path, *, verbose: bool = Fals
         code_offset += len(mod["code"]) * 4
         ro_offset += len(mod["rodata"])
 
+    aggregated_values: List[Dict[str, Any]] = []
+    aggregated_commands: List[Dict[str, Any]] = []
     aggregated_mailboxes: List[Dict[str, Any]] = []
+    seen_values: Dict[tuple[int, int], Path] = {}
+    seen_commands: Dict[tuple[int, int], Path] = {}
     seen_mailboxes: Dict[str, Path] = {}
     for mod in modules:
         metadata = mod.get("metadata") or {}
+        values_meta = metadata.get("values") or []
+        if not isinstance(values_meta, list):
+            raise ValueError(f"Value metadata for {mod['path']} must be a list")
+        for entry in values_meta:
+            if not isinstance(entry, dict):
+                raise ValueError(f"Value metadata entries must be objects ({mod['path']})")
+            group_id = _normalise_uint8("value metadata group_id", entry.get("group", entry.get("group_id")))
+            value_id = _normalise_uint8("value metadata value_id", entry.get("value", entry.get("value_id")))
+            key = (group_id, value_id)
+            if key in seen_values:
+                raise ValueError(
+                    f"Duplicate value metadata ({group_id},{value_id}) defined in {mod['path']} and {seen_values[key]}"
+                )
+            seen_values[key] = mod["path"]
+            aggregated_values.append(dict(entry))
         mailboxes = metadata.get("mailboxes") or []
         if not isinstance(mailboxes, list):
             raise ValueError(f"Mailbox metadata for {mod['path']} must be a list")
@@ -191,10 +409,43 @@ def link_objects(object_paths: List[Path], output: Path, *, verbose: bool = Fals
             normalized["target"] = target_norm
             aggregated_mailboxes.append(normalized)
         mod["metadata"] = metadata
+        commands_meta = metadata.get("commands") or []
+        if not isinstance(commands_meta, list):
+            raise ValueError(f"Command metadata for {mod['path']} must be a list")
+        for entry in commands_meta:
+            if not isinstance(entry, dict):
+                raise ValueError(f"Command metadata entries must be objects ({mod['path']})")
+            group_id = _normalise_uint8("command metadata group_id", entry.get("group", entry.get("group_id")))
+            cmd_id = _normalise_uint8("command metadata cmd_id", entry.get("cmd", entry.get("cmd_id")))
+            key = (group_id, cmd_id)
+            if key in seen_commands:
+                raise ValueError(
+                    f"Duplicate command metadata ({group_id},{cmd_id}) defined in {mod['path']} and {seen_commands[key]}"
+                )
+            seen_commands[key] = mod["path"]
+            aggregated_commands.append(dict(entry))
 
     if aggregated_mailboxes:
         aggregated_mailboxes.sort(key=lambda item: item["target"])
+    if aggregated_values:
+        aggregated_values.sort(
+            key=lambda item: (
+                _normalise_uint8("value metadata group_id", item.get("group", item.get("group_id"))),
+                _normalise_uint8("value metadata value_id", item.get("value", item.get("value_id"))),
+            )
+        )
+    if aggregated_commands:
+        aggregated_commands.sort(
+            key=lambda item: (
+                _normalise_uint8("command metadata group_id", item.get("group", item.get("group_id"))),
+                _normalise_uint8("command metadata cmd_id", item.get("cmd", item.get("cmd_id"))),
+            )
+        )
     metadata: Dict[str, Any] = {}
+    if aggregated_values:
+        metadata["values"] = aggregated_values
+    if aggregated_commands:
+        metadata["commands"] = aggregated_commands
     if aggregated_mailboxes:
         metadata["mailboxes"] = aggregated_mailboxes
 

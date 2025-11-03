@@ -546,14 +546,14 @@ Design specifies parsing `.value` and `.cmd` sections from HXE header (section 4
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.04--ValCmd](../../../04--Design/04.04--ValCmd.md)
-- [ ] Design .value section format (JSON or binary)
-- [ ] Design .cmd section format (JSON or binary)
-- [ ] Implement .value section parser
-- [ ] Implement .cmd section parser
-- [ ] Validate section contents
-- [ ] Handle parsing errors gracefully
-- [ ] Add section parsing tests
-- [ ] Document section formats in `docs/hxe_format.md`
+- [x] Design .value section format (JSON or binary)
+- [x] Design .cmd section format (JSON or binary)
+- [x] Implement .value section parser
+- [x] Implement .cmd section parser
+- [x] Validate section contents
+- [x] Handle parsing errors gracefully
+- [x] Add section parsing tests
+- [x] Document section formats in `docs/hxe_format.md`
 
 ---
 
