@@ -25,3 +25,4 @@
 ## Additional Notes
 - Update this file whenever new commits land or PR state changes.
 - Link CI runs, code reviews, or related issues as the implementation progresses.
+- 2025-11-07: Phase 1 checklist reconciled; no functional changes (documentation-only update).

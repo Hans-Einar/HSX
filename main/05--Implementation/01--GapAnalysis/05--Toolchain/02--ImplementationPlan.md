@@ -37,7 +37,7 @@ This implementation plan addresses the gaps identified in the Toolchain Study do
 - [ ] `02--ImplementationPlan.md` checkboxes refreshed.
 - [ ] `03--ImplementationNotes.md` entry recorded (focus, status, tests, follow-ups).
 - [ ] Design document updated (or follow-up filed) if behaviour diverges.
-- [ ] `04--git.md` log updated once changes land.
+- [x] `04--git.md` log updated once changes land.
 - [ ] Required review gate(s) completed (design → implementation → integration).
 
 ### Review Gates
@@ -67,15 +67,15 @@ Design specifies HXE version 0x0002 with metadata sections (sections 4.2.2, 4.2.
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Add version field support to HXE header (0x0001 vs 0x0002)
-- [ ] Add app_name field (32 bytes at offset 0x20)
-- [ ] Add allow_multiple_instances flag
-- [ ] Add meta_offset field (pointer to section table)
-- [ ] Add meta_count field (number of metadata sections)
-- [ ] Update HXE header structure in `python/build_hxe.py`
-- [ ] Maintain backward compatibility with v0.0001
-- [ ] Add HXE v2 header tests
-- [ ] Update `docs/hxe_format.md` with v2 specification
+- [x] Add version field support to HXE header (0x0001 vs 0x0002)
+- [x] Add app_name field (32 bytes at offset 0x20)
+- [x] Add allow_multiple_instances flag
+- [x] Add meta_offset field (pointer to section table)
+- [x] Add meta_count field (number of metadata sections)
+- [x] Update HXE header structure in `python/build_hxe.py`
+- [x] Maintain backward compatibility with v0.0001
+- [x] Add HXE v2 header tests
+- [x] Update `docs/hxe_format.md` with v2 specification
 
 ---
 
@@ -90,13 +90,13 @@ Section table specifies location and size of .value, .cmd, .mailbox sections. Re
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Design section table entry format (section_type, offset, size)
-- [ ] Define section types: VALUE (0x01), COMMAND (0x02), MAILBOX (0x03)
-- [ ] Specify table layout (array of entries following header)
-- [ ] Document table format in `docs/hxe_format.md`
-- [ ] Add section table encoding/decoding functions
-- [ ] Add section table tests
-- [ ] Validate table integrity (no overlaps, within bounds)
+- [x] Design section table entry format (section_type, offset, size)
+- [x] Define section types: VALUE (0x01), COMMAND (0x02), MAILBOX (0x03)
+- [x] Specify table layout (array of entries following header)
+- [x] Document table format in `docs/hxe_format.md`
+- [x] Add section table encoding/decoding functions
+- [x] Add section table tests
+- [x] Validate table integrity (no overlaps, within bounds)
 
 ---
 
@@ -111,14 +111,14 @@ Linker must generate HXE v2 executables with metadata sections. Design specifies
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Add `--app-name` parameter to `python/hld.py` (required)
-- [ ] Add `--allow-multiple-instances` flag to `python/hld.py`
-- [ ] Add `--hxe-version` parameter (default v2, allow v1 for compatibility)
-- [ ] Implement section table generation
-- [ ] Write metadata sections to HXE file
-- [ ] Update CRC calculation to include metadata
-- [ ] Add v2 linker tests (with/without metadata)
-- [ ] Update linker documentation
+- [x] Add `--app-name` parameter to `python/hld.py` (required)
+- [x] Add `--allow-multiple-instances` flag to `python/hld.py`
+- [x] Add `--hxe-version` parameter (default v2, allow v1 for compatibility)
+- [x] Implement section table generation
+- [x] Write metadata sections to HXE file
+- [x] Update CRC calculation to include metadata
+- [x] Add v2 linker tests (with/without metadata)
+- [x] Update linker documentation
 
 ---
 
@@ -133,13 +133,13 @@ VM/executive must parse HXE v2 headers and section tables. Enables metadata prep
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Update HXE loader to detect version field
-- [ ] Parse v2 header fields (app_name, meta_offset, meta_count)
-- [ ] Parse section table and extract metadata sections
-- [ ] Maintain v1 compatibility (fallback for old HXE files)
-- [ ] Add loader tests for v1 and v2 formats
-- [ ] Document loader behavior for both versions
-- [ ] Coordinate with Executive HXE v2 support
+- [x] Update HXE loader to detect version field
+- [x] Parse v2 header fields (app_name, meta_offset, meta_count)
+- [x] Parse section table and extract metadata sections
+- [x] Maintain v1 compatibility (fallback for old HXE files)
+- [x] Add loader tests for v1 and v2 formats
+- [x] Document loader behavior for both versions
+- [x] Coordinate with Executive HXE v2 support
 
 ---
 
@@ -183,7 +183,7 @@ Design specifies parsing pragma directives from LLVM IR metadata (section 4.2.1)
 - [x] Extract mailbox declarations from metadata
 - [x] Store extracted metadata in intermediate structure
 - [x] Add pragma extraction tests
-- [ ] Document extraction process
+- [x] Document extraction process
 
 ---
 

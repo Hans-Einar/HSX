@@ -26,6 +26,15 @@ This document specifies the implementation of debug metadata preservation throug
 - .sym JSON format (functions only)
 - Executive symbol loading and `symbols.list` API
 
+**Extraction Workflow (hsx-llc)**
+1. Scan the LLVM IR for metadata definitions (`!123 = ...`) and accumulate `!DIFile` and `!DISubprogram` records, transparently handling multi-line entries.
+2. When a function definition includes a `!dbg !<id>` attachment, record the link between the function and the previously parsed `!DISubprogram`.
+3. Emit an intermediate IR structure with:
+   - `debug.files` mapping metadata ids to `{"filename", "directory"}`
+   - `debug.subprograms` containing the raw `!DISubprogram` fields (name, linkageName, file ref, line)
+   - `debug.functions` summarising each function (sanitised name, associated file metadata, start line).
+4. Later phases consume this structure when generating `.dbg` and `.sym` artefacts.
+
 ### Phase 2: Instruction-Level Line Tracking
 **Goal:** Map every instruction to source line/column for accurate debugging.
 
