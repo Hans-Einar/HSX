@@ -121,17 +121,38 @@ Defines commands to be registered. Each entry:
 ### `.mailbox` Section (type=3)
 Defines mailboxes to be created before the VM starts running. HXE v2 uses a UTF-8 JSON payload:
 
-```json
+```jsonc
 {
   "version": 1,
   "mailboxes": [
     {
       "target": "app:telemetry",
-      "capacity": 128,
-      "mode_mask": 0x0007,
-      "owner_pid": 2,
+      "capacity": 96,
+      "mode": "RDWR",           // simple single-reader mailbox bound to app PID 2
+      "owner_pid": 2
+    },
+    {
+      "target": "shared:metrics",
+      "capacity": 192,
+      "mode": "RDWR|FANOUT_DROP", // fan-out telemetry stream (drop oldest on overflow)
       "bindings": [
-        {"pid": 2, "flags": 0x0001}
+        {"pid": 0, "flags": 0x0001},   // executive tap for dashboards
+        {"pid": 3, "flags": 0x0001}    // background logger subscribes
+      ]
+    },
+    {
+      "target": "svc:stdio.out@5",
+      "mode": "RDWR|TAP",          // declare tap for task 5 stdout mirroring
+      "bindings": [
+        {"pid": 0, "flags": 0x0004}
+      ]
+    },
+    {
+      "target": "pid:5",
+      "capacity": 64,
+      "mode": "RDWR",
+      "bindings": [
+        {"pid": 0, "flags": 0x0001}    // executive control channel (stdin)
       ]
     }
   ]
@@ -164,6 +185,18 @@ HSX source files declare mailbox metadata with a C-style pragma:
 - `target` (required) follows the same namespace rules as the JSON schema (`svc:`, `pid:`, `app:`, `shared:`).
 - Optional fields (`capacity`, `mode_mask`, `mode`, `owner_pid`, `bindings`) mirror the JSON object. The `mode` string supports `RDONLY`, `WRONLY`, `RDWR`, `FANOUT`, `FANOUT_DROP`, `FANOUT_BLOCK`, and `TAP`, combined with `|`.
 - The Clang → LLVM pipeline lowers the pragma to a comment in the IR: `; #pragma hsx_mailbox(...)`. `hsx-llc.py` detects these directives and emits matching `.mailbox { ... }` MVASM entries, which the assembler/linker convert into the HXE `.mailbox` section described above.
+
+#### Example scenarios
+
+- **Simple IPC (`app:telemetry`)** - single-reader mailbox provisioned for the owning PID. Use when a task exposes a control channel to tooling or other tasks.
+- **Fan-out broadcast (`shared:metrics`)** - shared namespace with `FANOUT_DROP` ensures producers never block; older entries are discarded when subscribers lag.
+- **Tap monitoring (`svc:stdio.out@5`)** - enable the `TAP` mode to duplicate stdout to the executive without starving the owner. Combine with tap rate limits configured in the mailbox profile.
+- **Stdio redirection (`pid:5`)** - declare the per-task control mailbox so provisioning can pre-bind stdin/stdout handles on load.
+
+**Tuning tips:**
+- Keep capacities power-of-two multiples of the default (64B) for predictable SRAM usage. Fan-out mailboxes must account for the largest payload multiplied by the number of subscribers.
+- Reserve `shared:` namespace for telemetry and logging. Use `app:` for intra-application channels and `svc:` for executive-owned plumbing (stdio, control).
+- When taps are involved, prefer `FANOUT_DROP` or tap-specific rate limits to protect the owner’s throughput.
 
 Legacy (pre-v2) images may still encode `.mailbox` entries as fixed-size binary structures:
 

@@ -219,9 +219,39 @@ def _normalise_mailbox_capacity(value: Any) -> Optional[int]:
     return capacity
 
 
+_MODE_NAME_TO_MASK: Dict[str, int] = {
+    "RDONLY": mbx_const.HSX_MBX_MODE_RDONLY,
+    "READONLY": mbx_const.HSX_MBX_MODE_RDONLY,
+    "RO": mbx_const.HSX_MBX_MODE_RDONLY,
+    "WRONLY": mbx_const.HSX_MBX_MODE_WRONLY,
+    "WRITEONLY": mbx_const.HSX_MBX_MODE_WRONLY,
+    "WO": mbx_const.HSX_MBX_MODE_WRONLY,
+    "RDWR": mbx_const.HSX_MBX_MODE_RDWR,
+    "RW": mbx_const.HSX_MBX_MODE_RDWR,
+    "FANOUT": mbx_const.HSX_MBX_MODE_FANOUT,
+    "FANOUT_DROP": mbx_const.HSX_MBX_MODE_FANOUT_DROP,
+    "FANOUT_BLOCK": mbx_const.HSX_MBX_MODE_FANOUT_BLOCK,
+    "TAP": mbx_const.HSX_MBX_MODE_TAP,
+}
+
+
 def _normalise_mode_mask(value: Any) -> int:
     if value in (None, "", 0):
         return mbx_const.HSX_MBX_MODE_RDWR
+    if isinstance(value, str):
+        tokenised = value.replace(",", "|")
+        mask = 0
+        for token in tokenised.split("|"):
+            name = token.strip().upper()
+            if not name:
+                continue
+            mapped = _MODE_NAME_TO_MASK.get(name)
+            if mapped is None:
+                raise ValueError(f"unknown mailbox mode '{token}'")
+            mask |= mapped
+        if mask == 0:
+            return mbx_const.HSX_MBX_MODE_RDWR
+        return mask & 0xFFFF
     try:
         mode_mask = int(value)
     except (TypeError, ValueError) as exc:

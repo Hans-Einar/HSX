@@ -18,6 +18,7 @@ from platforms.python.host_vm import (
     load_hxe_bytes,
     HXEMetadata,
 )
+from python import hsx_mailbox_constants as mbx_const
 
 
 def _pad_app_name(name: str) -> bytes:
@@ -196,6 +197,67 @@ def test_load_hxe_bytes_parses_mailbox_json_metadata():
     assert entry["owner_pid"] == 2
     assert entry["bindings"] == [{"pid": 2, "flags": 5}]
     assert entry.get("_source") == "json"
+
+
+def test_load_hxe_bytes_allows_mode_string_aliases():
+    payload = json.dumps(
+        {
+            "version": 1,
+            "mailboxes": [
+                {
+                    "target": "shared:metrics",
+                    "mode": "rdwr|fanout_drop|tap",
+                    "bindings": [{"pid": 1, "flags": 1}],
+                }
+            ],
+        }
+    ).encode("utf-8")
+
+    image, _, _ = _build_v2_image([(METADATA_SECTION_MAILBOX, payload, 1)])
+    header, _, _ = load_hxe_bytes(image)
+
+    entry = header["metadata"]["mailboxes"][0]
+    expected = (
+        mbx_const.HSX_MBX_MODE_RDWR
+        | mbx_const.HSX_MBX_MODE_FANOUT_DROP
+        | mbx_const.HSX_MBX_MODE_TAP
+    )
+    assert entry["mode_mask"] == expected
+
+
+def test_load_hxe_bytes_supports_mode_name_variants_and_spacing():
+    payload = json.dumps(
+        [
+            {
+                "target": "svc:stdio.out@5",
+                "mode": "rw | tap",
+            }
+        ]
+    ).encode("utf-8")
+
+    image, _, _ = _build_v2_image([(METADATA_SECTION_MAILBOX, payload, 1)])
+    header, _, _ = load_hxe_bytes(image)
+
+    entry = header["metadata"]["mailboxes"][0]
+    assert entry["mode_mask"] == (
+        mbx_const.HSX_MBX_MODE_RDWR | mbx_const.HSX_MBX_MODE_TAP
+    )
+
+
+def test_load_hxe_bytes_rejects_unknown_mode_name():
+    payload = json.dumps(
+        [
+            {
+                "target": "app:oob",
+                "mode": "rdwr|SLOW",
+            }
+        ]
+    ).encode("utf-8")
+
+    image, _, _ = _build_v2_image([(METADATA_SECTION_MAILBOX, payload, 1)])
+
+    with pytest.raises(ValueError, match="unknown mailbox mode"):
+        load_hxe_bytes(image)
 
 
 def test_load_hxe_bytes_parses_legacy_mailbox_metadata():

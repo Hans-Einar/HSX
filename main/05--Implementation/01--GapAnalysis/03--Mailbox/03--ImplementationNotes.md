@@ -851,3 +851,23 @@ esource_stats() on the mailbox manager and exposed aggregated metrics (capacity,
   - `PYTHONPATH=. pytest python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_shell_client.py` (pass).
 - Follow-up actions / hand-off notes:
   - Continue with Phase 5.2 (`.mailbox` examples) after review.
+
+
+## 2025-11-05 - Codex (Session 20)
+
+### Focus
+- Task(s) tackled: Phase 5.2 HXE `.mailbox` documentation examples and loader support.
+- Dependencies touched: `docs/hxe_format.md`, `platforms/python/host_vm.py`, `python/tests/test_hxe_v2_metadata.py`, implementation plan.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions:
+  - Expanded `.mailbox` documentation with four worked scenarios (simple IPC, fan-out, tap monitoring, stdio redirection) and accompanying tuning guidance.
+  - Extended the host VM metadata loader to interpret string-based `mode` aliases (`RDWR`, `FANOUT_DROP`, `TAP`, etc.) so docs and tooling share a single encoding.
+  - Added regression tests guaranteeing alias parsing, whitespace tolerance, and error handling for unknown mode names.
+- Tests run (commands + result):
+  - PYTHONPATH=. pytest python/tests/test_hxe_v2_metadata.py -k mode (pass)
+- Follow-up actions / hand-off notes:
+  - Phase 5.2 complete; next session should begin Phase 5.3 usage-pattern documentation.

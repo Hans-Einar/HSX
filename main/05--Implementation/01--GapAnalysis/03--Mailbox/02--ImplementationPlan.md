@@ -535,12 +535,12 @@ Examples help developers understand declarative mailbox usage. Documentation gap
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.03--Mailbox](../../../04--Design/04.03--Mailbox.md)
-- [ ] Create example .mailbox section for simple IPC
-- [ ] Create example for fan-out scenario
-- [ ] Create example for tap monitoring
-- [ ] Create example for stdio redirection
-- [ ] Add examples to documentation
-- [ ] Include explanatory comments
+- [x] Create example .mailbox section for simple IPC
+- [x] Create example for fan-out scenario
+- [x] Create example for tap monitoring
+- [x] Create example for stdio redirection
+- [x] Add examples to documentation
+- [x] Include explanatory comments
 
 ---
 
