@@ -763,6 +763,15 @@ class ValCmdRegistry:
             entry.subscribers.append(mailbox_handle)
         return HSX_VAL_STATUS_OK
 
+    def get_value_subscribers(self, oid: int) -> List[Any]:
+        entry = self._values.get(oid)
+        if entry is None:
+            return []
+        return list(entry.subscribers)
+
+    def get_value_entry(self, oid: int) -> Optional[ValueEntry]:
+        return self._values.get(oid)
+
     def value_persist(self, oid: int, mode: int, caller_pid: int) -> int:
         entry = self._values.get(oid)
         if entry is None:

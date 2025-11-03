@@ -3220,6 +3220,21 @@ class VMController:
                     current_time=time.monotonic(),
                 )
                 vm.regs[0] = status & 0xFFFF
+                if status == val_const.HSX_VAL_STATUS_OK:
+                    entry = self.valcmd.get_value_entry(oid)
+                    if entry is not None:
+                        payload = struct.pack("<HH", oid & 0xFFFF, entry.last_f16_raw & 0xFFFF)
+                        for sub_pid, handle, _ in self.valcmd.get_value_subscribers(oid):
+                            try:
+                                self.mailboxes.send(
+                                    pid=sub_pid,
+                                    handle=handle,
+                                    payload=payload,
+                                    flags=0,
+                                    channel=0,
+                                )
+                            except MailboxError:
+                                continue
                 return
 
             if fn == val_const.HSX_VAL_FN_LIST:
@@ -3312,8 +3327,25 @@ class VMController:
 
             if fn == cmd_const.HSX_CMD_FN_CALL_ASYNC:
                 oid = vm.regs[1] & 0xFFFF
-                status, _ = self.valcmd.command_call_async(oid, caller_pid=pid)
+                target = vm._read_c_string(vm.regs[3])
+                if not target:
+                    vm.regs[0] = cmd_const.HSX_CMD_STATUS_EINVAL
+                    return
+                try:
+                    handle = self.mailboxes.open(pid=pid, target=target)
+                except MailboxError:
+                    vm.regs[0] = cmd_const.HSX_CMD_STATUS_EINVAL
+                    return
+                status, result = self.valcmd.command_call(oid, caller_pid=pid)
                 vm.regs[0] = status & 0xFFFF
+                payload = struct.pack("<HH", oid & 0xFFFF, status & 0xFFFF)
+                if isinstance(result, (int, float)):
+                    payload += struct.pack("<I", int(result) & 0xFFFFFFFF)
+                try:
+                    self.mailboxes.send(pid=pid, handle=handle, payload=payload, flags=0, channel=0)
+                except MailboxError:
+                    pass
+                vm.regs[1] = handle
                 return
 
             if fn == cmd_const.HSX_CMD_FN_HELP:
