@@ -205,6 +205,30 @@ def test_mailbox_svc_app_bind_open_reuse_and_backpressure():
     assert vm2.mem[recv_ptr : recv_ptr + len(payload)] == payload
 
 
+def test_mailbox_svc_poll_recv_returns_no_data_and_does_not_wait():
+    controller = _make_controller_with_tasks(1)
+    vm = _attach_vm(controller, 1)
+    controller.current_pid = 1
+
+    target = "app:poll_demo"
+    controller.mailboxes.bind_target(pid=1, target=target, mode_mask=mbx_const.HSX_MBX_MODE_RDWR)
+    handle = controller.mailboxes.open(pid=1, target=target)
+
+    buffer_ptr = 0x0600
+    vm.mem[buffer_ptr : buffer_ptr + 16] = b"\x00" * 16
+    vm.regs[1] = handle
+    vm.regs[2] = buffer_ptr
+    vm.regs[3] = 16
+    vm.regs[4] = mbx_const.HSX_MBX_TIMEOUT_POLL
+    vm.regs[5] = 0
+
+    controller._svc_mailbox_controller(vm, mbx_const.HSX_MBX_FN_RECV)
+
+    assert vm.regs[0] == mbx_const.HSX_MBX_STATUS_NO_DATA
+    assert controller.waiting_tasks == {}
+    assert _drain_events(vm, "mailbox_wait") == []
+
+
 def test_mailbox_svc_shared_fanout_writes_recv_info():
     controller = _make_controller_with_tasks(1, 2, 3)
 
@@ -754,3 +778,38 @@ def test_mailbox_event_payload_shapes():
     assert recv_events
     recv_event = recv_events[-1]
     assert {"descriptor", "handle", "length", "flags", "channel", "src_pid"} <= set(recv_event.keys())
+
+
+def test_mailbox_snapshot_reports_resource_stats():
+    controller = _make_controller_with_tasks(1)
+    vm = _attach_vm(controller, 1)
+    controller.current_pid = 1
+
+    target = "app:snapshot_metrics"
+    desc = controller.mailboxes.bind_target(pid=1, target=target, capacity=64, mode_mask=mbx_const.HSX_MBX_MODE_RDWR)
+    handle = controller.mailboxes.open(pid=1, target=target)
+
+    payload = b"metrics"
+    send_ptr = 0x0800
+    vm.mem[send_ptr : send_ptr + len(payload)] = payload
+    vm.regs[1] = handle
+    vm.regs[2] = send_ptr
+    vm.regs[3] = len(payload)
+    vm.regs[4] = 0
+    vm.regs[5] = 0
+    controller._svc_mailbox_controller(vm, mbx_const.HSX_MBX_FN_SEND)
+
+    snapshot = controller.mailbox_snapshot()
+    stats = snapshot["stats"]
+    descriptors = snapshot["descriptors"]
+    assert stats["active_descriptors"] >= 1
+    assert stats["handles_total"] >= 1
+    assert stats["bytes_used"] >= len(payload)
+    assert stats["queue_depth"] >= 1
+    handle_limit = stats["handle_limit_per_pid"]
+    assert handle_limit is None or handle_limit >= 0
+    assert any(entry["descriptor_id"] == desc.descriptor_id for entry in descriptors)
+    matching = next(entry for entry in descriptors if entry["descriptor_id"] == desc.descriptor_id)
+    assert matching["bytes_used"] >= len(payload)
+    assert matching["queue_depth"] >= 1
+    assert matching["mode_mask"] & mbx_const.HSX_MBX_MODE_RDWR

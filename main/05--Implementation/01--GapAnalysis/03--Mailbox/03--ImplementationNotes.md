@@ -871,3 +871,42 @@ esource_stats() on the mailbox manager and exposed aggregated metrics (capacity,
   - PYTHONPATH=. pytest python/tests/test_hxe_v2_metadata.py -k mode (pass)
 - Follow-up actions / hand-off notes:
   - Phase 5.2 complete; next session should begin Phase 5.3 usage-pattern documentation.
+
+
+## 2025-11-05 - Codex (Session 21)
+
+### Focus
+- Task(s) tackled: Phase 5.3 mailbox usage pattern documentation.
+- Dependencies touched: `docs/mailbox_usage.md`, `main/05--Implementation/01--GapAnalysis/03--Mailbox/02--ImplementationPlan.md`.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions:
+  - Authored `docs/mailbox_usage.md` with step-by-step walkthroughs for single-reader, fan-out, tap monitoring, and request/reply patterns.
+  - Documented namespace rules, timeout strategies, and error-handling guidance to close the Phase 5.3 checklist.
+  - Cross-referenced design and ABI docs so future updates keep the references aligned.
+- Tests run (commands + result):
+  - (none, documentation-only update)
+- Follow-up actions / hand-off notes:
+  - Ready to begin Phase 5.4 test coverage expansion or schedule review gates for completed documentation phases.
+
+
+## 2025-11-05 - Codex (Session 22)
+
+### Focus
+- Task(s) tackled: Phase 5.4 coverage for timeout status codes and resource monitoring APIs.
+- Dependencies touched: `python/tests/test_mailbox_svc_runtime.py`, implementation plan.
+
+### Status
+- IN PROGRESS (partial)
+
+### Details
+- Summary of code changes / key decisions:
+  - Added regression ensuring poll-mode receives return `HSX_MBX_STATUS_NO_DATA` without registering waiters to capture timeout status behaviour.
+  - Exercised `mailbox_snapshot()` to validate resource statistics wiring, including descriptor snapshots after live traffic.
+- Tests run (commands + result):
+  - `PYTHONPATH=. pytest python/tests/test_mailbox_svc_runtime.py -k "poll or snapshot"` (pass)
+- Follow-up actions / hand-off notes:
+  - Remaining Phase 5.4 tasks: descriptor exhaustion stress, event cross-checks, scheduler WAIT_MBX assertions, and broader stress/concurrency suites.

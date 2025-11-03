@@ -555,14 +555,14 @@ Documentation gap: missing examples of fan-out and tap usage patterns (Study sec
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.03--Mailbox](../../../04--Design/04.03--Mailbox.md)
-- [ ] Document single-reader usage pattern
-- [ ] Document fan-out usage pattern with examples
-- [ ] Document tap usage pattern with examples
-- [ ] Document namespace usage (svc:, pid:, app:, shared:)
-- [ ] Document blocking vs. polling patterns
-- [ ] Document error handling patterns
-- [ ] Add code examples for each pattern
-- [ ] Create tutorial-style documentation
+- [x] Document single-reader usage pattern
+- [x] Document fan-out usage pattern with examples
+- [x] Document tap usage pattern with examples
+- [x] Document namespace usage (svc:, pid:, app:, shared:)
+- [x] Document blocking vs. polling patterns
+- [x] Document error handling patterns
+- [x] Add code examples for each pattern
+- [x] Create tutorial-style documentation
 
 ---
 
@@ -577,10 +577,10 @@ Test coverage expansion needed for new features and gap closures. Ensures qualit
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.03--Mailbox](../../../04--Design/04.03--Mailbox.md)
-- [ ] Add tests for timeout status code behavior
+- [x] Add tests for timeout status code behavior
 - [ ] Add tests for descriptor exhaustion scenarios
 - [ ] Add tests for event emission (all event types)
-- [ ] Add tests for resource monitoring APIs
+- [x] Add tests for resource monitoring APIs
 - [ ] Add tests for .mailbox section processing
 - [ ] Add tests for scheduler integration (WAIT_MBX state)
 - [ ] Add tests for quota enforcement

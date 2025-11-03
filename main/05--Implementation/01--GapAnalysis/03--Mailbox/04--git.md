@@ -11,6 +11,8 @@
 ## Commit Log
 | Date | Commit hash | Message | Author | Notes |
 | --- | --- | --- | --- | --- |
+| 2025-11-05 | `<pending>` | `mailbox: extend svc runtime coverage` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_mailbox_svc_runtime.py -k "poll or snapshot"` |
+| 2025-11-05 | `<pending>` | `mailbox: document usage patterns` | Codex | Tests: `(not run; documentation-only)` |
 | 2025-11-05 | `<pending>` | `mailbox: document .mailbox examples` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hxe_v2_metadata.py -k mode` |
 | 2025-11-03 | `0a7afaf` | `mailbox: document event schemas` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_shell_client.py` |
 | 2025-11-03 | `683a7f4` | `mailbox: add stdio tap rate limiting` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_shell_client.py` |
