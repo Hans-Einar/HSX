@@ -387,7 +387,7 @@ Disassembly
 |-------|------|-------------|
 | `seq` | uint64 | Monotonic sequence number (per executive instance). Values never repeat within a process lifetime. |
 | `ts` | float | Seconds since epoch (UTC). |
-| `type` | string | Event category (`trace_step`, `debug_break`, `scheduler`, `mailbox_send`, `mailbox_recv`, `watch_update`, `stdout`, `stderr`, `warning`, etc.). |
+| `type` | string | Event category (`trace_step`, `debug_break`, `scheduler`, `mailbox_send`, `mailbox_recv`, `mailbox_exhausted`, `mailbox_backpressure`, `watch_update`, `stdout`, `stderr`, `warning`, etc.). |
 | `pid` | int or `null` | PID associated with the event (`null` for global events). |
 | `data` | object | Event payload (schema depends on `type`). Unknown keys must be ignored for forward compatibility. |
 
@@ -402,6 +402,8 @@ Typical payloads:
 - `mailbox_wake`: `{ "descriptor": <int>, "handle": <int>, "status": <uint16>, "length": <int>, "flags": <uint16>, "channel": <uint16>, "src_pid": <int> }`
 - `mailbox_timeout`: `{ "descriptor": <int>, "handle": <int>, "status": <uint16>, "length": <int>, "flags": <uint16>, "channel": <uint16>, "src_pid": <int> }`
 - `mailbox_overrun`: `{ "descriptor": <int>, "pid": <int>, "dropped_seq": <int>, "dropped_length": <int>, "dropped_flags": <uint16>, "channel": <uint16>, "reason": <string>, "queue_depth": <int> }`
+- `mailbox_exhausted`: `{ "reason": "descriptor_pool_full" | "handle_limit", "max_descriptors"?: <int>, "namespace"?: <int>, "name"?: <string>, "owner"?: <int>, "pid"?: <int>, "handles"?: <int> }`
+- `mailbox_backpressure`: `{ "descriptor": <int>, "policy": "single" | "fanout_block" | "fanout_drop", "capacity": <int>, "bytes_used": <int>, "requested": <int> }`
 - `mailbox_error`: `{ "fn": <int>, "error": <string>, "status": <uint16?> }`
 - `watch_update`: `{ "watch_id": <string>, "value": <string>, "formatted": <string?> }`
 - `stdout` / `stderr`: `{ "text": <string> }`
@@ -431,4 +433,3 @@ These semantics ensure: (1) FIFO fairness - waiters are processed in arrival ord
 - After disconnection clients should resume with `since_seq` set to the last processed sequence to avoid gaps. If the requested range was evicted the executive replies with `status:"error","error":"seq_evicted"` so clients can perform a full refresh.
 
 Clients must continue sending `session.keepalive` within the advertised heartbeat interval (default 30 seconds). Inactivity causes the executive to close the session and release PID locks automatically. Observer sessions that lapse simply stop receiving events; owner sessions incur `pid_lock` release notifications so tooling can warn the user.
-

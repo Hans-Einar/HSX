@@ -490,13 +490,13 @@ Design mentions rate limits for tap consumers to prevent starvation (section 6).
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.03--Mailbox](../../../04--Design/04.03--Mailbox.md)
-- [ ] Design rate limiting policy for tap consumers
-- [ ] Implement rate limit tracking per tap
-- [ ] Drop tap messages when rate limit exceeded
-- [ ] Add rate limit configuration (messages per second)
-- [ ] Add rate limiting tests
-- [ ] Document stdio rate limiting behavior
-- [ ] Provide tuning guidelines
+- [x] Design rate limiting policy for tap consumers
+- [x] Implement rate limit tracking per tap
+- [x] Drop tap messages when rate limit exceeded
+- [x] Add rate limit configuration (messages per second)
+- [x] Add rate limiting tests
+- [x] Document stdio rate limiting behavior
+- [x] Provide tuning guidelines
 
 ---
 

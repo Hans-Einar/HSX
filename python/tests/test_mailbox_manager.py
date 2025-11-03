@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 import pytest
 
 from python.mailbox import MailboxManager, MailboxError
+from python import mailbox as mailbox_module
 from python import hsx_mailbox_constants as mbx_const
 
 
@@ -231,6 +232,46 @@ def test_open_enforces_per_pid_handle_limit_and_recovers_after_close():
     other = mgr.open(pid=2, target="svc:stdio.out")
     assert other == 1
 
+
+def test_tap_rate_limit_drops_messages(monkeypatch):
+    events: List[Dict[str, Any]] = []
+    mgr = MailboxManager(tap_rate_limit=2, event_hook=events.append)
+    desc = mgr.bind_target(pid=1, target="svc:stdio.out")
+    owner = mgr.open(pid=1, target="svc:stdio.out")
+    tap_handle = mgr.open(pid=0, target="svc:stdio.out@1")
+    mgr.tap(pid=0, handle=tap_handle, enable=True)
+
+    now = [0.0]
+
+    def fake_monotonic() -> float:
+        return now[0]
+
+    monkeypatch.setattr(mailbox_module.time, "monotonic", fake_monotonic)
+
+    payload = b"x"
+    for _ in range(3):
+        ok, _ = mgr.send(pid=1, handle=owner, payload=payload)
+        assert ok is True
+
+    state = mgr._handles[0][tap_handle]
+    assert state.is_tap is True
+    assert events, "expected at least one event from backpressure"
+    assert any(ev.get("type") == "mailbox_backpressure" and ev.get("policy") == "tap_rate_limit" for ev in events)
+
+    received = [mgr.recv(pid=0, handle=tap_handle, record_waiter=False) for _ in range(3)]
+    non_none = [msg for msg in received if msg is not None]
+    assert len(non_none) == 2
+    assert all(msg.payload == payload for msg in non_none)
+    assert non_none[0].flags & mbx_const.HSX_MBX_FLAG_OVERRUN
+    assert not (non_none[1].flags & mbx_const.HSX_MBX_FLAG_OVERRUN)
+    assert mgr.recv(pid=0, handle=tap_handle, record_waiter=False) is None
+
+    # Advance window and ensure delivery resumes
+    now[0] = 1.5
+    state.pending_tap_overrun = False
+    ok, _ = mgr.send(pid=1, handle=owner, payload=payload)
+    assert ok is True
+    assert mgr.recv(pid=0, handle=tap_handle, record_waiter=False) is not None
 
 def test_fanout_reclaims_after_all_consumers_ack():
     mgr = MailboxManager()

@@ -6,6 +6,7 @@ import collections
 import errno
 from dataclasses import dataclass, field
 from typing import Any, Callable, Deque, Dict, Iterable, Iterator, List, Optional, Tuple
+import time
 
 from python import hsx_mailbox_constants as mbx_const  # namespace package import
 
@@ -101,6 +102,7 @@ class MailboxManager:
         per_pid_handle_limit: Optional[int] = None,
         default_capacity: Optional[int] = None,
         event_hook: Optional[Callable[[Dict[str, Any]], None]] = None,
+        tap_rate_limit: Optional[int] = None,
     ) -> None:
         self._max_descriptors = max(1, int(max_descriptors))
         self._handle_limit = int(per_pid_handle_limit) if per_pid_handle_limit is not None else None
@@ -126,6 +128,8 @@ class MailboxManager:
         self._stdio_handles: Dict[int, Dict[str, int]] = {}
         self._message_overhead = 8  # header size used in _message_cost
         self._event_hook: Optional[Callable[[Dict[str, Any]], None]] = event_hook
+        self._tap_rate_limit = max(0, int(tap_rate_limit)) if tap_rate_limit is not None else 0
+        self._tap_rate_windows: Dict[Tuple[int, int], Dict[str, float]] = {}
         self._descriptor_exhausted = False
 
     # ------------------------------------------------------------------
@@ -152,6 +156,27 @@ class MailboxManager:
         except Exception:
             # Instrumentation must never disrupt mailbox operation.
             pass
+
+    def set_tap_rate_limit(self, limit: Optional[int]) -> None:
+        value = 0 if limit is None else max(0, int(limit))
+        if value != self._tap_rate_limit:
+            self._tap_rate_limit = value
+            self._tap_rate_windows.clear()
+
+    def _tap_rate_allow(self, key: Tuple[int, int]) -> bool:
+        limit = self._tap_rate_limit
+        if limit <= 0:
+            return True
+        now = time.monotonic()
+        window = self._tap_rate_windows.get(key)
+        if window is None or now - window.get("start", 0.0) >= 1.0:
+            window = {"start": now, "count": 0, "dropped": 0}
+            self._tap_rate_windows[key] = window
+        if window["count"] >= limit:
+            window["dropped"] += 1
+            return False
+        window["count"] += 1
+        return True
 
     def register_task(self, pid: int) -> None:
         """Ensure the per-task mailboxes exist (stdio + control)."""
@@ -302,6 +327,7 @@ class MailboxManager:
                 key = (pid, handle)
                 desc.tap_buffers.pop(key, None)
                 desc.taps = [entry for entry in desc.taps if entry != key]
+                self._tap_rate_windows.pop(key, None)
             self._reclaim_acked(desc)
 
     def descriptor_for_handle(self, pid: int, handle: int) -> MailboxDescriptor:
@@ -430,12 +456,14 @@ class MailboxManager:
                 desc.taps.append(key)
             desc.tap_buffers.setdefault(key, TapBuffer())
             state.is_tap = True
+            self._tap_rate_windows.pop(key, None)
         else:
             if key in desc.taps:
                 desc.taps = [entry for entry in desc.taps if entry != key]
             desc.tap_buffers.pop(key, None)
             state.is_tap = False
             state.pending_tap_overrun = False
+            self._tap_rate_windows.pop(key, None)
 
     def iter_waiters(self, descriptor_id: int) -> Iterable[int]:
         desc = self._descriptors.get(descriptor_id)
@@ -547,6 +575,7 @@ class MailboxManager:
             "handles_total": total_handles,
             "handles_per_pid": handles_per_pid,
             "handle_limit_per_pid": self._handle_limit,
+            "tap_rate_limit": self._tap_rate_limit,
             "descriptor_pool_exhausted": self._descriptor_exhausted,
             "tap_count": tap_total,
             "tap_queue_depth": tap_queue_depth,
@@ -706,6 +735,18 @@ class MailboxManager:
             buffer = desc.tap_buffers.setdefault((tap_pid, tap_handle), TapBuffer())
             state = self._handles.get(tap_pid, {}).get(tap_handle)
             if state is None or not state.is_tap:
+                continue
+            key = (tap_pid, tap_handle)
+            if not self._tap_rate_allow(key):
+                state.pending_tap_overrun = True
+                self._emit_event(
+                    "mailbox_backpressure",
+                    descriptor=desc.descriptor_id,
+                    policy="tap_rate_limit",
+                    tap_pid=tap_pid,
+                    tap_handle=tap_handle,
+                    limit=self._tap_rate_limit,
+                )
                 continue
             if cost > desc.capacity:
                 state.pending_tap_overrun = True

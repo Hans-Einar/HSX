@@ -93,11 +93,13 @@ MAILBOX_PROFILES: Dict[str, Dict[str, Any]] = {
         "max_descriptors": 256,
         "handle_limit_per_pid": 64,
         "default_capacity": mbx_const.HSX_MBX_DEFAULT_RING_CAPACITY,
+        "tap_rate_limit": 0,
     },
     "embedded": {
         "max_descriptors": 16,
         "handle_limit_per_pid": 8,
         "default_capacity": mbx_const.HSX_MBX_DEFAULT_RING_CAPACITY,
+        "tap_rate_limit": 20,
     },
 }
 MAILBOX_COUNTER_FIELDS = ("MAILBOX_STEP", "MAILBOX_WAKE", "MAILBOX_TIMEOUT")
@@ -2075,6 +2077,9 @@ class VMController:
         default_capacity = profile.get("default_capacity")
         if default_capacity is not None:
             kwargs["default_capacity"] = int(default_capacity)
+        tap_rate_limit = profile.get("tap_rate_limit")
+        if tap_rate_limit is not None:
+            kwargs["tap_rate_limit"] = int(tap_rate_limit)
         mgr = MailboxManager(**kwargs)
         return mgr
 

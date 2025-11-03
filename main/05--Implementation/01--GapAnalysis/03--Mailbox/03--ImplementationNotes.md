@@ -811,3 +811,23 @@ esource_stats() on the mailbox manager and exposed aggregated metrics (capacity,
   - `PYTHONPATH=. pytest python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_shell_client.py` (pass).
 - Follow-up actions / hand-off notes:
   - Implementation review gate remains pending for Phase 4; capture outcome once scheduled.
+
+
+## 2025-11-03 - Codex (Session 18)
+
+### Focus
+- Task(s) tackled: Phase 4.4 stdio tap rate limiting (policy, implementation, tests, docs).
+- Dependencies touched: `python/mailbox.py`, `platforms/python/host_vm.py`, `python/shell_client.py`, `python/tests/test_mailbox_manager.py`, `docs/executive_protocol.md`, `docs/resource_budgets.md`, implementation plan.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions:
+  - Introduced per-tap rate limiting with configurable messages-per-second budget (profile + runtime adjustable) and new `mailbox_backpressure` events to surface drops.
+  - Shell `mbox` summary now displays the configured tap cap; stdio profile defaults documented for host vs embedded targets.
+  - Added regression coverage confirming tap drops, overrun signalling, recovery after the window, and ensured existing descriptors remain unaffected.
+- Tests run (commands + result):
+  - `PYTHONPATH=. pytest python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_shell_client.py` (pass).
+- Follow-up actions / hand-off notes:
+  - Review gate for Phase 4 still outstanding; capture result once rate-limiting changes are reviewed.
