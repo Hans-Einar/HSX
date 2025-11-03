@@ -22,7 +22,7 @@
 | 2025-11-03 | `0e7d497` | `valcmd: metadata descriptor chains` | Hans Einar | Tests: `python -m pytest python/tests/test_vm_stream_loader.py`, `python -m pytest python/tests/test_valcmd_registry.py`, `python -m pytest python/tests/test_valcmd_svc_integration.py` |
 | 2025-11-03 | `5ea1518` | `valcmd: persistence backend + FRAM load/save` | Hans Einar | Tests: `python -m pytest python/tests/test_vm_stream_loader.py`, `python -m pytest python/tests/test_valcmd_registry.py`, `python -m pytest python/tests/test_valcmd_svc_integration.py` |
 | 2025-11-03 | `9e941c5` | `valcmd: persistence mailbox integration polish` | Hans Einar | Tests: `python -m pytest python/tests/test_vm_stream_loader.py`, `python -m pytest python/tests/test_valcmd_registry.py`, `python -m pytest python/tests/test_valcmd_svc_integration.py` |
-| <YYYY-MM-DD> | <commit-hash> | <short message> | <author> | Tests: `<command>` |
+| 2025-11-03 | `8e9050c` | `valcmd shell: add named lookup + CLI polishing` | Hans Einar | Tests: `python -m pytest python/tests/test_shell_client.py` |
 
 ## Pull Request
 - PR URL / ID: `<link or ID>`
