@@ -227,6 +227,45 @@ def _encode_command_metadata(entries: List[Dict[str, Any]]) -> tuple[bytes, int]
     return bytes(entries_blob + string_table), len(normalised)
 
 
+def _resolve_command_handler_offsets(
+    commands: List[Dict[str, Any]],
+    modules: List[Dict[str, Any]],
+    symbol_table: Dict[str, Dict[str, Any]],
+) -> None:
+    for entry in commands:
+        origin = entry.pop("_module", None)
+        handler_offset_value = entry.get("handler_offset")
+        handler_value = entry.pop("handler", None)
+        if handler_offset_value is not None and handler_value is None:
+            entry["handler_offset"] = int(handler_offset_value) & 0xFFFFFFFF
+            continue
+        if handler_value is None:
+            if handler_offset_value is not None:
+                entry["handler_offset"] = int(handler_offset_value) & 0xFFFFFFFF
+            continue
+        if isinstance(handler_value, (int, float, bool)):
+            entry["handler_offset"] = int(handler_value) & 0xFFFFFFFF
+            continue
+        if not isinstance(handler_value, str):
+            raise ValueError(f"command handler must be string or integer, got {handler_value!r}")
+        handler_name = handler_value.strip()
+        if not handler_name:
+            raise ValueError("command handler name cannot be empty")
+        sym_entry = symbol_table.get(handler_name)
+        resolved_address: Optional[int] = None
+        if sym_entry is not None:
+            if sym_entry.get("section") != "text":
+                raise ValueError(f"command handler '{handler_name}' must reference .text symbol")
+            resolved_address = int(sym_entry["address"])
+        elif origin is not None and origin in modules:
+            local_info = origin.get("local_symbols", {}).get(handler_name)
+            if local_info and local_info.get("section") == "text":
+                resolved_address = origin["code_base"] + int(local_info.get("offset", 0))
+        if resolved_address is None:
+            raise ValueError(f"command handler symbol '{handler_name}' not found in linked objects")
+        entry["handler_offset"] = resolved_address & 0xFFFFFFFF
+
+
 def load_hxo(path: Path) -> Dict:
     data = json.loads(path.read_text(encoding="utf-8"))
     module = {
@@ -430,7 +469,9 @@ def link_objects(object_paths: List[Path], output: Path, *, verbose: bool = Fals
                     f"Duplicate command metadata ({group_id},{cmd_id}) defined in {mod['path']} and {seen_commands[key]}"
                 )
             seen_commands[key] = mod["path"]
-            aggregated_commands.append(dict(entry))
+            entry_copy = dict(entry)
+            entry_copy["_module"] = mod
+            aggregated_commands.append(entry_copy)
 
     if aggregated_mailboxes:
         aggregated_mailboxes.sort(key=lambda item: item["target"])
@@ -535,6 +576,12 @@ def link_objects(object_paths: List[Path], output: Path, *, verbose: bool = Fals
                     raise ValueError(f"Unsupported data relocation type {reloc['type']}")
             else:
                 raise ValueError(f"Unknown relocation section {reloc.get('section')}")
+
+    if metadata.get("commands"):
+        _resolve_command_handler_offsets(metadata["commands"], modules, symbol_table)
+    if metadata.get("values"):
+        for entry in metadata["values"]:
+            entry.pop("_module", None)
 
     # Choose entry point
     entry_address = None

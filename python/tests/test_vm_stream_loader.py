@@ -62,9 +62,39 @@ def _build_mailbox_hxe_bytes(tmp_path: Path, mailbox_entry: dict[str, object]) -
 
 
 def _build_value_cmd_hxe_bytes(tmp_path: Path) -> bytes:
+    value_entry = {
+        "group": 1,
+        "id": 2,
+        "group_name": "sensors",
+        "flags": "PERSIST",
+        "auth": "PUBLIC",
+        "init": 12.5,
+        "name": "temperature",
+        "unit": "degC",
+        "epsilon": 0.1,
+        "min": -40.0,
+        "max": 125.0,
+        "persist_key": 17,
+    }
+    command_entry = {
+        "group": 1,
+        "id": 7,
+        "group_name": "control",
+        "flags": "PIN",
+        "auth": "USER",
+        "handler": "reset_handler",
+        "name": "reset",
+        "help": "Soft reset",
+    }
     lines = [
+        f".value {json.dumps(value_entry, separators=(',', ':'))}",
+        f".cmd {json.dumps(command_entry, separators=(',', ':'))}",
         ".text",
-        ".entry",
+        ".entry main",
+        "main:",
+        "BRK",
+        "JMP reset_handler",
+        "reset_handler:",
         "RET",
     ]
     (
@@ -78,36 +108,7 @@ def _build_value_cmd_hxe_bytes(tmp_path: Path) -> bytes:
         entry_symbol,
         local_symbols,
     ) = hsx_asm.assemble(lines, for_object=True)
-    metadata = {
-        "values": [
-            {
-                "group": 1,
-                "value": 2,
-                "group_name": "sensors",
-                "flags": HSX_VAL_FLAG_PERSIST,
-                "auth": HSX_VAL_AUTH_PUBLIC,
-                "init": 12.5,
-                "name": "temperature",
-                "unit": "degC",
-                "epsilon": 0.1,
-                "min": -40.0,
-                "max": 125.0,
-                "persist_key": 17,
-            }
-        ],
-        "commands": [
-            {
-                "group": 1,
-                "cmd": 7,
-                "group_name": "control",
-                "flags": HSX_CMD_FLAG_PIN,
-                "auth": HSX_VAL_AUTH_USER,
-                "handler": 0x100,
-                "name": "reset",
-                "help": "Soft reset",
-            }
-        ],
-    }
+    metadata = hsx_asm.LAST_METADATA
     hxo_path = tmp_path / "value_cmd.hxo"
     hsx_asm.write_hxo_object(
         hxo_path,
@@ -214,6 +215,8 @@ def test_value_command_metadata_roundtrip(tmp_path):
     assert value_entry["name"] == "temperature"
     assert value_entry["unit"] == "degC"
     assert value_entry["persist_key"] == 17
+    assert value_entry["flags"] & HSX_VAL_FLAG_PERSIST
+    assert value_entry["auth_level"] == HSX_VAL_AUTH_PUBLIC
     assert f16_to_float(value_entry["init_raw"]) == pytest.approx(12.5, rel=1e-3)
     assert value_entry["group_name"] == "sensors"
     command_entry = metadata["commands"][0]
@@ -236,7 +239,8 @@ def test_value_command_metadata_roundtrip(tmp_path):
     meta_command = meta_obj.commands[0]
     assert meta_command["group_id"] == 1
     assert meta_command["cmd_id"] == 7
-    assert meta_command["handler_offset"] == 0x100
+    assert meta_command["handler_offset"] == 0x0008
+    assert meta_command["flags"] & HSX_CMD_FLAG_PIN
     assert meta_command["group_name"] == "control"
     value_oid = (1 << 8) | 2
     status, value = controller.valcmd.value_get(value_oid, caller_pid=pid)

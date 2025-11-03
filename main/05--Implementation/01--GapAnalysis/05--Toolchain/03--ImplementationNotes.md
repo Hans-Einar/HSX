@@ -68,4 +68,23 @@ Append sessions chronologically and ensure every entry references the relevant d
   - `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_vm_stream_loader.py python/tests/test_linker.py python/tests/test_linker_dupdef.py python/tests/test_import_unresolved.py`
   - `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_asm_sections.py python/tests/test_vm_exit.py`
 - Follow-up actions / hand-off notes:
-  - Extend `hsx-llc` to emit `.mailbox` directives from pragmas and mirror this work for `.value`/`.cmd` sections in subsequent phases.
+- Extend `hsx-llc` to emit `.mailbox` directives from pragmas and mirror this work for `.value`/`.cmd` sections in subsequent phases.
+
+## 2025-11-07 - Codex (Session 3)
+
+### Scope
+- Plan item / phase addressed: Phase 2 metadata pipeline (pragma extraction, directive emission, assembler/linker integration) for values & commands.
+- Design sections reviewed: 04.05--Toolchain.md §4.2.1–4.2.3, docs/hxe_format.md declarative registration, docs/MVASM_SPEC.md directives.
+
+### Work Summary
+- Expanded `hsx-llc.py` to parse `#pragma hsx_value` / `#pragma hsx_command`, normalise flags/auth tokens, and emit `.value`/`.cmd` JSON directives alongside existing `.mailbox` entries. Updated MVASM spec and design docs with the new directive details.
+- Taught `python/asm.py` to parse `.value`/`.cmd` directives (JSON object/array), validate parameters, coerce types, and include the metadata in HXO objects. Added helpers for flag/auth parsing and extended `LAST_METADATA`.
+- Enhanced `python/hld.py` metadata merger to resolve command handler symbols to code offsets, allowing linker-side resolution when directives reference handler names. Cleaned up metadata before encoding.
+- Added regression tests covering the new directive flow end-to-end (`test_hsx_llc_mailbox` value/command scenario, `test_vm_stream_loader` using directives, linker/assembler suites) and documented behaviour in `docs/MVASM_SPEC.md` and `docs/hxe_format.md`.
+
+### Testing
+- `python -m pytest python/tests/test_hsx_llc_mailbox.py python/tests/test_vm_stream_loader.py python/tests/test_linker.py python/tests/test_linker_dupdef.py python/tests/test_import_unresolved.py python/tests/test_asm_sections.py`
+
+### Next Steps
+- Document pragma-to-LLVM metadata mapping details and outline the helper pipeline for later debug metadata work (Phase 2.2 documentation task).
+- Begin planning Phase 3 debug metadata extraction once value/command pipeline lands in review.

@@ -35,7 +35,62 @@ main:
 | `.half v1, …` / `.hword` | literals | Emits 16-bit values. |
 | `.word v1, …` | literals or symbol refs | Emits 32-bit values. Symbol operands may use `symbol`, `lo16(symbol)`, `hi16(symbol)`, or `off16(symbol)` to request relocations. |
 | `.asciz "text"` / `.string "text"` | string literal | Emits UTF-8 bytes followed by `0x00`. Supports standard `\n`, `\r`, `\t`, `\\`, `\0`, `\xNN` escapes. |
+| `.value {…}` | JSON object/array | Declares value metadata consumed by the linker when emitting HXE metadata sections. See below. |
+| `.cmd {…}` | JSON object/array | Declares command metadata consumed by the linker when emitting HXE metadata sections. See below. |
 | `.mailbox {…}` | JSON object/array | Declares mailbox metadata to embed in the `.mailbox` section of the final HXE. See below. |
+
+**`.value` directive**
+
+The `.value` directive accepts a JSON object (or array of objects) that describes one declarative value entry. Keys mirror the loader schema and are case-sensitive. Required fields: `group`/`group_id`, `id`/`value`. Optional fields include `name`, `group_name`, `flags`, `auth`, `init`, `unit`, `epsilon`, `min`, `max`, and `persist_key`. Numeric values may be expressed as decimal or hexadecimal literals; floats use standard JSON syntax.
+
+Flag and auth strings are expanded automatically:
+
+| Field | Accepted tokens |
+|-------|-----------------|
+| `flags` | `RO`, `PERSIST`, `STICKY`, `PIN`, `BOOL` (combine with `|`) |
+| `auth`  | `PUBLIC`, `USER`, `ADMIN`, `FACTORY` |
+
+Example:
+
+```mvasm
+.value {
+  "group": 1,
+  "id": 5,
+  "name": "motor_rpm",
+  "group_name": "motor",
+  "unit": "rpm",
+  "flags": "PERSIST|PIN",
+  "auth": "USER",
+  "init": 0.0,
+  "epsilon": 0.1,
+  "min": 0.0,
+  "max": 8000.0,
+  "persist_key": 0x1205
+}
+```
+
+An array form (`.value [{...}, {...}]`) may be used to declare multiple entries in one directive.
+
+**`.cmd` directive**
+
+The `.cmd` directive mirrors `.value` but targets command metadata. Required fields: `group`/`group_id`, `id`/`cmd`. Optional fields include `name`, `group_name`, `flags`, `auth`, `handler`, and `help`. The `handler` field may be either an immediate code offset (`handler_offset`) or the name of a text-section symbol; the linker resolves symbol names to final offsets during HXE emission.
+
+Flag/auth tokens match the value directive except command flags support `PIN` and `ASYNC`.
+
+Example:
+
+```mvasm
+.cmd {
+  "group": 1,
+  "id": 7,
+  "name": "reset",
+  "group_name": "motor",
+  "flags": "PIN",
+  "auth": "ADMIN",
+  "handler": "do_reset",
+  "help": "Reset motor controller"
+}
+```
 
 **`.mailbox` directive**
 

@@ -14,8 +14,12 @@ from typing import Dict, List, Optional, Set, Tuple
 
 try:
     import hsx_mailbox_constants as mbx_const
+    import hsx_value_constants as val_const
+    import hsx_command_constants as cmd_const
 except ImportError:  # pragma: no cover - allow running as package
     from python import hsx_mailbox_constants as mbx_const
+    from python import hsx_value_constants as val_const
+    from python import hsx_command_constants as cmd_const
 
 R_RET = "R0"
 ATTR_TOKENS = {"nsw", "nuw", "noundef", "dso_local", "local_unnamed_addr", "volatile"}
@@ -38,6 +42,35 @@ MODE_ALIASES = {
     "FANOUT": mbx_const.HSX_MBX_MODE_FANOUT,
     "FANOUT_DROP": mbx_const.HSX_MBX_MODE_FANOUT_DROP,
     "FANOUT_BLOCK": mbx_const.HSX_MBX_MODE_FANOUT_BLOCK,
+}
+
+VALUE_FLAG_ALIASES = {
+    "RO": val_const.HSX_VAL_FLAG_RO,
+    "READONLY": val_const.HSX_VAL_FLAG_RO,
+    "READ_ONLY": val_const.HSX_VAL_FLAG_RO,
+    "PERSIST": val_const.HSX_VAL_FLAG_PERSIST,
+    "STICKY": val_const.HSX_VAL_FLAG_STICKY,
+    "PIN": val_const.HSX_VAL_FLAG_PIN,
+    "BOOL": val_const.HSX_VAL_FLAG_BOOL,
+}
+
+VALUE_AUTH_ALIASES = {
+    "PUBLIC": val_const.HSX_VAL_AUTH_PUBLIC,
+    "USER": val_const.HSX_VAL_AUTH_USER,
+    "ADMIN": val_const.HSX_VAL_AUTH_ADMIN,
+    "FACTORY": val_const.HSX_VAL_AUTH_FACTORY,
+}
+
+COMMAND_FLAG_ALIASES = {
+    "PIN": cmd_const.HSX_CMD_FLAG_PIN,
+    "ASYNC": cmd_const.HSX_CMD_FLAG_ASYNC,
+}
+
+COMMAND_AUTH_ALIASES = {
+    "PUBLIC": cmd_const.HSX_CMD_AUTH_PUBLIC,
+    "USER": cmd_const.HSX_CMD_AUTH_USER,
+    "ADMIN": cmd_const.HSX_CMD_AUTH_ADMIN,
+    "FACTORY": cmd_const.HSX_CMD_AUTH_FACTORY,
 }
 
 
@@ -272,6 +305,82 @@ def _coerce_pragma_value(value: str) -> object:
         return text
 
 
+def _pop_any(values: Dict[str, object], *keys: str) -> Optional[object]:
+    for key in keys:
+        if key in values:
+            return values.pop(key)
+    return None
+
+
+def _parse_flag_tokens(raw: object, alias_map: Dict[str, int], field: str) -> int:
+    if raw is None or raw == "":
+        return 0
+    if isinstance(raw, bool):
+        return int(raw)
+    if isinstance(raw, (int, float)):
+        return int(raw)
+    if isinstance(raw, str):
+        mask = 0
+        tokens = [token.strip().upper() for token in re.split(r"[|]", raw) if token.strip()]
+        if not tokens:
+            return 0
+        for token in tokens:
+            value = alias_map.get(token)
+            if value is None:
+                raise ISelError(f"{field} uses unknown flag '{token}'")
+            mask |= int(value)
+        return mask
+    raise ISelError(f"{field} expects integer or flag string, got {raw!r}")
+
+
+def _parse_auth_token(raw: object, alias_map: Dict[str, int], field: str) -> int:
+    if raw is None or raw == "":
+        return 0
+    if isinstance(raw, bool):
+        return int(raw)
+    if isinstance(raw, (int, float)):
+        return int(raw)
+    if isinstance(raw, str):
+        token = raw.strip().upper()
+        if not token:
+            return 0
+        value = alias_map.get(token)
+        if value is None:
+            raise ISelError(f"{field} uses unknown token '{raw}'")
+        return int(value)
+    raise ISelError(f"{field} expects integer or auth token, got {raw!r}")
+
+
+def _coerce_float_arg(name: str, value: object) -> float:
+    if value is None or value == "":
+        return 0.0
+    if isinstance(value, bool):
+        return 1.0 if value else 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError as exc:
+            raise ISelError(f"{name} expects numeric value, got '{value}'") from exc
+    raise ISelError(f"{name} expects numeric value, got {value!r}")
+
+
+def _coerce_int_arg(name: str, value: object) -> int:
+    if value is None or value == "":
+        raise ISelError(f"{name} requires a value")
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (int, float)):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value, 0)
+        except ValueError as exc:
+            raise ISelError(f"{name} expects integer literal, got '{value}'") from exc
+    raise ISelError(f"{name} expects integer literal, got {value!r}")
+
+
 def _parse_mailbox_mode_tokens(spec: str) -> int:
     tokens = [tok.strip().upper() for tok in re.split(r"[|]", spec) if tok.strip()]
     if not tokens:
@@ -322,8 +431,162 @@ def _parse_mailbox_pragma(arg_text: str) -> Dict[str, object]:
     return entry
 
 
+def _parse_value_pragma(arg_text: str) -> Dict[str, object]:
+    params = _split_top_level(arg_text, ',')
+    positional: List[object] = []
+    parsed: Dict[str, object] = {}
+    for piece in params:
+        token = piece.strip()
+        if not token:
+            continue
+        if '=' in token:
+            key, value = token.split('=', 1)
+            key = key.strip()
+            if not key:
+                raise ISelError("hsx_value pragma contains empty key")
+            parsed[key] = _coerce_pragma_value(value)
+        else:
+            positional.append(_coerce_pragma_value(token))
+    entry: Dict[str, object] = {}
+    if positional:
+        name_token = str(positional[0]).strip()
+        if name_token:
+            entry["name"] = name_token
+    group_raw = _pop_any(parsed, "group", "group_id", "groupId")
+    if group_raw is None:
+        raise ISelError("hsx_value pragma requires group=<id>")
+    group_id = _coerce_int_arg("hsx_value group", group_raw)
+    if not (0 <= group_id <= 0xFF):
+        raise ISelError("hsx_value group must be within 0..255")
+    entry["group"] = group_id
+    value_raw = _pop_any(parsed, "id", "value", "value_id", "valueId")
+    if value_raw is None:
+        raise ISelError("hsx_value pragma requires id=<value_id>")
+    value_id = _coerce_int_arg("hsx_value id", value_raw)
+    if not (0 <= value_id <= 0xFF):
+        raise ISelError("hsx_value id must be within 0..255")
+    entry["value"] = value_id
+    group_name = _pop_any(parsed, "group_name", "groupName")
+    if group_name is not None:
+        entry["group_name"] = str(group_name)
+    flags_raw = _pop_any(parsed, "flags")
+    if flags_raw is not None:
+        entry["flags"] = _parse_flag_tokens(flags_raw, VALUE_FLAG_ALIASES, "hsx_value flags")
+    auth_raw = _pop_any(parsed, "auth", "auth_level", "authLevel")
+    if auth_raw is not None:
+        entry["auth"] = _parse_auth_token(auth_raw, VALUE_AUTH_ALIASES, "hsx_value auth")
+    init_raw = _pop_any(parsed, "init", "init_value")
+    if init_raw is not None:
+        entry["init"] = _coerce_float_arg("hsx_value init", init_raw)
+    init_raw_raw = _pop_any(parsed, "init_raw")
+    if init_raw_raw is not None:
+        entry["init_raw"] = _coerce_int_arg("hsx_value init_raw", init_raw_raw) & 0xFFFF
+    epsilon_raw = _pop_any(parsed, "epsilon")
+    if epsilon_raw is not None:
+        entry["epsilon"] = _coerce_float_arg("hsx_value epsilon", epsilon_raw)
+    epsilon_raw_raw = _pop_any(parsed, "epsilon_raw")
+    if epsilon_raw_raw is not None:
+        entry["epsilon_raw"] = _coerce_int_arg("hsx_value epsilon_raw", epsilon_raw_raw) & 0xFFFF
+    min_raw = _pop_any(parsed, "min")
+    if min_raw is not None:
+        entry["min"] = _coerce_float_arg("hsx_value min", min_raw)
+    min_raw_raw = _pop_any(parsed, "min_raw")
+    if min_raw_raw is not None:
+        entry["min_raw"] = _coerce_int_arg("hsx_value min_raw", min_raw_raw) & 0xFFFF
+    max_raw = _pop_any(parsed, "max")
+    if max_raw is not None:
+        entry["max"] = _coerce_float_arg("hsx_value max", max_raw)
+    max_raw_raw = _pop_any(parsed, "max_raw")
+    if max_raw_raw is not None:
+        entry["max_raw"] = _coerce_int_arg("hsx_value max_raw", max_raw_raw) & 0xFFFF
+    persist_key = _pop_any(parsed, "persist_key", "persist")
+    if persist_key is not None:
+        key_value = _coerce_int_arg("hsx_value persist_key", persist_key)
+        if not (0 <= key_value <= 0xFFFF):
+            raise ISelError("hsx_value persist_key must be within 0..65535")
+        entry["persist_key"] = key_value
+    unit_value = _pop_any(parsed, "unit", "unit_name", "unitName")
+    if unit_value is not None:
+        entry["unit"] = str(unit_value)
+    rate_ms = _pop_any(parsed, "rate_ms", "rateMs")
+    if rate_ms is not None:
+        entry["rate_ms"] = _coerce_int_arg("hsx_value rate_ms", rate_ms)
+    # Preserve any additional keys for forwards compatibility.
+    for key, value in parsed.items():
+        entry[key] = value
+    return entry
+
+
+def _parse_command_pragma(arg_text: str) -> Dict[str, object]:
+    params = _split_top_level(arg_text, ',')
+    positional: List[object] = []
+    parsed: Dict[str, object] = {}
+    for piece in params:
+        token = piece.strip()
+        if not token:
+            continue
+        if '=' in token:
+            key, value = token.split('=', 1)
+            key = key.strip()
+            if not key:
+                raise ISelError("hsx_command pragma contains empty key")
+            parsed[key] = _coerce_pragma_value(value)
+        else:
+            positional.append(_coerce_pragma_value(token))
+    entry: Dict[str, object] = {}
+    if positional:
+        name_token = str(positional[0]).strip()
+        if name_token:
+            entry["name"] = name_token
+    group_raw = _pop_any(parsed, "group", "group_id", "groupId")
+    if group_raw is None:
+        raise ISelError("hsx_command pragma requires group=<id>")
+    group_id = _coerce_int_arg("hsx_command group", group_raw)
+    if not (0 <= group_id <= 0xFF):
+        raise ISelError("hsx_command group must be within 0..255")
+    entry["group"] = group_id
+    cmd_raw = _pop_any(parsed, "id", "cmd", "cmd_id", "command_id", "commandId")
+    if cmd_raw is None:
+        raise ISelError("hsx_command pragma requires id=<cmd_id>")
+    cmd_id = _coerce_int_arg("hsx_command id", cmd_raw)
+    if not (0 <= cmd_id <= 0xFF):
+        raise ISelError("hsx_command id must be within 0..255")
+    entry["cmd"] = cmd_id
+    group_name = _pop_any(parsed, "group_name", "groupName")
+    if group_name is not None:
+        entry["group_name"] = str(group_name)
+    flags_raw = _pop_any(parsed, "flags")
+    if flags_raw is not None:
+        entry["flags"] = _parse_flag_tokens(flags_raw, COMMAND_FLAG_ALIASES, "hsx_command flags")
+    auth_raw = _pop_any(parsed, "auth", "auth_level", "authLevel")
+    if auth_raw is not None:
+        entry["auth"] = _parse_auth_token(auth_raw, COMMAND_AUTH_ALIASES, "hsx_command auth")
+    handler_offset_raw = _pop_any(parsed, "handler_offset")
+    if handler_offset_raw is not None:
+        entry["handler_offset"] = _coerce_int_arg("hsx_command handler_offset", handler_offset_raw)
+    else:
+        handler_raw = _pop_any(parsed, "handler")
+        if handler_raw is not None:
+            if isinstance(handler_raw, str):
+                handler_name = handler_raw.strip()
+                if not handler_name:
+                    raise ISelError("hsx_command handler cannot be empty")
+                entry["handler"] = handler_name
+            else:
+                entry["handler_offset"] = _coerce_int_arg("hsx_command handler", handler_raw)
+    help_value = _pop_any(parsed, "help")
+    if help_value is not None:
+        entry["help"] = str(help_value)
+    reserved_value = _pop_any(parsed, "reserved")
+    if reserved_value is not None:
+        entry["reserved"] = _coerce_int_arg("hsx_command reserved", reserved_value)
+    for key, value in parsed.items():
+        entry[key] = value
+    return entry
+
+
 def parse_ir(lines: List[str]) -> Dict:
-    ir = {"functions": [], "globals": [], "types": {}, "mailboxes": []}
+    ir = {"functions": [], "globals": [], "types": {}, "mailboxes": [], "values": [], "commands": []}
     cur = None
     bb = None
     for raw in lines:
@@ -331,12 +594,21 @@ def parse_ir(lines: List[str]) -> Dict:
         if not line:
             continue
         if line.startswith(";"):
-            pragma_match = re.match(r';\s*#pragma\s+hsx_mailbox\s*\((.*)\)\s*$', line, re.IGNORECASE)
-            if pragma_match:
-                entry = _parse_mailbox_pragma(pragma_match.group(1))
+            mailbox_match = re.match(r';\s*#pragma\s+hsx_mailbox\s*\((.*)\)\s*$', line, re.IGNORECASE)
+            if mailbox_match:
+                entry = _parse_mailbox_pragma(mailbox_match.group(1))
                 ir["mailboxes"].append(entry)
-            continue
-        if not line or line.startswith(";"):
+                continue
+            value_match = re.match(r';\s*#pragma\s+hsx_value\s*\((.*)\)\s*$', line, re.IGNORECASE)
+            if value_match:
+                entry = _parse_value_pragma(value_match.group(1))
+                ir["values"].append(entry)
+                continue
+            command_match = re.match(r';\s*#pragma\s+hsx_command\s*\((.*)\)\s*$', line, re.IGNORECASE)
+            if command_match:
+                entry = _parse_command_pragma(command_match.group(1))
+                ir["commands"].append(entry)
+                continue
             continue
         if cur is None:
             type_match = re.match(r'(%[A-Za-z0-9_.]+)\s*=\s*type\s+(.+)', line)
@@ -1808,6 +2080,8 @@ def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
             spill_data_all.extend(fn_spill_data)
     data_section = render_globals(globals_list)
     mailbox_entries = ir.get("mailboxes", [])
+    value_entries = ir.get("values", [])
+    command_entries = ir.get("commands", [])
     if spill_data_all:
         if data_section:
             data_section.extend(spill_data_all)
@@ -1825,6 +2099,12 @@ def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
         if imports:
             for name in sorted(imports):
                 header.append(f".import {name}")
+        if value_entries:
+            for entry in value_entries:
+                header.append(".value " + json.dumps(entry, separators=(",", ":"), sort_keys=True))
+        if command_entries:
+            for entry in command_entries:
+                header.append(".cmd " + json.dumps(entry, separators=(",", ":"), sort_keys=True))
         if mailbox_entries:
             for entry in mailbox_entries:
                 header.append(".mailbox " + json.dumps(entry, separators=(",", ":"), sort_keys=True))

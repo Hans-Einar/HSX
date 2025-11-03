@@ -268,6 +268,8 @@ The toolchain processes preprocessor directives in HXE source code to generate m
 #pragma hsx_mailbox(motor_status, depth=8, flags=SHARED)
 ```
 
+Flags supplied to pragmas may be written symbolically (`flags=PERSIST|PIN`), and auth levels accept the tokens `PUBLIC`, `USER`, `ADMIN`, and `FACTORY`. The command `handler=` parameter accepts either a literal offset or the name of a text-section symbol; the linker resolves symbol names to final code offsets.
+
 **Preprocessing flow:**
 1. Compiler frontend (clang) parses pragma directives and emits special metadata annotations.
 2. `hsx-llc` or assembler collects annotations and generates `.value`/`.cmd`/`.mailbox` section data.

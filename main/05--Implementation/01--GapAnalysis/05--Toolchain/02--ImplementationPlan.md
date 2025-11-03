@@ -156,11 +156,11 @@ Design specifies C preprocessor directives for value/command/mailbox declaration
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Define `#pragma hsx_value(group, id, name, unit, ...)` syntax
-- [ ] Define `#pragma hsx_command(group, id, name, help, ...)` syntax
-- [ ] Define `#pragma hsx_mailbox(name, capacity, mode)` syntax
-- [ ] Document pragma parameters and options
-- [ ] Provide C code examples using pragmas
+- [x] Define `#pragma hsx_value(group, id, name, unit, ...)` syntax
+- [x] Define `#pragma hsx_command(group, id, name, help, ...)` syntax
+- [x] Define `#pragma hsx_mailbox(name, capacity, mode)` syntax
+- [x] Document pragma parameters and options
+- [x] Provide C code examples using pragmas
 - [ ] Document how pragmas map to LLVM IR metadata
 - [ ] Create pragma reference documentation
 
@@ -177,12 +177,12 @@ Design specifies parsing pragma directives from LLVM IR metadata (section 4.2.1)
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Parse LLVM IR metadata nodes (look for pragma annotations)
-- [ ] Extract value declarations from metadata
-- [ ] Extract command declarations from metadata
-- [ ] Extract mailbox declarations from metadata
-- [ ] Store extracted metadata in intermediate structure
-- [ ] Add pragma extraction tests
+- [x] Parse LLVM IR metadata nodes (look for pragma annotations)
+- [x] Extract value declarations from metadata
+- [x] Extract command declarations from metadata
+- [x] Extract mailbox declarations from metadata
+- [x] Store extracted metadata in intermediate structure
+- [x] Add pragma extraction tests
 - [ ] Document extraction process
 
 ---
@@ -198,13 +198,13 @@ hsx-llc must emit .value, .cmd, .mailbox MVASM directives from pragma data (sect
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Design MVASM directive syntax (.value group=X id=Y name="..." ...)
-- [ ] Implement .value directive emission
-- [ ] Implement .cmd directive emission
-- [ ] Implement .mailbox directive emission
-- [ ] Format metadata as MVASM directives in output
-- [ ] Add directive emission tests
-- [ ] Document MVASM directive syntax in `docs/MVASM_SPEC.md`
+- [x] Design MVASM directive syntax (.value group=X id=Y name="..." ...)
+- [x] Implement .value directive emission
+- [x] Implement .cmd directive emission
+- [x] Implement .mailbox directive emission
+- [x] Format metadata as MVASM directives in output
+- [x] Add directive emission tests
+- [x] Document MVASM directive syntax in `docs/MVASM_SPEC.md`
 
 ---
 
@@ -219,13 +219,13 @@ Assembler must parse metadata directives from MVASM source (section 4.2.2).
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Implement .value directive parser in `python/asm.py`
-- [ ] Implement .cmd directive parser
-- [ ] Implement .mailbox directive parser
-- [ ] Validate directive parameters
-- [ ] Store metadata in intermediate structures
-- [ ] Add assembler metadata parsing tests
-- [ ] Update assembler documentation
+- [x] Implement .value directive parser in `python/asm.py`
+- [x] Implement .cmd directive parser
+- [x] Implement .mailbox directive parser
+- [x] Validate directive parameters
+- [x] Store metadata in intermediate structures
+- [x] Add assembler metadata parsing tests
+- [x] Update assembler documentation
 
 ---
 
@@ -240,13 +240,13 @@ Assembler must encode metadata sections per HXE format spec in HXO objects (sect
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Design HXO metadata section format
-- [ ] Implement .value section encoding
-- [ ] Implement .cmd section encoding
-- [ ] Implement .mailbox section encoding
-- [ ] Include metadata sections in HXO output
-- [ ] Add section encoding tests
-- [ ] Document HXO metadata format
+- [x] Design HXO metadata section format
+- [x] Implement .value section encoding
+- [x] Implement .cmd section encoding
+- [x] Implement .mailbox section encoding
+- [x] Include metadata sections in HXO output
+- [x] Add section encoding tests
+- [x] Document HXO metadata format
 
 ---
 
@@ -261,14 +261,14 @@ Linker must merge metadata sections from multiple HXO inputs, deduplicate string
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Implement metadata section extraction from HXO inputs
-- [ ] Merge .value sections from multiple objects
-- [ ] Merge .cmd sections from multiple objects
-- [ ] Merge .mailbox sections from multiple objects
-- [ ] Deduplicate strings (names, units, help text)
-- [ ] Build unified section table
-- [ ] Write merged sections to HXE output
-- [ ] Add linker metadata merging tests
+- [x] Implement metadata section extraction from HXO inputs
+- [x] Merge .value sections from multiple objects
+- [x] Merge .cmd sections from multiple objects
+- [x] Merge .mailbox sections from multiple objects
+- [x] Deduplicate strings (names, units, help text)
+- [x] Build unified section table
+- [x] Write merged sections to HXE output
+- [x] Add linker metadata merging tests
 - [ ] Document merging behavior
 
 ---
