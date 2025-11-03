@@ -37,6 +37,7 @@
 
 - Mailbox descriptor pool: start with 16 descriptors × 64 B metadata ≈ 1 KiB SRAM. Each message buffer lives in caller-owned RAM; no global payload copies beyond staging.
 - Mailbox quotas: embedded profile enforces ≤16 descriptors and ≤8 handles per task; host prototype defaults to 256 descriptors and a 64 handle-per-task ceiling. Both limits are configurable via the Python `MailboxManager` profile knobs (`max_descriptors`, `handle_limit_per_pid`).
+- Exhaustion handling: when the CLI reports `descriptor pool: exhausted` or `mailbox_exhausted` events appear, close surplus mailboxes/taps or increase the active profile limits before retrying the operation.
 
 ### Mailbox profile defaults
 

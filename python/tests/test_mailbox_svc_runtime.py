@@ -380,7 +380,7 @@ def test_mailbox_open_returns_enospc_when_handle_quota_exhausted():
     controller = VMController(mailbox_profile={"handle_limit_per_pid": 4})
     controller.mailboxes.register_task(1)
     controller.mailboxes.ensure_stdio_handles(1)
-    controller.mailboxes.open(pid=1, target="app:pre_fill")
+    prefill_handle = controller.mailboxes.open(pid=1, target="app:pre_fill")
 
     vm = _attach_vm(controller, 1)
     overflow_target = "app:quota_hit"
@@ -390,7 +390,15 @@ def test_mailbox_open_returns_enospc_when_handle_quota_exhausted():
     vm.regs[2] = 0
 
     controller._svc_mailbox_controller(vm, mbx_const.HSX_MBX_FN_OPEN)
-    assert vm.regs[0] == errno.ENOSPC
+    assert vm.regs[0] == mbx_const.HSX_MBX_STATUS_NO_DESCRIPTOR
+    events = _drain_events(vm)
+    assert any(event.get("type") == "mailbox_exhausted" and event.get("reason") == "handle_limit" for event in events)
+
+    controller.mailboxes.close(pid=1, handle=prefill_handle)
+    vm.regs[0] = vm.regs[2] = 0
+    vm.regs[1] = target_addr
+    controller._svc_mailbox_controller(vm, mbx_const.HSX_MBX_FN_OPEN)
+    assert vm.regs[0] == mbx_const.HSX_MBX_STATUS_OK
 
 
 def test_vmcontroller_supports_named_mailbox_profile():
@@ -407,6 +415,33 @@ def test_vmcontroller_env_mailbox_profile(monkeypatch):
     assert stats["max_descriptors"] == 16
     assert stats["handle_limit_per_pid"] == 8
     assert controller.mailbox_profile_name == "embedded"
+
+
+def test_descriptor_pool_exhaustion_emits_event_and_existing_handles_work():
+    controller = VMController(mailbox_profile={"max_descriptors": 4})
+    controller.mailboxes.register_task(1)
+    controller.mailboxes.ensure_stdio_handles(1)
+    vm = _attach_vm(controller, 1)
+    _drain_events(vm)
+
+    target_addr = 0x0800
+    overflow_target = "app:out_of_descriptors"
+    _write_c_string(vm, target_addr, overflow_target)
+    vm.regs[1] = target_addr
+    vm.regs[2] = 0
+    vm.regs[3] = mbx_const.HSX_MBX_MODE_RDWR
+
+    controller._svc_mailbox_controller(vm, mbx_const.HSX_MBX_FN_BIND)
+    assert vm.regs[0] == mbx_const.HSX_MBX_STATUS_NO_DESCRIPTOR
+    events = _drain_events(vm)
+    assert any(event.get("type") == "mailbox_exhausted" and event.get("reason") == "descriptor_pool_full" for event in events)
+
+    handles = controller.mailboxes.ensure_stdio_handles(1)
+    stdout_handle = handles["stdout"]
+    ok, _ = controller.mailboxes.send(pid=1, handle=stdout_handle, payload=b"ping")
+    assert ok is True
+    msg = controller.mailboxes.recv(pid=1, handle=stdout_handle)
+    assert msg is not None and msg.payload == b"ping"
 
 
 def test_mailbox_send_event_payload():

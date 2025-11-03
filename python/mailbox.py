@@ -126,6 +126,7 @@ class MailboxManager:
         self._stdio_handles: Dict[int, Dict[str, int]] = {}
         self._message_overhead = 8  # header size used in _message_cost
         self._event_hook: Optional[Callable[[Dict[str, Any]], None]] = event_hook
+        self._descriptor_exhausted = False
 
     # ------------------------------------------------------------------
     # Lifecycle helpers
@@ -196,6 +197,15 @@ class MailboxManager:
         descriptor_id = self._lookup.get(key)
         if descriptor_id is None:
             if len(self._descriptors) >= self._max_descriptors:
+                self._descriptor_exhausted = True
+                self._emit_event(
+                    "mailbox_exhausted",
+                    reason="descriptor_pool_full",
+                    namespace=namespace,
+                    name=name,
+                    owner=owner_pid,
+                    max_descriptors=self._max_descriptors,
+                )
                 raise MailboxError(
                     "descriptor pool exhausted",
                     code=mbx_const.HSX_MBX_STATUS_NO_DESCRIPTOR,
@@ -215,6 +225,7 @@ class MailboxManager:
             self._update_head_seq(desc)
             if mode_mask:
                 self._apply_descriptor_mode(desc, mode_mask)
+            self._descriptor_exhausted = len(self._descriptors) >= self._max_descriptors
             return desc
 
         desc = self._descriptors[descriptor_id]
@@ -260,6 +271,13 @@ class MailboxManager:
         desc = self.bind(namespace=namespace, name=name, owner_pid=owner_pid)
         handle_table = self._handles.setdefault(pid, {})
         if self._handle_limit is not None and len(handle_table) >= self._handle_limit:
+            self._emit_event(
+                "mailbox_exhausted",
+                reason="handle_limit",
+                pid=pid,
+                handle_limit=self._handle_limit,
+                handles=len(handle_table),
+            )
             raise MailboxError(
                 "handle quota exceeded",
                 code=errno.ENOSPC,
@@ -529,6 +547,7 @@ class MailboxManager:
             "handles_total": total_handles,
             "handles_per_pid": handles_per_pid,
             "handle_limit_per_pid": self._handle_limit,
+            "descriptor_pool_exhausted": self._descriptor_exhausted,
             "tap_count": tap_total,
             "tap_queue_depth": tap_queue_depth,
             "waiter_count": wait_total,
@@ -616,6 +635,14 @@ class MailboxManager:
         fanout_enabled = bool(desc.mode_mask & HSX_MBX_MODE_FANOUT)
         if not fanout_enabled:
             if cost > desc.space_remaining():
+                self._emit_event(
+                    "mailbox_backpressure",
+                    descriptor=desc.descriptor_id,
+                    policy="single",
+                    capacity=desc.capacity,
+                    bytes_used=desc.bytes_used,
+                    requested=cost,
+                )
                 return False
             self._append_message(desc, message, cost)
             self._deliver_to_taps(desc, message)
@@ -624,6 +651,14 @@ class MailboxManager:
         self._reclaim_acked(desc)
         if desc.mode_mask & HSX_MBX_MODE_FANOUT_BLOCK:
             if cost > desc.space_remaining():
+                self._emit_event(
+                    "mailbox_backpressure",
+                    descriptor=desc.descriptor_id,
+                    policy="fanout_block",
+                    capacity=desc.capacity,
+                    bytes_used=desc.bytes_used,
+                    requested=cost,
+                )
                 return False
         else:
             while cost > desc.space_remaining() and desc.queue:
@@ -642,6 +677,14 @@ class MailboxManager:
                     )
                     self._mark_overrun(desc.descriptor_id, dropped.seq_no)
         if cost > desc.space_remaining():
+            self._emit_event(
+                "mailbox_backpressure",
+                descriptor=desc.descriptor_id,
+                policy="fanout_block" if (desc.mode_mask & HSX_MBX_MODE_FANOUT_BLOCK) else "fanout_drop",
+                capacity=desc.capacity,
+                bytes_used=desc.bytes_used,
+                requested=cost,
+            )
             return False
         self._append_message(desc, message, cost)
         self._deliver_to_taps(desc, message)

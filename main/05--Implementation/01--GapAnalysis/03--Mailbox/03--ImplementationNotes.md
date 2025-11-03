@@ -791,3 +791,23 @@ esource_stats() on the mailbox manager and exposed aggregated metrics (capacity,
   - `PYTHONPATH=. pytest python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_shell_client.py` (pass).
 - Follow-up actions / hand-off notes:
   - Review gate still outstanding for Phase 4; ensure profile defaults propagate into embedded harness when that port begins.
+
+
+## 2025-11-03 - Codex (Session 17)
+
+### Focus
+- Task(s) tackled: Phase 4.3 exhaustion handling (events, diagnostics, runtime behaviour, tests, documentation).
+- Dependencies touched: `python/mailbox.py`, `platforms/python/host_vm.py`, `python/shell_client.py`, `python/tests/test_mailbox_svc_runtime.py`, `docs/resource_budgets.md`, `main/04--Design/04.03--Mailbox.md`, implementation plan.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions:
+  - Added `mailbox_exhausted`/`mailbox_backpressure` events and resource stats flags so tooling surfaces handle/descriptor saturation while keeping existing descriptors operational.
+  - Mapped SVC OPEN/BIND failures to the proper mailbox status code, surfaced the active mailbox profile via `info()`, and taught the shell to flag exhausted pools.
+  - Documented operator mitigation guidance and validated behaviour with new regression coverage; updated plan/design notes accordingly.
+- Tests run (commands + result):
+  - `PYTHONPATH=. pytest python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_shell_client.py` (pass).
+- Follow-up actions / hand-off notes:
+  - Implementation review gate remains pending for Phase 4; capture outcome once scheduled.

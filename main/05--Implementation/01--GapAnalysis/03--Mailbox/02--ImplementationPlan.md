@@ -453,21 +453,25 @@ Toolchain needs to generate .mailbox sections from application code. Enables dec
 **Dependencies:** 4.1 (Quota enforcement)  
 **Estimated Effort:** 1-2 days  
 **Design Reference:** [04.03--Mailbox.md](../../../04--Design/04.03--Mailbox.md) Sections 4.6, 6; 5.1.1  
-**Design Questions Resolved:** _TBD_  
-**Design Updates Needed:** _TBD_
+**Design Questions Resolved:** Descriptor exhaustion should emit a `mailbox_exhausted` event and surface via CLI; handle quota saturation treated equivalently.  
+**Design Updates Needed:** Section 6 updated with operator guidance.
 
 **Pre-Implementation Checklist**
-- [ ] Review design guidance on exhaustion scenarios (descriptor pool, queue overrun).
-- [ ] Identify required observability (events, CLI output, counters).
+- [x] Review design guidance on exhaustion scenarios (descriptor pool, queue overrun).
+- [x] Identify required observability (events, CLI output, counters).
 
 **Implementation Tasks**
-- [ ] Implement detection and logging for descriptor exhaustion / queue overruns.
-- [ ] Ensure existing descriptors continue functioning when pool is exhausted.
-- [ ] Return correct status codes (`NO_DESCRIPTOR`, etc.) on BIND/OPEN failure.
-- [ ] Add recovery tests (close descriptors, allocate new ones).
-- [ ] Update operator documentation with mitigation guidance.
+- [x] Implement detection and logging for descriptor exhaustion / queue overruns.
+- [x] Ensure existing descriptors continue functioning when pool is exhausted.
+- [x] Return correct status codes (`NO_DESCRIPTOR`, etc.) on BIND/OPEN failure.
+- [x] Add recovery tests (close descriptors, allocate new ones).
+- [x] Update operator documentation with mitigation guidance.
 
 **Post-Implementation Checklist**
+- [x] Validate behaviour against design (events, status codes, diagnostics).
+- [x] Update design doc if additional diagnostics or behaviours were added.
+- [x] Record results/tests/follow-ups in `03--ImplementationNotes.md`.
+- [ ] Confirm review gate completion.
 - [ ] Validate behaviour against design (events, recovery, status codes).
 - [ ] Update design doc if additional diagnostics or behaviours were added.
 - [x] Record tests/results/follow-ups in `03--ImplementationNotes.md`.

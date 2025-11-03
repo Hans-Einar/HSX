@@ -1392,6 +1392,8 @@ def _pretty_mbox(payload: dict) -> None:
             print(f"    handles     : {total_handles}")
         if handle_limit:
             print(f"    handle limit: {handle_limit} / pid")
+        if stats.get("descriptor_pool_exhausted"):
+            print("    descriptor pool: exhausted")
         tap_count = stats.get("tap_count")
         if tap_count is not None:
             print(f"    taps        : {tap_count}")
