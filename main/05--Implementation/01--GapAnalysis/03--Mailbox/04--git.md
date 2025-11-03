@@ -11,6 +11,7 @@
 ## Commit Log
 | Date | Commit hash | Message | Author | Notes |
 | --- | --- | --- | --- | --- |
+| 2025-11-02 | `627da4d` | `mailbox: add configurable quotas + profile wiring` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_shell_client.py` |
 | 2025-11-02 | `62cbade` | `mailbox: surface scheduler mailbox counters` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_mailbox_wait.py python/tests/test_scheduler_stats.py` |
 | 2025-11-02 | `643bfa9` | `mailbox: persist wait metadata + deadlines through refresh` | Hans Einar | Tests: `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py` |
 | 2025-11-03 | `6a3b9d2` | `mailbox: add timeout status constant` | Codex | Tests: `python -m pytest python/tests/test_mailbox_constants.py python/tests/test_mailbox_wait.py python/tests/test_mailbox_svc_runtime.py` |

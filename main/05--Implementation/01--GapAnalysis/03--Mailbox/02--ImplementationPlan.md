@@ -426,23 +426,23 @@ Toolchain needs to generate .mailbox sections from application code. Enables dec
 **Dependencies:** 4.1 (Quota enforcement)  
 **Estimated Effort:** 1-2 days  
 **Design Reference:** [04.03--Mailbox.md](../../../04--Design/04.03--Mailbox.md) Section 4.6; `docs/resource_budgets.md`  
-**Design Questions Resolved:** _TBD_  
-**Design Updates Needed:** _TBD_
+**Design Questions Resolved:** Host (`desktop`) vs embedded mailbox quotas captured in docs; configurable knobs surfaced through controller profiles.  
+**Design Updates Needed:** Addressed in 04.03 Section 4.6 (profiles paragraph).
 
 **Pre-Implementation Checklist**
-- [ ] Gather current platform constraints (host + embedded) and log in notes.
-- [ ] Review existing budget guidance to ensure mailbox additions integrate cleanly.
+- [x] Gather current platform constraints (host + embedded) and log in notes.
+- [x] Review existing budget guidance to ensure mailbox additions integrate cleanly.
 
 **Implementation Tasks**
-- [ ] Define descriptor pool sizes and default capacities per platform profile.
-- [ ] Update `docs/resource_budgets.md` with mailbox entries and rationale.
-- [ ] Provide guidance for tuning quotas (dev vs production vs constrained targets).
-- [ ] Cross-link configuration knobs in design + plan.
+- [x] Define descriptor pool sizes and default capacities per platform profile.
+- [x] Update `docs/resource_budgets.md` with mailbox entries and rationale.
+- [x] Provide guidance for tuning quotas (dev vs production vs constrained targets).
+- [x] Cross-link configuration knobs in design + plan.
 
 **Post-Implementation Checklist**
-- [ ] Ensure resource budget documentation aligns with implementation defaults.
-- [ ] Update design doc if new configuration considerations exist.
-- [ ] Record outcomes/tests/follow-ups in `03--ImplementationNotes.md`.
+- [x] Ensure resource budget documentation aligns with implementation defaults.
+- [x] Update design doc if new configuration considerations exist.
+- [x] Record outcomes/tests/follow-ups in `03--ImplementationNotes.md`.
 - [ ] Confirm review gate completion.
 
 ---

@@ -11,7 +11,7 @@ import struct
 import sys
 import zlib
 from pathlib import PurePosixPath
-from typing import Any, Callable, Dict, Optional, List, Set, Tuple
+from typing import Any, Callable, Dict, Optional, List, Set, Tuple, Union
 from collections import defaultdict, deque
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -86,6 +86,19 @@ HEADER = HEADER_V1
 HEADER_FIELDS = HEADER_V1_FIELDS
 
 RECV_INFO_STRUCT = struct.Struct("<iiIII")
+
+MAILBOX_PROFILES: Dict[str, Dict[str, Any]] = {
+    "desktop": {
+        "max_descriptors": 256,
+        "handle_limit_per_pid": 64,
+        "default_capacity": mbx_const.HSX_MBX_DEFAULT_RING_CAPACITY,
+    },
+    "embedded": {
+        "max_descriptors": 16,
+        "handle_limit_per_pid": 8,
+        "default_capacity": mbx_const.HSX_MBX_DEFAULT_RING_CAPACITY,
+    },
+}
 MAILBOX_COUNTER_FIELDS = ("MAILBOX_STEP", "MAILBOX_WAKE", "MAILBOX_TIMEOUT")
 
 
@@ -1987,6 +2000,24 @@ class MiniVM:
 
 
 class VMController:
+    @staticmethod
+    def _resolve_mailbox_profile(profile: Optional[Union[str, Dict[str, Any]]]) -> Tuple[str, Dict[str, Any]]:
+        resolved: Optional[Union[str, Dict[str, Any]]] = profile
+        if resolved is None:
+            env_value = os.environ.get("HSX_MAILBOX_PROFILE")
+            resolved = env_value if env_value else "desktop"
+        if isinstance(resolved, str):
+            key = resolved.strip().lower()
+            if not key:
+                key = "desktop"
+            config = MAILBOX_PROFILES.get(key)
+            if config is None:
+                raise ValueError(f"unknown mailbox profile '{resolved}'")
+            return key, dict(config)
+        if isinstance(resolved, dict):
+            return "custom", dict(resolved)
+        raise TypeError("mailbox_profile must be None, str, or dict")
+
     def __init__(
         self,
         *,
@@ -2011,7 +2042,9 @@ class VMController:
         self.restart_targets: Optional[List[str]] = None
         self.server: Optional["VMServer"] = None
         self._pending_mailbox_events: List[Dict[str, Any]] = []
-        self.mailbox_profile: Dict[str, Any] = dict(mailbox_profile or {})
+        profile_name, profile_config = self._resolve_mailbox_profile(mailbox_profile)
+        self.mailbox_profile_name = profile_name
+        self.mailbox_profile: Dict[str, Any] = profile_config
         self.mailboxes = self._create_mailbox_manager()
         self.valcmd = self._create_valcmd_registry()
         self.waiting_tasks: Dict[int, Dict[str, Any]] = {}
@@ -3276,6 +3309,10 @@ class VMController:
             "trace": self.scheduler_trace_snapshot(limit=32),
             "counters": self.scheduler_stats(),
             "mailbox_counters": self.mailbox_stats(),
+        }
+        info["mailbox_profile"] = {
+            "name": self.mailbox_profile_name,
+            "config": dict(self.mailbox_profile),
         }
         return info
 

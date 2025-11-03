@@ -771,3 +771,23 @@ esource_stats() on the mailbox manager and exposed aggregated metrics (capacity,
   - `PYTHONPATH=. pytest python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_shell_client.py` (pass).
 - Follow-up actions / hand-off notes:
   - Implementation review gate still outstanding; capture result in the plan once complete.
+
+
+## 2025-11-02 - Codex (Session 16)
+
+### Focus
+- Task(s) tackled: Phase 4.2 resource budget profiles (host vs embedded quotas, documentation cross-links, configurability).
+- Dependencies touched: `platforms/python/host_vm.py`, `python/tests/test_mailbox_svc_runtime.py`, `docs/resource_budgets.md`, `main/04--Design/04.03--Mailbox.md`, implementation plan.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions:
+  - Added named mailbox profiles (`desktop`, `embedded`) with descriptor/handle quotas, selectable via env (`HSX_MAILBOX_PROFILE`) or the controller `mailbox_profile` argument.
+  - `VMController.info()` and shell diagnostics surface the active profile so operators can confirm runtime quotas.
+  - Updated design and resource budget docs with the new configuration knobs and default numbers; plan checkboxes reflect completion.
+- Tests run (commands + result):
+  - `PYTHONPATH=. pytest python/tests/test_mailbox_manager.py python/tests/test_mailbox_svc_runtime.py python/tests/test_shell_client.py` (pass).
+- Follow-up actions / hand-off notes:
+  - Review gate still outstanding for Phase 4; ensure profile defaults propagate into embedded harness when that port begins.

@@ -393,6 +393,22 @@ def test_mailbox_open_returns_enospc_when_handle_quota_exhausted():
     assert vm.regs[0] == errno.ENOSPC
 
 
+def test_vmcontroller_supports_named_mailbox_profile():
+    controller = VMController(mailbox_profile="embedded")
+    stats = controller.mailboxes.resource_stats()
+    assert stats["max_descriptors"] == 16
+    assert stats["handle_limit_per_pid"] == 8
+
+
+def test_vmcontroller_env_mailbox_profile(monkeypatch):
+    monkeypatch.setenv("HSX_MAILBOX_PROFILE", "embedded")
+    controller = VMController()
+    stats = controller.mailboxes.resource_stats()
+    assert stats["max_descriptors"] == 16
+    assert stats["handle_limit_per_pid"] == 8
+    assert controller.mailbox_profile_name == "embedded"
+
+
 def test_mailbox_send_event_payload():
     controller = _make_controller_with_tasks(1)
     vm = _attach_vm(controller, 1)
