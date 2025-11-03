@@ -50,6 +50,13 @@ Set `HSX_MAILBOX_PROFILE=embedded` (or pass `mailbox_profile="embedded"` to `VMC
 - Event stream buffer: cap at 256 events × 16 B ≈ 4 KiB on desktop builds; shrink to 64 events × 12 B (~768 B) on AVR.
 - FS cache: reuse existing HEOS buffer (already counted in baseline). Avoid duplicate buffers inside the HSX port.
 
+### Value/command registry budgets
+
+- Desktop reference builds target 256 values, 128 commands, and a 16 KiB string table. The embedded profile trims these to the design minimums (64 / 16 / 2 KiB) to stay within SRAM limits.
+- The executive now exposes `val.stats` and `cmd.stats` RPCs; poll them during long-running tests to watch occupancy and string usage without instrumenting guest code.
+- Warnings are logged via the `hsx.valcmd` logger when utilisation crosses ~80 % of capacity and clear automatically once usage falls below ~70 %.
+- Maintain ≥20 % headroom in shipping profiles so descriptor churn and transient allocations never hit hard limits mid-flight.
+
 ## Action items / validation plan
 
 | Task | Owner | When | Notes |

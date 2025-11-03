@@ -28,6 +28,12 @@ class DummyVM:
     def restart(self, targets):
         return {}
 
+    def val_stats(self):
+        return getattr(self, "_val_stats", {"values": {}, "strings": {}})
+
+    def cmd_stats(self):
+        return getattr(self, "_cmd_stats", {"commands": {}, "strings": {}})
+
 
 def make_state():
     return ExecutiveState(DummyVM(), step_batch=1)
@@ -193,6 +199,28 @@ def test_command_events_update_registry():
     assert entry["last_status"] == 0
     assert entry["last_result"] == "ok"
     assert entry["last_completed_ts"] <= time.time()
+
+
+def test_val_stats_passthrough():
+    state = make_state()
+    state.vm._val_stats = {
+        "values": {"count": 2, "capacity": 8, "usage_pct": 25.0},
+        "strings": {"used_bytes": 32, "total_bytes": 256, "usage_pct": 12.5},
+    }
+    stats = state.val_stats()
+    assert stats["values"]["count"] == 2
+    assert stats["strings"]["used_bytes"] == 32
+
+
+def test_cmd_stats_passthrough():
+    state = make_state()
+    state.vm._cmd_stats = {
+        "commands": {"count": 1, "capacity": 4, "usage_pct": 25.0},
+        "strings": {"used_bytes": 40, "total_bytes": 256, "usage_pct": 15.6},
+    }
+    stats = state.cmd_stats()
+    assert stats["commands"]["count"] == 1
+    assert stats["strings"]["usage_pct"] == pytest.approx(15.6)
 
 
 class ValCmdClient:

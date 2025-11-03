@@ -230,6 +230,10 @@ class VMClient:
             payload["pid"] = pid
         return _check_ok(self.request(payload)).get("value", {})
 
+    def val_stats(self) -> dict:
+        payload: Dict[str, Any] = {"cmd": "val_stats"}
+        return _check_ok(self.request(payload)).get("stats", {})
+
     def cmd_list(
         self,
         *,
@@ -256,6 +260,10 @@ class VMClient:
         if async_call:
             payload["async"] = 1
         return _check_ok(self.request(payload)).get("command", {})
+
+    def cmd_stats(self) -> dict:
+        payload: Dict[str, Any] = {"cmd": "cmd_stats"}
+        return _check_ok(self.request(payload)).get("stats", {})
 
     def mailbox_send(self, pid: int, handle: int, *, data: str | None = None, data_hex: str | None = None, flags: int = 0, channel: int = 0) -> dict:
         payload: Dict[str, Any] = {"cmd": "mailbox_send", "pid": pid, "handle": handle, "flags": flags, "channel": channel}

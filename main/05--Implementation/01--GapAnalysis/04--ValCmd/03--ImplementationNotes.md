@@ -181,3 +181,23 @@ Append sessions chronologically and ensure every entry references the relevant d
 ### Next Steps
 - Phase 4.3 resource tracking RPC (`val.stats`/`cmd.stats`) and persistence follow-ups.
 - Schedule implementation review for new ValCmd Executive interfaces and update design leverage if async payloads evolve.
+
+## 2025-11-06 - Codex (Session 6)
+
+### Scope
+- Plan item / phase addressed: Phase 4.3 Resource Tracking
+- Design sections reviewed: 04.04--ValCmd.md (§4.3 registry model, §5.3 instrumentation), docs/resource_budgets.md monitoring guidance
+
+### Work Summary
+- Added high-water tracking and 80 %/70 % warn thresholds to `python/valcmd.py` (value/command tables, shared string pool) with `hsx.valcmd` warnings when limits are approached; exposed warning state and high-water metrics in `get_stats`.
+- Extended `platforms/python/host_vm.py`, `python/vmclient.py`, and `python/execd.py` with `val_stats`/`cmd_stats` surfaces plus new JSON-RPC commands (`val.stats`, `cmd.stats`) returning registry/string metrics.
+- Documented the new RPCs in `docs/executive_protocol.md` and captured monitoring expectations in `docs/resource_budgets.md` under a dedicated value/command budget section.
+- Added pytest coverage for stats/warning behaviour (`python/tests/test_valcmd_registry.py`, `python/tests/test_valcmd_svc_integration.py`, `python/tests/test_executive_sessions.py`) validating logging thresholds, high-water reporting, and RPC plumbing.
+
+### Testing
+- Intended: `PYTHONPATH=. python -m pytest python/tests/test_valcmd_registry.py python/tests/test_valcmd_svc_integration.py python/tests/test_executive_sessions.py -k stats -v`
+- Result: Fails early (`No module named pytest`) because the current environment is missing the pytest dependency.
+
+### Next Steps
+- Confirm pytest availability for future sessions (install into the WSL env or document alternative).
+- Proceed to Phase 4.4 persistence follow-ups once regressions from the new stats plumbing are cleared.

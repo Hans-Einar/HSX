@@ -2188,6 +2188,13 @@ class VMController:
                 })
         return result
 
+    def val_stats(self) -> Dict[str, Any]:
+        stats = self.valcmd.get_stats()
+        return {
+            "values": stats.get("values", {}),
+            "strings": stats.get("strings", {}),
+        }
+
     def cmd_snapshot(
         self,
         *,
@@ -2224,6 +2231,13 @@ class VMController:
             "status": status,
             "result": result,
             "pid": caller_pid,
+        }
+
+    def cmd_stats(self) -> Dict[str, Any]:
+        stats = self.valcmd.get_stats()
+        return {
+            "commands": stats.get("commands", {}),
+            "strings": stats.get("strings", {}),
         }
 
     def _handle_mailbox_manager_event(self, event: Dict[str, Any]) -> None:
@@ -4787,6 +4801,8 @@ class VMController:
                 pid_int = int(pid_value) if pid_value is not None else None
                 result = self.val_set(oid_int, request.get("value"), pid=pid_int)
                 return {"status": "ok", "value": result}
+            if cmd == "val_stats":
+                return {"status": "ok", "stats": self.val_stats()}
             if cmd == "cmd_list":
                 pid_filter = request.get("pid")
                 group_filter = request.get("group")
@@ -4818,6 +4834,8 @@ class VMController:
                     async_call = False
                 result = self.cmd_call(oid_int, pid=pid_int, async_call=async_call)
                 return {"status": "ok", "command": result}
+            if cmd == "cmd_stats":
+                return {"status": "ok", "stats": self.cmd_stats()}
             if cmd == "restart":
                 targets = request.get("targets")
                 if isinstance(targets, str):

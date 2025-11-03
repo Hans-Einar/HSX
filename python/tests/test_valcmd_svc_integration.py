@@ -163,6 +163,54 @@ class TestValCmdSVCIntegration:
         assert result == 42
         assert call_count[0] == 1
 
+    def test_controller_exposes_stats(self):
+        """Controller should surface registry stats for RPCs."""
+        controller = VMController()
+        status, _ = controller.valcmd.value_register(
+            group_id=1,
+            value_id=1,
+            flags=0,
+            auth_level=HSX_VAL_AUTH_PUBLIC,
+            owner_pid=200,
+            descriptors=[{"type": "name", "name": "tv"}],
+        )
+        assert status == HSX_VAL_STATUS_OK
+        status, _ = controller.valcmd.command_register(
+            group_id=1,
+            cmd_id=1,
+            flags=0,
+            auth_level=0,
+            owner_pid=200,
+            descriptors=[{"type": "name", "name": "cmd", "help": "run"}],
+        )
+        assert status == HSX_CMD_STATUS_OK
+
+        val_stats = controller.val_stats()
+        assert val_stats["values"]["count"] == 1
+        assert "strings" in val_stats
+
+        cmd_stats = controller.cmd_stats()
+        assert cmd_stats["commands"]["count"] == 1
+        assert "strings" in cmd_stats
+
+    def test_handle_command_stats_routes(self):
+        """RPC handler should respond with stats payloads."""
+        controller = VMController()
+        controller.valcmd.value_register(
+            group_id=0,
+            value_id=1,
+            flags=0,
+            auth_level=0,
+            owner_pid=1,
+            descriptors=[{"type": "name", "name": "stat"}],
+        )
+        response = controller.handle_command({"cmd": "val_stats"})
+        assert response["status"] == "ok"
+        assert "values" in response["stats"]
+        response = controller.handle_command({"cmd": "cmd_stats"})
+        assert response["status"] == "ok"
+        assert "strings" in response["stats"]
+
     def test_value_register_via_svc_with_descriptor(self):
         controller, vm = self._make_controller()
         name_ptr = 0x0200

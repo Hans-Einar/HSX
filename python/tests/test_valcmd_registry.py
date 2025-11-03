@@ -1,5 +1,6 @@
 """Tests for the ValCmd Registry Manager."""
 
+import logging
 import pytest
 from python.valcmd import (
     ValCmdRegistry,
@@ -136,6 +137,93 @@ class TestDescriptors:
         assert name.next == unit
         assert unit.next == range_desc
         assert range_desc.next is None
+
+
+class TestRegistryStats:
+    """Tests for registry resource statistics and warnings."""
+
+    def test_stats_high_water_tracking(self):
+        registry = ValCmdRegistry(max_values=4, max_commands=3, string_capacity=128)
+
+        for value_id in range(3):
+            status, _ = registry.value_register(
+                group_id=0,
+                value_id=value_id,
+                flags=0,
+                auth_level=HSX_VAL_AUTH_PUBLIC,
+                owner_pid=42,
+                descriptors=[{"type": "name", "name": f"val_{value_id}"}],
+            )
+            assert status == HSX_VAL_STATUS_OK
+
+        status, _ = registry.command_register(
+            group_id=0,
+            cmd_id=1,
+            flags=0,
+            auth_level=0,
+            owner_pid=42,
+            descriptors=[{"type": "name", "name": "cmd_1", "help": "noop"}],
+        )
+        assert status == HSX_CMD_STATUS_OK
+
+        stats = registry.get_stats()
+        assert stats["values"]["count"] == 3
+        assert stats["values"]["high_water"] == 3
+        assert pytest.approx(stats["values"]["usage_pct"], rel=1e-6) == 75.0
+        assert pytest.approx(stats["values"]["high_water_pct"], rel=1e-6) == 75.0
+        assert stats["commands"]["count"] == 1
+        assert stats["commands"]["high_water"] == 1
+        assert stats["strings"]["used_bytes"] > 0
+        assert stats["strings"]["total_bytes"] == 128
+
+    def test_value_warning_threshold_and_reset(self, caplog: pytest.LogCaptureFixture):
+        caplog.set_level(logging.WARNING, logger="hsx.valcmd")
+        registry = ValCmdRegistry(max_values=5, max_commands=2, string_capacity=128)
+
+        for value_id in range(4):  # 4/5 -> 80% occupancy
+            status, _ = registry.value_register(
+                group_id=1,
+                value_id=value_id,
+                flags=0,
+                auth_level=HSX_VAL_AUTH_PUBLIC,
+                owner_pid=7,
+                descriptors=[{"type": "name", "name": f"warn_val_{value_id}"}],
+            )
+            assert status == HSX_VAL_STATUS_OK
+
+        assert any("value registry occupancy high" in rec.message for rec in caplog.records)
+
+        registry.cleanup_pid(7)
+        caplog.clear()
+
+        for value_id in range(4):
+            status, _ = registry.value_register(
+                group_id=1,
+                value_id=value_id,
+                flags=0,
+                auth_level=HSX_VAL_AUTH_PUBLIC,
+                owner_pid=7,
+                descriptors=[{"type": "name", "name": f"warn_val_{value_id}"}],
+            )
+            assert status == HSX_VAL_STATUS_OK
+
+        assert any("value registry occupancy high" in rec.message for rec in caplog.records)
+
+    def test_string_warning_threshold(self, caplog: pytest.LogCaptureFixture):
+        caplog.set_level(logging.WARNING, logger="hsx.valcmd")
+        registry = ValCmdRegistry(max_values=2, max_commands=1, string_capacity=20)
+
+        status, _ = registry.value_register(
+            group_id=0,
+            value_id=0,
+            flags=0,
+            auth_level=HSX_VAL_AUTH_PUBLIC,
+            owner_pid=1,
+            descriptors=[{"type": "name", "name": "abcdefghijklmnop"}],
+        )
+        assert status == HSX_VAL_STATUS_OK
+
+        assert any("string table usage high" in rec.message for rec in caplog.records)
 
 
 class TestValueEntry:

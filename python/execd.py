@@ -3773,6 +3773,9 @@ class ExecutiveState:
             self._merge_value_snapshot(snapshot)
         return result
 
+    def val_stats(self) -> Dict[str, Any]:
+        return self.vm.val_stats()
+
     def cmd_list(
         self,
         *,
@@ -3803,6 +3806,9 @@ class ExecutiveState:
                 entry["last_status"] = status
                 entry["last_result"] = result.get("result")
         return result
+
+    def cmd_stats(self) -> Dict[str, Any]:
+        return self.vm.cmd_stats()
 
     def _mark_task_wait_mailbox(self, pid: int, event: Dict[str, Any]) -> None:
         descriptor = event.get("descriptor")
@@ -4261,6 +4267,9 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 name_token = str(request.get("name")) if request.get("name") is not None else None
                 values = self.state.val_list(pid=pid_int, group=group_int, oid=oid_int, name=name_token)
                 return {"version": 1, "status": "ok", "values": values}
+            if cmd == "val.stats":
+                stats = self.state.val_stats()
+                return {"version": 1, "status": "ok", "stats": stats}
             if cmd == "val.get":
                 oid_value = request.get("oid")
                 if oid_value is None:
@@ -4302,6 +4311,9 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 name_token = str(request.get("name")) if request.get("name") is not None else None
                 commands = self.state.cmd_list(pid=pid_int, group=group_int, oid=oid_int, name=name_token)
                 return {"version": 1, "status": "ok", "commands": commands}
+            if cmd == "cmd.stats":
+                stats = self.state.cmd_stats()
+                return {"version": 1, "status": "ok", "stats": stats}
             if cmd == "cmd.call":
                 oid_value = request.get("oid")
                 if oid_value is None:

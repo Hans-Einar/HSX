@@ -523,13 +523,13 @@ Monitor table occupancy and string table usage against budgets. System/ValCmd.md
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.04--ValCmd](../../../04--Design/04.04--ValCmd.md)
-- [ ] Track value registry occupancy (used/total)
-- [ ] Track command registry occupancy (used/total)
-- [ ] Track string table usage (bytes used/total)
-- [ ] Expose metrics via RPC command (val.stats, cmd.stats)
-- [ ] Log warnings when approaching limits
-- [ ] Add resource tracking tests
-- [ ] Document resource limits in `docs/resource_budgets.md`
+- [x] Track value registry occupancy (used/total)
+- [x] Track command registry occupancy (used/total)
+- [x] Track string table usage (bytes used/total)
+- [x] Expose metrics via RPC command (val.stats, cmd.stats)
+- [x] Log warnings when approaching limits
+- [x] Add resource tracking tests
+- [x] Document resource limits in `docs/resource_budgets.md`
 
 ---
 

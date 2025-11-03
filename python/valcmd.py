@@ -9,6 +9,7 @@ port will rely upon.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import logging
 import struct
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
@@ -57,6 +58,10 @@ from python.hsx_command_constants import (
 
 # ---------------------------------------------------------------------------
 # Utility conversions
+
+_LOGGER = logging.getLogger("hsx.valcmd")
+_RESOURCE_WARN_THRESHOLD = 0.80
+_RESOURCE_RESET_THRESHOLD = 0.70
 
 _F16_STRUCT = struct.Struct("<e")
 
@@ -216,6 +221,7 @@ class StringTable:
         self.capacity = capacity
         self._data = bytearray()
         self._offsets: Dict[str, int] = {}
+        self._high_water = 0
 
     def insert(self, text: str) -> Optional[int]:
         """Insert string, returning byte offset or None if table full."""
@@ -229,6 +235,8 @@ class StringTable:
         self._data.extend(encoded)
         self._data.append(0)
         self._offsets[text] = offset
+        if len(self._data) > self._high_water:
+            self._high_water = len(self._data)
         return offset
 
     def get(self, offset: int) -> Optional[str]:
@@ -243,6 +251,10 @@ class StringTable:
     @property
     def usage(self) -> Tuple[int, int]:
         return (len(self._data), self.capacity)
+
+    @property
+    def high_water(self) -> int:
+        return self._high_water
 
 
 # ---------------------------------------------------------------------------
@@ -533,6 +545,11 @@ class ValCmdRegistry:
         self._event_hook: Optional[Callable[..., None]] = None
         self._command_handlers: Dict[int, Callable[[], Any]] = {}
         self._next_handler_ref: int = 1
+        self._value_high_water = 0
+        self._command_high_water = 0
+        self._value_warn_active = False
+        self._command_warn_active = False
+        self._string_warn_active = False
 
     # ------------------------------------------------------------------ utils
 
@@ -610,6 +627,7 @@ class ValCmdRegistry:
             else:
                 raise ValueError(f"unsupported value descriptor spec: {spec}")
             next_offset = self._descriptors.allocate(record)
+            self._observe_string_usage()
         return (True, next_offset)
 
     def _allocate_command_descriptors(
@@ -635,6 +653,7 @@ class ValCmdRegistry:
             else:
                 raise ValueError(f"unsupported command descriptor spec: {spec}")
             next_offset = self._descriptors.allocate(record)
+            self._observe_string_usage()
         return (True, next_offset)
 
     def _iter_value_descriptors(self, entry: ValueEntry) -> Iterable[DescriptorRecord]:
@@ -642,6 +661,55 @@ class ValCmdRegistry:
 
     def _iter_command_descriptors(self, entry: CommandEntry) -> Iterable[DescriptorRecord]:
         return self._descriptors.iter_chain(entry.desc_head)
+
+    def _observe_string_usage(self) -> None:
+        used, total = self._string_table.usage
+        usage_pct = (used / total) if total else 0.0
+        if usage_pct >= _RESOURCE_WARN_THRESHOLD:
+            if not self._string_warn_active:
+                _LOGGER.warning(
+                    "string table usage high: %.1f%% (%d/%d bytes)",
+                    usage_pct * 100.0,
+                    used,
+                    total,
+                )
+                self._string_warn_active = True
+        elif self._string_warn_active and usage_pct <= _RESOURCE_RESET_THRESHOLD:
+            self._string_warn_active = False
+
+    def _record_value_usage(self) -> None:
+        count = len(self._values)
+        if count > self._value_high_water:
+            self._value_high_water = count
+        usage_pct = (count / self.max_values) if self.max_values else 0.0
+        if usage_pct >= _RESOURCE_WARN_THRESHOLD:
+            if not self._value_warn_active:
+                _LOGGER.warning(
+                    "value registry occupancy high: %.1f%% (%d/%d entries)",
+                    usage_pct * 100.0,
+                    count,
+                    self.max_values,
+                )
+                self._value_warn_active = True
+        elif self._value_warn_active and usage_pct <= _RESOURCE_RESET_THRESHOLD:
+            self._value_warn_active = False
+
+    def _record_command_usage(self) -> None:
+        count = len(self._commands)
+        if count > self._command_high_water:
+            self._command_high_water = count
+        usage_pct = (count / self.max_commands) if self.max_commands else 0.0
+        if usage_pct >= _RESOURCE_WARN_THRESHOLD:
+            if not self._command_warn_active:
+                _LOGGER.warning(
+                    "command registry occupancy high: %.1f%% (%d/%d entries)",
+                    usage_pct * 100.0,
+                    count,
+                    self.max_commands,
+                )
+                self._command_warn_active = True
+        elif self._command_warn_active and usage_pct <= _RESOURCE_RESET_THRESHOLD:
+            self._command_warn_active = False
 
     # ------------------------------------------------------------ value APIs
 
@@ -678,6 +746,7 @@ class ValCmdRegistry:
             desc_head=desc_head,
         )
         self._values[oid] = entry
+        self._record_value_usage()
         self._emit_event(
             "value_registered",
             pid=owner_pid,
@@ -858,6 +927,18 @@ class ValCmdRegistry:
             desc_head=desc_head,
         )
         self._commands[oid] = entry
+        self._record_command_usage()
+        self._emit_event(
+            "cmd_registered",
+            pid=owner_pid,
+            caller_pid=owner_pid,
+            oid=oid,
+            group_id=group_id,
+            cmd_id=cmd_id,
+            flags=flags,
+            auth_level=auth_level,
+            desc_head=desc_head,
+        )
         return (HSX_CMD_STATUS_OK, oid)
 
     def command_lookup(self, group_id: int, cmd_id: int) -> Tuple[int, int]:
@@ -1037,21 +1118,37 @@ class ValCmdRegistry:
 
     def get_stats(self) -> Dict[str, Any]:
         used_bytes, total_bytes = self._string_table.usage
+        string_high = self._string_table.high_water
+        value_count = len(self._values)
+        command_count = len(self._commands)
+        value_usage_pct = (value_count / self.max_values * 100.0) if self.max_values else 0.0
+        command_usage_pct = (command_count / self.max_commands * 100.0) if self.max_commands else 0.0
+        string_usage_pct = (used_bytes / total_bytes * 100.0) if total_bytes else 0.0
+        string_high_pct = (string_high / total_bytes * 100.0) if total_bytes else 0.0
         return {
             "values": {
-                "count": len(self._values),
+                "count": value_count,
                 "capacity": self.max_values,
-                "usage_pct": (len(self._values) / self.max_values * 100) if self.max_values else 0.0,
+                "usage_pct": value_usage_pct,
+                "high_water": self._value_high_water,
+                "high_water_pct": (self._value_high_water / self.max_values * 100.0) if self.max_values else 0.0,
+                "warning": self._value_warn_active,
             },
             "commands": {
-                "count": len(self._commands),
+                "count": command_count,
                 "capacity": self.max_commands,
-                "usage_pct": (len(self._commands) / self.max_commands * 100) if self.max_commands else 0.0,
+                "usage_pct": command_usage_pct,
+                "high_water": self._command_high_water,
+                "high_water_pct": (self._command_high_water / self.max_commands * 100.0) if self.max_commands else 0.0,
+                "warning": self._command_warn_active,
             },
             "strings": {
                 "used_bytes": used_bytes,
                 "total_bytes": total_bytes,
-                "usage_pct": (used_bytes / total_bytes * 100) if total_bytes else 0.0,
+                "usage_pct": string_usage_pct,
+                "high_water_bytes": string_high,
+                "high_water_pct": string_high_pct,
+                "warning": self._string_warn_active,
             },
         }
 
@@ -1064,3 +1161,5 @@ class ValCmdRegistry:
             entry = self._commands.pop(oid)
             if entry.handler_ref in self._command_handlers:
                 self._command_handlers.pop(entry.handler_ref, None)
+        self._record_value_usage()
+        self._record_command_usage()
