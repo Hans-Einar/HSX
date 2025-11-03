@@ -9,8 +9,14 @@ from python import hsx_mailbox_constants as mbx_const
 from python.hsx_value_constants import (
     HSX_VAL_AUTH_PUBLIC,
     HSX_VAL_AUTH_USER,
+    HSX_VAL_STATUS_OK,
+    HSX_VAL_FLAG_PERSIST,
 )
-from python.hsx_command_constants import HSX_CMD_FLAG_PIN
+from python.hsx_command_constants import (
+    HSX_CMD_FLAG_PIN,
+    HSX_CMD_STATUS_OK,
+    HSX_CMD_STATUS_EPERM,
+)
 from python.valcmd import f16_to_float
 from platforms.python.host_vm import HXEMetadata, VMController, load_hxe, load_hxe_bytes
 
@@ -77,7 +83,7 @@ def _build_value_cmd_hxe_bytes(tmp_path: Path) -> bytes:
             {
                 "group": 1,
                 "value": 2,
-                "flags": 0,
+                "flags": HSX_VAL_FLAG_PERSIST,
                 "auth": HSX_VAL_AUTH_PUBLIC,
                 "init": 12.5,
                 "name": "temperature",
@@ -226,6 +232,21 @@ def test_value_command_metadata_roundtrip(tmp_path):
     assert meta_command["group_id"] == 1
     assert meta_command["cmd_id"] == 7
     assert meta_command["handler_offset"] == 0x100
+    value_oid = (1 << 8) | 2
+    status, value = controller.valcmd.value_get(value_oid, caller_pid=pid)
+    assert status == HSX_VAL_STATUS_OK
+    assert value == pytest.approx(12.5, rel=1e-3)
+    value_entry = controller.valcmd.get_value_entry(value_oid)
+    assert value_entry is not None
+    assert value_entry.flags & HSX_VAL_FLAG_PERSIST
+    assert value_entry.owner_pid == pid
+    status, cmd_oid = controller.valcmd.command_lookup(1, 7)
+    assert status == HSX_CMD_STATUS_OK
+    status, _ = controller.valcmd.command_call(cmd_oid, caller_pid=pid)
+    assert status == HSX_CMD_STATUS_EPERM
+    command_entry = controller.valcmd.get_command_entry(cmd_oid)
+    assert command_entry is not None
+    assert command_entry.owner_pid == pid
 
 
 def test_linker_rejects_duplicate_value_metadata(tmp_path):

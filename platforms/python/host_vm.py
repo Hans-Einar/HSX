@@ -2136,6 +2136,135 @@ class VMController:
         if self.vm:
             self.vm.emit_event({'type': event_type, **kwargs})
 
+    @staticmethod
+    def _metadata_u8(name: str, value: Any) -> int:
+        try:
+            num = int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{name} must be an integer") from exc
+        if not (0 <= num <= 0xFF):
+            raise ValueError(f"{name} must be within 0..255")
+        return num
+
+    @staticmethod
+    def _metadata_u16(name: str, value: Any) -> int:
+        try:
+            num = int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{name} must be an integer") from exc
+        if not (0 <= num <= 0xFFFF):
+            raise ValueError(f"{name} must be within 0..65535")
+        return num
+
+    def _register_metadata_values(
+        self,
+        pid: int,
+        entries: List[Dict[str, Any]],
+        metadata_dict: Dict[str, Any],
+    ) -> None:
+        if not entries:
+            return
+        value_meta_list = metadata_dict.get("values")
+        for index, entry in enumerate(entries):
+            group_id = self._metadata_u8("value metadata group_id", entry.get("group_id", entry.get("group")))
+            value_id = self._metadata_u8("value metadata value_id", entry.get("value_id", entry.get("value")))
+            flags = self._metadata_u8("value metadata flags", entry.get("flags", 0))
+            persist_key = self._metadata_u16("value metadata persist_key", entry.get("persist_key", 0))
+            if persist_key and not (flags & val_const.HSX_VAL_FLAG_PERSIST):
+                flags |= val_const.HSX_VAL_FLAG_PERSIST
+            auth_level = self._metadata_u8("value metadata auth_level", entry.get("auth_level", entry.get("auth", 0)))
+            init_raw = entry.get("init_raw")
+            if init_raw is None:
+                init_value = entry.get("init_value", entry.get("init", 0.0))
+                init_raw = float_to_f16(float(init_value))
+            init_value = entry.get("init_value")
+            if init_value is None:
+                init_value = f16_to_float(int(init_raw) & 0xFFFF)
+            epsilon_raw = entry.get("epsilon_raw")
+            epsilon_value = entry.get("epsilon")
+            if epsilon_value is None:
+                epsilon_value = f16_to_float(int(epsilon_raw or 0) & 0xFFFF)
+            min_raw = entry.get("min_raw")
+            min_value = entry.get("min")
+            if min_value is None:
+                min_value = f16_to_float(int(min_raw or 0) & 0xFFFF)
+            max_raw = entry.get("max_raw")
+            max_value = entry.get("max")
+            if max_value is None:
+                max_value = f16_to_float(int(max_raw or 0) & 0xFFFF)
+            specs: List[Dict[str, Any]] = []
+            name_value = entry.get("name")
+            if name_value:
+                specs.append({"type": "name", "name": name_value})
+            unit_value = entry.get("unit")
+            if unit_value:
+                specs.append({"type": "unit", "unit": unit_value, "epsilon": epsilon_value, "rate_ms": int(entry.get("rate_ms", 0))})
+            if min_raw not in (None, 0) or max_raw not in (None, 0):
+                specs.append({"type": "range", "min": min_value, "max": max_value})
+            if persist_key:
+                specs.append({"type": "persist", "key": persist_key, "debounce_ms": int(entry.get("debounce_ms", 0))})
+            status, oid = self.valcmd.value_register(
+                group_id,
+                value_id,
+                flags,
+                auth_level,
+                owner_pid=pid,
+                descriptors=specs,
+            )
+            if status != val_const.HSX_VAL_STATUS_OK:
+                raise ValueError(f"Failed to register value ({group_id},{value_id}): status=0x{status:04X}")
+            registry_entry = self.valcmd.get_value_entry(oid)
+            if registry_entry is not None:
+                registry_entry.set_value(float(init_value))
+                registry_entry.last_change_time = 0.0
+            entry["oid"] = oid
+            if isinstance(value_meta_list, list) and index < len(value_meta_list):
+                value_meta_list[index]["oid"] = oid
+
+    @staticmethod
+    def _metadata_u32(name: str, value: Any) -> int:
+        try:
+            num = int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{name} must be an integer") from exc
+        if not (0 <= num <= 0xFFFFFFFF):
+            raise ValueError(f"{name} must be within 0..4294967295")
+        return num & 0xFFFFFFFF
+
+    def _register_metadata_commands(
+        self,
+        pid: int,
+        entries: List[Dict[str, Any]],
+        metadata_dict: Dict[str, Any],
+    ) -> None:
+        if not entries:
+            return
+        command_meta_list = metadata_dict.get("commands")
+        for index, entry in enumerate(entries):
+            group_id = self._metadata_u8("command metadata group_id", entry.get("group_id", entry.get("group")))
+            cmd_id = self._metadata_u8("command metadata cmd_id", entry.get("cmd_id", entry.get("cmd")))
+            flags = self._metadata_u8("command metadata flags", entry.get("flags", 0))
+            auth_level = self._metadata_u8("command metadata auth_level", entry.get("auth_level", entry.get("auth", 0)))
+            handler_offset = self._metadata_u32("command metadata handler_offset", entry.get("handler_offset", entry.get("handler", 0)))
+            specs: List[Dict[str, Any]] = []
+            name_value = entry.get("name")
+            if name_value or entry.get("help"):
+                specs.append({"type": "name", "name": name_value or "", "help": entry.get("help", "")})
+            status, oid = self.valcmd.command_register(
+                group_id,
+                cmd_id,
+                flags,
+                auth_level,
+                owner_pid=pid,
+                handler_ref=handler_offset,
+                descriptors=specs,
+            )
+            if status != cmd_const.HSX_CMD_STATUS_OK:
+                raise ValueError(f"Failed to register command ({group_id},{cmd_id}): status=0x{status:04X}")
+            entry["oid"] = oid
+            if isinstance(command_meta_list, list) and index < len(command_meta_list):
+                command_meta_list[index]["oid"] = oid
+
     def val_snapshot(
         self,
         *,
@@ -3661,6 +3790,9 @@ class VMController:
         state["context"] = ctx
         metadata_dict = header.get("metadata") or {}
         metadata_obj = header.get("_metadata_obj")
+        if isinstance(metadata_obj, HXEMetadata):
+            self._register_metadata_values(pid, metadata_obj.values, metadata_dict)
+            self._register_metadata_commands(pid, metadata_obj.commands, metadata_dict)
         self.tasks[pid] = {
             "pid": pid,
             "program": program_label,

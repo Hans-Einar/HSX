@@ -575,6 +575,13 @@ Design specifies registering all values/commands before VM execution (section 1.
 - [ ] Handle registration failures
 - [ ] Add preprocessed registration tests
 - [ ] Document preprocessing behavior
+ - [x] Implement metadata preprocessing during task load
+ - [x] Call VALUE_REGISTER for each .value entry
+ - [x] Call CMD_REGISTER for each .cmd entry
+ - [x] Build descriptor chains from metadata
+ - [x] Handle registration failures
+ - [x] Add preprocessed registration tests
+ - [x] Document preprocessing behavior
 
 ---
 
