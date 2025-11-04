@@ -95,14 +95,18 @@ def test_compile_records_last_debug_info():
     assert func["function"] == "foo"
     assert isinstance(func["mvasm_start_line"], int) and func["mvasm_start_line"] >= 1
     assert isinstance(func["mvasm_end_line"], int) and func["mvasm_end_line"] >= func["mvasm_start_line"]
+    assert isinstance(func.get("mvasm_start_ordinal"), int)
+    assert isinstance(func.get("mvasm_end_ordinal"), int)
     line_map = debug_info.get("line_map")
     assert line_map, "expected instruction line map entries"
+    assert line_map[0].get("mvasm_ordinal") is not None
     assert any(entry.get("source_line") == 5 for entry in line_map)
     llvm_map = debug_info.get("llvm_to_mvasm")
     assert llvm_map, "expected llvm_to_mvasm entries"
     entry = next((item for item in llvm_map if item.get("function") == "foo"), None)
     assert entry is not None
     assert entry.get("mvasm_lines"), "expected MVASM line coverage"
+    assert entry.get("mvasm_ordinals"), "expected MVASM ordinal coverage"
 
 
 def test_emit_debug_flag_writes_json(tmp_path):
@@ -143,4 +147,6 @@ def test_emit_debug_flag_writes_json(tmp_path):
     assert isinstance(emitted["mvasm_start_line"], int) and emitted["mvasm_start_line"] >= 1
     assert isinstance(emitted["mvasm_end_line"], int) and emitted["mvasm_end_line"] >= emitted["mvasm_start_line"]
     assert dbg_data.get("line_map"), "expected line_map in emitted debug file"
+    assert dbg_data["line_map"][0].get("mvasm_ordinal") is not None
     assert dbg_data.get("llvm_to_mvasm"), "expected llvm_to_mvasm mapping in debug file"
+    assert dbg_data["llvm_to_mvasm"][0].get("mvasm_ordinals")

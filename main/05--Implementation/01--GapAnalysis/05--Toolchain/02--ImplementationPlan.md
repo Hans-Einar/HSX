@@ -349,14 +349,14 @@ Design specifies --emit-sym flag to generate debugger symbol files (section 4.2.
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Add `--emit-sym` flag to `python/hld.py`
-- [ ] Parse .dbg files from object inputs
-- [ ] Resolve addresses after linking
-- [ ] Generate .sym JSON file with final addresses
-- [ ] Include function boundaries
-- [ ] Include memory region information
-- [ ] Add --emit-sym tests
-- [ ] Integrate with unified build script
+- [x] Add `--emit-sym` flag to `python/hld.py`
+- [x] Parse .dbg files from object inputs
+- [x] Resolve addresses after linking
+- [x] Generate .sym JSON file with final addresses
+- [x] Include function boundaries
+- [x] Include memory region information
+- [x] Add --emit-sym tests
+- [x] Integrate with unified build script
 
 ---
 

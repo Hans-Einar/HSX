@@ -2463,6 +2463,19 @@ def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
     else:
         header_len = 0
 
+    instruction_ordinals: Dict[int, int] = {}
+    ordinal_counter = 0
+    for idx, asm_line in enumerate(out):
+        if is_instruction_line(asm_line):
+            tag = line_tags[idx]
+            if not isinstance(tag, dict):
+                tag = {}
+                line_tags[idx] = tag
+            tag["ordinal"] = ordinal_counter
+            instruction_ordinals[idx + 1] = ordinal_counter
+            ordinal_counter += 1
+    line_to_ordinal = dict(instruction_ordinals)
+
     debug_info = ir.get("debug", {"files": {}, "subprograms": {}, "functions": []})
     files = debug_info.get("files", {})
     subprograms = debug_info.get("subprograms", {})
@@ -2537,6 +2550,18 @@ def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
         else:
             start_line = None
             end_line = None
+        ordinals_in_range: List[int] = []
+        if start_line is not None and end_line is not None:
+            for line_num in range(start_line, end_line + 1):
+                ordinal_val = line_to_ordinal.get(line_num)
+                if ordinal_val is not None:
+                    ordinals_in_range.append(ordinal_val)
+        if ordinals_in_range:
+            start_ord = min(ordinals_in_range)
+            end_ord = max(ordinals_in_range)
+        else:
+            start_ord = None
+            end_ord = None
         functions_list.append(
             {
                 "function": name,
@@ -2546,6 +2571,8 @@ def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
                 "line": entry.get("line"),
                 "mvasm_start_line": start_line,
                 "mvasm_end_line": end_line,
+                "mvasm_start_ordinal": start_ord,
+                "mvasm_end_ordinal": end_ord,
             }
         )
     line_map_entries: List[Dict[str, Any]] = []
@@ -2566,16 +2593,30 @@ def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
             "mvasm_line": idx + 1,
             "source_line": loc_info["line"],
         }
+        ordinal_val = tag.get("ordinal")
+        if ordinal_val is not None:
+            entry["mvasm_ordinal"] = ordinal_val
         if loc_info.get("column") is not None:
             entry["source_column"] = loc_info["column"]
         file_entry = loc_info.get("file")
         if file_entry:
             entry["source_file"] = file_entry.get("filename")
-            if file_entry.get("directory"):
-                entry["source_directory"] = file_entry["directory"]
+            directory = file_entry.get("directory")
+            if directory:
+                entry["source_directory"] = directory
             entry["source_file_id"] = file_entry.get("id")
         line_map_entries.append(entry)
     line_map_entries.sort(key=lambda item: item["mvasm_line"])
+
+    instruction_ordinal_map: Dict[str, List[int]] = {}
+    for inst_id, line_numbers in instruction_line_map.items():
+        ordinals: List[int] = []
+        for line_number in line_numbers:
+            ordinal_val = line_to_ordinal.get(line_number)
+            if ordinal_val is not None:
+                ordinals.append(ordinal_val)
+        if ordinals:
+            instruction_ordinal_map[inst_id] = ordinals
 
     llvm_map_entries: List[Dict[str, Any]] = []
     for inst_id in instruction_order:
@@ -2605,6 +2646,9 @@ def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
                     entry["source_file"] = file_entry.get("filename")
                     if file_entry.get("directory"):
                         entry["source_directory"] = file_entry["directory"]
+        ordinals_for_inst = instruction_ordinal_map.get(inst_id)
+        if ordinals_for_inst:
+            entry["mvasm_ordinals"] = ordinals_for_inst
         llvm_map_entries.append(entry)
     LAST_DEBUG_INFO = {
         "version": 1,

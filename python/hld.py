@@ -266,6 +266,130 @@ def _resolve_command_handler_offsets(
         entry["handler_offset"] = resolved_address & 0xFFFFFFFF
 
 
+def _generate_symbol_payload(
+    modules: List[Dict[str, Any]],
+    symbol_table: Dict[str, Dict[str, Any]],
+    final_code: List[int],
+    final_rodata: bytearray,
+    output_path: Path,
+    crc: int,
+) -> Dict[str, Any]:
+    functions_section: List[Dict[str, Any]] = []
+    instructions_section: List[Dict[str, Any]] = []
+
+    labels_map: Dict[str, List[str]] = {}
+    for name, info in symbol_table.items():
+        addr = int(info.get("address", 0)) & 0xFFFFFFFF
+        key = f"0x{addr:08X}"
+        labels_map.setdefault(key, []).append(name)
+    for names in labels_map.values():
+        names.sort()
+
+    for mod in modules:
+        debug_payload = mod.get("debug")
+        if not debug_payload:
+            continue
+        code_words: List[int] = mod["code"]
+        base_address = int(mod["code_base"])
+        functions_meta = debug_payload.get("functions", [])
+        function_ranges: List[Tuple[int, int, Dict[str, Any]]] = []
+        for fn_entry in functions_meta:
+            start_ord = fn_entry.get("mvasm_start_ordinal")
+            if start_ord is None:
+                continue
+            end_ord = fn_entry.get("mvasm_end_ordinal")
+            if end_ord is None or end_ord < start_ord:
+                end_ord = start_ord
+            function_ranges.append((start_ord, end_ord, fn_entry))
+            size_words = max(1, end_ord - start_ord + 1)
+            file_info = fn_entry.get("file")
+            file_name = None
+            if isinstance(file_info, dict):
+                file_name = file_info.get("filename")
+            elif isinstance(file_info, str):
+                file_name = file_info
+            functions_section.append(
+                {
+                    "name": fn_entry.get("name") or fn_entry.get("function"),
+                    "linkage_name": fn_entry.get("linkage_name"),
+                    "address": base_address + start_ord * 4,
+                    "size": size_words * 4,
+                    "file": file_name,
+                    "line": fn_entry.get("line"),
+                }
+            )
+        function_ranges.sort(key=lambda item: item[0])
+
+        def _function_for_ordinal(ordinal: int) -> Optional[Dict[str, Any]]:
+            for start_ord, end_ord, fn_meta in function_ranges:
+                if start_ord <= ordinal <= end_ord:
+                    return fn_meta
+            return None
+
+        for line_entry in debug_payload.get("line_map", []):
+            ordinal = line_entry.get("mvasm_ordinal")
+            if ordinal is None or ordinal >= len(code_words):
+                continue
+            pc = base_address + ordinal * 4
+            instruction_record: Dict[str, Any] = {
+                "pc": pc,
+                "word": int(code_words[ordinal]) & 0xFFFFFFFF,
+                "mvasm_line": line_entry.get("mvasm_line"),
+            }
+            fn_meta = _function_for_ordinal(ordinal)
+            if fn_meta:
+                instruction_record["function"] = fn_meta.get("name") or fn_meta.get("function")
+            if "source_file" in line_entry:
+                instruction_record["file"] = line_entry["source_file"]
+            if "source_directory" in line_entry:
+                instruction_record["directory"] = line_entry["source_directory"]
+            if "source_file_id" in line_entry:
+                instruction_record["file_id"] = line_entry["source_file_id"]
+            if "source_line" in line_entry:
+                instruction_record["line"] = line_entry["source_line"]
+            if "source_column" in line_entry:
+                instruction_record["column"] = line_entry["source_column"]
+            instructions_section.append(instruction_record)
+
+    functions_section.sort(key=lambda item: item["address"])
+    instructions_section.sort(key=lambda item: item["pc"])
+
+    memory_regions: List[Dict[str, Any]] = []
+    if final_code:
+        memory_regions.append(
+            {
+                "name": "code",
+                "type": "text",
+                "start": 0,
+                "end": len(final_code) * 4 - 1,
+            }
+        )
+    if final_rodata:
+        memory_regions.append(
+            {
+                "name": "rodata",
+                "type": "data",
+                "start": RODATA_BASE,
+                "end": RODATA_BASE + len(final_rodata) - 1,
+            }
+        )
+
+    symbols_payload = {
+        "functions": functions_section,
+        "variables": [],
+        "labels": {key: names for key, names in sorted(labels_map.items())},
+    }
+
+    return {
+        "version": 1,
+        "hxe_path": str(output_path),
+        "hxe_crc": crc & 0xFFFFFFFF,
+        "symbols": symbols_payload,
+        "instructions": instructions_section,
+        "memory_regions": memory_regions,
+    }
+
+
 def load_hxo(path: Path) -> Dict:
     data = json.loads(path.read_text(encoding="utf-8"))
     module = {
@@ -398,12 +522,51 @@ def write_hxe_v2(
     struct.pack_into(">I", image, CRC_FIELD_OFFSET, crc)
 
     output.write_bytes(image)
+    return crc
 
 
-def link_objects(object_paths: List[Path], output: Path, *, verbose: bool = False) -> Dict:
+def link_objects(
+    object_paths: List[Path],
+    output: Path,
+    *,
+    verbose: bool = False,
+    debug_infos: Optional[List[Path]] = None,
+    emit_sym: Optional[Path] = None,
+    app_name: Optional[str] = None,
+    allow_multiple: bool = True,
+    req_caps: int = 0,
+) -> Dict:
     modules = [load_hxo(Path(p)) for p in object_paths]
     if not modules:
         raise ValueError("No object files provided")
+
+    debug_info_map: Dict[str, List[Tuple[Path, Dict[str, Any]]]] = {}
+    if debug_infos:
+        for item in debug_infos:
+            dbg_path = Path(item)
+            data = json.loads(dbg_path.read_text(encoding="utf-8"))
+            debug_info_map.setdefault(dbg_path.stem, []).append((dbg_path, data))
+    for mod in modules:
+        stem = mod["path"].stem
+        entries = debug_info_map.get(stem)
+        if entries:
+            dbg_path, dbg_data = entries.pop(0)
+            mod["debug"] = dbg_data
+            mod["debug_path"] = dbg_path
+    if emit_sym:
+        missing_debug = [mod["path"].name for mod in modules if "debug" not in mod]
+        if missing_debug:
+            raise ValueError(
+                "Debug info required for --emit-sym, missing for: " + ", ".join(sorted(missing_debug))
+            )
+    unused_debug = [
+        str(entry[0])
+        for entries in debug_info_map.values()
+        for entry in entries
+        if entries
+    ]
+    if unused_debug:
+        raise ValueError("Unmatched debug info files: " + ", ".join(sorted(unused_debug)))
 
     code_offset = 0
     ro_offset = 0
@@ -603,23 +766,35 @@ def link_objects(object_paths: List[Path], output: Path, *, verbose: bool = Fals
         final_code.extend(mod["code"])
         final_rodata.extend(mod["rodata"])
 
-    write_hxe_v2(
+    crc = write_hxe_v2(
         Path(output),
         code_words=final_code,
         entry=entry_address or 0,
         rodata=bytes(final_rodata),
         metadata=metadata,
-        app_name=Path(output).stem,
+        app_name=app_name or Path(output).stem,
+        allow_multiple=allow_multiple,
+        req_caps=req_caps,
     )
+    sym_payload: Optional[Dict[str, Any]] = None
+    if emit_sym:
+        sym_path = Path(emit_sym)
+        sym_path.parent.mkdir(parents=True, exist_ok=True)
+        sym_payload = _generate_symbol_payload(modules, symbol_table, final_code, final_rodata, Path(output), crc)
+        sym_path.write_text(json.dumps(sym_payload, indent=2, sort_keys=True))
     if verbose:
         print(f"Linked {len(modules)} modules -> {output}")
         print(f"  entry=0x{entry_address or 0:08X} words={len(final_code)} rodata={len(final_rodata)}")
         print(f"  exports: {', '.join(sorted(symbol_table.keys()))}")
-    return {
+    result = {
         "entry": entry_address or 0,
         "words": len(final_code),
         "rodata": len(final_rodata),
+        "crc": crc,
     }
+    if sym_payload is not None:
+        result["sym"] = sym_payload
+    return result
 
 
 def main():
@@ -627,6 +802,23 @@ def main():
     ap.add_argument("inputs", nargs="+")
     ap.add_argument("-o", "--output", required=True)
     ap.add_argument("-v", "--verbose", action="store_true")
+    ap.add_argument("--app-name")
+    ap.add_argument("--emit-sym")
+    ap.add_argument("--debug-info", nargs="+", action="append", default=[])
+    ap.add_argument("--req-cap", dest="req_cap", type=int, default=0, help="Required capability mask")
+    ap.add_argument(
+        "--single-instance",
+        dest="allow_multiple",
+        action="store_false",
+        help="Disallow multiple concurrent instances of the linked application",
+    )
+    ap.add_argument(
+        "--allow-multiple-instances",
+        dest="allow_multiple",
+        action="store_true",
+        help="Explicitly allow multiple concurrent instances (default)",
+    )
+    ap.set_defaults(allow_multiple=True)
     args = ap.parse_args()
 
     input_paths = [Path(p) for p in args.inputs]
@@ -648,7 +840,20 @@ def main():
         print("Provide .hxo objects or a single .hxe", file=sys.stderr)
         sys.exit(2)
 
-    link_objects(hxo_inputs, Path(args.output), verbose=args.verbose)
+    debug_info_paths: List[Path] = []
+    for group in args.debug_info:
+        debug_info_paths.extend(Path(item) for item in group)
+
+    link_objects(
+        hxo_inputs,
+        Path(args.output),
+        verbose=args.verbose,
+        debug_infos=debug_info_paths or None,
+        emit_sym=Path(args.emit_sym) if args.emit_sym else None,
+        app_name=args.app_name,
+        allow_multiple=args.allow_multiple,
+        req_caps=args.req_cap,
+    )
     print(f"Wrote {args.output}")
 
 

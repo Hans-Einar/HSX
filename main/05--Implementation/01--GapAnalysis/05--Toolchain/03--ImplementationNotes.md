@@ -142,3 +142,21 @@ Append sessions chronologically and ensure every entry references the relevant d
 
 ### Next Steps
 - Phase 3.4: enrich `.dbg` with variable metadata and begin linker `.sym` integration once symbol layout work resumes.
+
+## 2025-11-08 - Codex (Session 7)
+
+### Scope
+- Plan item / phase addressed: Phase 3.4 `--emit-sym` linker integration
+- Design sections reviewed: 04.05--Toolchain §4.2.1–4.2.3, toolchain/debug-metadata.md, Implementation Plan 3.4 checklist
+
+### Work Summary
+- Augmented `hsx-llc` line mapping to track MVASM ordinals, annotate functions with start/end ordinals, and emit ordinal data inside `line_map` / `llvm_to_mvasm` entries for downstream address resolution.
+- Extended linker CLI with `--debug-info`/`--emit-sym`/`--app-name` options, associated `.dbg` files per object, and synthesized `.sym` payloads (functions, instructions, labels, memory regions) using relocated addresses; helper `_generate_symbol_payload` writes the symbol JSON alongside HXE.
+- Updated debug metadata documentation and plan checklists, added HSX builder compatibility, and introduced regression tests covering `.sym` generation plus updated debug expectations.
+
+### Testing
+- `python -m pytest python/tests/test_hsx_llc_debug.py`
+- `python -m pytest python/tests/test_linker.py python/tests/test_import_unresolved.py python/tests/test_hsx_cc_build.py`
+
+### Next Steps
+- Phase 3.5: finalize `.sym` schema (variables, instruction mnemonics, region enrichment) and document consumer expectations.
