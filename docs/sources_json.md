@@ -51,4 +51,6 @@ Each entry in `sources` contains:
 - All entries are de-duplicated and sorted by relative path.
 - Files residing in the build directory (e.g. generated sources) are skipped.
 - The builder exports the prefix map in both `HSX_DEBUG_PREFIX_MAP` and `DEBUG_PREFIX_MAP`, allowing custom build steps to consume the same mapping.
-
+- Consumers can load and resolve entries using `python/source_map.py`, which
+  applies the recorded prefix map and searches alternate project roots when
+  necessary.

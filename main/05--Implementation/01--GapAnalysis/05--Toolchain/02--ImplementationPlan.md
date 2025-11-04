@@ -435,9 +435,9 @@ Validate debugger can resolve source files across different build environments (
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Create test builds in different directories
-- [ ] Verify path resolution with sources.json
-- [ ] Test debugger source file loading
+- [x] Create test builds in different directories
+- [x] Verify path resolution with sources.json
+- [x] Test debugger source file loading
 - [ ] Test missing source file handling
 - [ ] Document resolution algorithm
 - [ ] Add edge case tests (symlinks, network paths)

@@ -212,3 +212,21 @@ Append sessions chronologically and ensure every entry references the relevant d
 
 ### Next Steps
 - Phase 4.3: validate debugger path resolution using the emitted `sources.json` in varied build locations.
+
+## 2025-11-08 - Codex (Session 11)
+
+### Scope
+- Plan item / phase addressed: Phase 4.3 Test Path Resolution
+- Design sections reviewed: 04.05--Toolchain §4.2.4, docs/sources_json.md, Implementation Plan 4.3 checklist
+
+### Work Summary
+- Introduced `python/source_map.py` to load `sources.json`, apply prefix-map rewrites, and resolve source paths against alternate roots.
+- Added unit coverage (`python/tests/test_source_map.py`) simulating relocated builds and prefix-map rewrites, and expanded builder tests to ensure make-driven debug builds emit `sources.json` by default.
+- Documented consumer usage in the source map guide and closed out Phase 4.3 tasks.
+
+### Testing
+- `python -m pytest python/tests/test_source_map.py`
+- `python -m pytest python/tests/test_hsx_cc_build.py`
+
+### Next Steps
+- Phase 5 planning (to be confirmed) or integration with debugger tooling consuming `source_map.SourceMap`.
