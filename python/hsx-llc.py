@@ -1847,6 +1847,42 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 maybe_release(dst)
                 return line
 
+            m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*shl\s+i32\s+([^,]+),\s*([^,]+)', line)
+            if m:
+                dst, lhs, rhs = m.groups()
+                clear_alias(dst)
+                value_types[dst] = 'i32'
+                rd = alloc_vreg(dst, 'i32')
+                ra = materialize(lhs, "R12")
+                rb = materialize(rhs, "R13")
+                asm.append(f"LSL {rd}, {ra}, {rb}")
+                maybe_release(dst)
+                return line
+
+            m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*lshr\s+i32\s+([^,]+),\s*([^,]+)', line)
+            if m:
+                dst, lhs, rhs = m.groups()
+                clear_alias(dst)
+                value_types[dst] = 'i32'
+                rd = alloc_vreg(dst, 'i32')
+                ra = materialize(lhs, "R12")
+                rb = materialize(rhs, "R13")
+                asm.append(f"LSR {rd}, {ra}, {rb}")
+                maybe_release(dst)
+                return line
+
+            m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*ashr\s+i32\s+([^,]+),\s*([^,]+)', line)
+            if m:
+                dst, lhs, rhs = m.groups()
+                clear_alias(dst)
+                value_types[dst] = 'i32'
+                rd = alloc_vreg(dst, 'i32')
+                ra = materialize(lhs, "R12")
+                rb = materialize(rhs, "R13")
+                asm.append(f"ASR {rd}, {ra}, {rb}")
+                maybe_release(dst)
+                return line
+
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*f(add|sub|mul|div)\s+half\s+([^,]+),\s*([^,]+)', line)
             if m:
                 dst, op, lhs, rhs = m.groups()

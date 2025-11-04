@@ -246,3 +246,19 @@ Append sessions chronologically and ensure every entry references the relevant d
 
 ### Next Steps
 - Begin Phase 5 ISA work (shift/ADC/SBC opcode additions) or coordinate with VM team before implementation.
+
+## 2025-11-08 - Codex (Session 13)
+
+### Scope
+- Plan item / phase addressed: Phase 5.1 Shift Opcode Lowering
+- Design sections reviewed: docs/MVASM_SPEC.md (shift semantics), hsx-llc lowering pipeline
+
+### Work Summary
+- Added `shl`/`lshr`/`ashr` lowering paths in `hsx-llc.py`, mapping LLVM shift operations to `LSL`/`LSR`/`ASR` MVASM instructions with register or immediate operands.
+- Created regression coverage (`python/tests/test_hsx_llc_shift.py`) verifying both register-based and immediate shifts emit the expected instructions and helper loads.
+
+### Testing
+- `python -m pytest python/tests/test_hsx_llc_shift.py`
+
+### Next Steps
+- Continue Phase 5 with carry arithmetic lowering (`ADC`/`SBC`) and opcode table sync.
