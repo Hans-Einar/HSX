@@ -276,14 +276,29 @@ def _generate_symbol_payload(
 ) -> Dict[str, Any]:
     functions_section: List[Dict[str, Any]] = []
     instructions_section: List[Dict[str, Any]] = []
+    variables_section: List[Dict[str, Any]] = []
 
     labels_map: Dict[str, List[str]] = {}
     for name, info in symbol_table.items():
         addr = int(info.get("address", 0)) & 0xFFFFFFFF
         key = f"0x{addr:08X}"
         labels_map.setdefault(key, []).append(name)
+        if info.get("section") == "data":
+            size_val = info.get("size")
+            if size_val is None:
+                size_val = 0
+            variables_section.append(
+                {
+                    "name": name,
+                    "address": addr,
+                    "size": int(size_val),
+                    "scope": "global",
+                    "type": info.get("type"),
+                }
+            )
     for names in labels_map.values():
         names.sort()
+    variables_section.sort(key=lambda item: item["address"])
 
     for mod in modules:
         debug_payload = mod.get("debug")
@@ -335,6 +350,7 @@ def _generate_symbol_payload(
                 "pc": pc,
                 "word": int(code_words[ordinal]) & 0xFFFFFFFF,
                 "mvasm_line": line_entry.get("mvasm_line"),
+                "ordinal": ordinal,
             }
             fn_meta = _function_for_ordinal(ordinal)
             if fn_meta:
@@ -376,7 +392,7 @@ def _generate_symbol_payload(
 
     symbols_payload = {
         "functions": functions_section,
-        "variables": [],
+        "variables": variables_section,
         "labels": {key: names for key, names in sorted(labels_map.items())},
     }
 

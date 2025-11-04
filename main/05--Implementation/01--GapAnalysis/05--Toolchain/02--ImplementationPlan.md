@@ -369,16 +369,16 @@ Design specifies --emit-sym flag to generate debugger symbol files (section 4.2.
 **Rationale:**  
 Complete JSON schema for functions, variables, labels, instructions, memory regions (section 4.2.3). Ensures debugger compatibility.
 
-**Todo:**
+- **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Finalize .sym JSON schema
-- [ ] Add functions section (name, addr, size, file, line)
-- [ ] Add variables section (name, addr, type, scope)
-- [ ] Add labels section (name, addr)
-- [ ] Add instructions section (addr, source_line, source_file)
-- [ ] Add memory_regions section (type, start, end)
-- [ ] Document complete schema in `docs/symbol_format.md`
-- [ ] Add schema validation tests
+- [x] Finalize .sym JSON schema
+- [x] Add functions section (name, addr, size, file, line)
+- [x] Add variables section (name, addr, type, scope)
+- [x] Add labels section (name, addr)
+- [x] Add instructions section (addr, source_line, source_file)
+- [x] Add memory_regions section (type, start, end)
+- [x] Document complete schema in `docs/symbol_format.md`
+- [x] Add schema validation tests
 
 ---
 

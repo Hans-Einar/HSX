@@ -160,3 +160,21 @@ Append sessions chronologically and ensure every entry references the relevant d
 
 ### Next Steps
 - Phase 3.5: finalize `.sym` schema (variables, instruction mnemonics, region enrichment) and document consumer expectations.
+
+## 2025-11-08 - Codex (Session 8)
+
+### Scope
+- Plan item / phase addressed: Phase 3.5 Symbol File Schema Finalization
+- Design sections reviewed: 04.05--Toolchain §4.2.3, new `docs/symbol_format.md`, Implementation Plan 3.5 checklist
+
+### Work Summary
+- Added MVASM ordinal propagation to linker symbol generation, enriched instruction records, and surfaced proto variable entries for exported data symbols.
+- Authored `docs/symbol_format.md` describing the versioned `.sym` schema, refreshed debug-metadata reference examples, and reasoned through schema stability expectations.
+- Expanded regression tests to assert the presence of new fields (`ordinal`, `variables`, `memory_regions`), ensuring HSX builder flows continue to emit debug artefacts.
+
+### Testing
+- `python -m pytest python/tests/test_hsx_llc_debug.py`
+- `python -m pytest python/tests/test_linker.py python/tests/test_import_unresolved.py python/tests/test_hsx_cc_build.py`
+
+### Next Steps
+- Phase 4.1: integrate `-fdebug-prefix-map` handling to stabilise source paths within emitted debug metadata.
