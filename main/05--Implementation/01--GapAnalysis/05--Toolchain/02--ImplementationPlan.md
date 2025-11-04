@@ -546,13 +546,13 @@ Comprehensive testing for all new instructions ensures correctness.
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Add assembler tests for shift opcodes
-- [ ] Add assembler tests for ADC/SBC
-- [ ] Add assembler tests for DIV
-- [ ] Add disassembler tests for new opcodes
-- [ ] Add integration tests (assemble → disassemble)
-- [ ] Test edge cases (invalid operands, etc.)
-- [ ] Verify opcode encoding matches VM
+- [x] Add assembler tests for shift opcodes
+- [x] Add assembler tests for ADC/SBC
+- [x] Add assembler tests for DIV
+- [x] Add disassembler tests for new opcodes
+- [x] Add integration tests (assemble → disassemble)
+- [x] Test edge cases (invalid operands, etc.)
+- [x] Verify opcode encoding matches VM
 
 ---
 

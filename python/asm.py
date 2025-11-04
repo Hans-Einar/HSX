@@ -10,10 +10,15 @@ except ImportError:  # pragma: no cover - running as package
     from python import hsx_value_constants as val_const
     from python import hsx_command_constants as cmd_const
 
-try:  # pragma: no cover - packaging vs in-repo execution
-    from opcodes import OPCODES as OPC
-except ImportError:  # pragma: no cover - running as package
-    from python.opcodes import OPCODES as OPC
+try:  # pragma: no cover - prefer namespace package when available
+    import python.opcodes as _opcode_module
+except ImportError:  # pragma: no cover - running as top-level script
+    import opcodes as _opcode_module  # type: ignore[no-redef]
+else:  # pragma: no cover - align module aliases
+    if "opcodes" not in sys.modules:
+        sys.modules["opcodes"] = _opcode_module
+
+OPC = _opcode_module.OPCODES
 
 MAGIC = 0x48535845  # 'HSXE'
 VERSION = 0x0001

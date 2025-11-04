@@ -2,10 +2,18 @@
 
 from typing import Optional, Sequence
 
-try:  # pragma: no cover - supporting both package/script execution
-    from opcodes import OPCODES, OPCODE_NAMES
-except ImportError:  # pragma: no cover - running as package
-    from python.opcodes import OPCODES, OPCODE_NAMES
+import sys
+
+try:  # pragma: no cover - favour namespace package
+    import python.opcodes as _opcode_module
+except ImportError:  # pragma: no cover - script execution
+    import opcodes as _opcode_module  # type: ignore[no-redef]
+else:  # pragma: no cover - keep alias stable
+    if "opcodes" not in sys.modules:
+        sys.modules["opcodes"] = _opcode_module
+
+OPCODES = _opcode_module.OPCODES
+OPCODE_NAMES = _opcode_module.OPCODE_NAMES
 
 
 def instruction_size(mnemonic: str) -> int:

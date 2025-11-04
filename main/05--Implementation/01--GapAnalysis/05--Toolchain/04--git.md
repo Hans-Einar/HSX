@@ -24,7 +24,8 @@
 | 2025-11-08 | `e237910` | `toolchain: add hsx-llc shift lowering + tests` | Codex | Tests: `python -m pytest python/tests/test_hsx_llc_shift.py` |
 | 2025-11-08 | `0bf8fb5` | `toolchain: lower llvm.{uadd,usub}.with.overflow` | Codex | Tests: `python -m pytest python/tests/test_hsx_llc_shift.py python/tests/test_hsx_llc_carry.py python/tests/test_asm_adc_sbc.py` |
 | 2025-11-08 | `b2d491f` | `toolchain: emit instruction line_map and llvm_to_mvasm metadata` | Codex | Tests: `python -m pytest python/tests/test_hsx_llc_debug.py python/tests/test_opt_movs.py python/tests/test_opt_peephole_extra.py` |
-| 2025-11-08 | `<pending>` | `toolchain: centralize opcode table and sync docs/tests` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_opcode_table.py python/tests/test_asm_adc_sbc.py python/tests/test_hsx_llc_shift.py python/tests/test_hsx_llc_carry.py` |
+| 2025-11-08 | `9954599` | `toolchain: centralize opcode table and sync docs/tests` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_opcode_table.py python/tests/test_asm_adc_sbc.py python/tests/test_hsx_llc_shift.py python/tests/test_hsx_llc_carry.py` |
+| 2025-11-08 | `<pending>` | `toolchain: broaden opcode tests (shift/div disasm, validation)` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_asm_shift_div.py python/tests/test_disasm_new_opcodes.py python/tests/test_opcode_table.py python/tests/test_asm_adc_sbc.py python/tests/test_vm_shift_ops.py python/tests/test_vm_div.py` |
 
 ## Pull Request
 - PR URL / ID: `<link or ID>`

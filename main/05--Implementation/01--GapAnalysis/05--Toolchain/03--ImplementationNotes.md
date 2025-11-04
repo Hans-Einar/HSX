@@ -311,3 +311,20 @@ Append sessions chronologically and ensure every entry references the relevant d
 
 ### Next Steps
 - Proceed to Phase 5.4 to broaden opcode execution tests (integration / edge cases).
+
+## 2025-11-08 - Codex (Session 17)
+
+### Scope
+- Plan item / phase addressed: Phase 5.4 Test New Opcodes
+- Design sections reviewed: docs/MVASM_SPEC.md (§Opcode table), python/disasm_util.py operand formatting, MiniVM execution for DIV/shifts
+
+### Work Summary
+- Added targeted assembler encoding tests for the shift family and DIV, plus register validation guards (`python/tests/test_asm_shift_div.py`).
+- Introduced disassembler coverage to ensure operand formatting and round-trip decoding for ADC/SBC/shift/DIV instructions (`python/tests/test_disasm_new_opcodes.py`).
+- Normalised opcode imports so assembler/disassembler share the same module aliasing (`python/asm.py`, `python/disasm_util.py`), preventing duplicate module instances during mixed package/script execution.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_asm_shift_div.py python/tests/test_disasm_new_opcodes.py python/tests/test_opcode_table.py python/tests/test_asm_adc_sbc.py python/tests/test_vm_shift_ops.py python/tests/test_vm_div.py`
+
+### Next Steps
+- Begin Phase 6.1 determinism tasks once opcode validation lands in mainline.
