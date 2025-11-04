@@ -1350,6 +1350,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
     AVAILABLE_REGS = ["R4", "R5", "R6", "R8", "R9", "R10", "R11"]
     free_regs: List[str] = AVAILABLE_REGS.copy()
     value_types: Dict[str, str] = {}
+    overflow_pairs: Dict[str, Tuple[str, str]] = {}
     spilled_values: Dict[str, Tuple[str, str]] = {}
     spill_slots: Dict[str, int] = {}
     spill_data_lines: List[str] = []
@@ -1553,45 +1554,47 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
             spill_value(candidate)
 
     def alloc_vreg(name: str, val_type: Optional[str] = None) -> str:
-        val_type = canonical_type(val_type or value_types.get(name))
-        value_types[name] = val_type
-        if name in pinned_registers:
-            reg = pinned_registers[name]
-            if name not in vmap:
-                vmap[name] = reg
-            mark_used(name)
+        canonical = resolve_name(name)
+        val_type = canonical_type(val_type or value_types.get(canonical))
+        value_types[canonical] = val_type
+        if canonical in pinned_registers:
+            reg = pinned_registers[canonical]
+            if canonical not in vmap:
+                vmap[canonical] = reg
+            mark_used(canonical)
             return reg
-        if name in vmap:
-            mark_used(name)
-            return vmap[name]
-        if name in spilled_values:
-            ensure_register_available({name})
+        if canonical in vmap:
+            mark_used(canonical)
+            return vmap[canonical]
+        if canonical in spilled_values:
+            ensure_register_available({canonical})
             reg = free_regs.pop(0)
-            vmap[name] = reg
-            mark_used(name)
-            slot_offset, stored_type = spilled_values.pop(name)
-            value_types[name] = stored_type
+            vmap[canonical] = reg
+            mark_used(canonical)
+            slot_offset, stored_type = spilled_values.pop(canonical)
+            value_types[canonical] = stored_type
             load_instr = type_to_load_instr(stored_type)
             asm.append(f"{load_instr} {reg}, [R7{format_stack_offset(slot_offset)}]")
-            if name in spilled_float_alias:
-                float_alias[name] = reg
-                spilled_float_alias.remove(name)
+            if canonical in spilled_float_alias:
+                float_alias[canonical] = reg
+                spilled_float_alias.remove(canonical)
             return reg
-        ensure_register_available({name})
+        ensure_register_available({canonical})
         reg = free_regs.pop(0)
-        vmap[name] = reg
-        mark_used(name)
-        if name in spilled_float_alias:
-            float_alias[name] = reg
-            spilled_float_alias.remove(name)
+        vmap[canonical] = reg
+        mark_used(canonical)
+        if canonical in spilled_float_alias:
+            float_alias[canonical] = reg
+            spilled_float_alias.remove(canonical)
         return reg
 
     def ensure_value_in_reg(name: str) -> str:
-        if name in vmap:
-            mark_used(name)
-            return vmap[name]
-        if name in spilled_values:
-            return alloc_vreg(name, value_types.get(name))
+        canonical = resolve_name(name)
+        if canonical in vmap:
+            mark_used(canonical)
+            return vmap[canonical]
+        if canonical in spilled_values:
+            return alloc_vreg(canonical, value_types.get(canonical))
         raise ISelError(f"Unknown value {name}")
 
     global_symbols_set = set(global_symbols or [])
@@ -1608,9 +1611,13 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
         else:
             asm.append(f"LDI32 {reg}, {value & 0xFFFFFFFF}")
 
+    def resolve_name(name: str) -> str:
+        return name
+
     def materialize(value: str, tmp: str) -> str:
         value = value.strip()
         if value.startswith('%'):
+            value = resolve_name(value)
             reg = ensure_value_in_reg(value)
             consume_use(value)
             if reg != tmp:
@@ -1674,6 +1681,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
 
     def materialize_ptr(value: str, tmp: str) -> str:
         value = value.strip()
+        value = resolve_name(value)
         if value in vmap or value in spilled_values:
             reg = ensure_value_in_reg(value)
             consume_use(value)
@@ -1698,11 +1706,12 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
 
     def resolve_operand(value: str, tmp: str = "R12") -> str:
         value = value.strip()
-        if value in float_alias:
-            reg = float_alias[value]
-            if value not in vmap or vmap[value] != reg:
-                reg = ensure_value_in_reg(value)
-            consume_use(value)
+        canonical = resolve_name(value) if value.startswith('%') else value
+        if canonical in float_alias:
+            reg = float_alias[canonical]
+            if canonical not in vmap or vmap[canonical] != reg:
+                reg = ensure_value_in_reg(canonical)
+            consume_use(canonical)
             return reg
         hmatch = re.match(r'0xH([0-9A-Fa-f]+)', value)
         if hmatch:
@@ -1710,8 +1719,8 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
             load_const(tmp, bits)
             return tmp
         if value.startswith('%'):
-            reg = ensure_value_in_reg(value)
-            consume_use(value)
+            reg = ensure_value_in_reg(canonical)
+            consume_use(canonical)
             return reg
         if value.startswith('@'):
             return materialize_global(value[1:], tmp)
@@ -1822,6 +1831,18 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     src_reg = resolve_operand(value, R_RET)
                     if src_reg != R_RET:
                         asm.append(f"MOV {R_RET}, {src_reg}")
+                elif re.match(r'ret\s+i1\s+(%[A-Za-z0-9_]+)', line):
+                    m = re.search(r'ret\s+i1\s+(%[A-Za-z0-9_]+)', line)
+                    if not m:
+                        raise ISelError("Unsupported ret: " + orig_line)
+                    v = m.group(1)
+                    r = ensure_value_in_reg(v)
+                    consume_use(v)
+                    if r != R_RET:
+                        asm.append(f"MOV {R_RET}, {r}")
+                elif re.match(r'ret\s+i1\s+[-]?\d+', line):
+                    imm = int(line.split()[-1]) & 0x1
+                    asm.append(f"LDI {R_RET}, {imm}")
                 elif re.match(r'ret\s+i16\s+(%[A-Za-z0-9_]+)', line):
                     value = line.split()[-1]
                     src_reg = resolve_operand(value, R_RET)
@@ -1956,6 +1977,56 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 rs = resolve_operand(src, "R12")
                 rd = alloc_vreg(dst, 'i32')
                 asm.append(f"F2I {rd}, {rs}")
+                maybe_release(dst)
+                return line
+
+            m = re.match(r'(%[A-Za-z0-9_.]+)\s*=\s*call\s+\{\s*i32\s*,\s*i1\s*\}\s+@llvm\.uadd\.with\.overflow\.i32\(\s*i32\s+([^,]+),\s*i32\s+([^)]*)\)', line)
+            if m:
+                dst, lhs, rhs = m.groups()
+                lhs = lhs.strip()
+                rhs = rhs.strip()
+                sum_name = f"{dst}__sum"
+                carry_name = f"{dst}__carry"
+                overflow_pairs[dst] = (sum_name, carry_name)
+                value_types[sum_name] = 'i32'
+                value_types[carry_name] = 'i32'
+                ra = materialize(lhs, "R12")
+                rb = materialize(rhs, "R13")
+                rd_sum = alloc_vreg(sum_name, 'i32')
+                asm.append(f"ADD {rd_sum}, {ra}, {rb}")
+                zero_name = f"{dst}__carry_seed"
+                value_types[zero_name] = 'i32'
+                rd_zero = alloc_vreg(zero_name, 'i32')
+                asm.append(f"LDI {rd_zero}, 0")
+                rd_carry = alloc_vreg(carry_name, 'i32')
+                asm.append(f"ADC {rd_carry}, {rd_zero}, {rd_zero}")
+                maybe_release(zero_name)
+                return line
+
+            m = re.match(r'(%[A-Za-z0-9_.]+)\s*=\s*extractvalue\s+\{\s*i32\s*,\s*i1\s*\}\s+(%[A-Za-z0-9_.]+),\s*(\d+)', line)
+            if m:
+                dst, src, idx = m.groups()
+                pair = overflow_pairs.get(src)
+                if not pair:
+                    raise ISelError(f"extractvalue from unsupported value {src}")
+                if idx == '0':
+                    alias = pair[0]
+                    value_types[dst] = value_types.get(alias, 'i32')
+                    src_reg = ensure_value_in_reg(alias)
+                    consume_use(alias)
+                    rd = alloc_vreg(dst, value_types[alias])
+                    if rd != src_reg:
+                        asm.append(f"MOV {rd}, {src_reg}")
+                elif idx == '1':
+                    alias = pair[1]
+                    value_types[dst] = 'i32'
+                    src_reg = ensure_value_in_reg(alias)
+                    consume_use(alias)
+                    rd = alloc_vreg(dst, 'i32')
+                    if rd != src_reg:
+                        asm.append(f"MOV {rd}, {src_reg}")
+                else:
+                    raise ISelError(f"Unsupported extractvalue index {idx}")
                 maybe_release(dst)
                 return line
 

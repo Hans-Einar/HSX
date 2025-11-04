@@ -22,6 +22,7 @@
 | 2025-11-08 | `<pending>` | `toolchain: add sources.json resolver + relocation tests` | Codex | Tests: `python -m pytest python/tests/test_source_map.py python/tests/test_hsx_cc_build.py` |
 | 2025-11-08 | `<pending>` | `toolchain: document portable debug workflow` | Codex | Tests: _n/a (docs only)_ |
 | 2025-11-08 | `<pending>` | `toolchain: add hsx-llc shift lowering + tests` | Codex | Tests: `python -m pytest python/tests/test_hsx_llc_shift.py` |
+| 2025-11-08 | `<pending>` | `toolchain: lower llvm.uadd.with.overflow via ADC` | Codex | Tests: `python -m pytest python/tests/test_hsx_llc_shift.py python/tests/test_hsx_llc_carry.py` |
 | 2025-11-08 | `<pending>` | `toolchain: emit instruction line_map and llvm_to_mvasm metadata` | Codex | Tests: `python -m pytest python/tests/test_hsx_llc_debug.py python/tests/test_opt_movs.py python/tests/test_opt_peephole_extra.py` |
 
 ## Pull Request

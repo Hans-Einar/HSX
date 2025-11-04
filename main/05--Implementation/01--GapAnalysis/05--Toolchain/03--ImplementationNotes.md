@@ -262,3 +262,19 @@ Append sessions chronologically and ensure every entry references the relevant d
 
 ### Next Steps
 - Continue Phase 5 with carry arithmetic lowering (`ADC`/`SBC`) and opcode table sync.
+
+## 2025-11-08 - Codex (Session 14)
+
+### Scope
+- Plan item / phase addressed: Phase 5.2 carry arithmetic lowering (initial support)
+- Design sections reviewed: docs/MVASM_SPEC.md (carry semantics), LLVM overflow intrinsics
+
+### Work Summary
+- Lowered `llvm.uadd.with.overflow.i32` into MVASM `ADD`/`ADC` sequences, producing both sum and carry values so multi-word addition can cascade through hardware flags.
+- Added `ret i1` handling and `extractvalue` support in `hsx-llc` for the overflow structs, plus regression coverage (`python/tests/test_hsx_llc_carry.py`).
+
+### Testing
+- `python -m pytest python/tests/test_hsx_llc_shift.py python/tests/test_hsx_llc_carry.py`
+
+### Next Steps
+- Extend lowering to subtraction with borrow (`llvm.usub.with.overflow`) and sync opcode tables/assembler docs before Phase 5.3 checklist closes.

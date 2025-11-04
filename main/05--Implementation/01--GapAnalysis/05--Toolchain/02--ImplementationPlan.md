@@ -483,13 +483,13 @@ Design references shift operations (LSL, LSR, ASR). Coordinates with VM ISA comp
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Define LSL, LSR, ASR opcodes (coordinate with VM)
-- [ ] Implement opcode encoding in `python/asm.py`
-- [ ] Update OPC dictionary with shift opcodes
-- [ ] Add shift instruction parsing
-- [ ] Add shift instruction tests
-- [ ] Update `docs/MVASM_SPEC.md` with shift syntax
-- [ ] Update disassembler for shift opcodes
+- [x] Define LSL, LSR, ASR opcodes (coordinate with VM)
+- [x] Implement opcode encoding in `python/asm.py`
+- [x] Update OPC dictionary with shift opcodes
+- [x] Add shift instruction parsing
+- [x] Add shift instruction tests
+- [x] Update `docs/MVASM_SPEC.md` with shift syntax
+- [x] Update disassembler for shift opcodes
 
 ---
 
