@@ -153,7 +153,23 @@ class HSXBuilder:
             for key, value in self.debug_env.items():
                 env.setdefault(key, value)
         return env
-    
+
+    def _normalize_sources(self, source_files: List[Path]) -> List[Path]:
+        """Return sorted, de-duplicated list of existing source files."""
+        seen: Dict[Path, Path] = {}
+        for src in source_files:
+            path = Path(src)
+            try:
+                resolved = path.resolve()
+            except FileNotFoundError:
+                continue
+            if resolved in seen:
+                continue
+            if resolved.is_dir():
+                continue
+            seen[resolved] = resolved
+        return sorted(seen.values(), key=lambda p: p.as_posix())
+
     def find_tool(self, tool: str) -> Path:
         """Find tool in python/ directory or PATH"""
         # Try python/ directory first
@@ -287,6 +303,8 @@ class HSXBuilder:
     def generate_sources_json(self, source_files: List[Path]):
         """Generate sources.json for debugger path resolution"""
         self.log("Generating sources.json...")
+
+        normalized_sources = self._normalize_sources(source_files)
         
         sources_data = {
             'version': 1,
@@ -295,20 +313,25 @@ class HSXBuilder:
             'sources': [],
             'include_paths': []
         }
+        if self.debug_prefix_map:
+            sources_data['prefix_map'] = self.debug_prefix_map
         
-        for src in source_files:
-            src_path = Path(src)
+        root = self.project_root.resolve()
+        for resolved in normalized_sources:
             try:
-                # Try to make relative to project root
-                rel_path = src_path.resolve().relative_to(self.project_root)
+                rel_path = resolved.relative_to(root)
+                rel_str = rel_path.as_posix()
+                rel_entry = f"./{rel_str}"
+                file_field = rel_str
             except ValueError:
-                # Outside project root, use as-is
-                rel_path = src_path
+                rel_str = resolved.as_posix()
+                rel_entry = rel_str
+                file_field = rel_str
             
             sources_data['sources'].append({
-                'file': str(rel_path),
-                'path': str(src_path.resolve()),
-                'relative': f"./{rel_path}"
+                'file': file_field,
+                'path': resolved.as_posix(),
+                'relative': rel_entry,
             })
         
         # Add common include paths
@@ -332,16 +355,24 @@ class HSXBuilder:
         """Discover C source files in project"""
         self.log("Discovering source files...")
         
-        source_files = []
-        
-        # Look for common source directories
+        candidates: List[Path] = []
         search_dirs = [self.project_root, self.project_root / 'src']
-        
         for search_dir in search_dirs:
-            if search_dir.exists():
-                for ext in ['*.c', '*.cpp']:
-                    source_files.extend(search_dir.glob(ext))
-        
+            if not search_dir.exists():
+                continue
+            for ext in ('*.c', '*.cpp'):
+                for candidate in search_dir.rglob(ext):
+                    if candidate.is_dir():
+                        continue
+                    try:
+                        candidate.relative_to(self.build_dir.resolve())
+                        continue
+                    except ValueError:
+                        pass
+                    candidates.append(candidate)
+
+        source_files = self._normalize_sources(candidates)
+
         if not source_files:
             raise HSXBuildError("No source files found")
         
@@ -351,11 +382,12 @@ class HSXBuilder:
     def build_direct(self, source_files: List[Path]):
         """Build source files directly without make"""
         self.log(f"Building {len(source_files)} source files...")
-        
+
+        normalized_sources = self._normalize_sources(source_files)
         hxo_files = []
         dbg_files = []
         
-        for c_file in source_files:
+        for c_file in normalized_sources:
             # C -> LLVM IR
             ll_file = self.compile_c_to_ll(c_file)
             
@@ -373,7 +405,7 @@ class HSXBuilder:
         
         # Generate sources.json for debug builds
         if self.args.debug:
-            self.generate_sources_json(source_files)
+            self.generate_sources_json(normalized_sources)
         
         self.log(f"Build complete: {hxe_file}")
         return hxe_file

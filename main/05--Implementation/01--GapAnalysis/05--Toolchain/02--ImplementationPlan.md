@@ -415,12 +415,12 @@ Design specifies sources.json for source list mapping (section 4.2.4). Helps deb
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Design sources.json format (relative path → absolute path)
-- [ ] Generate sources.json during build
-- [ ] Include all source files compiled
-- [ ] Store build-time absolute paths
-- [ ] Add sources.json generation tests
-- [ ] Document sources.json format
+- [x] Design sources.json format (relative path → absolute path)
+- [x] Generate sources.json during build
+- [x] Include all source files compiled
+- [x] Store build-time absolute paths
+- [x] Add sources.json generation tests
+- [x] Document sources.json format
 
 ---
 

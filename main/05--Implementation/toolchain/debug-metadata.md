@@ -446,6 +446,8 @@ paths using Clang's `-fdebug-prefix-map` option. When `hsx-cc-build.py` runs in
 Tests assert that the builder passes the flag and that emitted `.dbg` records
 reference relative directories whenever debug builds are requested.
 
+For details on the generated source map file, see `docs/sources_json.md`.
+
 ## Linker Implementation
 
 ### Debug Info Merge

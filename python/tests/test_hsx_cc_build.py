@@ -294,15 +294,21 @@ class TestHSXBuilderSourcesJson:
     
     def test_generate_sources_json(self, tmp_path):
         """Test sources.json file generation"""
-        args = make_args()
+        args = make_args(debug=True)
         with patch('os.getcwd', return_value=str(tmp_path)):
             builder = HSXBuilder(args)
             
             # Create source files
-            src_file = tmp_path / "test.c"
+            src_dir = tmp_path / "src"
+            src_dir.mkdir()
+            src_file = src_dir / "test.c"
             src_file.write_text("int main() {}")
+            dup_src = src_dir / "test.c"
+            other_src = tmp_path / "module" / "util.c"
+            other_src.parent.mkdir()
+            other_src.write_text("int util() {}")
             
-            builder.generate_sources_json([src_file])
+            builder.generate_sources_json([src_file, dup_src, other_src])
             
             sources_json = builder.build_dir / 'sources.json'
             assert sources_json.exists()
@@ -311,8 +317,46 @@ class TestHSXBuilderSourcesJson:
             assert data['version'] == 1
             assert 'project_root' in data
             assert 'sources' in data
-            assert len(data['sources']) == 1
-            assert data['sources'][0]['file'] == 'test.c'
+            assert len(data['sources']) == 2
+            files = [entry['file'] for entry in data['sources']]
+            assert files == ['module/util.c', 'src/test.c']
+            assert data['sources'][0]['relative'].startswith('./')
+            assert data.get('prefix_map') == builder.debug_prefix_map
+
+    def test_generate_sources_json_outside_root(self, tmp_path):
+        """Paths outside project root should retain absolute entries"""
+        args = make_args(debug=True)
+        with patch('os.getcwd', return_value=str(tmp_path)):
+            builder = HSXBuilder(args)
+        external_dir = tmp_path.parent / f"external_{tmp_path.name}"
+        external_dir.mkdir(exist_ok=True)
+        external = external_dir / 'external.c'
+        external.write_text("int ext() {}")
+        builder.generate_sources_json([external])
+        data = json.loads((builder.build_dir / 'sources.json').read_text())
+        entry = data['sources'][0]
+        assert entry['file'] == external.as_posix()
+        assert entry['relative'] == external.as_posix()
+        external.unlink()
+        external_dir.rmdir()
+
+    def test_discover_source_files_skips_build_dir(self, tmp_path):
+        args = make_args(debug=True)
+        with patch('os.getcwd', return_value=str(tmp_path)):
+            builder = HSXBuilder(args)
+            src_a = tmp_path / "main.c"
+            src_a.write_text("int main() {return 0;}")
+            src_b = tmp_path / "src" / "mod.c"
+            src_b.parent.mkdir()
+            src_b.write_text("int mod() {return 1;}")
+            ignored = builder.build_dir / "generated.c"
+            ignored.parent.mkdir(parents=True, exist_ok=True)
+            ignored.write_text("int ignore() {return 2;}")
+            files = builder.discover_source_files()
+            paths = [p.as_posix() for p in files]
+            assert src_a.resolve().as_posix() in paths
+            assert src_b.resolve().as_posix() in paths
+            assert ignored.resolve().as_posix() not in paths
 
 
 class TestHSXBuilderBuildModes:
@@ -369,6 +413,18 @@ class TestHSXBuilderBuildModes:
                 cmd = mock_run.call_args[0][0]
                 assert '-j' in cmd
                 assert '4' in cmd
+
+    def test_build_debug_with_make_generates_sources_json(self, tmp_path):
+        args = make_args(debug=True)
+        with patch('os.getcwd', return_value=str(tmp_path)):
+            makefile = tmp_path / "Makefile"
+            makefile.write_text("debug:\n\t@echo Debug build")
+            (tmp_path / "main.c").write_text("int main(){return 0;}")
+            builder = HSXBuilder(args)
+            with patch.object(builder, 'run_command') as mock_run:
+                mock_run.return_value = Mock(returncode=0, stdout="")
+                builder.build()
+        assert (builder.build_dir / 'sources.json').exists()
 
 
 class TestHSXBuilderErrorHandling:

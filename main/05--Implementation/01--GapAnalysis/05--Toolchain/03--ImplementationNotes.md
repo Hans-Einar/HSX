@@ -195,3 +195,20 @@ Append sessions chronologically and ensure every entry references the relevant d
 
 ### Next Steps
 - Phase 4.2: generate `sources.json` consistently for debug builds using the remapped paths.
+
+## 2025-11-08 - Codex (Session 10)
+
+### Scope
+- Plan item / phase addressed: Phase 4.2 Generate sources.json
+- Design sections reviewed: 04.05--Toolchain §4.2.4, docs/sources_json.md, Implementation Plan 4.2 checklist
+
+### Work Summary
+- Normalised builder source discovery to recurse through the project, skip the build directory, and de-duplicate results before use.
+- Enhanced `generate_sources_json` to emit sorted relative paths, absolute paths, optional prefix map metadata, and to rely on the normalised source list for both direct and Make-driven builds.
+- Authored `docs/sources_json.md` describing the schema, and expanded unit tests to cover deduplication, outside-root handling, Make integrations, and env propagation.
+
+### Testing
+- `python -m pytest python/tests/test_hsx_cc_build.py`
+
+### Next Steps
+- Phase 4.3: validate debugger path resolution using the emitted `sources.json` in varied build locations.
