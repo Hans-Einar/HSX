@@ -35,3 +35,25 @@ def test_lower_uadd_with_overflow():
     assert "ADC" in asm
     assert "LDI" in asm  # zero seed for ADC
     assert "RET" in asm
+
+
+def test_lower_usub_with_overflow():
+    llvm_ir = textwrap.dedent(
+        """
+        %struct = type { i32, i1 }
+        define dso_local i1 @borrow(i32 %a, i32 %b, ptr %out) {
+        entry:
+          %diff = call { i32, i1 } @llvm.usub.with.overflow.i32(i32 %a, i32 %b)
+          %flag = extractvalue { i32, i1 } %diff, 1
+          %value = extractvalue { i32, i1 } %diff, 0
+          store i32 %value, ptr %out
+          ret i1 %flag
+        }
+        """
+    ).strip()
+
+    asm = HSX_LLC.compile_ll_to_mvasm(llvm_ir, trace=False)
+    assert "SUB" in asm
+    assert "SBC" in asm
+    assert "LSR" in asm
+    assert asm.count("LDI") >= 2

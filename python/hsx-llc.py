@@ -1350,7 +1350,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
     AVAILABLE_REGS = ["R4", "R5", "R6", "R8", "R9", "R10", "R11"]
     free_regs: List[str] = AVAILABLE_REGS.copy()
     value_types: Dict[str, str] = {}
-    overflow_pairs: Dict[str, Tuple[str, str]] = {}
+    overflow_pairs: Dict[str, Dict[str, str]] = {}
     spilled_values: Dict[str, Tuple[str, str]] = {}
     spill_slots: Dict[str, int] = {}
     spill_data_lines: List[str] = []
@@ -1987,7 +1987,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 rhs = rhs.strip()
                 sum_name = f"{dst}__sum"
                 carry_name = f"{dst}__carry"
-                overflow_pairs[dst] = (sum_name, carry_name)
+                overflow_pairs[dst] = {"value": sum_name, "flag": carry_name, "kind": "uadd"}
                 value_types[sum_name] = 'i32'
                 value_types[carry_name] = 'i32'
                 ra = materialize(lhs, "R12")
@@ -2003,6 +2003,39 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 maybe_release(zero_name)
                 return line
 
+            m = re.match(r'(%[A-Za-z0-9_.]+)\s*=\s*call\s+\{\s*i32\s*,\s*i1\s*\}\s+@llvm\.usub\.with\.overflow\.i32\(\s*i32\s+([^,]+),\s*i32\s+([^)]*)\)', line)
+            if m:
+                dst, lhs, rhs = m.groups()
+                lhs = lhs.strip()
+                rhs = rhs.strip()
+                diff_name = f"{dst}__diff"
+                flag_name = f"{dst}__borrow"
+                overflow_pairs[dst] = {"value": diff_name, "flag": flag_name, "kind": "usub"}
+                value_types[diff_name] = 'i32'
+                value_types[flag_name] = 'i32'
+                ra = materialize(lhs, "R12")
+                rb = materialize(rhs, "R13")
+                rd_diff = alloc_vreg(diff_name, 'i32')
+                asm.append(f"SUB {rd_diff}, {ra}, {rb}")
+                zero_name = f"{dst}__borrow_seed"
+                value_types[zero_name] = 'i32'
+                rd_zero = alloc_vreg(zero_name, 'i32')
+                asm.append(f"LDI {rd_zero}, 0")
+                borrow_tmp = f"{dst}__borrow_tmp"
+                value_types[borrow_tmp] = 'i32'
+                rd_tmp = alloc_vreg(borrow_tmp, 'i32')
+                asm.append(f"SBC {rd_tmp}, {rd_zero}, {rd_zero}")
+                shift_name = f"{dst}__borrow_shift"
+                value_types[shift_name] = 'i32'
+                rd_shift = alloc_vreg(shift_name, 'i32')
+                load_const(rd_shift, 31)
+                rd_flag = alloc_vreg(flag_name, 'i32')
+                asm.append(f"LSR {rd_flag}, {rd_tmp}, {rd_shift}")
+                maybe_release(zero_name)
+                maybe_release(borrow_tmp)
+                maybe_release(shift_name)
+                return line
+
             m = re.match(r'(%[A-Za-z0-9_.]+)\s*=\s*extractvalue\s+\{\s*i32\s*,\s*i1\s*\}\s+(%[A-Za-z0-9_.]+),\s*(\d+)', line)
             if m:
                 dst, src, idx = m.groups()
@@ -2010,7 +2043,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 if not pair:
                     raise ISelError(f"extractvalue from unsupported value {src}")
                 if idx == '0':
-                    alias = pair[0]
+                    alias = pair["value"]
                     value_types[dst] = value_types.get(alias, 'i32')
                     src_reg = ensure_value_in_reg(alias)
                     consume_use(alias)
@@ -2018,11 +2051,11 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     if rd != src_reg:
                         asm.append(f"MOV {rd}, {src_reg}")
                 elif idx == '1':
-                    alias = pair[1]
-                    value_types[dst] = 'i32'
+                    alias = pair["flag"]
+                    value_types[dst] = 'i1'
                     src_reg = ensure_value_in_reg(alias)
                     consume_use(alias)
-                    rd = alloc_vreg(dst, 'i32')
+                    rd = alloc_vreg(dst, 'i1')
                     if rd != src_reg:
                         asm.append(f"MOV {rd}, {src_reg}")
                 else:
@@ -2687,6 +2720,7 @@ def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
     for idx, tag in enumerate(line_tags):
         if not tag or not isinstance(tag, dict):
             continue
+
         inst_id = tag.get("inst")
         if inst_id:
             instruction_line_map.setdefault(inst_id, []).append(idx + 1)
