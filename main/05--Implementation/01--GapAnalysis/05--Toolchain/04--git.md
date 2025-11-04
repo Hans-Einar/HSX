@@ -20,6 +20,7 @@
 | 2025-11-08 | `<pending>` | `toolchain: add debug prefix map plumbing` | Codex | Tests: `python -m pytest python/tests/test_hsx_cc_build.py` |
 | 2025-11-08 | `<pending>` | `toolchain: normalize sources.json generation and docs` | Codex | Tests: `python -m pytest python/tests/test_hsx_cc_build.py` |
 | 2025-11-08 | `<pending>` | `toolchain: add sources.json resolver + relocation tests` | Codex | Tests: `python -m pytest python/tests/test_source_map.py python/tests/test_hsx_cc_build.py` |
+| 2025-11-08 | `<pending>` | `toolchain: document portable debug workflow` | Codex | Tests: _n/a (docs only)_ |
 | 2025-11-08 | `<pending>` | `toolchain: emit instruction line_map and llvm_to_mvasm metadata` | Codex | Tests: `python -m pytest python/tests/test_hsx_llc_debug.py python/tests/test_opt_movs.py python/tests/test_opt_peephole_extra.py` |
 
 ## Pull Request

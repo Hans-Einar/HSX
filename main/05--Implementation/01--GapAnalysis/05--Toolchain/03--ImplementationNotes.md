@@ -230,3 +230,19 @@ Append sessions chronologically and ensure every entry references the relevant d
 
 ### Next Steps
 - Phase 5 planning (to be confirmed) or integration with debugger tooling consuming `source_map.SourceMap`.
+
+## 2025-11-08 - Codex (Session 12)
+
+### Scope
+- Plan item / phase addressed: Phase 4.4 Document Workflow
+- Design sections reviewed: 04.05--Toolchain §4.2.4, docs/toolchain.md, docs/sources_json.md, Implementation Plan 4.4 checklist
+
+### Work Summary
+- Authored `docs/portable_debug_workflow.md` capturing direct builds, Makefile integration, custom scripting, troubleshooting, and a hands-on tutorial for portable debug artefacts.
+- Cross-referenced the new guide from `docs/toolchain.md` and updated the Phase 4.4 checklist/notes/git log.
+
+### Testing
+- Documentation-only update (no code paths affected).
+
+### Next Steps
+- Begin Phase 5 ISA work (shift/ADC/SBC opcode additions) or coordinate with VM team before implementation.

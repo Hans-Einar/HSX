@@ -461,6 +461,12 @@ Provide examples and guidelines for portable debug builds (section 4.2.4).
 - [ ] Document common pitfalls
 - [ ] Add troubleshooting guide
 - [ ] Create tutorial for portable builds
+- [x] Document recommended build workflow
+- [x] Provide Makefile examples
+- [x] Provide build script examples
+- [x] Document common pitfalls
+- [x] Add troubleshooting guide
+- [x] Create tutorial for portable builds
 
 ---
 
