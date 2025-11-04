@@ -77,7 +77,10 @@ class HSXBuilder:
     def __init__(self, args):
         self.args = args
         self.verbose = args.verbose
-        
+        self.debug_prefix_map: Optional[str] = None
+        self.debug_prefix_map_flag: Optional[str] = None
+        self.debug_env: Dict[str, str] = {}
+
         # Determine working directory
         if args.directory:
             os.chdir(args.directory)
@@ -98,13 +101,22 @@ class HSXBuilder:
             if self.verbose:
                 print(f"[hsx-cc-build] Cleaning build directory: {self.build_dir}")
             shutil.rmtree(self.build_dir)
-        
+
         self.build_dir.mkdir(parents=True, exist_ok=True)
-        
+
         if self.verbose:
             print(f"Project root: {self.project_root}")
             print(f"Build directory: {self.build_dir}")
-    
+
+        if args.debug:
+            resolved_root = str(self.project_root.resolve())
+            self.debug_prefix_map = f"{resolved_root}=."
+            self.debug_prefix_map_flag = f"-fdebug-prefix-map={self.debug_prefix_map}"
+            self.debug_env = {
+                "HSX_DEBUG_PREFIX_MAP": self.debug_prefix_map,
+                "DEBUG_PREFIX_MAP": self.debug_prefix_map,
+            }
+
     def log(self, msg: str):
         """Log message if verbose"""
         if self.verbose:
@@ -121,7 +133,8 @@ class HSXBuilder:
                 cwd=cwd,
                 check=True,
                 capture_output=True,
-                text=True
+                text=True,
+                env=self._command_env(),
             )
             if result.stdout and self.verbose:
                 print(result.stdout)
@@ -133,6 +146,13 @@ class HSXBuilder:
             if e.stderr:
                 print("STDERR:", e.stderr, file=sys.stderr)
             raise HSXBuildError(f"Command failed: {cmd_str}")
+
+    def _command_env(self) -> Dict[str, str]:
+        env = os.environ.copy()
+        if self.debug_env:
+            for key, value in self.debug_env.items():
+                env.setdefault(key, value)
+        return env
     
     def find_tool(self, tool: str) -> Path:
         """Find tool in python/ directory or PATH"""
@@ -187,7 +207,7 @@ class HSXBuilder:
             clang_cmd.extend([
                 '-g',
                 '-O0',
-                f'-fdebug-prefix-map={self.project_root}=.'
+                self.debug_prefix_map_flag or f'-fdebug-prefix-map={self.project_root.resolve()}=.'
             ])
         else:
             clang_cmd.extend(['-O2'])

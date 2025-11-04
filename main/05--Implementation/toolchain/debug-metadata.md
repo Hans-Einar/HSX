@@ -431,6 +431,21 @@ if args.emit_debug:
     lowering.emit_debug_file(args.emit_debug)
 ```
 
+### Debug Prefix Mapping
+
+To keep debug metadata portable, the build pipeline rewrites absolute source
+paths using Clang's `-fdebug-prefix-map` option. When `hsx-cc-build.py` runs in
+`--debug` mode it:
+
+- Computes the mapping `<project_root>=.` based on the resolved project root.
+- Appends `-fdebug-prefix-map=<project_root>=.` to every Clang invocation.
+- Exposes the computed mapping via the environment variables
+  `HSX_DEBUG_PREFIX_MAP` and `DEBUG_PREFIX_MAP` so custom Makefiles can reuse
+  the value (for example `CFLAGS += -fdebug-prefix-map=$(DEBUG_PREFIX_MAP)`).
+
+Tests assert that the builder passes the flag and that emitted `.dbg` records
+reference relative directories whenever debug builds are requested.
+
 ## Linker Implementation
 
 ### Debug Info Merge

@@ -176,8 +176,8 @@ class TestHSXBuilderCompile:
                 cmd = mock_run.call_args[0][0]
                 assert '-g' in cmd
                 assert '-O0' in cmd
-                # Check for -fdebug-prefix-map
-                assert any('-fdebug-prefix-map' in str(arg) for arg in cmd)
+                # Check for -fdebug-prefix-map with resolved project root
+                assert builder.debug_prefix_map_flag in cmd
 
 
 class TestHSXBuilderLower:
@@ -427,3 +427,22 @@ class TestHSXBuilderVerboseMode:
             
             captured = capsys.readouterr()
             assert "Test message" not in captured.out
+
+
+class TestHSXBuilderEnv:
+    """Test environment configuration for commands"""
+
+    def test_run_command_sets_debug_prefix_map_env(self, tmp_path):
+        args = make_args(debug=True)
+        with patch('os.getcwd', return_value=str(tmp_path)):
+            builder = HSXBuilder(args)
+
+        with patch('subprocess.run') as mock_run:
+            mock_run.return_value = Mock(returncode=0, stdout="")
+            builder.run_command(['echo', 'hi'])
+
+        env = mock_run.call_args.kwargs.get('env')
+        assert env is not None
+        expected = builder.debug_prefix_map
+        assert env.get('HSX_DEBUG_PREFIX_MAP') == expected
+        assert env.get('DEBUG_PREFIX_MAP') == expected

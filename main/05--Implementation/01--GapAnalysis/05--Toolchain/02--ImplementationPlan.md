@@ -395,12 +395,12 @@ Design specifies using Clang -fdebug-prefix-map for relative paths (section 4.2.
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Ensure build scripts use `-fdebug-prefix-map` flag
-- [ ] Test path remapping in debug metadata
-- [ ] Verify relative paths in .dbg files
-- [ ] Document -fdebug-prefix-map usage
-- [ ] Add path remapping tests
-- [ ] Provide build script examples
+- [x] Ensure build scripts use `-fdebug-prefix-map` flag
+- [x] Test path remapping in debug metadata
+- [x] Verify relative paths in .dbg files
+- [x] Document -fdebug-prefix-map usage
+- [x] Add path remapping tests
+- [x] Provide build script examples
 
 ---
 

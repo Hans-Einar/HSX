@@ -178,3 +178,20 @@ Append sessions chronologically and ensure every entry references the relevant d
 
 ### Next Steps
 - Phase 4.1: integrate `-fdebug-prefix-map` handling to stabilise source paths within emitted debug metadata.
+
+## 2025-11-08 - Codex (Session 9)
+
+### Scope
+- Plan item / phase addressed: Phase 4.1 Source Path Handling
+- Design sections reviewed: 04.05--Toolchain §4.2.4, toolchain/debug-metadata.md, Implementation Plan 4.1 checklist
+
+### Work Summary
+- Added automatic `-fdebug-prefix-map` calculation in `hsx-cc-build.py`, surfaced the mapping via `HSX_DEBUG_PREFIX_MAP` / `DEBUG_PREFIX_MAP`, and ensured all child commands inherit the environment.
+- Documented usage guidance in the debug-metadata implementation doc so Makefile builds can reuse the exported mapping.
+- Extended builder tests to validate the flag, the propagated environment, and kept regression suite green.
+
+### Testing
+- `python -m pytest python/tests/test_hsx_cc_build.py`
+
+### Next Steps
+- Phase 4.2: generate `sources.json` consistently for debug builds using the remapped paths.
