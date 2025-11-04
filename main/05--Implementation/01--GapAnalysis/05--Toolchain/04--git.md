@@ -27,7 +27,7 @@
 | 2025-11-08 | `9954599` | `toolchain: centralize opcode table and sync docs/tests` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_opcode_table.py python/tests/test_asm_adc_sbc.py python/tests/test_hsx_llc_shift.py python/tests/test_hsx_llc_carry.py` |
 | 2025-11-08 | `4d457fb` | `toolchain: broaden opcode tests (shift/div disasm, validation)` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_asm_shift_div.py python/tests/test_disasm_new_opcodes.py python/tests/test_opcode_table.py python/tests/test_asm_adc_sbc.py python/tests/test_vm_shift_ops.py python/tests/test_vm_div.py` |
 | 2025-11-08 | `414471a` | `toolchain: enforce deterministic outputs and add reproducibility tests` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_build_determinism.py python/tests/test_asm_shift_div.py python/tests/test_disasm_new_opcodes.py python/tests/test_opcode_table.py` |
-| 2025-11-08 | `<pending>` | `toolchain: improve register allocation heuristics and expose metrics` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_register_allocation_metrics.py python/tests/test_build_determinism.py` |
+| 2025-11-08 | `ad5f627` | `toolchain: improve register allocation heuristics and expose metrics` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_register_allocation_metrics.py python/tests/test_build_determinism.py` |
 
 ## Pull Request
 - PR URL / ID: `<link or ID>`

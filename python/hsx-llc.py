@@ -2632,6 +2632,14 @@ def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
             data_section.extend(spill_data_all)
         else:
             data_section = ['.data'] + spill_data_all
+    summary_total_funcs = len(function_reg_stats)
+    total_spills = sum(stats["spill_count"] for stats in function_reg_stats.values())
+    total_reloads = sum(stats["reload_count"] for stats in function_reg_stats.values())
+    max_pressure_overall = max((stats["max_pressure"] for stats in function_reg_stats.values()), default=0)
+    max_stack_bytes = max((stats["stack_bytes"] for stats in function_reg_stats.values()), default=0)
+    functions_with_spills = sorted(
+        name for name, stats in function_reg_stats.items() if stats["spill_count"] > 0
+    )
     if out or data_section:
         header = []
         if entry_label:
@@ -2866,12 +2874,21 @@ def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
         if ordinals_for_inst:
             entry["mvasm_ordinals"] = ordinals_for_inst
         llvm_map_entries.append(entry)
+    allocation_summary = {
+        "total_functions": summary_total_funcs,
+        "functions_with_spills": functions_with_spills,
+        "max_pressure": max_pressure_overall,
+        "total_spills": total_spills,
+        "total_reloads": total_reloads,
+        "max_stack_bytes": max_stack_bytes,
+    }
     LAST_DEBUG_INFO = {
         "version": 1,
         "files": files_list,
         "functions": functions_list,
         "line_map": line_map_entries,
         "llvm_to_mvasm": llvm_map_entries,
+        "register_allocation_summary": allocation_summary,
     }
     return "\n".join(out) + "\n"
 
@@ -2891,6 +2908,7 @@ def main():
     ap.add_argument("--trace", action="store_true")
     ap.add_argument("--no-opt", action="store_true", help="disable MOV optimization pass")
     ap.add_argument("--emit-debug", help="write debug metadata JSON to file")
+    ap.add_argument("--dump-reg-stats", action="store_true", help="emit register allocation summary to stdout")
     args = ap.parse_args()
     txt = open(args.input,"r",encoding="utf-8").read()
     asm = compile_ll_to_mvasm(txt, trace=args.trace, enable_opt=not args.no_opt)
@@ -2898,6 +2916,9 @@ def main():
         f.write(asm)
     if args.emit_debug:
         _write_debug_file(args.emit_debug, LAST_DEBUG_INFO)
+    if args.dump_reg_stats:
+        summary = (LAST_DEBUG_INFO or {}).get("register_allocation_summary", {})
+        print(json.dumps(summary, indent=2, sort_keys=True))
     print(f"Wrote {args.output}")
 if __name__ == "__main__":
     main()

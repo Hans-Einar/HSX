@@ -589,8 +589,8 @@ Current linear scan algorithm is basic. Better allocation reduces spills and imp
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Profile current register allocation
-- [ ] Identify common spill scenarios
+- [x] Profile current register allocation
+- [x] Identify common spill scenarios
 - [x] Implement better spill cost heuristics
 - [ ] Add register coalescing
 - [ ] Add live range splitting

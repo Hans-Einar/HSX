@@ -41,6 +41,11 @@ entry:
 
     _compile(ir)
     alloc = _get_reg_alloc("main")
+    summary = (HSX_LLC.LAST_DEBUG_INFO or {}).get("register_allocation_summary")
+    assert summary is not None, "register allocation summary missing"
+    assert summary["total_functions"] >= 1
+    assert summary["max_pressure"] >= alloc["max_pressure"]
+    assert summary["total_spills"] >= alloc["spill_count"]
     for key in (
         "max_pressure",
         "spill_count",
@@ -89,7 +94,11 @@ entry:
 
     _compile(ir)
     alloc = _get_reg_alloc("main")
+    summary = (HSX_LLC.LAST_DEBUG_INFO or {}).get("register_allocation_summary")
+    assert summary is not None
     assert alloc["spill_count"] > 0
     assert alloc["reload_count"] > 0
     assert alloc["stack_slots"] >= 1
     assert alloc["stack_bytes"] >= 4
+    assert summary["total_spills"] >= alloc["spill_count"]
+    assert "main" in summary["functions_with_spills"]
