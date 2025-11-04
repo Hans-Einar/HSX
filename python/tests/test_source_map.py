@@ -81,6 +81,33 @@ def test_resolve_missing_should_raise(tmp_path):
         smap.resolve("missing.c")
 
 
+def test_resolve_symlink(tmp_path):
+    old_root = tmp_path / "app"
+    new_root = tmp_path / "relocated"
+    (new_root / "src").mkdir(parents=True)
+    shared_target = tmp_path / "shared" / "module.c"
+    shared_target.parent.mkdir(parents=True)
+    shared_target.write_text("int module(){return 42;}", encoding="utf-8")
+    relocated = new_root / "src" / "module.c"
+    relocated.symlink_to(shared_target)
+    original = old_root / "src" / "module.c"
+    data = {
+        "version": 1,
+        "project_root": str(old_root),
+        "prefix_map": f"{old_root}=.",
+        "sources": [
+            {
+                "file": "src/module.c",
+                "path": str(original),
+                "relative": "./src/module.c",
+            }
+        ],
+    }
+    smap = SourceMap.from_file(make_sources_json(tmp_path, data))
+    resolved = smap.resolve("./src/module.c", search_roots=[new_root])
+    assert resolved == relocated
+
+
 def test_prefix_map_reverse_lookup(tmp_path):
     project_root = tmp_path / "workspace"
     project_root.mkdir()

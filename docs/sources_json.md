@@ -54,3 +54,17 @@ Each entry in `sources` contains:
 - Consumers can load and resolve entries using `python/source_map.py`, which
   applies the recorded prefix map and searches alternate project roots when
   necessary.
+
+### Resolution Algorithm
+
+`SourceMap.resolve()` performs the following steps:
+
+1. Normalises the requested path and collects candidate keys (raw, without `./`,
+   project-root absolute, and prefix-map rewrites).
+2. Looks up matching source entries and, for each, tries the recorded absolute
+   path (`path`). If it exists, it is returned immediately.
+3. For each entry, combines the relative descriptor (`file` or `relative`) with
+   the project root, optional search roots supplied by the caller, and the
+   current working directory. The first existing file or symlink is returned.
+4. When no candidates exist, a `FileNotFoundError` is raised with the original
+   request path for diagnostics.

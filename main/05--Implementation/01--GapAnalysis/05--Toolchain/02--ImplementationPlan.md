@@ -438,9 +438,9 @@ Validate debugger can resolve source files across different build environments (
 - [x] Create test builds in different directories
 - [x] Verify path resolution with sources.json
 - [x] Test debugger source file loading
-- [ ] Test missing source file handling
-- [ ] Document resolution algorithm
-- [ ] Add edge case tests (symlinks, network paths)
+- [x] Test missing source file handling
+- [x] Document resolution algorithm
+- [x] Add edge case tests (symlinks, network paths)
 
 ---
 
