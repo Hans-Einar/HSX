@@ -8,8 +8,9 @@ Usage:
   python3 hsx-llc.py input.ll -o output.mvasm --trace
 """
 import argparse, json, re, sys
+import math
 import struct
-from collections import defaultdict
+from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -1328,6 +1329,8 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
     inst_counter = 0
 
     use_counts: Dict[str, int] = defaultdict(int)
+    use_positions: Dict[str, List[int]] = defaultdict(list)
+    instruction_index = 0
     for block in fn["blocks"]:
         for raw in block["ins"]:
             norm = normalize_ir_line(raw)
@@ -1338,6 +1341,8 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                     val = val.strip()
                     if val.startswith('%'):
                         use_counts[val] += 1
+                        use_positions[val].append(instruction_index)
+                instruction_index += 1
                 continue
             dest_match = re.match(r'(%[A-Za-z0-9_]+)\s*=', norm)
             dest = dest_match.group(1) if dest_match else None
@@ -1346,7 +1351,12 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 if tok == dest:
                     continue
                 use_counts[tok] += 1
+                use_positions[tok].append(instruction_index)
+            instruction_index += 1
 
+    future_use_positions: Dict[str, deque[int]] = {
+        name: deque(indices) for name, indices in use_positions.items()
+    }
     AVAILABLE_REGS = ["R4", "R5", "R6", "R8", "R9", "R10", "R11"]
     free_regs: List[str] = AVAILABLE_REGS.copy()
     value_types: Dict[str, str] = {}
@@ -1361,6 +1371,23 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
     pinned_registers: Dict[str, str] = {}
     reg_lru: List[str] = []
     spilled_float_alias = set()
+    allocation_stats: Dict[str, Any] = {
+        "max_pressure": 0,
+        "spill_count": 0,
+        "reload_count": 0,
+    }
+    used_registers: Set[str] = set()
+
+    def record_pressure() -> None:
+        active = len(AVAILABLE_REGS) - len(free_regs)
+        if active > allocation_stats["max_pressure"]:
+            allocation_stats["max_pressure"] = active
+
+    def next_use_for(name: str) -> float:
+        queue = future_use_positions.get(name)
+        if not queue:
+            return math.inf
+        return float(queue[0])
 
     def mark_used(name: str) -> None:
         if name in reg_lru:
@@ -1480,16 +1507,25 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
 
     def select_spill_candidate(exclude: Optional[set] = None) -> Optional[str]:
         blocked = set(exclude or ())
-        for name in reg_lru:
-            if name in blocked:
-                continue
-            if name in pinned_values:
+        best_name: Optional[str] = None
+        best_next_use = -1.0
+        best_lru_pos = len(reg_lru) + 1
+        for idx, name in enumerate(reg_lru):
+            if name in blocked or name in pinned_values:
                 continue
             reg = vmap.get(name)
             if not reg or reg not in AVAILABLE_REGS:
                 continue
-            return name
-        return None
+            next_use_val = next_use_for(name)
+            # Prefer values with no future use (next_use == inf), otherwise farthest use.
+            if (
+                next_use_val > best_next_use
+                or (next_use_val == best_next_use and idx < best_lru_pos)
+            ):
+                best_name = name
+                best_next_use = next_use_val
+                best_lru_pos = idx
+        return best_name
 
     def align_up(value: int, alignment: int) -> int:
         if alignment <= 0:
@@ -1533,6 +1569,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
         slot_offset = record_frame_slot(name, val_type, 4)
         store_instr = type_to_store_instr(val_type)
         asm.append(f"{store_instr} [R7{format_stack_offset(slot_offset)}], {reg}")
+        allocation_stats["spill_count"] += 1
         vmap.pop(name, None)
         add_free_reg(reg)
         if name in reg_lru:
@@ -1562,13 +1599,17 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
             if canonical not in vmap:
                 vmap[canonical] = reg
             mark_used(canonical)
+            used_registers.add(reg)
             return reg
         if canonical in vmap:
             mark_used(canonical)
-            return vmap[canonical]
+            reg = vmap[canonical]
+            used_registers.add(reg)
+            return reg
         if canonical in spilled_values:
             ensure_register_available({canonical})
             reg = free_regs.pop(0)
+            record_pressure()
             vmap[canonical] = reg
             mark_used(canonical)
             slot_offset, stored_type = spilled_values.pop(canonical)
@@ -1578,14 +1619,18 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
             if canonical in spilled_float_alias:
                 float_alias[canonical] = reg
                 spilled_float_alias.remove(canonical)
+            allocation_stats["reload_count"] += 1
+            used_registers.add(reg)
             return reg
         ensure_register_available({canonical})
         reg = free_regs.pop(0)
+        record_pressure()
         vmap[canonical] = reg
         mark_used(canonical)
         if canonical in spilled_float_alias:
             float_alias[canonical] = reg
             spilled_float_alias.remove(canonical)
+        used_registers.add(reg)
         return reg
 
     def ensure_value_in_reg(name: str) -> str:
@@ -1661,6 +1706,11 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
     def consume_use(name: str) -> None:
         if not name.startswith('%'):
             return
+        queue = future_use_positions.get(name)
+        if queue:
+            queue.popleft()
+            if not queue:
+                future_use_positions.pop(name, None)
         if name not in use_counts:
             return
         remaining = use_counts[name] - 1
@@ -2516,13 +2566,18 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                         )
                         for asm_index in emitted_indices:
                             line_debug_entries.append((asm_index, dbg_id, inst_id))
+    allocation_stats["available_registers"] = len(AVAILABLE_REGS)
+    allocation_stats["stack_slots"] = len(spill_slots)
+    allocation_stats["stack_bytes"] = frame_size
+    allocation_stats["used_registers"] = sorted(used_registers)
+    allocation_stats["used_register_count"] = len(allocation_stats["used_registers"])
     line_tags: List[Optional[Dict[str, Any]]] = [None] * len(asm)
     for asm_index, dbg_id, inst_id in line_debug_entries:
         tag: Dict[str, Any] = {"inst": inst_id}
         if dbg_id:
             tag["dbg"] = dbg_id
         line_tags[asm_index] = tag
-    return asm, spill_data_lines, line_tags, instruction_records
+    return asm, spill_data_lines, line_tags, instruction_records, allocation_stats
 
 def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
     global LAST_DEBUG_INFO
@@ -2540,9 +2595,16 @@ def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
     function_spans: List[Tuple[str, int, int]] = []
     instruction_records: Dict[str, Dict[str, Any]] = {}
     instruction_order: List[str] = []
+    function_reg_stats: Dict[str, Dict[str, Any]] = {}
     for fn in ir['functions']:
         start_line = len(out)
-        fn_asm, fn_spill_data, fn_tags, fn_instruction_records = lower_function(
+        (
+            fn_asm,
+            fn_spill_data,
+            fn_tags,
+            fn_instruction_records,
+            fn_alloc_stats,
+        ) = lower_function(
             fn,
             trace=trace,
             imports=imports,
@@ -2560,6 +2622,7 @@ def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
             inst_id = record["id"]
             instruction_records[inst_id] = record
             instruction_order.append(inst_id)
+        function_reg_stats[fn["name"]] = fn_alloc_stats
     data_section = render_globals(globals_list)
     mailbox_entries = ir.get("mailboxes", [])
     value_entries = ir.get("values", [])
@@ -2702,17 +2765,29 @@ def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
         else:
             start_ord = None
             end_ord = None
+        func_entry: Dict[str, Any] = {
+            "function": name,
+            "name": entry.get("name"),
+            "linkage_name": entry.get("linkage_name"),
+            "file": entry.get("file"),
+            "line": entry.get("line"),
+            "mvasm_start_line": start_line,
+            "mvasm_end_line": end_line,
+            "mvasm_start_ordinal": start_ord,
+            "mvasm_end_ordinal": end_ord,
+        }
+        stats_entry = function_reg_stats.get(name)
+        if stats_entry:
+            func_entry["register_allocation"] = stats_entry
+        functions_list.append(func_entry)
+    existing_names = {entry["function"] for entry in functions_list}
+    for name, stats_entry in function_reg_stats.items():
+        if name in existing_names:
+            continue
         functions_list.append(
             {
                 "function": name,
-                "name": entry.get("name"),
-                "linkage_name": entry.get("linkage_name"),
-                "file": entry.get("file"),
-                "line": entry.get("line"),
-                "mvasm_start_line": start_line,
-                "mvasm_end_line": end_line,
-                "mvasm_start_ordinal": start_ord,
-                "mvasm_end_ordinal": end_ord,
+                "register_allocation": stats_entry,
             }
         )
     line_map_entries: List[Dict[str, Any]] = []

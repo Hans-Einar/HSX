@@ -346,3 +346,20 @@ Append sessions chronologically and ensure every entry references the relevant d
 
 ### Next Steps
 - Evaluate remaining Phase 6 quality tasks (6.2 register allocation, 6.3 test coverage) following determinism landing.
+
+## 2025-11-08 - Codex (Session 19)
+
+### Scope
+- Plan item / phase addressed: Phase 6.2 Register Allocation Improvements
+- Design sections reviewed: 04.05--Toolchain (§4.3.1), toolchain/hsx-llc notes on register pressure metrics
+
+### Work Summary
+- Added future-use tracking to the linear-scan allocator so spill decisions prefer values with the longest reuse distance, falling back to LRU only when necessary.
+- Instrumented lowering to capture register allocation metrics (peak pressure, spill/reload counts, stack usage, register set) and surfaced them via `LAST_DEBUG_INFO.functions[].register_allocation`.
+- Updated documentation (`debug-metadata.md`) to describe the new metrics block and created regression coverage validating both metadata emission and spill statistics.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_register_allocation_metrics.py python/tests/test_build_determinism.py`
+
+### Next Steps
+- Explore additional allocator enhancements (coalescing/live-range splitting) and benchmark impact once profiling harness is in place.
