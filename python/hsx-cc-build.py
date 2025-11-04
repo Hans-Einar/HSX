@@ -80,6 +80,7 @@ class HSXBuilder:
         self.debug_prefix_map: Optional[str] = None
         self.debug_prefix_map_flag: Optional[str] = None
         self.debug_env: Dict[str, str] = {}
+        self.build_timestamp = self._compute_build_timestamp()
 
         # Determine working directory
         if args.directory:
@@ -116,6 +117,20 @@ class HSXBuilder:
                 "HSX_DEBUG_PREFIX_MAP": self.debug_prefix_map,
                 "DEBUG_PREFIX_MAP": self.debug_prefix_map,
             }
+
+    def _compute_build_timestamp(self) -> str:
+        epoch = os.environ.get("SOURCE_DATE_EPOCH")
+        if epoch is None or epoch == "":
+            seconds = 0
+        else:
+            try:
+                seconds = int(epoch, 10)
+            except ValueError as exc:
+                raise HSXBuildError("SOURCE_DATE_EPOCH must be an integer value") from exc
+            if seconds < 0:
+                raise HSXBuildError("SOURCE_DATE_EPOCH must be non-negative")
+        dt = datetime.fromtimestamp(seconds, tz=timezone.utc)
+        return dt.isoformat().replace("+00:00", "Z")
 
     def log(self, msg: str):
         """Log message if verbose"""
@@ -309,7 +324,7 @@ class HSXBuilder:
         sources_data = {
             'version': 1,
             'project_root': str(self.project_root.resolve()),
-            'build_time': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+            'build_time': self.build_timestamp,
             'sources': [],
             'include_paths': []
         }

@@ -569,12 +569,12 @@ Design requires bit-identical output for same inputs (section 4.1). Critical for
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Identify sources of non-determinism (timestamps, ordering)
-- [ ] Remove or fix non-deterministic behavior
-- [ ] Add deterministic build tests (build twice, compare outputs)
-- [ ] Test with different build environments
-- [ ] Document determinism guarantees
-- [ ] Add CI tests for deterministic builds
+- [x] Identify sources of non-determinism (timestamps, ordering)
+- [x] Remove or fix non-deterministic behavior
+- [x] Add deterministic build tests (build twice, compare outputs)
+- [x] Test with different build environments
+- [x] Document determinism guarantees
+- [x] Add CI tests for deterministic builds
 
 ---
 

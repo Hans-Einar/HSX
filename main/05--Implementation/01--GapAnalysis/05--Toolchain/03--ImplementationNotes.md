@@ -328,3 +328,21 @@ Append sessions chronologically and ensure every entry references the relevant d
 
 ### Next Steps
 - Begin Phase 6.1 determinism tasks once opcode validation lands in mainline.
+
+## 2025-11-08 - Codex (Session 18)
+
+### Scope
+- Plan item / phase addressed: Phase 6.1 Deterministic Build Validation
+- Design sections reviewed: 04.05--Toolchain §4.1 (deterministic output), docs/sources_json.md, implementation note `hsx-cc-build.md`
+
+### Work Summary
+- Audited the toolchain for nondeterministic artefacts and identified `sources.json` timestamps as the divergent field.
+- Normalised `hsx-cc-build.py` to derive `build_time` from `SOURCE_DATE_EPOCH` (defaulting to the Unix epoch) and validate the environment value, ensuring reproducible metadata across runs.
+- Documented the timestamp behaviour in `docs/sources_json.md` and recorded checklist progress in the implementation plan.
+- Added regression coverage (`python/tests/test_build_determinism.py`) that round-trips assembler/linker outputs to confirm byte-identical `.hxo`/`.hxe` emission and verifies `sources.json` determinism under default and custom epochs.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_build_determinism.py python/tests/test_asm_shift_div.py python/tests/test_disasm_new_opcodes.py python/tests/test_opcode_table.py`
+
+### Next Steps
+- Evaluate remaining Phase 6 quality tasks (6.2 register allocation, 6.3 test coverage) following determinism landing.
