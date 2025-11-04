@@ -134,7 +134,21 @@ The MiniVM tracks condition codes in the low nibble of `PSW`:
 | 3 | `V` | Signed overflow | `ADD`, `SUB`, `CMP`, `MUL` |
 
 - `SUB`, `SBC`, and `CMP` set `C = 1` when no borrow occurs (`Rsrc1 >= Rsrc2 + borrow_in`), making it safe to cascade for multi-precision arithmetic.
-- `ADC` consumes the incoming carry (`C`) as a +1 term; `SBC` treats `C` as "no borrow yet" (borrow-in = `1 - C`).
+- `ADC` consumes the incoming carry (`C`) as a +1 term; `SBC` treats `C` as "no borrow yet" (borrow-in = `1 - C`). A common pattern for cascading wide arithmetic is:
+  ```
+  ; accumulate sum
+  ADD Rd_lo, Ra_lo, Rb_lo
+  ADC Rd_hi, Ra_hi, Rb_hi
+
+  ; convert carry flag to boolean
+  LDI Rtmp, 0
+  ADC Rcarry, Rtmp, Rtmp    ; Rcarry becomes 0 or 1
+
+  ; convert borrow flag to boolean
+  SBC RborrowTmp, Rtmp, Rtmp ; writes 0 or 0xFFFFFFFF depending on borrow
+  LDI Rshift, 31
+  LSR Rborrow, RborrowTmp, Rshift
+  ```
 - Logical operations (`AND`, `OR`, `XOR`, `NOT`) clear `C` and `V`. Shift instructions clear `V` and set `C` to the last bit shifted out when the amount is non-zero.
 - Branch instructions currently test `Z` (`JZ` / `JNZ`); future opcodes may consume the other flags.
 - `DIV` performs signed 32-bit integer division with truncation toward zero; divide-by-zero halts execution and latches `HSX_ERR_DIV_ZERO` in `R0`.

@@ -278,3 +278,19 @@ Append sessions chronologically and ensure every entry references the relevant d
 
 ### Next Steps
 - Extend lowering to subtraction with borrow (`llvm.usub.with.overflow`) and sync opcode tables/assembler docs before Phase 5.3 checklist closes.
+
+## 2025-11-08 - Codex (Session 15)
+
+### Scope
+- Plan item / phase addressed: Phase 5.2 carry arithmetic (assembler/disassembler/tests) + `llvm.usub.with.overflow`
+- Design sections reviewed: MVASM spec §ALU flags, hsx-llc lowering helpers
+
+### Work Summary
+- Implemented lowering for `llvm.usub.with.overflow.i32`, generating `SUB` + `SBC` + shift sequences producing a boolean borrow flag; reused overflow tracking map for both add/sub flows.
+- Added unit tests exercising the lowering paths (`python/tests/test_hsx_llc_carry.py`) and assembler parsing/encoding for `ADC`/`SBC` (`python/tests/test_asm_adc_sbc.py`), and updated MVASM spec with usage patterns.
+
+### Testing
+- `python -m pytest python/tests/test_hsx_llc_shift.py python/tests/test_hsx_llc_carry.py python/tests/test_asm_adc_sbc.py`
+
+### Next Steps
+- Phase 5.3: final opcode table audit and documentation / validation tests.

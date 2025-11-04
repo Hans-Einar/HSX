@@ -504,13 +504,13 @@ Design references ADC, SBC for multi-precision arithmetic. Coordinates with VM I
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Define ADC, SBC opcodes (coordinate with VM)
-- [ ] Implement opcode encoding in `python/asm.py`
-- [ ] Update OPC dictionary with ADC, SBC
-- [ ] Add carry arithmetic parsing
-- [ ] Add carry arithmetic tests
-- [ ] Update `docs/MVASM_SPEC.md` with ADC/SBC syntax
-- [ ] Update disassembler for ADC/SBC
+- [x] Define ADC, SBC opcodes (coordinate with VM)
+- [x] Implement opcode encoding in `python/asm.py`
+- [x] Update OPC dictionary with ADC, SBC
+- [x] Add carry arithmetic parsing
+- [x] Add carry arithmetic tests
+- [x] Update `docs/MVASM_SPEC.md` with ADC/SBC syntax
+- [x] Update disassembler for ADC/SBC
 
 ---
 
