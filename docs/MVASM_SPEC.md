@@ -118,7 +118,7 @@ Supported keys mirror the loader schema (`target`, `capacity`, `mode_mask`, `own
 | Floating/FP helpers | `FADD`, `FSUB`, `FMUL`, `FDIV`, `I2F`, `F2I` | Operate on f16 values stored in 32-bit registers. |
 | System services | `SVC mod, fn` | Encodes module/function IDs in the immediate field. Arguments travel in `R0`–`R3` per `docs/abi_syscalls.md`. |
 
-Opcode values follow `OPC` in `python/asm.py`; tooling should treat mnemonics as the public contract while opcode IDs remain stable for the VM decoder.
+Opcode values follow `OPCODES` in `python/opcodes.py`; tooling should treat mnemonics as the public contract while opcode IDs remain stable for the VM decoder.
 
 `LSL` and `LSR` treat the shift amount modulo 32 and always operate on the logical (zero-extended) source value. `ASR` performs an arithmetic right shift with sign extension using the same modulo-32 shift amount.
 
@@ -152,6 +152,51 @@ The MiniVM tracks condition codes in the low nibble of `PSW`:
 - Logical operations (`AND`, `OR`, `XOR`, `NOT`) clear `C` and `V`. Shift instructions clear `V` and set `C` to the last bit shifted out when the amount is non-zero.
 - Branch instructions currently test `Z` (`JZ` / `JNZ`); future opcodes may consume the other flags.
 - `DIV` performs signed 32-bit integer division with truncation toward zero; divide-by-zero halts execution and latches `HSX_ERR_DIV_ZERO` in `R0`.
+
+## Opcode Table
+
+| Opcode | Mnemonic | Description |
+| ------ | -------- | ----------- |
+| 0x01 | `LDI` | Load 12-bit immediate into `Rd` |
+| 0x02 | `LD` | Load 32-bit word from `[Rs1 + imm]` into `Rd` |
+| 0x03 | `ST` | Store 32-bit word from `Rs2` into `[Rs1 + imm]` |
+| 0x04 | `MOV` | Copy `Rs1` into `Rd` |
+| 0x06 | `LDB` | Load byte from `[Rs1 + imm]` (zero-extend) |
+| 0x07 | `LDH` | Load halfword from `[Rs1 + imm]` (zero-extend) |
+| 0x08 | `STB` | Store byte from `Rs2` into `[Rs1 + imm]` |
+| 0x09 | `STH` | Store halfword from `Rs2` into `[Rs1 + imm]` |
+| 0x10 | `ADD` | Integer addition |
+| 0x11 | `SUB` | Integer subtraction |
+| 0x12 | `MUL` | Integer multiplication |
+| 0x13 | `DIV` | Integer division (traps on divide-by-zero) |
+| 0x14 | `AND` | Bitwise AND |
+| 0x15 | `OR` | Bitwise OR |
+| 0x16 | `XOR` | Bitwise XOR |
+| 0x17 | `NOT` | Bitwise invert |
+| 0x20 | `CMP` | Compare registers (sets NZCV) |
+| 0x21 | `JMP` | Unconditional jump |
+| 0x22 | `JZ` | Jump if zero flag set |
+| 0x23 | `JNZ` | Jump if zero flag clear |
+| 0x24 | `CALL` | Subroutine call |
+| 0x25 | `RET` | Return from subroutine |
+| 0x30 | `SVC` | Supervisor call (module/function encoded in imm) |
+| 0x31 | `LSL` | Logical left shift |
+| 0x32 | `LSR` | Logical right shift |
+| 0x33 | `ASR` | Arithmetic right shift |
+| 0x34 | `ADC` | Add with carry |
+| 0x35 | `SBC` | Subtract with borrow |
+| 0x40 | `PUSH` | Push register onto stack |
+| 0x41 | `POP` | Pop register from stack |
+| 0x50 | `FADD` | Float16 addition |
+| 0x51 | `FSUB` | Float16 subtraction |
+| 0x52 | `FMUL` | Float16 multiplication |
+| 0x53 | `FDIV` | Float16 division |
+| 0x54 | `I2F` | Convert integer to float16 |
+| 0x55 | `F2I` | Convert float16 to integer |
+| 0x60 | `LDI32` | Load 32-bit immediate (two-word encoding) |
+| 0x7F | `BRK` | Breakpoint / trap to debugger |
+
+The assembler (`python/asm.py`) and disassembler (`python/disasm_util.py`) expose matching opcode dictionaries; automated tests keep the mapping in sync with the VM implementation.
 
 ## Labels and Relocations
 - Labels end with `:` and bind to the current section offset.

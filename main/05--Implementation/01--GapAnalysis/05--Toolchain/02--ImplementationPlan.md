@@ -525,13 +525,13 @@ Synchronize OPC dictionary with VM design spec including DIV. Ensures toolchain 
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Review VM design spec opcode table
-- [ ] Update OPC dictionary in `python/asm.py`
-- [ ] Add DIV opcode (0x13)
-- [ ] Verify all opcodes match VM implementation
-- [ ] Add opcode validation tests
-- [ ] Document complete opcode table
-- [ ] Update MVASM spec with all opcodes
+- [x] Review VM design spec opcode table
+- [x] Update OPC dictionary in `python/asm.py`
+- [x] Add DIV opcode (0x13)
+- [x] Verify all opcodes match VM implementation
+- [x] Add opcode validation tests
+- [x] Document complete opcode table
+- [x] Update MVASM spec with all opcodes
 
 ---
 

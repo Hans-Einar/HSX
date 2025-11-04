@@ -1,18 +1,11 @@
 #!/usr/bin/env python3
 
-from typing import Dict, Optional, Sequence
+from typing import Optional, Sequence
 
-OPCODES: Dict[str, int] = {
-    "LDI": 0x01, "LD": 0x02, "ST": 0x03, "MOV": 0x04, "LDB": 0x06, "LDH": 0x07, "STB": 0x08, "STH": 0x09,
-    "ADD": 0x10, "SUB": 0x11, "MUL": 0x12, "DIV": 0x13,
-    "AND": 0x14, "OR": 0x15, "XOR": 0x16, "NOT": 0x17,
-    "CMP": 0x20, "JMP": 0x21, "JZ": 0x22, "JNZ": 0x23, "CALL": 0x24, "RET": 0x25,
-    "SVC": 0x30, "LSL": 0x31, "LSR": 0x32, "ASR": 0x33, "ADC": 0x34, "SBC": 0x35, "PUSH": 0x40, "POP": 0x41,
-    "FADD": 0x50, "FSUB": 0x51, "FMUL": 0x52, "FDIV": 0x53, "I2F": 0x54, "F2I": 0x55,
-    "LDI32": 0x60, "BRK": 0x7F
-}
-
-OPCODE_NAMES: Dict[int, str] = {code: name for name, code in OPCODES.items()}
+try:  # pragma: no cover - supporting both package/script execution
+    from opcodes import OPCODES, OPCODE_NAMES
+except ImportError:  # pragma: no cover - running as package
+    from python.opcodes import OPCODES, OPCODE_NAMES
 
 
 def instruction_size(mnemonic: str) -> int:

@@ -10,19 +10,14 @@ except ImportError:  # pragma: no cover - running as package
     from python import hsx_value_constants as val_const
     from python import hsx_command_constants as cmd_const
 
+try:  # pragma: no cover - packaging vs in-repo execution
+    from opcodes import OPCODES as OPC
+except ImportError:  # pragma: no cover - running as package
+    from python.opcodes import OPCODES as OPC
+
 MAGIC = 0x48535845  # 'HSXE'
 VERSION = 0x0001
 RODATA_BASE = 0x4000
-
-OPC = {
-    "LDI":   0x01, "LD": 0x02, "ST": 0x03, "MOV": 0x04, "LDB": 0x06, "LDH": 0x07, "STB": 0x08, "STH": 0x09,
-    "ADD": 0x10, "SUB": 0x11, "MUL": 0x12, "DIV": 0x13,
-    "AND": 0x14, "OR": 0x15, "XOR": 0x16, "NOT": 0x17,
-    "CMP": 0x20, "JMP": 0x21, "JZ": 0x22, "JNZ": 0x23, "CALL": 0x24, "RET": 0x25,
-    "SVC": 0x30, "LSL": 0x31, "LSR": 0x32, "ASR": 0x33, "ADC": 0x34, "SBC": 0x35, "PUSH": 0x40, "POP": 0x41,
-    "FADD": 0x50, "FSUB": 0x51, "FMUL": 0x52, "FDIV": 0x53, "I2F": 0x54, "F2I": 0x55,
-    "LDI32": 0x60, "BRK": 0x7F
-}
 
 REGISTER_RE = re.compile(r"R([0-9]|1[0-5])\b", re.IGNORECASE)
 SYMBOL_TOKEN_RE = re.compile(r"[A-Za-z_.][A-Za-z0-9_.$]*")

@@ -294,3 +294,20 @@ Append sessions chronologically and ensure every entry references the relevant d
 
 ### Next Steps
 - Phase 5.3: final opcode table audit and documentation / validation tests.
+
+## 2025-11-08 - Codex (Session 16)
+
+### Scope
+- Plan item / phase addressed: Phase 5.3 Update Opcode Table
+- Design sections reviewed: docs/MVASM_SPEC.md (§Opcode table), 04.05--Toolchain design, platforms/python/host_vm.py opcode dispatch
+
+### Work Summary
+- Consolidated opcode definitions in `python/opcodes.py` and updated both `python/asm.py` and `python/disasm_util.py` to consume the shared table, eliminating divergent dictionaries.
+- Added regression tests ensuring assembler/disassembler share the mapping, the VM executes every defined opcode, and the MVASM spec table stays in sync (`python/tests/test_opcode_table.py`).
+- Refreshed `docs/MVASM_SPEC.md` to reference the canonical table, updated the toolchain implementation plan Phase 5.3 checklist, and recorded commit hashes in the git log.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_opcode_table.py python/tests/test_asm_adc_sbc.py python/tests/test_hsx_llc_shift.py python/tests/test_hsx_llc_carry.py`
+
+### Next Steps
+- Proceed to Phase 5.4 to broaden opcode execution tests (integration / edge cases).
