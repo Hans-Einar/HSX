@@ -1817,8 +1817,6 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 phi_comments[block["label"]].append(raw)
                 phi_types[dest] = phi_type
                 value_types[dest] = phi_type
-                alloc_vreg(dest, phi_type)
-                maybe_release(dest)
             else:
                 remaining_ins.append(raw)
                 dbg_id = dbg_refs[idx_ins] if idx_ins < len(dbg_refs) else None
@@ -1833,10 +1831,42 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
         for dest, value in moves:
             clear_alias(dest)
             dest_type = phi_types.get(dest, value_types.get(dest, 'i32'))
-            dest_reg = alloc_vreg(dest, dest_type)
-            src_reg = resolve_operand(value, dest_reg)
-            if dest_reg != src_reg:
-                asm.append(f"MOV {dest_reg}, {src_reg}")
+            value_types[dest] = dest_type
+            coalesced = False
+            if value.startswith('%'):
+                canonical = resolve_name(value)
+                src_reg = vmap.get(canonical)
+                remaining_uses = use_counts.get(canonical, 0)
+                if (
+                    src_reg
+                    and canonical not in pinned_values
+                    and remaining_uses <= 1
+                ):
+                    # Re-use the source register for the phi result.
+                    vmap.pop(canonical, None)
+                    if canonical in reg_lru:
+                        reg_lru.remove(canonical)
+                    float_src = float_alias.pop(canonical, None)
+                    if float_src is not None:
+                        float_alias[dest] = float_src
+                    spilled_float_alias.discard(canonical)
+                    spill_entry = spilled_values.pop(canonical, None)
+                    if spill_entry is not None:
+                        spilled_values[dest] = spill_entry
+                    frame_ptr_offsets_dest = frame_ptr_offsets.pop(canonical, None)
+                    if frame_ptr_offsets_dest is not None:
+                        frame_ptr_offsets[dest] = frame_ptr_offsets_dest
+                    vmap[dest] = src_reg
+                    mark_used(dest)
+                    used_registers.add(src_reg)
+                    use_counts.pop(canonical, None)
+                    future_use_positions.pop(canonical, None)
+                    coalesced = True
+            if not coalesced:
+                dest_reg = alloc_vreg(dest, dest_type)
+                src_reg = resolve_operand(value, dest_reg)
+                if dest_reg != src_reg:
+                    asm.append(f"MOV {dest_reg}, {src_reg}")
             maybe_release(dest)
 
     def _lower_ir_instruction(raw_line: str, block_label: str) -> str:
