@@ -89,7 +89,10 @@ def test_resolve_symlink(tmp_path):
     shared_target.parent.mkdir(parents=True)
     shared_target.write_text("int module(){return 42;}", encoding="utf-8")
     relocated = new_root / "src" / "module.c"
-    relocated.symlink_to(shared_target)
+    try:
+        relocated.symlink_to(shared_target)
+    except (OSError, NotImplementedError) as exc:  # Windows may lack symlink privilege
+        pytest.skip(f"symlink not supported in this environment: {exc}")
     original = old_root / "src" / "module.c"
     data = {
         "version": 1,

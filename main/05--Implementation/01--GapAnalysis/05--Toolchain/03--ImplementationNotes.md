@@ -356,8 +356,9 @@ Append sessions chronologically and ensure every entry references the relevant d
 ### Work Summary
 - Added future-use tracking to the linear-scan allocator so spill decisions prefer values with the longest reuse distance, falling back to LRU only when necessary.
 - Introduced register coalescing helpers for PHI edges and copy-like lowers, eliminating redundant MOVs when the source has no remaining uses.
-- Instrumented lowering to capture register allocation metrics (peak pressure, spill/reload counts, stack usage, register set) and surfaced them via `LAST_DEBUG_INFO.functions[].register_allocation` plus an aggregate `register_allocation_summary` block (also printable via `hsx-llc --dump-reg-stats`).
-- Updated documentation (`debug-metadata.md`) to describe the new metrics block and created regression coverage validating both metadata emission/spill statistics and the new coalescing behaviour.
+- Implemented proactive live-range splitting: values whose next use is many instructions ahead are spilled early, tracked via a new `proactive_splits` counter, and reloaded only when needed.
+- Instrumented lowering to capture register allocation metrics (peak pressure, spill/reload counts, proactive split count, stack usage, register set) and surfaced them via `LAST_DEBUG_INFO.functions[].register_allocation` plus an aggregate `register_allocation_summary` block (also printable via `hsx-llc --dump-reg-stats`).
+- Updated documentation (`debug-metadata.md`) to describe the new metrics block and created regression coverage validating metadata emission, coalescing behaviour, and live-range splitting heuristics.
 
 ### Testing
 - `PYTHONPATH=. pytest python/tests/test_register_allocation_metrics.py python/tests/test_build_determinism.py`

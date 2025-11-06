@@ -1375,6 +1375,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
         "max_pressure": 0,
         "spill_count": 0,
         "reload_count": 0,
+        "proactive_splits": 0,
     }
     used_registers: Set[str] = set()
 
@@ -1561,7 +1562,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
         spill_slots[name] = offset
         return offset
 
-    def spill_value(name: str) -> None:
+    def spill_value(name: str, *, proactive: bool = False) -> None:
         reg = vmap.get(name)
         if not reg or reg not in AVAILABLE_REGS:
             return
@@ -1570,6 +1571,8 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
         store_instr = type_to_store_instr(val_type)
         asm.append(f"{store_instr} [R7{format_stack_offset(slot_offset)}], {reg}")
         allocation_stats["spill_count"] += 1
+        if proactive:
+            allocation_stats["proactive_splits"] += 1
         vmap.pop(name, None)
         add_free_reg(reg)
         if name in reg_lru:
@@ -1792,6 +1795,20 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
         float_alias.pop(name, None)
         spilled_float_alias.discard(name)
         frame_ptr_offsets.pop(name, None)
+
+    def maybe_split_long_lived(current_index: int) -> None:
+        if SPLIT_DISTANCE_THRESHOLD <= 0:
+            return
+        for name in list(vmap.keys()):
+            if name in pinned_values:
+                continue
+            if name not in future_use_positions:
+                continue
+            next_use_val = next_use_for(name)
+            if math.isinf(next_use_val):
+                continue
+            if next_use_val - current_index >= SPLIT_DISTANCE_THRESHOLD:
+                spill_value(name, proactive=True)
 
     def try_coalesce_value(dest: str, value: str, dest_type: str) -> bool:
         value = value.strip()
@@ -2602,6 +2619,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                         )
                         for asm_index in emitted_indices:
                             line_debug_entries.append((asm_index, dbg_id, inst_id))
+            maybe_split_long_lived(inst_counter)
     allocation_stats["available_registers"] = len(AVAILABLE_REGS)
     allocation_stats["stack_slots"] = len(spill_slots)
     allocation_stats["stack_bytes"] = frame_size
@@ -2910,6 +2928,7 @@ def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
         if ordinals_for_inst:
             entry["mvasm_ordinals"] = ordinals_for_inst
         llvm_map_entries.append(entry)
+    total_proactive = sum(stats.get("proactive_splits", 0) for stats in function_reg_stats.values())
     allocation_summary = {
         "total_functions": summary_total_funcs,
         "functions_with_spills": functions_with_spills,
@@ -2917,6 +2936,7 @@ def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
         "total_spills": total_spills,
         "total_reloads": total_reloads,
         "max_stack_bytes": max_stack_bytes,
+        "total_proactive_splits": total_proactive,
     }
     LAST_DEBUG_INFO = {
         "version": 1,
@@ -2958,3 +2978,4 @@ def main():
     print(f"Wrote {args.output}")
 if __name__ == "__main__":
     main()
+SPLIT_DISTANCE_THRESHOLD = 12

@@ -55,6 +55,7 @@ entry:
         "available_registers",
         "used_register_count",
         "used_registers",
+        "proactive_splits",
     ):
         assert key in alloc, f"{key} missing from allocation metrics"
     assert alloc["spill_count"] == 0
@@ -102,6 +103,39 @@ entry:
     assert alloc["stack_bytes"] >= 4
     assert summary["total_spills"] >= alloc["spill_count"]
     assert "main" in summary["functions_with_spills"]
+
+
+def test_proactive_split_metrics():
+    ir = """
+define dso_local i32 @split_demo(i32 %a) {
+entry:
+  %keep = add i32 %a, 1
+  %t0 = add i32 0, 1
+  %t1 = add i32 %t0, 2
+  %t2 = add i32 %t1, 3
+  %t3 = add i32 %t2, 4
+  %t4 = add i32 %t3, 5
+  %t5 = add i32 %t4, 6
+  %t6 = add i32 %t5, 7
+  %t7 = add i32 %t6, 8
+  %t8 = add i32 %t7, 9
+  %t9 = add i32 %t8, 10
+  %t10 = add i32 %t9, 11
+  %t11 = add i32 %t10, 12
+  %t12 = add i32 %t11, 13
+  %t13 = add i32 %t12, 14
+  %t14 = add i32 %t13, 15
+  %t15 = add i32 %t14, 16
+  ret i32 %keep
+}
+"""
+
+    _compile(ir)
+    alloc = _get_reg_alloc("split_demo")
+    assert alloc["proactive_splits"] >= 1
+    summary = (HSX_LLC.LAST_DEBUG_INFO or {}).get("register_allocation_summary")
+    assert summary is not None
+    assert summary["total_proactive_splits"] >= alloc["proactive_splits"]
 
 
 def test_phi_coalescing_eliminates_redundant_moves():
