@@ -102,3 +102,31 @@ entry:
     assert alloc["stack_bytes"] >= 4
     assert summary["total_spills"] >= alloc["spill_count"]
     assert "main" in summary["functions_with_spills"]
+
+
+def test_phi_coalescing_eliminates_redundant_moves():
+    ir = """
+define i32 @main(i1 %cond, i32 %a, i32 %b) {
+entry:
+  br i1 %cond, label %left, label %right
+
+left:
+  br label %merge
+
+right:
+  br label %merge
+
+merge:
+  %phi = phi i32 [%a, %left], [%b, %right]
+  ret i32 %phi
+}
+"""
+
+    asm = HSX_LLC.compile_ll_to_mvasm(ir, trace=False)
+    mov_lines = [line.strip() for line in asm.splitlines() if line.strip().startswith("MOV ")]
+    filtered = [
+        line
+        for line in mov_lines
+        if not line.startswith("MOV R7,") and not line.startswith("MOV R0,")
+    ]
+    assert not filtered, f"Unexpected MOV instructions remain: {filtered}"

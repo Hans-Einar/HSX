@@ -1793,6 +1793,41 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
         spilled_float_alias.discard(name)
         frame_ptr_offsets.pop(name, None)
 
+    def try_coalesce_value(dest: str, value: str, dest_type: str) -> bool:
+        value = value.strip()
+        if not value.startswith('%'):
+            return False
+        canonical = resolve_name(value)
+        if canonical in pinned_values:
+            return False
+        reg = vmap.get(canonical)
+        if not reg:
+            return False
+        if use_counts.get(canonical, 0) > 1:
+            return False
+        use_counts.pop(canonical, None)
+        future_use_positions.pop(canonical, None)
+        pinned_registers.pop(canonical, None)
+        pinned_values.discard(canonical)
+        if canonical in reg_lru:
+            reg_lru.remove(canonical)
+        vmap.pop(canonical, None)
+        alias_reg = float_alias.pop(canonical, None)
+        if alias_reg is not None:
+            float_alias[dest] = alias_reg
+        spilled_float_alias.discard(canonical)
+        spill_entry = spilled_values.pop(canonical, None)
+        if spill_entry is not None:
+            spilled_values[dest] = spill_entry
+        frame_slot = frame_ptr_offsets.pop(canonical, None)
+        if frame_slot is not None:
+            frame_ptr_offsets[dest] = frame_slot
+        value_types[dest] = dest_type
+        vmap[dest] = reg
+        mark_used(dest)
+        used_registers.add(reg)
+        return True
+
     def emit_stack_teardown() -> None:
         if frame_committed > 0:
             words = frame_committed // 4
@@ -1831,38 +1866,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
         for dest, value in moves:
             clear_alias(dest)
             dest_type = phi_types.get(dest, value_types.get(dest, 'i32'))
-            value_types[dest] = dest_type
-            coalesced = False
-            if value.startswith('%'):
-                canonical = resolve_name(value)
-                src_reg = vmap.get(canonical)
-                remaining_uses = use_counts.get(canonical, 0)
-                if (
-                    src_reg
-                    and canonical not in pinned_values
-                    and remaining_uses <= 1
-                ):
-                    # Re-use the source register for the phi result.
-                    vmap.pop(canonical, None)
-                    if canonical in reg_lru:
-                        reg_lru.remove(canonical)
-                    float_src = float_alias.pop(canonical, None)
-                    if float_src is not None:
-                        float_alias[dest] = float_src
-                    spilled_float_alias.discard(canonical)
-                    spill_entry = spilled_values.pop(canonical, None)
-                    if spill_entry is not None:
-                        spilled_values[dest] = spill_entry
-                    frame_ptr_offsets_dest = frame_ptr_offsets.pop(canonical, None)
-                    if frame_ptr_offsets_dest is not None:
-                        frame_ptr_offsets[dest] = frame_ptr_offsets_dest
-                    vmap[dest] = src_reg
-                    mark_used(dest)
-                    used_registers.add(src_reg)
-                    use_counts.pop(canonical, None)
-                    future_use_positions.pop(canonical, None)
-                    coalesced = True
-            if not coalesced:
+            if not try_coalesce_value(dest, value, dest_type):
                 dest_reg = alloc_vreg(dest, dest_type)
                 src_reg = resolve_operand(value, dest_reg)
                 if dest_reg != src_reg:
@@ -2125,19 +2129,21 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
                 if idx == '0':
                     alias = pair["value"]
                     value_types[dst] = value_types.get(alias, 'i32')
-                    src_reg = ensure_value_in_reg(alias)
-                    consume_use(alias)
-                    rd = alloc_vreg(dst, value_types[alias])
-                    if rd != src_reg:
-                        asm.append(f"MOV {rd}, {src_reg}")
+                    if not try_coalesce_value(dst, alias, value_types[dst]):
+                        src_reg = ensure_value_in_reg(alias)
+                        consume_use(alias)
+                        rd = alloc_vreg(dst, value_types[alias])
+                        if rd != src_reg:
+                            asm.append(f"MOV {rd}, {src_reg}")
                 elif idx == '1':
                     alias = pair["flag"]
                     value_types[dst] = 'i1'
-                    src_reg = ensure_value_in_reg(alias)
-                    consume_use(alias)
-                    rd = alloc_vreg(dst, 'i1')
-                    if rd != src_reg:
-                        asm.append(f"MOV {rd}, {src_reg}")
+                    if not try_coalesce_value(dst, alias, 'i1'):
+                        src_reg = ensure_value_in_reg(alias)
+                        consume_use(alias)
+                        rd = alloc_vreg(dst, 'i1')
+                        if rd != src_reg:
+                            asm.append(f"MOV {rd}, {src_reg}")
                 else:
                     raise ISelError(f"Unsupported extractvalue index {idx}")
                 maybe_release(dst)
