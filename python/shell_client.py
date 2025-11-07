@@ -989,15 +989,21 @@ def _print_watch_entry(entry: dict) -> None:
     addr = entry.get("address")
     length = entry.get("length", 0)
     value = entry.get("value")
-    addr_text = f"0x{int(addr) & 0xFFFF:04X}" if isinstance(addr, int) else str(addr or "-")
+    addr_text = f"0x{int(addr) & 0xFFFF:04X}" if isinstance(addr, int) else ("-" if addr is None else str(addr))
     value_text = value if isinstance(value, str) else "-"
     symbol = entry.get("symbol")
     description = entry.get("description")
+    location = entry.get("location")
+    mode = entry.get("mode")
     details: List[str] = []
     if symbol:
         details.append(f"symbol={symbol}")
     if description and description != symbol:
         details.append(description)
+    if location:
+        details.append(f"loc={location}")
+    if mode and mode not in {None, "memory"}:
+        details.append(f"mode={mode}")
     suffix = f" ({', '.join(details)})" if details else ""
     print(f"  id={watch_id} pid={pid} type={wtype:<7} addr={addr_text} len={length} value={value_text} expr={expr}{suffix}")
 
@@ -2621,7 +2627,7 @@ def _build_watch_payload(args: list[str]) -> dict:
                     raise ValueError("watch add --length requires a value")
                 payload["length"] = int(tokens[i], 0)
             else:
-                raise ValueError("watch add usage: watch add <pid> <expr> [--type address|symbol] [--length N]")
+                raise ValueError("watch add usage: watch add <pid> <expr> [--type address|symbol|local] [--length N]")
             i += 1
         return payload
     if action in {"remove", "del", "delete", "rm"}:

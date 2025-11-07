@@ -1099,6 +1099,28 @@ def _seed_symbol_table(state: ExecutiveState, pid: int, entries: list[tuple[str,
         state.symbol_tables[pid] = table
 
 
+def _inject_locals(state: ExecutiveState, pid: int, locals_entries: list[dict]) -> None:
+    with state.symbol_cache_lock:
+        table = state.symbol_tables.get(pid)
+        if not table:
+            table = {
+                "path": "test.sym",
+                "symbols": [],
+                "addresses": [],
+                "by_name": {},
+                "lines": [],
+            }
+        table["locals"] = list(locals_entries)
+        mapping: Dict[str, List[dict]] = {}
+        for entry in locals_entries:
+            fn = entry.get("function")
+            if not fn:
+                continue
+            mapping.setdefault(fn, []).append(entry)
+        table["locals_by_function"] = mapping
+        state.symbol_tables[pid] = table
+
+
 def test_symbols_list_filters_and_paginate():
     state, _ = make_debug_state()
     _seed_symbol_table(
@@ -1203,6 +1225,57 @@ def test_watch_add_emits_event_on_change():
     assert data["watch_id"] == watch["id"]
     assert data["old"] == "1020"
     assert data["new"] == "1122"
+
+
+def test_watch_add_local_stack_tracks_frame_pointer():
+    state, vm = make_debug_state()
+    _seed_symbol_table(state, 1, [("main", 0x100, 32)])
+    local_entry = {
+        "name": "tmp",
+        "function": "main",
+        "locations": [
+            {"start": 0x100, "end": 0x200, "location": {"kind": "stack", "offset": -4}},
+        ],
+    }
+    _inject_locals(state, 1, [local_entry])
+    vm.pc = 0x120
+    vm.fp = 0x9000
+    vm.regs_list[7] = vm.fp
+    vm.memory[vm.fp - 4] = 0xAA
+    vm.memory[vm.fp - 3] = 0xBB
+    vm.memory[vm.fp - 2] = 0xCC
+    vm.memory[vm.fp - 1] = 0xDD
+    watch = state.watch_add(1, "local:tmp", watch_type="local")
+    assert watch["type"] == "local"
+    assert watch.get("mode") == "local"
+    assert watch.get("location") == "fp-0x4"
+    assert watch["value"] == "aabbccdd"
+
+
+def test_watch_local_register_emits_updates():
+    state, vm = make_debug_state()
+    _seed_symbol_table(state, 1, [("main", 0x100, 64)])
+    local_entry = {
+        "name": "acc",
+        "function": "main",
+        "locations": [
+            {"start": 0x100, "end": 0x200, "location": {"kind": "register", "name": "R5", "index": 5}},
+        ],
+    }
+    _inject_locals(state, 1, [local_entry])
+    vm.pc = 0x110
+    vm.regs_list[5] = 0x11223344
+    watch = state.watch_add(1, "local:acc", watch_type="local")
+    assert watch["type"] == "local"
+    assert watch.get("location") == "R5"
+    vm.regs_list[5] = 0x55667788
+    result = state.step(steps=1, pid=1)
+    updates = [evt for evt in result.get("events", []) if evt.get("type") == "watch_update"]
+    assert updates, "expected local watch update"
+    data = updates[0]["data"]
+    assert data["type"] == "local"
+    assert data.get("location") == "R5"
+    assert data["new"] == "88776655"
 
 
 def test_watch_add_symbol_resolves_address():

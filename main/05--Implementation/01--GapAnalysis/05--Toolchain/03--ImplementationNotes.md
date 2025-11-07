@@ -384,3 +384,20 @@ Append sessions chronologically and ensure every entry references the relevant d
 
 ### Next Steps
 - Phase 7.2: tighten instruction-level mapping completeness + debugger stepping guarantees; follow-up work to hook locals into debugger watch commands.
+
+## 2025-11-09 - Codex (Session 21)
+
+### Scope
+- Plan item / phase addressed: Phase 7.1 Variable Tracking (debugger integration)
+- Design sections reviewed: 04.05--Toolchain §4.2.1, 04.09--Debugger §5.7 (watch expressions), executive protocol notes on watch events.
+
+### Work Summary
+- Extended `execd` symbol parsing to understand the nested `.sym` structure and retain `locals` metadata alongside the existing flattened symbol/line tables.
+- Added resolver helpers that interpret local variable ranges, compute FP-relative addresses, and follow register/global/const storage kinds; watch expressions now accept `--type local`/`local:<var>` formats and dynamically re-evaluate locations on each step.
+- Enhanced shell client watch output to surface mode/location hints, wired watch events to include those hints, and added regression coverage for both stack- and register-backed locals plus CLI payload parsing.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_shell_client.py python/tests/test_executive_sessions.py -k watch`
+
+### Next Steps
+- Begin 7.2 (instruction-level line tracking completeness) once debugger integration stabilizes; consider VSCode adapter updates to surface the new location metadata.

@@ -663,7 +663,7 @@ Extract `!DILocalVariable` metadata (section 4.2.1 Phase 3) so debugger watch ex
 - [x] Update .sym files with variable information for debugger lookup
 - [x] Add variable tracking tests
 - [x] Document variable metadata format and debugger usage
-- [ ] Integrate with debugger watch expressions (CLI/VSCode) to display locals
+- [x] Integrate with debugger watch expressions (CLI/VSCode) to display locals
 
 ---
 

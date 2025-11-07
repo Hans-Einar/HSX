@@ -76,6 +76,12 @@ def test_watch_add_payload_with_options(tmp_path: Path) -> None:
     assert payload["length"] == 2
 
 
+def test_watch_add_payload_local_type(tmp_path: Path) -> None:
+    payload = shell_client._build_payload("watch", ["add", "3", "local:tmp", "--type", "local"], tmp_path)
+    assert payload["type"] == "local"
+    assert payload["expr"] == "local:tmp"
+
+
 def test_watch_remove_payload(tmp_path: Path) -> None:
     payload = shell_client._build_payload("watch", ["remove", "9", "3"], tmp_path)
     assert payload == {"cmd": "watch", "op": "remove", "pid": 9, "id": 3}

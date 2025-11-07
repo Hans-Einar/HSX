@@ -1045,26 +1045,41 @@ class ExecutiveState:
             return entry
 
         if isinstance(data, dict):
+            def _append_list(items: Iterable[Dict[str, Any]], default_type: Optional[str] = None) -> None:
+                for info in items:
+                    if not isinstance(info, dict):
+                        continue
+                    entry = dict(info)
+                    if default_type and not entry.get("type"):
+                        entry["type"] = default_type
+                    name = entry.get("name") or entry.get("symbol")
+                    if not name:
+                        continue
+                    entries.append(normalise(str(name), entry))
+
             sym_block = data.get("symbols")
             if isinstance(sym_block, dict):
                 for name, info in sym_block.items():
                     if isinstance(info, dict):
                         entries.append(normalise(str(name), info))
+                functions_block = sym_block.get("functions")
+                if isinstance(functions_block, list):
+                    _append_list(functions_block, default_type="function")
+                variables_block = sym_block.get("variables")
+                if isinstance(variables_block, list):
+                    _append_list(variables_block, default_type="variable")
+                generic_block = sym_block.get("symbols")
+                if isinstance(generic_block, list):
+                    _append_list(generic_block)
             elif isinstance(sym_block, list):
-                for info in sym_block:
-                    if isinstance(info, dict):
-                        name = info.get("name") or info.get("symbol")
-                        if not name:
-                            continue
-                        entries.append(normalise(str(name), info))
+                _append_list(sym_block)
+
             functions = data.get("functions")
             if isinstance(functions, list):
-                for info in functions:
-                    if isinstance(info, dict):
-                        name = info.get("name")
-                        if name:
-                            info.setdefault("type", "function")
-                            entries.append(normalise(str(name), info))
+                _append_list(functions, default_type="function")
+            variables = data.get("variables")
+            if isinstance(variables, list):
+                _append_list(variables, default_type="variable")
         return entries
 
     @staticmethod
@@ -1107,10 +1122,106 @@ class ExecutiveState:
                     )
         return lines
 
+    @classmethod
+    def _extract_local_entries(
+        cls,
+        data: Any,
+    ) -> Tuple[List[Dict[str, Any]], Dict[str, List[Dict[str, Any]]]]:
+        locals_list: List[Dict[str, Any]] = []
+        by_function: Dict[str, List[Dict[str, Any]]] = {}
+        local_block: Optional[List[Any]] = None
+        if isinstance(data, dict):
+            sym_block = data.get("symbols")
+            if isinstance(sym_block, dict):
+                block = sym_block.get("locals")
+                if isinstance(block, list):
+                    local_block = block
+            if local_block is None:
+                block = data.get("locals")
+                if isinstance(block, list):
+                    local_block = block
+        if not isinstance(local_block, list):
+            return locals_list, by_function
+
+        def _append_entry(entry: Dict[str, Any]) -> None:
+            name = entry.get("name")
+            function = entry.get("function")
+            if not name or not function:
+                return
+            norm_entry: Dict[str, Any] = {
+                "name": str(name),
+                "function": str(function),
+                "scope": entry.get("scope"),
+                "file": entry.get("file"),
+                "directory": entry.get("directory"),
+                "line": entry.get("line"),
+                "type": entry.get("type"),
+                "locations": [],
+            }
+            if "size" in entry:
+                size_val = cls._optional_int(entry.get("size"))
+                if size_val is not None:
+                    norm_entry["size"] = size_val
+            locations = entry.get("locations")
+            if isinstance(locations, list):
+                for loc in locations:
+                    if not isinstance(loc, dict):
+                        continue
+                    start = cls._optional_int(loc.get("start"))
+                    end = cls._optional_int(loc.get("end"))
+                    loc_desc = loc.get("location") or {}
+                    if not isinstance(loc_desc, dict):
+                        continue
+                    kind = str(loc_desc.get("kind") or "stack").lower()
+                    details: Dict[str, Any] = {"kind": kind}
+                    if "offset" in loc_desc:
+                        offset_val = cls._optional_int(loc_desc.get("offset"))
+                        if offset_val is not None:
+                            details["offset"] = offset_val
+                    if "size" in loc_desc:
+                        loc_size = cls._optional_int(loc_desc.get("size"))
+                        if loc_size is not None:
+                            details["size"] = loc_size
+                    if kind == "register":
+                        reg_name = str(loc_desc.get("name") or loc_desc.get("register") or "").upper()
+                        details["name"] = reg_name
+                        if reg_name.startswith("R") and reg_name[1:].isdigit():
+                            details["index"] = int(reg_name[1:])
+                    elif kind == "global":
+                        if loc_desc.get("symbol"):
+                            details["symbol"] = str(loc_desc.get("symbol"))
+                        addr_val = cls._optional_int(loc_desc.get("address"))
+                        if addr_val is not None:
+                            details["address"] = addr_val & 0xFFFFFFFF
+                    elif kind == "const":
+                        const_val = loc_desc.get("value")
+                        if isinstance(const_val, str):
+                            try:
+                                const_val = int(const_val, 0)
+                            except ValueError:
+                                const_val = None
+                        if isinstance(const_val, int):
+                            details["value"] = const_val & 0xFFFFFFFF
+                    norm_entry["locations"].append(
+                        {
+                            "start": start,
+                            "end": end,
+                            "location": details,
+                        }
+                    )
+            locals_list.append(norm_entry)
+            by_function.setdefault(norm_entry["function"], []).append(norm_entry)
+
+        for raw_entry in local_block:
+            if isinstance(raw_entry, dict):
+                _append_entry(raw_entry)
+        return locals_list, by_function
+
     def _parse_symbol_file(self, path: Path) -> Dict[str, Any]:
         data = json.loads(path.read_text(encoding="utf-8"))
         entries = self._extract_symbol_entries(data)
         lines = self._extract_line_entries(data)
+        locals_entries, locals_by_function = self._extract_local_entries(data)
         by_name = {entry["name"]: entry for entry in entries if entry.get("name")}
         addresses = sorted(entries, key=lambda item: item.get("address", 0))
         line_index = sorted(lines, key=lambda item: item.get("address", 0))
@@ -1120,6 +1231,8 @@ class ExecutiveState:
             "by_name": by_name,
             "addresses": addresses,
             "lines": line_index,
+            "locals": locals_entries,
+            "locals_by_function": locals_by_function,
         }
 
     def load_symbols_for_pid(
@@ -1379,6 +1492,198 @@ class ExecutiveState:
             "layout": layout,
         }
 
+    def _frame_pointer_from_regs(self, regs: Dict[str, Any]) -> Optional[int]:
+        candidates = [
+            regs.get("frame_pointer"),
+            regs.get("fp"),
+            regs.get("r7"),
+            regs.get("R7"),
+        ]
+        regs_block = regs.get("regs")
+        if isinstance(regs_block, list) and len(regs_block) > 7:
+            candidates.append(regs_block[7])
+        for value in candidates:
+            fp = self._optional_int(value)
+            if fp is not None:
+                return fp & 0xFFFFFFFF
+        return None
+
+    def _register_value_from_snapshot(self, regs: Dict[str, Any], index: Optional[int]) -> Optional[int]:
+        if index is None or index < 0 or index > 15:
+            return None
+        regs_block = regs.get("regs")
+        if isinstance(regs_block, list) and len(regs_block) > index:
+            candidate = self._optional_int(regs_block[index])
+            if candidate is not None:
+                return candidate & 0xFFFFFFFF
+        for key in (f"r{index}", f"R{index}"):
+            if key in regs:
+                candidate = self._optional_int(regs.get(key))
+                if candidate is not None:
+                    return candidate & 0xFFFFFFFF
+        return None
+
+    def _read_register_bytes(self, regs: Dict[str, Any], index: int, length: int) -> bytes:
+        value = self._register_value_from_snapshot(regs, index)
+        if value is None:
+            raise ValueError(f"register R{index} unavailable")
+        raw = int(value & 0xFFFFFFFF).to_bytes(4, "little")
+        if length <= len(raw):
+            return raw[:length]
+        return raw + b"\x00" * max(0, length - len(raw))
+
+    @staticmethod
+    def _select_local_location(locations: List[Dict[str, Any]], pc: int) -> Optional[Dict[str, Any]]:
+        for loc in locations:
+            start = loc.get("start")
+            end = loc.get("end")
+            if start is not None and pc < start:
+                continue
+            if end is not None and pc >= end:
+                continue
+            return loc
+        return None
+
+    @staticmethod
+    def _format_stack_location(offset: Optional[int]) -> str:
+        if offset is None or offset == 0:
+            return "fp"
+        sign = "+" if offset >= 0 else "-"
+        return f"fp{sign}0x{abs(offset):X}"
+
+    def _read_local_bytes(
+        self,
+        pid: int,
+        local_info: Dict[str, Any],
+        length: int,
+        *,
+        regs: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        if regs is None:
+            regs = self.request_dump_regs(pid)
+        entry = local_info.get("entry") or {}
+        locations = entry.get("locations") or []
+        pc = self._optional_int(regs.get("pc")) or 0
+        location = self._select_local_location(locations, pc)
+        if location is None:
+            raise ValueError(f"local '{local_info.get('name')}' not live at current PC")
+        loc_desc = location.get("location") or {}
+        kind = str(loc_desc.get("kind") or "stack").lower()
+        if kind == "stack":
+            fp = self._frame_pointer_from_regs(regs)
+            if fp is None:
+                raise ValueError("frame pointer not available")
+            offset = loc_desc.get("offset") or 0
+            address = (fp + int(offset)) & 0xFFFFFFFF
+            data = self.vm.read_mem(address, length, pid=pid)
+            payload = bytes(data)
+            return {
+                "value": payload,
+                "address": address,
+                "location": self._format_stack_location(offset),
+            }
+        if kind == "register":
+            index = loc_desc.get("index")
+            if index is None:
+                name_token = str(loc_desc.get("name") or "").upper()
+                if name_token.startswith("R") and name_token[1:].isdigit():
+                    index = int(name_token[1:])
+            if index is None:
+                raise ValueError("register location missing index")
+            payload = self._read_register_bytes(regs, index, length)
+            reg_name = loc_desc.get("name") or f"R{index}"
+            return {"value": payload, "address": None, "location": reg_name}
+        if kind == "global":
+            base = loc_desc.get("address")
+            if base is None and loc_desc.get("symbol"):
+                sym_entry = self.symbol_lookup_name(pid, loc_desc["symbol"])
+                if sym_entry:
+                    base = sym_entry.get("address")
+            if base is None:
+                raise ValueError("global location missing base address")
+            offset = loc_desc.get("offset") or 0
+            address = (int(base) + int(offset)) & 0xFFFFFFFF
+            data = self.vm.read_mem(address, length, pid=pid)
+            payload = bytes(data)
+            symbol = loc_desc.get("symbol")
+            if symbol:
+                hint = f"{symbol}+0x{offset:X}" if offset else symbol
+            else:
+                hint = f"0x{address:04X}"
+            return {"value": payload, "address": address, "location": hint}
+        if kind == "const":
+            value = loc_desc.get("value")
+            if value is None:
+                raise ValueError("const location missing value")
+            try:
+                const_val = int(value) & 0xFFFFFFFF
+            except (TypeError, ValueError) as exc:
+                raise ValueError("invalid const value") from exc
+            raw = const_val.to_bytes(4, "little")
+            payload = raw[:length] if length <= len(raw) else raw + b"\x00" * (length - len(raw))
+            return {"value": payload, "address": None, "location": "const"}
+        raise ValueError(f"unsupported local storage kind '{kind}'")
+
+    def _resolve_local_watch(self, pid: int, expr: str) -> Dict[str, Any]:
+        expr_clean = expr.strip()
+        if expr_clean.lower().startswith("local:"):
+            expr_clean = expr_clean.split(":", 1)[1].strip()
+        if not expr_clean:
+            raise ValueError("local expression must name a variable")
+        if "::" in expr_clean:
+            func_hint, var_name = [part.strip() for part in expr_clean.split("::", 1)]
+        elif "@" in expr_clean:
+            var_name, func_hint = [part.strip() for part in expr_clean.split("@", 1)]
+        else:
+            func_hint = None
+            var_name = expr_clean.strip()
+        if not var_name:
+            raise ValueError("local expression missing variable name")
+        with self.symbol_cache_lock:
+            table = self.symbol_tables.get(pid)
+        if not table:
+            raise ValueError("symbols not loaded; use symbols.load before watching locals")
+        locals_by_function = table.get("locals_by_function") or {}
+        regs = self.request_dump_regs(pid)
+        pc = self._optional_int(regs.get("pc")) or 0
+        if not func_hint:
+            func_entry = self.symbol_lookup_addr(pid, pc)
+            func_hint = func_entry.get("name") if func_entry else None
+        if not func_hint:
+            raise ValueError("unable to determine current function for local lookup")
+        candidates = locals_by_function.get(func_hint)
+        if not candidates:
+            raise ValueError(f"function '{func_hint}' has no local metadata")
+        match_entry = None
+        for entry in candidates:
+            if entry.get("name") != var_name:
+                continue
+            if self._select_local_location(entry.get("locations") or [], pc):
+                match_entry = entry
+                break
+        if match_entry is None:
+            raise ValueError(f"local '{var_name}' is not live in function '{func_hint}' at current PC")
+        length_hint = match_entry.get("size")
+        if not length_hint:
+            for loc in match_entry.get("locations", []):
+                loc_size = loc.get("location", {}).get("size")
+                if isinstance(loc_size, int) and loc_size > 0:
+                    length_hint = loc_size
+                    break
+        description = f"{func_hint}::{var_name}"
+        return {
+            "type": "local",
+            "mode": "local",
+            "local": {
+                "name": var_name,
+                "function": func_hint,
+                "entry": match_entry,
+            },
+            "length": length_hint,
+            "description": description,
+            "regs": regs,
+        }
+
     def watch_add(
         self,
         pid: int,
@@ -1392,14 +1697,36 @@ class ExecutiveState:
         if not expr_text:
             raise ValueError("watch expression must be non-empty")
         resolved = self._resolve_watch_expression(pid, expr_text, watch_type)
-        length_value = 4 if length is None else max(1, int(length))
+        length_value = resolved.get("length")
+        if length_value is None:
+            length_value = 4 if length is None else max(1, int(length))
+        else:
+            length_value = max(1, length_value if isinstance(length_value, int) else int(length_value))
+        if length is not None:
+            length_value = max(1, int(length))
+        mode = resolved.get("mode", "memory")
+        location_hint: Optional[str] = None
+        address: Optional[int] = resolved.get("address")
+        regs_snapshot = resolved.pop("regs", None) if mode == "local" else None
         try:
-            address = resolved["address"] & 0xFFFF
-            raw = self.vm.read_mem(address, length_value, pid=pid)
+            if mode == "local":
+                local_info = resolved.get("local")
+                if not isinstance(local_info, dict):
+                    raise ValueError("local metadata missing")
+                read_info = self._read_local_bytes(pid, local_info, length_value, regs=regs_snapshot)
+                raw_bytes = read_info["value"]
+                address = read_info.get("address")
+                location_hint = read_info.get("location")
+            else:
+                if address is None:
+                    raise ValueError("address required for memory watch")
+                address &= 0xFFFF
+                raw_bytes = self.vm.read_mem(address, length_value, pid=pid)
         except Exception as exc:
             raise ValueError(f"watch read failed: {exc}") from exc
         watch_id = self._next_watch_id
         self._next_watch_id += 1
+        payload = bytes(raw_bytes)
         watch_record = {
             "id": watch_id,
             "pid": pid,
@@ -1409,8 +1736,13 @@ class ExecutiveState:
             "length": length_value,
             "symbol": resolved.get("symbol"),
             "description": resolved.get("description"),
-            "last_value": bytes(raw),
+            "mode": mode,
+            "last_value": payload,
         }
+        if mode == "local":
+            watch_record["local"] = resolved.get("local")
+        if location_hint:
+            watch_record["last_location"] = location_hint
         self.watchers.setdefault(pid, {})[watch_id] = watch_record
         return self._export_watch_record(watch_record)
 
@@ -1435,31 +1767,40 @@ class ExecutiveState:
         watch_type: Optional[str],
     ) -> Dict[str, Any]:
         expr_type = (watch_type or "").strip().lower()
+        expr_clean = expr.strip()
+        if not expr_clean:
+            raise ValueError("watch expression must be non-empty")
+        local_expr = expr_clean
+        if expr_clean.lower().startswith("local:"):
+            local_expr = expr_clean.split(":", 1)[1].strip()
+            expr_type = "local"
+        if expr_type in {"local", "locals"}:
+            return self._resolve_local_watch(pid, local_expr or expr_clean)
         address: Optional[int] = None
         symbol_name: Optional[str] = None
         description: Optional[str] = None
         if expr_type in {"addr", "address"}:
             try:
-                address = int(expr, 0)
+                address = int(expr_clean, 0)
             except (TypeError, ValueError) as exc:
-                raise ValueError(f"invalid address '{expr}'") from exc
+                raise ValueError(f"invalid address '{expr_clean}'") from exc
             expr_type = "address"
         elif expr_type in {"symbol", "name"}:
-            entry = self.symbol_lookup_name(pid, expr)
+            entry = self.symbol_lookup_name(pid, expr_clean)
             if not entry:
-                raise ValueError(f"symbol '{expr}' not found for pid {pid}")
+                raise ValueError(f"symbol '{expr_clean}' not found for pid {pid}")
             address = int(entry.get("address", 0))
             symbol_name = entry.get("name")
             description = entry.get("name")
             expr_type = "symbol"
         else:
             try:
-                address = int(expr, 0)
+                address = int(expr_clean, 0)
                 expr_type = "address"
             except (TypeError, ValueError):
-                entry = self.symbol_lookup_name(pid, expr)
+                entry = self.symbol_lookup_name(pid, expr_clean)
                 if not entry:
-                    raise ValueError(f"symbol '{expr}' not found for pid {pid}")
+                    raise ValueError(f"symbol '{expr_clean}' not found for pid {pid}")
                 address = int(entry.get("address", 0))
                 symbol_name = entry.get("name")
                 description = entry.get("name")
@@ -1474,19 +1815,24 @@ class ExecutiveState:
         }
 
     def _export_watch_record(self, record: Dict[str, Any]) -> Dict[str, Any]:
-        data = {
+        data: Dict[str, Any] = {
             "id": record["id"],
             "pid": record["pid"],
             "expr": record["expr"],
             "type": record["type"],
-            "address": record["address"],
             "length": record["length"],
             "value": record["last_value"].hex(),
         }
+        if "address" in record and record["address"] is not None:
+            data["address"] = int(record["address"]) & 0xFFFF
         if record.get("symbol"):
             data["symbol"] = record["symbol"]
         if record.get("description"):
             data["description"] = record["description"]
+        if record.get("mode"):
+            data["mode"] = record["mode"]
+        if record.get("last_location"):
+            data["location"] = record["last_location"]
         return data
 
     def _check_watches(self, pid: Optional[int] = None) -> List[Dict[str, Any]]:
@@ -1501,19 +1847,43 @@ class ExecutiveState:
             watch_map = self.watchers.get(watch_pid)
             if not watch_map:
                 continue
+            regs_cache: Optional[Dict[str, Any]] = None
             for watch_id, record in list(watch_map.items()):
+                mode = record.get("mode", "memory")
                 try:
-                    addr = int(record.get("address", 0)) & 0xFFFF
-                    data = self.vm.read_mem(addr, record["length"], pid=watch_pid)
+                    if mode == "local":
+                        if regs_cache is None:
+                            regs_cache = self.request_dump_regs(watch_pid)
+                        local_info = record.get("local")
+                        if not isinstance(local_info, dict):
+                            raise ValueError("local metadata missing")
+                        read_info = self._read_local_bytes(
+                            watch_pid,
+                            local_info,
+                            record["length"],
+                            regs=regs_cache,
+                        )
+                        current = read_info["value"]
+                        address = read_info.get("address")
+                        if address is not None:
+                            record["address"] = address
+                        record["last_location"] = read_info.get("location")
+                    else:
+                        addr_val = record.get("address")
+                        if addr_val is None:
+                            raise ValueError("watch address unavailable")
+                        addr = int(addr_val) & 0xFFFF
+                        data = self.vm.read_mem(addr, record["length"], pid=watch_pid)
+                        current = bytes(data)
+                        record["last_location"] = None
                 except Exception as exc:
                     self.log("warning", "watch read failed", pid=watch_pid, watch_id=watch_id, error=str(exc))
                     continue
-                current = bytes(data)
                 if current == record["last_value"]:
                     continue
                 payload = {
                     "watch_id": watch_id,
-                    "address": record["address"],
+                    "address": record.get("address"),
                     "expr": record["expr"],
                     "type": record["type"],
                     "length": record["length"],
@@ -1522,6 +1892,8 @@ class ExecutiveState:
                 }
                 if record.get("symbol"):
                     payload["symbol"] = record["symbol"]
+                if record.get("last_location"):
+                    payload["location"] = record["last_location"]
                 record["last_value"] = current
                 event = self.emit_event("watch_update", pid=watch_pid, data=payload)
                 events.append(event)
