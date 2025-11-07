@@ -150,3 +150,45 @@ def test_emit_debug_flag_writes_json(tmp_path):
     assert dbg_data["line_map"][0].get("mvasm_ordinal") is not None
     assert dbg_data.get("llvm_to_mvasm"), "expected llvm_to_mvasm mapping in debug file"
     assert dbg_data["llvm_to_mvasm"][0].get("mvasm_ordinals")
+
+
+def test_variable_metadata_tracks_stack_and_register_locations():
+    ir = textwrap.dedent(
+        """
+        declare void @llvm.dbg.declare(metadata, metadata, metadata)
+        declare void @llvm.dbg.value(metadata, metadata, metadata)
+
+        define dso_local i32 @main(i32 %a) !dbg !4 {
+        entry:
+          %x = alloca i32, align 4, !dbg !8
+          call void @llvm.dbg.declare(metadata ptr %x, metadata !11, metadata !DIExpression()), !dbg !8
+          store i32 %a, ptr %x, align 4, !dbg !9
+          %val = load i32, ptr %x, align 4, !dbg !10
+          call void @llvm.dbg.value(metadata i32 %val, metadata !11, metadata !DIExpression()), !dbg !10
+          ret i32 %val, !dbg !12
+        }
+
+        !0 = distinct !DICompileUnit(language: DW_LANG_C, file: !1, producer: "hsx", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+        !1 = !DIFile(filename: "debug.c", directory: "/tmp/project")
+        !4 = distinct !DISubprogram(name: "main", linkageName: "main", scope: !1, file: !1, line: 1, scopeLine: 1, unit: !0, retainedNodes: !{})
+        !8 = !DILocation(line: 2, column: 3, scope: !4)
+        !9 = !DILocation(line: 3, column: 3, scope: !4)
+        !10 = !DILocation(line: 4, column: 3, scope: !4)
+        !11 = !DILocalVariable(name: "x", scope: !4, file: !1, line: 2, type: !13)
+        !12 = !DILocation(line: 5, column: 3, scope: !4)
+        !13 = !DIBasicType(name: "int", size: 32, encoding: DW_ATE_signed)
+        """
+    ).strip()
+
+    HSX_LLC.compile_ll_to_mvasm(ir, trace=False)
+    dbg = HSX_LLC.LAST_DEBUG_INFO or {}
+    variables = dbg.get("variables", [])
+    assert variables, "expected variable metadata in debug info"
+    entry = next((item for item in variables if item.get("name") == "x"), None)
+    assert entry is not None, "local variable 'x' missing from metadata"
+    assert entry.get("function") == "main"
+    locations = entry.get("locations") or []
+    assert len(locations) >= 1
+    kinds = {loc.get("location", {}).get("kind") for loc in locations}
+    assert "stack" in kinds, "expected stack location coverage"
+    assert "register" in kinds or "global" in kinds, "expected non-stack location coverage"

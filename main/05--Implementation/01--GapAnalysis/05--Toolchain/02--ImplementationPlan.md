@@ -594,7 +594,7 @@ Current linear scan algorithm is basic. Better allocation reduces spills and imp
 - [x] Implement better spill cost heuristics
 - [x] Add register coalescing
 - [x] Add live range splitting
-- [ ] Benchmark improvements
+- [x] Benchmark improvements
 - [x] Add register allocation tests
 - [x] Document allocation algorithm
 
@@ -652,18 +652,18 @@ Identify and optimize bottlenecks in LLVM lowering and linking. Improves develop
 **Estimated Effort:** 2-3 weeks
 
 **Rationale:**  
-Extract `!DILocalVariable` metadata for watch expressions (section 4.2.1 Phase 3). Enables variable inspection in debugger.
+Extract `!DILocalVariable` metadata (section 4.2.1 Phase 3) so debugger watch expressions can show accurate values and track moves between registers/stack.
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Parse `!DILocalVariable` nodes from LLVM IR
-- [ ] Track variable locations (registers, stack offsets)
-- [ ] Handle variable liveness ranges
-- [ ] Store variable metadata in .dbg files
-- [ ] Update .sym files with variable information
-- [ ] Add variable tracking tests
-- [ ] Document variable metadata format
-- [ ] Integrate with debugger watch expressions
+- [x] Parse `!DILocalVariable`, `!DILexicalBlock`, and `dbg.declare/dbg.value` nodes from LLVM IR
+- [x] Track variable locations (registers, stack offsets) across moves
+- [x] Handle variable liveness ranges
+- [x] Store variable metadata (name, scope, location history) in .dbg files
+- [x] Update .sym files with variable information for debugger lookup
+- [x] Add variable tracking tests
+- [x] Document variable metadata format and debugger usage
+- [ ] Integrate with debugger watch expressions (CLI/VSCode) to display locals
 
 ---
 
@@ -674,15 +674,15 @@ Extract `!DILocalVariable` metadata for watch expressions (section 4.2.1 Phase 3
 **Estimated Effort:** 1 week
 
 **Rationale:**  
-Map every MVASM instruction to source line (Phase 2 completion). Enables precise source-level stepping.
+Map every MVASM instruction to source line (Phase 2 completion). Enables precise source-level stepping and reliable debugger breakpoints.
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Ensure every MVASM instruction has source line mapping
-- [ ] Handle instructions generated without source (prologue, epilogue)
+- [ ] Ensure every MVASM instruction has source line mapping; emit warnings/failures when coverage is incomplete
+- [ ] Handle compiler-generated instructions (prologue/epilogue, synthesized loads) with explicit “compiler” tags so the debugger can step over them
 - [ ] Add line mapping completeness tests
-- [ ] Verify debugger stepping behavior
-- [ ] Document line mapping guarantees
+- [ ] Verify debugger stepping behavior (single-step, breakpoints) using `.dbg` output
+- [ ] Document line mapping guarantees and fallback behavior
 
 ---
 

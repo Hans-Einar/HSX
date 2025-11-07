@@ -26,6 +26,20 @@ except ImportError:  # pragma: no cover - allow running as package
 R_RET = "R0"
 ATTR_TOKENS = {"nsw", "nuw", "noundef", "dso_local", "local_unnamed_addr", "volatile"}
 
+SPLIT_DISTANCE_THRESHOLD = 12
+ENABLE_COALESCE = True
+ENABLE_PROACTIVE_SPLIT = True
+
+
+def _set_allocator_features(*, coalesce: Optional[bool] = None, split: Optional[bool] = None) -> Tuple[bool, bool]:
+    global ENABLE_COALESCE, ENABLE_PROACTIVE_SPLIT
+    prev = (ENABLE_COALESCE, ENABLE_PROACTIVE_SPLIT)
+    if coalesce is not None:
+        ENABLE_COALESCE = bool(coalesce)
+    if split is not None:
+        ENABLE_PROACTIVE_SPLIT = bool(split)
+    return prev
+
 MOV_RE = re.compile(r"MOV\s+(R\d{1,2}),\s*(R\d{1,2})$", re.IGNORECASE)
 IMM_TOKEN = r"(?:-?\d+|0x[0-9A-Fa-f]+)"
 LDI_RE = re.compile(rf"LDI\s+(R\d{{1,2}}),\s*({IMM_TOKEN})$", re.IGNORECASE)
@@ -76,6 +90,13 @@ COMMAND_AUTH_ALIASES = {
 }
 
 LAST_DEBUG_INFO: Optional[Dict[str, Any]] = None
+
+def _write_debug_file(path: str, payload: Optional[Dict[str, Any]]) -> None:
+    if not payload:
+        raise ValueError("No debug metadata captured; rerun with -g input or ensure --emit-debug after lowering.")
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, indent=2)
+        fh.write("\n")
 
 
 # ---------------------------------------------------------------------------
@@ -758,6 +779,46 @@ def _parse_dilexicalblock(meta_id: str, text: str) -> Optional[Dict[str, Any]]:
     return result
 
 
+def _parse_dilocalvariable(meta_id: str, text: str) -> Optional[Dict[str, Any]]:
+    body = _extract_metadata_args(text, "!DILocalVariable")
+    if body is None:
+        return None
+    fields = _parse_metadata_fields(body)
+    return {
+        "id": meta_id,
+        "name": _strip_quotes(fields.get("name")) or "",
+        "arg": _parse_int_field(fields.get("arg")) or 0,
+        "scope": fields.get("scope"),
+        "file": fields.get("file"),
+        "line": _parse_int_field(fields.get("line")),
+        "type": fields.get("type"),
+        "flags": fields.get("flags"),
+        "align": _parse_int_field(fields.get("align")),
+    }
+
+
+def _parse_diexpression(meta_id: str, text: str) -> Optional[Dict[str, Any]]:
+    body = _extract_metadata_args(text, "!DIExpression")
+    if body is None:
+        return None
+    ops: List[Any] = []
+    for token in _split_top_level(body):
+        piece = token.strip()
+        if not piece:
+            continue
+        if piece.startswith("DW_OP"):
+            ops.append(piece)
+            continue
+        try:
+            ops.append(int(piece, 0))
+        except ValueError:
+            ops.append(piece)
+    return {
+        "id": meta_id,
+        "ops": ops,
+    }
+
+
 def parse_ir(lines: List[str]) -> Dict:
     ir = {
         "functions": [],
@@ -773,6 +834,8 @@ def parse_ir(lines: List[str]) -> Dict:
     debug_subprograms: Dict[str, Dict[str, Any]] = {}
     debug_locations: Dict[str, Dict[str, Any]] = {}
     debug_lexical_blocks: Dict[str, Dict[str, Any]] = {}
+    debug_locals: Dict[str, Dict[str, Any]] = {}
+    debug_expressions: Dict[str, Dict[str, Any]] = {}
     total = len(lines)
     idx = 0
     while idx < total:
@@ -803,7 +866,14 @@ def parse_ir(lines: List[str]) -> Dict:
             if meta_match:
                 meta_id = meta_match.group(1)
                 rhs = meta_match.group(2).strip()
-                target_tokens = ("!DISubprogram", "!DIFile", "!DILocation", "!DILexicalBlock")
+                target_tokens = (
+                    "!DISubprogram",
+                    "!DIFile",
+                    "!DILocation",
+                    "!DILexicalBlock",
+                    "!DILocalVariable",
+                    "!DIExpression",
+                )
                 merged = rhs
                 if any(token in rhs for token in target_tokens):
                     parts = [rhs]
@@ -830,6 +900,14 @@ def parse_ir(lines: List[str]) -> Dict:
                     parsed = _parse_dilexicalblock(meta_id, merged)
                     if parsed:
                         debug_lexical_blocks[meta_id] = parsed
+                elif "!DILocalVariable" in merged:
+                    parsed = _parse_dilocalvariable(meta_id, merged)
+                    if parsed:
+                        debug_locals[meta_id] = parsed
+                elif "!DIExpression" in merged:
+                    parsed = _parse_diexpression(meta_id, merged)
+                    if parsed:
+                        debug_expressions[meta_id] = parsed
             continue
         if cur is None:
             type_match = re.match(r'(%[A-Za-z0-9_.]+)\s*=\s*type\s+(.+)', line)
@@ -923,6 +1001,8 @@ def parse_ir(lines: List[str]) -> Dict:
         "subprograms": debug_subprograms,
         "locations": debug_locations,
         "lexical_blocks": debug_lexical_blocks,
+        "locals": debug_locals,
+        "expressions": debug_expressions,
         "functions": debug_functions,
     }
     return ir
@@ -1310,7 +1390,15 @@ def _optimize_movs(
     stage2_lines, stage2_tags = _eliminate_mov_chains_core(stage1_lines, stage1_tags)
     return stage2_lines, stage2_tags
 
-def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_symbols=None, type_info=None) -> List[str]:
+def lower_function(
+    fn: Dict,
+    trace=False,
+    imports=None,
+    defined=None,
+    global_symbols=None,
+    type_info=None,
+    debug_info=None,
+) -> List[str]:
     asm: List[str] = []
     vmap: Dict[str, str] = {}
     if imports is None:
@@ -1320,6 +1408,216 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
 
     type_defs = type_info or {}
     type_layout_cache: Dict[str, Tuple[int, int]] = {}
+    debug_info = debug_info or {}
+    debug_files: Dict[str, Dict[str, Any]] = debug_info.get("files", {})
+    debug_subprograms: Dict[str, Dict[str, Any]] = debug_info.get("subprograms", {})
+    debug_lexical_blocks: Dict[str, Dict[str, Any]] = debug_info.get("lexical_blocks", {})
+    debug_locals: Dict[str, Dict[str, Any]] = debug_info.get("locals", {})
+    debug_expressions: Dict[str, Dict[str, Any]] = debug_info.get("expressions", {})
+    function_dbg_id: Optional[str] = fn.get("dbg")
+
+    def scope_belongs_to_function(scope_id: Optional[str]) -> bool:
+        if not function_dbg_id or not scope_id:
+            return False
+        current = scope_id
+        visited: Set[str] = set()
+        while current and current not in visited:
+            if current == function_dbg_id:
+                return True
+            visited.add(current)
+            block = debug_lexical_blocks.get(current)
+            if block:
+                current = block.get("scope")
+                continue
+            sub = debug_subprograms.get(current)
+            if sub:
+                current = sub.get("scope")
+                continue
+            current = None
+        return False
+
+    tracked_variables: Dict[str, Dict[str, Any]] = {}
+    if function_dbg_id:
+        for var_id, var_meta in debug_locals.items():
+            if scope_belongs_to_function(var_meta.get("scope")):
+                tracked_variables[var_id] = var_meta
+    variable_states: Dict[str, Dict[str, Any]] = {}
+
+    def _extract_metadata_payload(text: Optional[str]) -> str:
+        if not text:
+            return ""
+        payload = text.strip()
+        if payload.startswith("metadata"):
+            payload = payload[len("metadata"):].strip()
+        return payload
+
+    def _resolve_expression_ops(expr_token: Optional[str]) -> List[Any]:
+        payload = _extract_metadata_payload(expr_token)
+        if not payload:
+            return []
+        if payload.startswith("!DIExpression"):
+            parsed = _parse_diexpression(payload, payload)
+            return parsed.get("ops", []) if parsed else []
+        if payload.startswith("!"):
+            parsed = debug_expressions.get(payload)
+            if parsed:
+                return parsed.get("ops", [])
+        return []
+
+    def _pointer_offset_from_ops(ops: List[Any]) -> Tuple[int, bool]:
+        extra = 0
+        deref = False
+        idx = 0
+        total = len(ops)
+        while idx < total:
+            op = ops[idx]
+            if op == "DW_OP_deref":
+                deref = True
+                idx += 1
+                continue
+            if op == "DW_OP_plus_uconst":
+                if idx + 1 < total:
+                    val = ops[idx + 1]
+                    if isinstance(val, int):
+                        extra += val
+                idx += 2
+                continue
+            break
+        return extra, deref
+
+    def _stack_location_from_pointer(ptr: str, extra: int = 0) -> Optional[Dict[str, Any]]:
+        canonical = resolve_name(ptr)
+        if canonical in frame_ptr_offsets:
+            return {"kind": "stack", "offset": frame_ptr_offsets[canonical] + extra}
+        if canonical in spill_slots:
+            return {"kind": "stack", "offset": spill_slots[canonical] + extra}
+        return None
+
+    def _resolve_value_location(value_token: str, ops: List[Any]) -> Optional[Dict[str, Any]]:
+        token = value_token.strip()
+        extra, deref = _pointer_offset_from_ops(ops)
+        if not token:
+            return None
+        if token.startswith('%'):
+            canonical = resolve_name(token)
+            if deref:
+                loc = _stack_location_from_pointer(token, extra)
+                if loc:
+                    return loc
+            reg = vmap.get(canonical)
+            if reg:
+                return {"kind": "register", "name": reg}
+            spilled = spilled_values.get(canonical)
+            if spilled:
+                slot_offset, stored_type = spilled
+                loc = {"kind": "stack", "offset": slot_offset + extra}
+                size_val = type_size(stored_type)
+                if size_val:
+                    loc["size"] = size_val
+                return loc
+            if canonical in frame_ptr_offsets:
+                return {"kind": "stack", "offset": frame_ptr_offsets[canonical] + extra}
+            return None
+        if token.startswith('@'):
+            symbol_name = token[1:]
+            return {"kind": "global", "symbol": symbol_name, "offset": extra}
+        lowered = token.lower()
+        if lowered in {"null", "undef"}:
+            return {"kind": "const", "value": 0}
+        if lowered == "true":
+            return {"kind": "const", "value": 1}
+        if lowered == "false":
+            return {"kind": "const", "value": 0}
+        try:
+            return {"kind": "const", "value": int(token, 0)}
+        except ValueError:
+            return None
+
+    def _current_line_hint() -> int:
+        hint = len(asm) - 1
+        if hint < 0:
+            hint = 0
+        return hint
+
+    def _record_variable_event(var_id: str, location: Optional[Dict[str, Any]], reason: str) -> None:
+        if not location or var_id not in tracked_variables:
+            return
+        loc_copy = dict(location)
+        state = variable_states.setdefault(var_id, {"events": [], "last_location": None})
+        if state.get("last_location") == loc_copy:
+            return
+        event = {
+            "location": loc_copy,
+            "line_index": _current_line_hint(),
+            "reason": reason,
+        }
+        state["events"].append(event)
+        state["last_location"] = loc_copy
+
+    def _parse_value_operand(text: str) -> Dict[str, Optional[str]]:
+        payload = _extract_metadata_payload(text)
+        if not payload:
+            return {"type": None, "token": None}
+        parts = payload.split(None, 1)
+        if len(parts) == 1:
+            return {"type": None, "token": parts[0]}
+        return {"type": parts[0], "token": parts[1]}
+
+    def _parse_metadata_id(text: str) -> Optional[str]:
+        payload = _extract_metadata_payload(text)
+        if payload.startswith('!'):
+            return payload
+        return None
+
+    def _pointer_token(text: str) -> Optional[str]:
+        payload = _extract_metadata_payload(text)
+        if not payload:
+            return None
+        parts = payload.split()
+        if not parts:
+            return None
+        return parts[-1]
+
+    def _split_dbg_args(line: str) -> List[str]:
+        start = line.find('(')
+        end = line.rfind(')')
+        if start == -1 or end == -1 or end <= start:
+            return []
+        return _split_top_level(line[start + 1 : end])
+
+    def _handle_dbg_declare(line: str) -> bool:
+        args = _split_dbg_args(line)
+        if len(args) < 2:
+            return True
+        var_id = _parse_metadata_id(args[1])
+        if not var_id:
+            return True
+        ptr_token = _pointer_token(args[0])
+        expr_ops = _resolve_expression_ops(args[2] if len(args) >= 3 else None)
+        extra_offset, _ = _pointer_offset_from_ops(expr_ops)
+        location: Optional[Dict[str, Any]] = None
+        if ptr_token and ptr_token.startswith('%'):
+            location = _stack_location_from_pointer(ptr_token, extra_offset)
+        elif ptr_token and ptr_token.startswith('@'):
+            location = {"kind": "global", "symbol": ptr_token[1:], "offset": extra_offset}
+        if location:
+            _record_variable_event(var_id, location, "declare")
+        return True
+
+    def _handle_dbg_value(line: str) -> bool:
+        args = _split_dbg_args(line)
+        if len(args) < 2:
+            return True
+        var_id = _parse_metadata_id(args[1])
+        if not var_id:
+            return True
+        value_info = _parse_value_operand(args[0])
+        token = value_info.get("token")
+        expr_ops = _resolve_expression_ops(args[2] if len(args) >= 3 else None)
+        if token:
+            location = _resolve_value_location(token, expr_ops)
+            _record_variable_event(var_id, location, "value")
+        return True
 
 
     asm.append(f"; -- function {fn['name']} --")
@@ -1334,6 +1632,8 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
     for block in fn["blocks"]:
         for raw in block["ins"]:
             norm = normalize_ir_line(raw)
+            if norm.startswith("call void @llvm.dbg."):
+                continue
             phi_match = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*phi', norm)
             if phi_match:
                 incoming = re.findall(r'\[\s*([^,]+),\s*%([A-Za-z0-9_]+)\s*\]', norm)
@@ -1797,7 +2097,7 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
         frame_ptr_offsets.pop(name, None)
 
     def maybe_split_long_lived(current_index: int) -> None:
-        if SPLIT_DISTANCE_THRESHOLD <= 0:
+        if not ENABLE_PROACTIVE_SPLIT or SPLIT_DISTANCE_THRESHOLD <= 0:
             return
         for name in list(vmap.keys()):
             if name in pinned_values:
@@ -1812,6 +2112,8 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
 
     def try_coalesce_value(dest: str, value: str, dest_type: str) -> bool:
         value = value.strip()
+        if not ENABLE_COALESCE:
+            return False
         if not value.startswith('%'):
             return False
         canonical = resolve_name(value)
@@ -1892,6 +2194,13 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
 
     def _lower_ir_instruction(raw_line: str, block_label: str) -> str:
             orig_line = raw_line
+            stripped_line = orig_line.strip()
+            if stripped_line.startswith("call void @llvm.dbg.declare"):
+                _handle_dbg_declare(stripped_line)
+                return None
+            if stripped_line.startswith("call void @llvm.dbg.value"):
+                _handle_dbg_value(stripped_line)
+                return None
             line = normalize_ir_line(raw_line)
             if trace: asm.append(f"; IR: {orig_line}")
             m = re.match(r'(%[A-Za-z0-9_]+)\s*=\s*alloca\s+([^,]+)', line)
@@ -2625,337 +2934,451 @@ def lower_function(fn: Dict, trace=False, imports=None, defined=None, global_sym
     allocation_stats["stack_bytes"] = frame_size
     allocation_stats["used_registers"] = sorted(used_registers)
     allocation_stats["used_register_count"] = len(allocation_stats["used_registers"])
+    variable_records: List[Dict[str, Any]] = []
+    for var_id, state in variable_states.items():
+        events = state.get("events") or []
+        if not events:
+            continue
+        variable_records.append(
+            {
+                "id": var_id,
+                "function": fn["name"],
+                "events": events,
+            }
+        )
     line_tags: List[Optional[Dict[str, Any]]] = [None] * len(asm)
     for asm_index, dbg_id, inst_id in line_debug_entries:
         tag: Dict[str, Any] = {"inst": inst_id}
         if dbg_id:
             tag["dbg"] = dbg_id
         line_tags[asm_index] = tag
-    return asm, spill_data_lines, line_tags, instruction_records, allocation_stats
+    return asm, spill_data_lines, line_tags, instruction_records, allocation_stats, variable_records
 
-def compile_ll_to_mvasm(ir_text: str, trace=False, enable_opt=True) -> str:
+
+def compile_ll_to_mvasm(
+    ir_text: str,
+    trace=False,
+    enable_opt=True,
+    allocator_opts: Optional[Dict[str, bool]] = None,
+) -> str:
     global LAST_DEBUG_INFO
     _reset_global_name_cache()
     ir_text = _preprocess_ir_text(ir_text)
-    ir = parse_ir(ir_text.splitlines())
-    entry_label = next((fn['name'] for fn in ir['functions'] if fn['name'] == 'main'), None)
-    defined_names = {fn['name'] for fn in ir['functions']}
-    globals_list = ir.get('globals', [])
-    global_names = {g['name'] for g in globals_list}
-    imports = set()
-    out: List[str] = []
-    line_tags: List[Optional[Dict[str, Any]]] = []
-    spill_data_all: List[str] = []
-    function_spans: List[Tuple[str, int, int]] = []
-    instruction_records: Dict[str, Dict[str, Any]] = {}
-    instruction_order: List[str] = []
-    function_reg_stats: Dict[str, Dict[str, Any]] = {}
-    for fn in ir['functions']:
-        start_line = len(out)
-        (
-            fn_asm,
-            fn_spill_data,
-            fn_tags,
-            fn_instruction_records,
-            fn_alloc_stats,
-        ) = lower_function(
-            fn,
-            trace=trace,
-            imports=imports,
-            defined=defined_names,
-            global_symbols=global_names,
-            type_info=ir.get('types', {}),
+    restore_features: Optional[Tuple[bool, bool]] = None
+    if allocator_opts:
+        restore_features = _set_allocator_features(
+            coalesce=allocator_opts.get("coalesce"),
+            split=allocator_opts.get("split"),
         )
-        out += fn_asm
-        line_tags.extend(fn_tags)
-        end_line = len(out)
-        function_spans.append((fn["name"], start_line, end_line))
-        if fn_spill_data:
-            spill_data_all.extend(fn_spill_data)
-        for record in fn_instruction_records:
-            inst_id = record["id"]
-            instruction_records[inst_id] = record
-            instruction_order.append(inst_id)
-        function_reg_stats[fn["name"]] = fn_alloc_stats
-    data_section = render_globals(globals_list)
-    mailbox_entries = ir.get("mailboxes", [])
-    value_entries = ir.get("values", [])
-    command_entries = ir.get("commands", [])
-    if spill_data_all:
-        if data_section:
-            data_section.extend(spill_data_all)
+    try:
+        ir = parse_ir(ir_text.splitlines())
+        entry_label = next((fn['name'] for fn in ir['functions'] if fn['name'] == 'main'), None)
+        defined_names = {fn['name'] for fn in ir['functions']}
+        globals_list = ir.get('globals', [])
+        global_names = {g['name'] for g in globals_list}
+        imports = set()
+        out: List[str] = []
+        line_tags: List[Optional[Dict[str, Any]]] = []
+        spill_data_all: List[str] = []
+        function_spans: List[Tuple[str, int, int]] = []
+        instruction_records: Dict[str, Dict[str, Any]] = {}
+        instruction_order: List[str] = []
+        function_reg_stats: Dict[str, Dict[str, Any]] = {}
+        variable_event_records: List[Dict[str, Any]] = []
+        for fn in ir['functions']:
+            start_line = len(out)
+            (
+                fn_asm,
+                fn_spill_data,
+                fn_tags,
+                fn_instruction_records,
+                fn_alloc_stats,
+                fn_variable_records,
+            ) = lower_function(
+                fn,
+                trace=trace,
+                imports=imports,
+                defined=defined_names,
+                global_symbols=global_names,
+                type_info=ir.get('types', {}),
+                debug_info=ir.get('debug', {}),
+            )
+            out += fn_asm
+            line_tags.extend(fn_tags)
+            end_line = len(out)
+            function_spans.append((fn["name"], start_line, end_line))
+            if fn_spill_data:
+                spill_data_all.extend(fn_spill_data)
+            for record in fn_instruction_records:
+                inst_id = record["id"]
+                instruction_records[inst_id] = record
+                instruction_order.append(inst_id)
+            function_reg_stats[fn["name"]] = fn_alloc_stats
+            for record in fn_variable_records:
+                entry = dict(record)
+                entry["line_base"] = start_line
+                variable_event_records.append(entry)
+        data_section = render_globals(globals_list)
+        mailbox_entries = ir.get("mailboxes", [])
+        value_entries = ir.get("values", [])
+        command_entries = ir.get("commands", [])
+        if spill_data_all:
+            if data_section:
+                data_section.extend(spill_data_all)
+            else:
+                data_section = ['.data'] + spill_data_all
+        summary_total_funcs = len(function_reg_stats)
+        total_spills = sum(stats["spill_count"] for stats in function_reg_stats.values())
+        total_reloads = sum(stats["reload_count"] for stats in function_reg_stats.values())
+        max_pressure_overall = max((stats["max_pressure"] for stats in function_reg_stats.values()), default=0)
+        max_stack_bytes = max((stats["stack_bytes"] for stats in function_reg_stats.values()), default=0)
+        functions_with_spills = sorted(
+            name for name, stats in function_reg_stats.items() if stats["spill_count"] > 0
+        )
+        if out or data_section:
+            header = []
+            if entry_label:
+                header.append(f".entry {entry_label}")
+            else:
+                header.append('.entry')
+            exports = sorted(defined_names)
+            for name in exports:
+                header.append(f".export {name}")
+            if imports:
+                for name in sorted(imports):
+                    header.append(f".import {name}")
+            if value_entries:
+                for entry in value_entries:
+                    header.append(".value " + json.dumps(entry, separators=(",", ":"), sort_keys=True))
+            if command_entries:
+                for entry in command_entries:
+                    header.append(".cmd " + json.dumps(entry, separators=(",", ":"), sort_keys=True))
+            if mailbox_entries:
+                for entry in mailbox_entries:
+                    header.append(".mailbox " + json.dumps(entry, separators=(",", ":"), sort_keys=True))
+            if data_section:
+                header += data_section
+            header.append('.text')
+            out = header + out
+            header_tags: List[Optional[Dict[str, Any]]] = [None] * len(header)
+            line_tags = header_tags + line_tags
+            header_len = len(header)
+            function_spans = [(name, start + header_len, end + header_len) for (name, start, end) in function_spans]
+            if enable_opt and not trace:
+                out, line_tags = _optimize_movs(out, line_tags)
         else:
-            data_section = ['.data'] + spill_data_all
-    summary_total_funcs = len(function_reg_stats)
-    total_spills = sum(stats["spill_count"] for stats in function_reg_stats.values())
-    total_reloads = sum(stats["reload_count"] for stats in function_reg_stats.values())
-    max_pressure_overall = max((stats["max_pressure"] for stats in function_reg_stats.values()), default=0)
-    max_stack_bytes = max((stats["stack_bytes"] for stats in function_reg_stats.values()), default=0)
-    functions_with_spills = sorted(
-        name for name, stats in function_reg_stats.items() if stats["spill_count"] > 0
-    )
-    if out or data_section:
-        header = []
-        if entry_label:
-            header.append(f".entry {entry_label}")
-        else:
-            header.append('.entry')
-        exports = sorted(defined_names)
-        for name in exports:
-            header.append(f".export {name}")
-        if imports:
-            for name in sorted(imports):
-                header.append(f".import {name}")
-        if value_entries:
-            for entry in value_entries:
-                header.append(".value " + json.dumps(entry, separators=(",", ":"), sort_keys=True))
-        if command_entries:
-            for entry in command_entries:
-                header.append(".cmd " + json.dumps(entry, separators=(",", ":"), sort_keys=True))
-        if mailbox_entries:
-            for entry in mailbox_entries:
-                header.append(".mailbox " + json.dumps(entry, separators=(",", ":"), sort_keys=True))
-        if data_section:
-            header += data_section
-        header.append('.text')
-        out = header + out
-        header_tags: List[Optional[Dict[str, Any]]] = [None] * len(header)
-        line_tags = header_tags + line_tags
-        header_len = len(header)
-        function_spans = [(name, start + header_len, end + header_len) for (name, start, end) in function_spans]
-        if enable_opt and not trace:
-            out, line_tags = _optimize_movs(out, line_tags)
-    else:
-        header_len = 0
+            header_len = 0
 
-    instruction_ordinals: Dict[int, int] = {}
-    ordinal_counter = 0
-    for idx, asm_line in enumerate(out):
-        if is_instruction_line(asm_line):
-            tag = line_tags[idx]
-            if not isinstance(tag, dict):
-                tag = {}
-                line_tags[idx] = tag
-            tag["ordinal"] = ordinal_counter
-            instruction_ordinals[idx + 1] = ordinal_counter
-            ordinal_counter += 1
-    line_to_ordinal = dict(instruction_ordinals)
+        instruction_ordinals: Dict[int, int] = {}
+        ordinal_counter = 0
+        for idx, asm_line in enumerate(out):
+            if is_instruction_line(asm_line):
+                tag = line_tags[idx]
+                if not isinstance(tag, dict):
+                    tag = {}
+                    line_tags[idx] = tag
+                tag["ordinal"] = ordinal_counter
+                instruction_ordinals[idx + 1] = ordinal_counter
+                ordinal_counter += 1
 
-    debug_info = ir.get("debug", {"files": {}, "subprograms": {}, "functions": []})
-    files = debug_info.get("files", {})
-    subprograms = debug_info.get("subprograms", {})
-    locations = debug_info.get("locations", {})
-    lexical_blocks = debug_info.get("lexical_blocks", {})
-    functions_meta = debug_info.get("functions", [])
+        line_to_ordinal = dict(instruction_ordinals)
 
-    def _resolve_file_ref(file_id: Optional[str], scope_id: Optional[str]) -> Optional[Dict[str, Any]]:
-        visited: Set[str] = set()
-        current_file = file_id
-        current_scope = scope_id
-        while True:
-            if current_file and current_file in files:
-                info = files[current_file]
-                return {
-                    "id": current_file,
+        debug_info = ir.get("debug", {"files": {}, "subprograms": {}, "functions": []})
+        files = debug_info.get("files", {})
+        subprograms = debug_info.get("subprograms", {})
+        locations = debug_info.get("locations", {})
+        lexical_blocks = debug_info.get("lexical_blocks", {})
+        local_variables = debug_info.get("locals", {})
+        functions_meta = debug_info.get("functions", [])
+
+        def _resolve_file_for_scope(scope_id: Optional[str]) -> Optional[Dict[str, Any]]:
+            current = scope_id
+            visited: Set[str] = set()
+            while current and current not in visited:
+                visited.add(current)
+                block = lexical_blocks.get(current)
+                if block:
+                    file_ref = block.get("file")
+                    if file_ref and file_ref in files:
+                        return files[file_ref]
+                    current = block.get("scope")
+                    continue
+                sub = subprograms.get(current)
+                if sub:
+                    file_ref = sub.get("file")
+                    if file_ref and file_ref in files:
+                        return files[file_ref]
+                    current = sub.get("scope")
+                    continue
+                if current in files:
+                    return files[current]
+                break
+            return None
+
+        def _resolve_location_ref(meta_id: Optional[str]) -> Optional[Dict[str, Any]]:
+            if not meta_id:
+                return None
+            loc = locations.get(meta_id)
+            if not loc:
+                return None
+            result: Dict[str, Any] = {
+                "id": meta_id,
+                "line": loc.get("line"),
+                "column": loc.get("column"),
+                "scope": loc.get("scope"),
+            }
+            file_entry = None
+            file_ref = loc.get("file")
+            if file_ref:
+                file_entry = files.get(file_ref)
+            if not file_entry:
+                file_entry = _resolve_file_for_scope(loc.get("scope"))
+            if file_entry:
+                result["file"] = {
+                    "id": file_entry.get("id"),
+                    "filename": file_entry.get("filename"),
+                    "directory": file_entry.get("directory"),
+                }
+            return result
+
+        files_list: List[Dict[str, Any]] = []
+        for meta_id, info in files.items():
+            files_list.append(
+                {
+                    "id": meta_id,
                     "filename": info.get("filename"),
                     "directory": info.get("directory"),
                 }
-            if not current_scope or current_scope in visited:
-                return None
-            visited.add(current_scope)
-            scope_info = lexical_blocks.get(current_scope) or subprograms.get(current_scope)
-            if not scope_info:
-                return None
-            current_file = scope_info.get("file")
-            current_scope = scope_info.get("scope")
+            )
+        total_proactive = sum(stats.get("proactive_splits", 0) for stats in function_reg_stats.values())
+        allocation_summary = {
+            "total_functions": summary_total_funcs,
+            "functions_with_spills": functions_with_spills,
+            "max_pressure": max_pressure_overall,
+            "total_spills": total_spills,
+            "total_reloads": total_reloads,
+            "max_stack_bytes": max_stack_bytes,
+            "total_proactive_splits": total_proactive,
+        }
 
-    def _resolve_location_ref(dbg_id: str) -> Optional[Dict[str, Any]]:
-        visited: Set[str] = set()
-        current = dbg_id
-        while current and current not in visited:
-            visited.add(current)
-            loc = locations.get(current)
-            if not loc:
-                break
-            line_val = loc.get("line")
-            column_val = loc.get("column")
-            file_entry = _resolve_file_ref(loc.get("file"), loc.get("scope"))
-            if line_val is not None:
-                result: Dict[str, Any] = {
-                    "line": line_val,
-                    "column": column_val,
-                    "file": file_entry,
-                }
-                if file_entry:
-                    result["file_id"] = file_entry.get("id")
-                return result
-            current = loc.get("inlined_at")
-        return None
-
-    span_map = {name: (start, end) for name, start, end in function_spans}
-    files_list: List[Dict[str, Any]] = []
-    for meta_id, info in files.items():
-        files_list.append(
-            {
-                "id": meta_id,
-                "filename": info.get("filename"),
-                "directory": info.get("directory"),
-            }
-        )
-    functions_list: List[Dict[str, Any]] = []
-    for entry in functions_meta:
-        name = entry.get("function")
-        start_end = span_map.get(name)
-        if start_end:
-            start_line = start_end[0] + 1  # convert to 1-based
-            if start_end[1] > start_end[0]:
-                end_line = start_end[1]
+        functions_list: List[Dict[str, Any]] = []
+        function_ordinals_map: Dict[str, Tuple[Optional[int], Optional[int]]] = {}
+        span_map = {fname: (start, end) for fname, start, end in function_spans}
+        for entry in functions_meta:
+            name = entry.get("function")
+            start_end = span_map.get(name)
+            if start_end:
+                start_line = start_end[0] + 1
+                end_line = start_end[1] if start_end[1] > start_end[0] else start_line
             else:
-                end_line = start_line
-        else:
-            start_line = None
-            end_line = None
-        ordinals_in_range: List[int] = []
-        if start_line is not None and end_line is not None:
-            for line_num in range(start_line, end_line + 1):
-                ordinal_val = line_to_ordinal.get(line_num)
-                if ordinal_val is not None:
-                    ordinals_in_range.append(ordinal_val)
-        if ordinals_in_range:
-            start_ord = min(ordinals_in_range)
-            end_ord = max(ordinals_in_range)
-        else:
-            start_ord = None
-            end_ord = None
-        func_entry: Dict[str, Any] = {
-            "function": name,
-            "name": entry.get("name"),
-            "linkage_name": entry.get("linkage_name"),
-            "file": entry.get("file"),
-            "line": entry.get("line"),
-            "mvasm_start_line": start_line,
-            "mvasm_end_line": end_line,
-            "mvasm_start_ordinal": start_ord,
-            "mvasm_end_ordinal": end_ord,
-        }
-        stats_entry = function_reg_stats.get(name)
-        if stats_entry:
-            func_entry["register_allocation"] = stats_entry
-        functions_list.append(func_entry)
-    existing_names = {entry["function"] for entry in functions_list}
-    for name, stats_entry in function_reg_stats.items():
-        if name in existing_names:
-            continue
-        functions_list.append(
-            {
+                start_line = None
+                end_line = None
+            ordinals_in_range: List[int] = []
+            if start_line is not None and end_line is not None:
+                for line_num in range(start_line, end_line + 1):
+                    ordinal_val = line_to_ordinal.get(line_num)
+                    if ordinal_val is not None:
+                        ordinals_in_range.append(ordinal_val)
+            if ordinals_in_range:
+                start_ord = min(ordinals_in_range)
+                end_ord = max(ordinals_in_range)
+            else:
+                start_ord = None
+                end_ord = None
+            function_ordinals_map[name] = (start_ord, end_ord)
+            func_entry: Dict[str, Any] = {
                 "function": name,
-                "register_allocation": stats_entry,
+                "name": entry.get("name"),
+                "linkage_name": entry.get("linkage_name"),
+                "file": entry.get("file"),
+                "line": entry.get("line"),
+                "mvasm_start_line": start_line,
+                "mvasm_end_line": end_line,
+                "mvasm_start_ordinal": start_ord,
+                "mvasm_end_ordinal": end_ord,
             }
-        )
-    line_map_entries: List[Dict[str, Any]] = []
-    instruction_line_map: Dict[str, List[int]] = defaultdict(list)
-    for idx, tag in enumerate(line_tags):
-        if not tag or not isinstance(tag, dict):
-            continue
+            stats_entry = function_reg_stats.get(name)
+            if stats_entry:
+                func_entry["register_allocation"] = stats_entry
+            functions_list.append(func_entry)
+        existing_names = {entry["function"] for entry in functions_list}
+        for name, stats_entry in function_reg_stats.items():
+            if name in existing_names:
+                continue
+            functions_list.append(
+                {
+                    "function": name,
+                    "register_allocation": stats_entry,
+                }
+            )
+            if name not in function_ordinals_map:
+                function_ordinals_map[name] = (None, None)
 
-        inst_id = tag.get("inst")
-        if inst_id:
-            instruction_line_map.setdefault(inst_id, []).append(idx + 1)
-        dbg_id = tag.get("dbg")
-        if not dbg_id:
-            continue
-        loc_info = _resolve_location_ref(dbg_id)
-        if not loc_info:
-            continue
-        entry: Dict[str, Any] = {
-            "mvasm_line": idx + 1,
-            "source_line": loc_info["line"],
-        }
-        ordinal_val = tag.get("ordinal")
-        if ordinal_val is not None:
-            entry["mvasm_ordinal"] = ordinal_val
-        if loc_info.get("column") is not None:
-            entry["source_column"] = loc_info["column"]
-        file_entry = loc_info.get("file")
-        if file_entry:
-            entry["source_file"] = file_entry.get("filename")
-            directory = file_entry.get("directory")
-            if directory:
-                entry["source_directory"] = directory
-            entry["source_file_id"] = file_entry.get("id")
-        line_map_entries.append(entry)
-    line_map_entries.sort(key=lambda item: item["mvasm_line"])
-
-    instruction_ordinal_map: Dict[str, List[int]] = {}
-    for inst_id, line_numbers in instruction_line_map.items():
-        ordinals: List[int] = []
-        for line_number in line_numbers:
-            ordinal_val = line_to_ordinal.get(line_number)
+        line_map_entries: List[Dict[str, Any]] = []
+        instruction_line_map: Dict[str, List[int]] = defaultdict(list)
+        for idx, tag in enumerate(line_tags):
+            if not tag or not isinstance(tag, dict):
+                continue
+            inst_id = tag.get("inst")
+            if inst_id:
+                instruction_line_map.setdefault(inst_id, []).append(idx + 1)
+            dbg_id = tag.get("dbg")
+            if not dbg_id:
+                continue
+            loc_info = _resolve_location_ref(dbg_id)
+            if not loc_info:
+                continue
+            entry: Dict[str, Any] = {
+                "mvasm_line": idx + 1,
+                "source_line": loc_info["line"],
+            }
+            ordinal_val = tag.get("ordinal")
             if ordinal_val is not None:
-                ordinals.append(ordinal_val)
-        if ordinals:
-            instruction_ordinal_map[inst_id] = ordinals
+                entry["mvasm_ordinal"] = ordinal_val
+            if loc_info.get("column") is not None:
+                entry["source_column"] = loc_info["column"]
+            file_entry = loc_info.get("file")
+            if file_entry:
+                entry["source_file"] = file_entry.get("filename")
+                directory = file_entry.get("directory")
+                if directory:
+                    entry["source_directory"] = directory
+                entry["source_file_id"] = file_entry.get("id")
+            line_map_entries.append(entry)
+        line_map_entries.sort(key=lambda item: item["mvasm_line"])
 
-    llvm_map_entries: List[Dict[str, Any]] = []
-    for inst_id in instruction_order:
-        lines_for_inst = instruction_line_map.get(inst_id)
-        if not lines_for_inst:
-            continue
-        record = instruction_records.get(inst_id)
-        if not record:
-            continue
-        entry: Dict[str, Any] = {
-            "id": inst_id,
-            "function": record.get("function"),
-            "ir": record.get("ir"),
-            "raw_ir": record.get("raw_ir"),
-            "mvasm_lines": lines_for_inst,
+        instruction_ordinal_map: Dict[str, List[int]] = {}
+        for inst_id, line_numbers in instruction_line_map.items():
+            ordinals: List[int] = []
+            for line_number in line_numbers:
+                ordinal_val = line_to_ordinal.get(line_number)
+                if ordinal_val is not None:
+                    ordinals.append(ordinal_val)
+            if ordinals:
+                instruction_ordinal_map[inst_id] = ordinals
+
+        llvm_map_entries: List[Dict[str, Any]] = []
+        for inst_id in instruction_order:
+            lines_for_inst = instruction_line_map.get(inst_id)
+            if not lines_for_inst:
+                continue
+            record = instruction_records.get(inst_id)
+            if not record:
+                continue
+            entry: Dict[str, Any] = {
+                "id": inst_id,
+                "function": record.get("function"),
+                "ir": record.get("ir"),
+                "raw_ir": record.get("raw_ir"),
+                "mvasm_lines": lines_for_inst,
+            }
+            dbg_ref = record.get("dbg")
+            if dbg_ref:
+                entry["dbg"] = dbg_ref
+                loc_info = _resolve_location_ref(dbg_ref)
+                if loc_info:
+                    entry["source_line"] = loc_info.get("line")
+                    if loc_info.get("column") is not None:
+                        entry["source_column"] = loc_info.get("column")
+                    file_entry = loc_info.get("file")
+                    if file_entry:
+                        entry["source_file"] = file_entry.get("filename")
+                        if file_entry.get("directory"):
+                            entry["source_directory"] = file_entry["directory"]
+            ordinals_for_inst = instruction_ordinal_map.get(inst_id)
+            if ordinals_for_inst:
+                entry["mvasm_ordinals"] = ordinals_for_inst
+            llvm_map_entries.append(entry)
+
+        def _ordinal_from_line_hint(global_index: int) -> Optional[int]:
+            if global_index < 0:
+                global_index = 0
+            limit = len(line_tags)
+            idx = min(global_index, limit - 1) if limit else 0
+            while idx < limit:
+                tag = line_tags[idx]
+                if tag and isinstance(tag, dict):
+                    ord_val = tag.get("ordinal")
+                    if ord_val is not None:
+                        return ord_val
+                idx += 1
+            return None
+
+        variables_entries: List[Dict[str, Any]] = []
+        for record in variable_event_records:
+            var_id = record.get("id")
+            fn_name = record.get("function")
+            events = record.get("events") or []
+            if not var_id or not fn_name or not events:
+                continue
+            var_meta = local_variables.get(var_id)
+            if not var_meta:
+                continue
+            line_base = record.get("line_base", 0)
+            resolved_events: List[Dict[str, Any]] = []
+            for event in events:
+                line_index = max(int(event.get("line_index", 0)), 0)
+                ordinal = _ordinal_from_line_hint(line_base + line_index)
+                if ordinal is None:
+                    continue
+                resolved_events.append(
+                    {
+                        "ordinal": ordinal,
+                        "location": dict(event.get("location") or {}),
+                    }
+                )
+            if not resolved_events:
+                continue
+            resolved_events.sort(key=lambda item: item["ordinal"])
+            fn_ordinals = function_ordinals_map.get(fn_name, (None, None))
+            ranges: List[Dict[str, Any]] = []
+            for idx, evt in enumerate(resolved_events):
+                start_ord = evt["ordinal"]
+                next_ord = (
+                    resolved_events[idx + 1]["ordinal"]
+                    if idx + 1 < len(resolved_events)
+                    else None
+                )
+                end_ord = next_ord if next_ord is not None else fn_ordinals[1]
+                range_entry = {
+                    "start_ordinal": start_ord,
+                    "end_ordinal": end_ord,
+                    "location": evt["location"],
+                }
+                ranges.append(range_entry)
+            if not ranges:
+                continue
+            file_info = None
+            file_ref = var_meta.get("file")
+            if file_ref and file_ref in files:
+                file_info = files[file_ref]
+            if not file_info:
+                file_info = _resolve_file_for_scope(var_meta.get("scope"))
+            variables_entries.append(
+                {
+                    "id": var_id,
+                    "name": var_meta.get("name"),
+                    "function": fn_name,
+                    "scope": var_meta.get("scope"),
+                    "file": file_info,
+                    "line": var_meta.get("line"),
+                    "type": var_meta.get("type"),
+                    "locations": ranges,
+                }
+            )
+        LAST_DEBUG_INFO = {
+            "version": 1,
+            "files": files_list,
+            "functions": functions_list,
+            "line_map": line_map_entries,
+            "llvm_to_mvasm": llvm_map_entries,
+            "variables": variables_entries,
+            "register_allocation_summary": allocation_summary,
         }
-        dbg_ref = record.get("dbg")
-        if dbg_ref:
-            entry["dbg"] = dbg_ref
-            loc_info = _resolve_location_ref(dbg_ref)
-            if loc_info:
-                entry["source_line"] = loc_info.get("line")
-                if loc_info.get("column") is not None:
-                    entry["source_column"] = loc_info.get("column")
-                file_entry = loc_info.get("file")
-                if file_entry:
-                    entry["source_file"] = file_entry.get("filename")
-                    if file_entry.get("directory"):
-                        entry["source_directory"] = file_entry["directory"]
-        ordinals_for_inst = instruction_ordinal_map.get(inst_id)
-        if ordinals_for_inst:
-            entry["mvasm_ordinals"] = ordinals_for_inst
-        llvm_map_entries.append(entry)
-    total_proactive = sum(stats.get("proactive_splits", 0) for stats in function_reg_stats.values())
-    allocation_summary = {
-        "total_functions": summary_total_funcs,
-        "functions_with_spills": functions_with_spills,
-        "max_pressure": max_pressure_overall,
-        "total_spills": total_spills,
-        "total_reloads": total_reloads,
-        "max_stack_bytes": max_stack_bytes,
-        "total_proactive_splits": total_proactive,
-    }
-    LAST_DEBUG_INFO = {
-        "version": 1,
-        "files": files_list,
-        "functions": functions_list,
-        "line_map": line_map_entries,
-        "llvm_to_mvasm": llvm_map_entries,
-        "register_allocation_summary": allocation_summary,
-    }
-    return "\n".join(out) + "\n"
-
-
-def _write_debug_file(path: str, payload: Optional[Dict[str, Any]]) -> None:
-    data = payload or {"version": 1, "files": [], "functions": []}
-    target = Path(path)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    with target.open("w", encoding="utf-8") as fp:
-        json.dump(data, fp, indent=2, sort_keys=True)
-
+        return "\n".join(out) + "\n"
+    finally:
+        if restore_features is not None:
+            _set_allocator_features(coalesce=restore_features[0], split=restore_features[1])
 
 def main():
     ap = argparse.ArgumentParser()
@@ -2965,9 +3388,21 @@ def main():
     ap.add_argument("--no-opt", action="store_true", help="disable MOV optimization pass")
     ap.add_argument("--emit-debug", help="write debug metadata JSON to file")
     ap.add_argument("--dump-reg-stats", action="store_true", help="emit register allocation summary to stdout")
+    ap.add_argument("--disable-coalesce", action="store_true", help="disable register coalescing heuristics")
+    ap.add_argument("--disable-split", action="store_true", help="disable proactive live-range splitting")
     args = ap.parse_args()
     txt = open(args.input,"r",encoding="utf-8").read()
-    asm = compile_ll_to_mvasm(txt, trace=args.trace, enable_opt=not args.no_opt)
+    allocator_opts = {}
+    if args.disable_coalesce:
+        allocator_opts["coalesce"] = False
+    if args.disable_split:
+        allocator_opts["split"] = False
+    asm = compile_ll_to_mvasm(
+        txt,
+        trace=args.trace,
+        enable_opt=not args.no_opt,
+        allocator_opts=allocator_opts or None,
+    )
     with open(args.output,"w",encoding="utf-8") as f:
         f.write(asm)
     if args.emit_debug:
@@ -2978,4 +3413,3 @@ def main():
     print(f"Wrote {args.output}")
 if __name__ == "__main__":
     main()
-SPLIT_DISTANCE_THRESHOLD = 12

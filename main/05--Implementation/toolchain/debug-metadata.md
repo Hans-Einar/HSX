@@ -191,6 +191,17 @@ The top-level payload also exposes `register_allocation_summary` aggregating met
 
 Tooling can use the summary for quick profiling without inspecting each function individually.
 
+### Variable Metadata (Phase 3)
+
+- `variables[]` entries (emitted by `hsx-llc --emit-debug`) now include the resolved `file`, `function`, and a `locations[]` history for each `!DILocalVariable`.
+- Each location range contains `{ "start_ordinal": <int>, "end_ordinal": <int|null>, "location": {...} }` where `location.kind` is one of:
+  - `stack`: includes `offset` (relative to `R7`) and optional `size`.
+  - `register`: includes the MV register name (e.g. `R5`).
+  - `global`: references linker-visible `symbol` plus optional `offset`.
+  - `const`: literal `value` captured via `dbg.value`.
+- When the linker merges `.dbg` payloads it materialises a matching `symbols.locals[]` array inside the `.sym` file. Each entry contains `name`, `function`, file/line metadata, and a list of `{start, end, location}` ranges expressed in final PC space (byte addresses).
+- Debugger front-ends can use these sections to implement watch expressions and live locals: prefer `.sym` data at runtime, fall back to `.dbg` for offline analysis.
+
 *Current implementation*: `hsx-llc --emit-debug` produces `files`/`functions`/`line_map`/`llvm_to_mvasm` with MVASM ordinals, and the linker consumes this data to emit `.sym` files (functions, variables, labels, instructions, memory regions) when `--emit-sym` is provided.
 
 ### Final .sym JSON Format

@@ -85,20 +85,28 @@ def test_link_two_objects(tmp_path):
 
 def test_emit_sym_generates_symbol_file(tmp_path):
     ir = """
-    define dso_local i32 @main() !dbg !10 {
+    declare void @llvm.dbg.declare(metadata, metadata, metadata)
+    declare void @llvm.dbg.value(metadata, metadata, metadata)
+
+    define dso_local i32 @main(i32 %arg) !dbg !10 {
     entry:
       %val = alloca i32, align 4, !dbg !12
-      store i32 5, ptr %val, align 4, !dbg !13
+      call void @llvm.dbg.declare(metadata ptr %val, metadata !16, metadata !DIExpression()), !dbg !12
+      store i32 %arg, ptr %val, align 4, !dbg !13
       %load = load i32, ptr %val, align 4, !dbg !14
+      call void @llvm.dbg.value(metadata i32 %load, metadata !16, metadata !DIExpression()), !dbg !14
       ret i32 %load, !dbg !15
     }
 
-    !10 = distinct !DISubprogram(name: "main", linkageName: "main", scope: !11, file: !11, line: 1, scopeLine: 1, unit: !1, retainedNodes: !{})
+    !0 = distinct !DICompileUnit(language: DW_LANG_C, file: !11, producer: "hsx", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+    !10 = distinct !DISubprogram(name: "main", linkageName: "main", scope: !11, file: !11, line: 1, scopeLine: 1, unit: !0, retainedNodes: !{})
     !11 = !DIFile(filename: "test.c", directory: "/project")
     !12 = !DILocation(line: 2, column: 3, scope: !10)
     !13 = !DILocation(line: 3, column: 3, scope: !10)
     !14 = !DILocation(line: 4, column: 3, scope: !10)
     !15 = !DILocation(line: 5, column: 3, scope: !10)
+    !16 = !DILocalVariable(name: "tmp", scope: !10, file: !11, line: 2, type: !17)
+    !17 = !DIBasicType(name: "int", size: 32, encoding: DW_ATE_signed)
     """.strip()
 
     hxo_path, dbg_path = compile_to_hxo_with_debug(ir, "dbg", tmp_path)
@@ -126,4 +134,9 @@ def test_emit_sym_generates_symbol_file(tmp_path):
     instructions = sym_data.get("instructions", [])
     assert any(inst.get("line") == 5 and inst.get("ordinal") is not None for inst in instructions)
     assert isinstance(sym_data["symbols"].get("variables"), list)
+    locals_section = sym_data["symbols"].get("locals") or []
+    assert locals_section, "expected locals section populated"
+    local_entry = locals_section[0]
+    assert local_entry.get("name") == "tmp"
+    assert local_entry.get("locations"), "expected local variable ranges"
     assert sym_data["memory_regions"], "expected memory region metadata"

@@ -277,6 +277,7 @@ def _generate_symbol_payload(
     functions_section: List[Dict[str, Any]] = []
     instructions_section: List[Dict[str, Any]] = []
     variables_section: List[Dict[str, Any]] = []
+    local_variables_section: List[Dict[str, Any]] = []
 
     labels_map: Dict[str, List[str]] = {}
     for name, info in symbol_table.items():
@@ -308,6 +309,7 @@ def _generate_symbol_payload(
         base_address = int(mod["code_base"])
         functions_meta = debug_payload.get("functions", [])
         function_ranges: List[Tuple[int, int, Dict[str, Any]]] = []
+        function_ord_map: Dict[str, Tuple[int, int]] = {}
         for fn_entry in functions_meta:
             start_ord = fn_entry.get("mvasm_start_ordinal")
             if start_ord is None:
@@ -316,6 +318,7 @@ def _generate_symbol_payload(
             if end_ord is None or end_ord < start_ord:
                 end_ord = start_ord
             function_ranges.append((start_ord, end_ord, fn_entry))
+            function_ord_map[fn_entry.get("function")] = (start_ord, end_ord)
             size_words = max(1, end_ord - start_ord + 1)
             file_info = fn_entry.get("file")
             file_name = None
@@ -367,6 +370,47 @@ def _generate_symbol_payload(
                 instruction_record["column"] = line_entry["source_column"]
             instructions_section.append(instruction_record)
 
+        for var_entry in debug_payload.get("variables", []):
+            fn_name = var_entry.get("function")
+            if not fn_name:
+                continue
+            ord_range = function_ord_map.get(fn_name)
+            if not ord_range:
+                continue
+            location_ranges: List[Dict[str, Any]] = []
+            for loc in var_entry.get("locations", []):
+                start_ord = loc.get("start_ordinal")
+                if start_ord is None or start_ord >= len(code_words):
+                    continue
+                end_ord = loc.get("end_ordinal")
+                if end_ord is None:
+                    end_ord = ord_range[1]
+                if end_ord is None:
+                    end_ord = start_ord
+                start_pc = base_address + start_ord * 4
+                bounded_end = max(start_ord, min(end_ord, len(code_words)))
+                end_pc = base_address + bounded_end * 4
+                range_entry = {
+                    "start": start_pc,
+                    "end": end_pc,
+                    "location": loc.get("location"),
+                }
+                location_ranges.append(range_entry)
+            if not location_ranges:
+                continue
+            file_info = var_entry.get("file") or {}
+            local_variables_section.append(
+                {
+                    "name": var_entry.get("name"),
+                    "function": fn_name,
+                    "file": file_info.get("filename"),
+                    "directory": file_info.get("directory"),
+                    "line": var_entry.get("line"),
+                    "scope": var_entry.get("scope"),
+                    "locations": location_ranges,
+                }
+            )
+
     functions_section.sort(key=lambda item: item["address"])
     instructions_section.sort(key=lambda item: item["pc"])
 
@@ -393,6 +437,7 @@ def _generate_symbol_payload(
     symbols_payload = {
         "functions": functions_section,
         "variables": variables_section,
+        "locals": local_variables_section,
         "labels": {key: names for key, names in sorted(labels_map.items())},
     }
 

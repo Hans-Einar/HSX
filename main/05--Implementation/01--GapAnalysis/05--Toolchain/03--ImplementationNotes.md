@@ -358,10 +358,29 @@ Append sessions chronologically and ensure every entry references the relevant d
 - Introduced register coalescing helpers for PHI edges and copy-like lowers, eliminating redundant MOVs when the source has no remaining uses.
 - Implemented proactive live-range splitting: values whose next use is many instructions ahead are spilled early, tracked via a new `proactive_splits` counter, and reloaded only when needed.
 - Instrumented lowering to capture register allocation metrics (peak pressure, spill/reload counts, proactive split count, stack usage, register set) and surfaced them via `LAST_DEBUG_INFO.functions[].register_allocation` plus an aggregate `register_allocation_summary` block (also printable via `hsx-llc --dump-reg-stats`).
-- Updated documentation (`debug-metadata.md`) to describe the new metrics block and created regression coverage validating metadata emission, coalescing behaviour, and live-range splitting heuristics.
+- Updated documentation (`debug-metadata.md`) to describe the new metrics block and created regression coverage validating metadata emission, coalescing behaviour, and live-range splitting heuristics. Added allocator feature toggles (`--disable-coalesce`, `--disable-split`) and a benchmarking helper (`python/allocator_benchmark.py`) that captures metrics across representative IR snippets.
 
 ### Testing
-- `PYTHONPATH=. pytest python/tests/test_register_allocation_metrics.py python/tests/test_build_determinism.py`
+- `PYTHONPATH=. pytest python/tests/test_register_allocation_metrics.py python/tests/test_ir_call_phi.py python/tests/test_source_map.py`
+- `python python/allocator_benchmark.py`
 
 ### Next Steps
-- Explore additional allocator enhancements (coalescing/live-range splitting) and benchmark impact once profiling harness is in place.
+- None remaining for Phase 6.2; shift focus to Phase 6.3 test coverage expansion.
+
+## 2025-11-09 - Codex (Session 20)
+
+### Scope
+- Plan item / phase addressed: Phase 7.1 Variable Tracking
+- Design sections reviewed: 04.05--Toolchain §4.2.1, toolchain/debug-metadata.md (variables schema), 04.09--Debugger.md (§5.5 watch expressions)
+
+### Work Summary
+- Extended `hsx-llc.py` IR parsing to capture `!DILocalVariable`, `!DIExpression`, and lexical scopes, wiring helpers that resolve scope/file ownership for variable metadata.
+- Added dbg intrinsic handling in `lower_function`: interpret `llvm.dbg.declare`/`llvm.dbg.value`, compute stack/register/global locations, record per-variable location timelines, and emit them into the `.dbg` payload alongside function ordinals.
+- Propagated variable metadata through the linker so `.sym` files now expose a `locals` section with PC ranges and storage descriptors, enabling debugger clients to surface live locals.
+- Documented the new metadata blocks (plan + debug-metadata notes) and added regression coverage for hsx-llc + linker to ensure variable info flows end-to-end.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_hsx_llc_debug.py python/tests/test_linker.py`
+
+### Next Steps
+- Phase 7.2: tighten instruction-level mapping completeness + debugger stepping guarantees; follow-up work to hook locals into debugger watch commands.

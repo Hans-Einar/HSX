@@ -16,8 +16,8 @@ def _load_hsx_llc():
 HSX_LLC = _load_hsx_llc()
 
 
-def _compile(ir: str) -> None:
-    HSX_LLC.compile_ll_to_mvasm(ir, trace=False)
+def _compile(ir: str, allocator_opts: dict | None = None) -> None:
+    HSX_LLC.compile_ll_to_mvasm(ir, trace=False, allocator_opts=allocator_opts or {})
 
 
 def _get_reg_alloc(function_name: str) -> dict[str, object]:
@@ -136,6 +136,24 @@ entry:
     summary = (HSX_LLC.LAST_DEBUG_INFO or {}).get("register_allocation_summary")
     assert summary is not None
     assert summary["total_proactive_splits"] >= alloc["proactive_splits"]
+
+
+def test_disable_split_suppresses_proactive_metrics():
+    ir = """
+define dso_local i32 @split_demo_off(i32 %a) {
+entry:
+  %keep = add i32 %a, 1
+  %t0 = add i32 0, 1
+  %t1 = add i32 %t0, 2
+  %t2 = add i32 %t1, 3
+  %t3 = add i32 %t2, 4
+  ret i32 %keep
+}
+"""
+
+    _compile(ir, allocator_opts={"split": False})
+    alloc = _get_reg_alloc("split_demo_off")
+    assert alloc["proactive_splits"] == 0
 
 
 def test_phi_coalescing_eliminates_redundant_moves():
