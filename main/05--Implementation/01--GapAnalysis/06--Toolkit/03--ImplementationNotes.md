@@ -80,3 +80,21 @@ Append sessions chronologically and ensure every entry references the relevant d
 ### Next Steps
 - Finish the Toolkit Phase 2.1 checklist: event subscription RPCs + ACK plumbing, improved queue/back-pressure handling, and documentation.
 - Start wiring the command/state cache layers so DAP adapter can query breakpoints/stack without bespoke RPC calls each time.
+
+## 2025-11-10 - Codex (Session 5)
+
+### Scope
+- Plan item / phase addressed: Toolkit Phase 2.1 follow-up – executive event subscription helpers, auto-ACK loop, and EventBus background dispatcher.
+- Design sections reviewed: `04.06--Toolkit.md` §5.2 and `docs/executive_protocol.md` (events.subscribe/ack schema).
+
+### Work Summary
+- Added automatic event routing + ACK management to `SessionManager`: `subscribe_events()` now negotiates filters, stores subscription metadata, and spins up a background ACK thread that tracks the highest delivered sequence (`events.ack` RPC). `unsubscribe_events()` runs during `session.close` for cleanup (`python/hsxdbg/session.py`).
+- Enhanced `EventBus` with optional background pumping via `start()/stop()` so subscribers can receive callbacks without manual `pump()` invocations (`python/hsxdbg/events.py`).
+- Expanded dummy executive + tests to model subscribe/ack flows and verify that events reach the bus and trigger ACKs (`python/tests/test_hsxdbg_transport.py`).
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_hsxdbg_transport.py python/tests/test_hsxdbg_package.py`
+
+### Next Steps
+- Flesh out event schema helpers (Phase 2.2) and expose richer filtering/subscription APIs to frontends.
+- Integrate the event bus with the upcoming command/state cache layers so stack/register watches react immediately to incoming events.

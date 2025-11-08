@@ -2,6 +2,7 @@ import json
 import socket
 import threading
 import time
+from typing import Optional
 
 from python.hsxdbg.transport import HSXTransport, TransportConfig
 from python.hsxdbg.session import SessionManager, SessionConfig
@@ -16,6 +17,8 @@ class DummyDebuggerServer:
         self.port = self._sock.getsockname()[1]
         self._sock.listen(5)
         self._stop = threading.Event()
+        self._next_seq = 100
+        self.last_ack_seq: Optional[int] = None
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
 
@@ -57,11 +60,12 @@ class DummyDebuggerServer:
                     if cmd == "event.test":
                         event = {
                             "type": "debug_break",
-                            "seq": 42,
+                            "seq": self._next_seq,
                             "pid": 1,
                             "ts": time.time(),
                             "data": {"pc": 0x1000},
                         }
+                        self._next_seq += 1
                         try:
                             conn.sendall(json.dumps(event).encode("utf-8") + b"\n")
                         except OSError:
@@ -91,6 +95,25 @@ class DummyDebuggerServer:
             return {"version": 1, "status": "ok", "reply": "pong"}
         if cmd == "event.test":
             return {"version": 1, "status": "ok"}
+        if cmd == "events.subscribe":
+            return {
+                "version": 1,
+                "status": "ok",
+                "events": {
+                    "token": "sub-dummy",
+                    "max": 128,
+                    "cursor": self._next_seq - 1,
+                    "retention_ms": 1000,
+                },
+            }
+        if cmd == "events.ack":
+            seq = msg.get("seq")
+            self.last_ack_seq = seq
+            return {
+                "version": 1,
+                "status": "ok",
+                "events": {"last_ack": seq, "pending": 0},
+            }
         if cmd == "force_close":
             return {"version": 1, "status": "ok", "note": "closing"}
         return {"version": 1, "status": "ok"}
@@ -183,6 +206,7 @@ def test_session_manager_event_bus_receives_events():
     try:
         transport = HSXTransport(TransportConfig(port=server.port))
         bus = EventBus()
+        bus.start(interval=0.01)
         received = []
         bus.subscribe(EventSubscription(handler=lambda event: received.append(event)))
         session = SessionManager(
@@ -191,6 +215,7 @@ def test_session_manager_event_bus_receives_events():
             event_bus=bus,
         )
         session.open()
+        session.subscribe_events(ack_interval=0.05)
         transport.send_request({"cmd": "event.test"})
         deadline = time.time() + 1.0
         while not received and time.time() < deadline:
@@ -198,5 +223,27 @@ def test_session_manager_event_bus_receives_events():
             time.sleep(0.01)
         assert received and received[0]["type"] == "debug_break"
         session.close()
+        bus.stop()
+    finally:
+        server.stop()
+
+
+def test_session_manager_auto_ack_sends_events_ack():
+    server = DummyDebuggerServer()
+    try:
+        transport = HSXTransport(TransportConfig(port=server.port))
+        bus = EventBus()
+        bus.start(interval=0.01)
+        session = SessionManager(transport=transport, session_config=SessionConfig(), event_bus=bus)
+        session.open()
+        session.subscribe_events(ack_interval=0.05)
+        transport.send_request({"cmd": "event.test"})
+        deadline = time.time() + 1.0
+        while server.last_ack_seq is None and time.time() < deadline:
+            bus.pump()
+            time.sleep(0.02)
+        assert server.last_ack_seq is not None
+        session.close()
+        bus.stop()
     finally:
         server.stop()

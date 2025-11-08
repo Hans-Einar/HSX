@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import logging
+import threading
+import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 from .events import EventBus
-from .transport import HSXTransport, TransportConfig
+from .transport import HSXTransport, TransportConfig, TransportError
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -47,15 +53,21 @@ class SessionManager:
         self.session_config = session_config or SessionConfig()
         self.event_bus = event_bus
         self.state = SessionState()
-        if event_bus is not None:
-            self.transport.set_event_handler(event_bus.publish)
+        self.transport.set_event_handler(self._handle_transport_event)
+
+        self._event_subscription_token: Optional[str] = None
+        self._event_filters: Optional[Dict] = None
+        self._event_lock = threading.Lock()
+        self._last_event_seq: Optional[int] = None
+        self._last_ack_seq: Optional[int] = None
+        self._ack_thread: Optional[threading.Thread] = None
+        self._ack_stop = threading.Event()
+        self._ack_interval = 0.5
 
     def attach_event_bus(self, event_bus: Optional[EventBus]) -> None:
         """Route transport events into the provided EventBus (or detach)."""
 
         self.event_bus = event_bus
-        handler = event_bus.publish if event_bus is not None else None
-        self.transport.set_event_handler(handler)
 
     def open(self) -> SessionState:
         capabilities: Dict[str, object] = {
@@ -112,8 +124,118 @@ class SessionManager:
     def close(self) -> None:
         if not self.state.session_id:
             return
+        self.unsubscribe_events()
         payload = {"cmd": "session.close", "session": self.state.session_id}
         try:
             self.transport.send_request(payload)
         finally:
             self.state = SessionState()
+
+    # ------------------------------------------------------------------
+    # Event streaming helpers
+    # ------------------------------------------------------------------
+
+    def subscribe_events(
+        self,
+        filters: Optional[Dict] = None,
+        *,
+        auto_ack: bool = True,
+        ack_interval: float = 0.5,
+    ) -> Dict:
+        """Subscribe to executive events and enable automatic ACKs."""
+
+        if not self.state.session_id:
+            self.open()
+        if self._event_subscription_token:
+            self.unsubscribe_events()
+        payload = {
+            "cmd": "events.subscribe",
+            "session": self.state.session_id,
+            "filters": filters or {},
+        }
+        response = self.transport.send_request(payload)
+        if response.get("status") != "ok":
+            raise RuntimeError(f"events.subscribe failed: {response}")
+        events_info = response.get("events") or {}
+        token = events_info.get("token")
+        if not token:
+            raise RuntimeError("events.subscribe response missing token")
+        self._event_subscription_token = token
+        self._event_filters = filters or {}
+        self._ack_interval = ack_interval
+        cursor = events_info.get("cursor")
+        with self._event_lock:
+            self._last_event_seq = cursor
+        self._last_ack_seq = cursor
+        if auto_ack:
+            self._start_ack_thread()
+        return events_info
+
+    def unsubscribe_events(self) -> None:
+        token = self._event_subscription_token
+        if not token:
+            return
+        self._stop_ack_thread()
+        self._event_subscription_token = None
+        with self._event_lock:
+            self._last_event_seq = None
+        if not self.state.session_id:
+            return
+        payload = {"cmd": "events.unsubscribe", "session": self.state.session_id}
+        try:
+            self.transport.send_request(payload)
+        except Exception as exc:  # best-effort
+            logger.debug("events.unsubscribe failed: %s", exc)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _handle_transport_event(self, event: Dict) -> None:
+        seq = event.get("seq")
+        if isinstance(seq, int):
+            with self._event_lock:
+                if self._last_event_seq is None or seq > self._last_event_seq:
+                    self._last_event_seq = seq
+        if self.event_bus is not None:
+            try:
+                self.event_bus.publish(event)
+            except Exception:
+                logger.exception("event bus publish failed")
+
+    def _start_ack_thread(self) -> None:
+        if self._ack_thread and self._ack_thread.is_alive():
+            return
+        self._ack_stop.clear()
+        self._ack_thread = threading.Thread(target=self._ack_loop, daemon=True)
+        self._ack_thread.start()
+
+    def _stop_ack_thread(self) -> None:
+        self._ack_stop.set()
+        thread = self._ack_thread
+        if thread and thread.is_alive():
+            thread.join(timeout=0.5)
+        self._ack_thread = None
+
+    def _ack_loop(self) -> None:
+        while not self._ack_stop.wait(self._ack_interval):
+            self._send_pending_ack()
+        self._send_pending_ack()
+
+    def _send_pending_ack(self) -> None:
+        if not self.state.session_id:
+            return
+        with self._event_lock:
+            target = self._last_event_seq
+        if target is None or target == self._last_ack_seq:
+            return
+        payload = {"cmd": "events.ack", "session": self.state.session_id, "seq": target}
+        try:
+            response = self.transport.send_request(payload)
+        except TransportError as exc:
+            logger.debug("events.ack transport error: %s", exc)
+            return
+        if response.get("status") == "ok":
+            self._last_ack_seq = target
+        else:
+            logger.debug("events.ack failed: %s", response)

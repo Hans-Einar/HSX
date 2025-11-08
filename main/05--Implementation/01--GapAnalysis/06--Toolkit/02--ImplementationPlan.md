@@ -183,14 +183,14 @@ Design specifies async event dispatcher with bounded queues (section 5.2). Real-
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
-- [ ] Create `hsxdbg/events.py` module
-- [ ] Implement async event dispatcher (asyncio or threading)
-- [ ] Implement bounded event queues (configurable size)
-- [ ] Implement subscriber registration by event type
-- [ ] Implement event delivery to subscribers
-- [ ] Handle slow subscribers (queue overflow)
-- [ ] Implement event filtering by PID
-- [ ] Add event bus tests
+- [x] Create `hsxdbg/events.py` module
+- [x] Implement async event dispatcher (asyncio or threading)
+- [x] Implement bounded event queues (configurable size)
+- [x] Implement subscriber registration by event type
+- [x] Implement event delivery to subscribers
+- [x] Handle slow subscribers (queue overflow)
+- [x] Implement event filtering by PID
+- [x] Add event bus tests
 - [ ] Document event bus API
 
 ---

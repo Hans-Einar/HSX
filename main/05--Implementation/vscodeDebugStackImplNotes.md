@@ -46,3 +46,14 @@
 - Follow-ups:
   - Implement actual `events.subscribe` / `events.ack` RPC helpers plus background dispatcher thread so EventBus pumping becomes automatic.
   - Define typed event objects (trace_step, debug_break, etc.) for the forthcoming state cache and DAP adapter.
+
+## 2025-11-10 — Event Subscription & ACK Loop
+
+- Scope: Continue Toolkit Phase 2.1—expose `events.subscribe` helpers, auto-ACK, and optional EventBus worker for VS Code adapters.
+- Highlights:
+  - `SessionManager.subscribe_events()` now negotiates subscriptions (filters + cursor), tracks delivered sequences, and spawns a background thread that periodically issues `events.ack` RPCs. `unsubscribe_events()` is invoked automatically during `session.close`.
+  - `EventBus.start()/stop()` provide a background dispatcher thread; tests spin it up to ensure subscribers receive callbacks without manual pumps.
+  - Dummy executive + transport tests extended to cover subscribe + ACK flows; executed `PYTHONPATH=. pytest python/tests/test_hsxdbg_transport.py python/tests/test_hsxdbg_package.py`.
+- Follow-ups:
+  - Layer event schema parsing atop the raw events (Phase 2.2) so the VS Code adapter can bind typed handlers.
+  - Explore exposing ACK metrics to frontends for slow-consumer diagnostics once back-pressure hooks land.

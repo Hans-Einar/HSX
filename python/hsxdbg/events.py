@@ -49,6 +49,9 @@ class EventBus:
         self._subs: Dict[int, EventSubscription] = {}
         self._lock = threading.Lock()
         self._next_token = 1
+        self._worker: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
+        self._interval = 0.01
 
     def subscribe(self, sub: EventSubscription) -> int:
         with self._lock:
@@ -78,3 +81,25 @@ class EventBus:
             sub = self._subs.get(token)
             if sub:
                 sub.dispatch()
+
+    def start(self, interval: float = 0.01) -> None:
+        """Start background dispatcher that periodically pumps the bus."""
+
+        self._interval = interval
+        if self._worker and self._worker.is_alive():
+            return
+        self._stop_event.clear()
+        self._worker = threading.Thread(target=self._run, daemon=True)
+        self._worker.start()
+
+    def stop(self) -> None:
+        self._stop_event.set()
+        worker = self._worker
+        if worker and worker.is_alive():
+            worker.join(timeout=0.5)
+        self._worker = None
+
+    def _run(self) -> None:
+        while not self._stop_event.wait(self._interval):
+            self.pump()
+        self.pump()
