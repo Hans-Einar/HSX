@@ -450,10 +450,14 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--log-file")
     parser.add_argument("--log-level", default="INFO")
     args, _ = parser.parse_known_args(argv)
+    if args.log_file:
+        log_path = Path(args.log_file)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(
         filename=args.log_file,
         level=getattr(logging, str(args.log_level).upper(), logging.INFO),
         format="[%(asctime)s] %(levelname)s: %(message)s",
+        force=True,
     )
     protocol = DAPProtocol(sys.stdin.buffer, sys.stdout.buffer)
     adapter = HSXDebugAdapter(protocol)
