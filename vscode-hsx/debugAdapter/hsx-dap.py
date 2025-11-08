@@ -12,7 +12,7 @@ def main() -> int:
     sys.path.insert(0, str(repo_root))
     from python.hsx_dap import main as dap_main  # noqa: WPS433
 
-    return dap_main()
+    return dap_main(sys.argv[1:])
 
 
 if __name__ == "__main__":
