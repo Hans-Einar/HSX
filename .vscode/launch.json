@@ -1,0 +1,13 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "hsx",
+            "name": "HSX Attach PID 5",
+            "request": "launch",
+            "pid": 5,                 // whichever PID your app uses
+            "host": "127.0.0.1",      // executive host
+            "port": 9998,             // executive port
+        }
+    ]
+}
