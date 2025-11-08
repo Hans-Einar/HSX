@@ -580,6 +580,28 @@ def main():
     
     args = parser.parse_args()
     
+    dir_sources = []
+    file_sources = []
+    normalized_sources = []
+    for src in args.sources:
+        path = Path(src)
+        if path.is_dir():
+            dir_sources.append(path)
+        else:
+            file_sources.append(path)
+    if dir_sources:
+        if file_sources:
+            parser.error("Cannot mix directory paths with individual source files.")
+        if len(dir_sources) > 1:
+            parser.error("Only one directory path is supported at a time.")
+        directory_path = dir_sources[0].resolve()
+        if not directory_path.exists():
+            parser.error(f"Directory does not exist: {directory_path}")
+        args.directory = str(directory_path)
+        args.sources = []
+    else:
+        args.sources = [str(Path(src)) for src in file_sources]
+
     builder = HSXBuilder(args)
     return builder.build()
 

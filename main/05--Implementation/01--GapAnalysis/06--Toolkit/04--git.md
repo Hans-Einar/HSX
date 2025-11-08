@@ -17,7 +17,7 @@
 | 2025-11-10 | `c0da03e` | `Event bus hookup` | Hans Einar | Tests: `PYTHONPATH=. pytest python/tests/test_hsxdbg_transport.py python/tests/test_hsxdbg_package.py` |
 | 2025-11-10 | `77c27b8` | `Event subscribe + ACK loop` | Hans Einar | Tests: `PYTHONPATH=. pytest python/tests/test_hsxdbg_transport.py python/tests/test_hsxdbg_package.py` |
 | 2025-11-10 | `c1ac388` | `Typed event schemas` | Hans Einar | Tests: `PYTHONPATH=. pytest python/tests/test_hsxdbg_events.py python/tests/test_hsxdbg_transport.py python/tests/test_hsxdbg_package.py python/tests/test_hsx_cc_build.py python/tests/test_build_determinism.py` |
-| 2025-11-10 | `b69f524` | `Runtime cache phases 3.1-3.3 + hsx-dap scaffold` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dap_protocol.py python/tests/test_hsxdbg_cache.py python/tests/test_hsxdbg_session.py python/tests/test_hsxdbg_commands.py python/tests/test_hsxdbg_events.py python/tests/test_hsxdbg_transport.py python/tests/test_hsxdbg_package.py` |
+| 2025-11-10 | `f071e6e` | `Runtime cache phases 3.1-3.3 + hsx-dap scaffold` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dap_protocol.py python/tests/test_hsxdbg_cache.py python/tests/test_hsxdbg_session.py python/tests/test_hsxdbg_commands.py python/tests/test_hsxdbg_events.py python/tests/test_hsxdbg_transport.py python/tests/test_hsxdbg_package.py` |
 
 ## Pull Request
 - PR URL / ID: `<link or ID>`

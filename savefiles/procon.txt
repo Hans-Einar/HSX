@@ -1,2 +1,2 @@
-examples/demos/build/mailbox/consumer.hxe
-examples/demos/build/mailbox/producer.hxe
+examples/demos/build/debug/mailbox/consumer.hxe
+examples/demos/build/debug/mailbox/producer.hxe
