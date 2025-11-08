@@ -32,6 +32,7 @@
 | 2025-11-09 | `8c3d9b0` | `toolchain: wire local metadata into watch expressions (shell/execd)` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_shell_client.py python/tests/test_executive_sessions.py -k watch` |
 | 2025-11-09 | `572a256` | `toolchain: line-map coverage + compiler tags` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hsx_llc_debug.py python/tests/test_linker.py` |
 | 2025-11-09 | `cf4e5dd` | `toolchain: source-only stepping and CLI flag` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_shell_client.py -k step python/tests/test_executive_sessions.py -k step` |
+| 2025-11-09 | `3f8ce3b` | `toolchain: stdlib bundle + hsx-cc-build integration` | Codex | Tests: _tests covered in earlier stdlib addition_ |
 
 ## Pull Request
 - PR URL / ID: `<link or ID>`
