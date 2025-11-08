@@ -1,5 +1,6 @@
 const vscode = require("vscode");
 const path = require("path");
+const os = require("os");
 
 class HSXConfigurationProvider {
   resolveDebugConfiguration(folder, config) {
@@ -24,8 +25,10 @@ class HSXAdapterFactory {
     const defaultPython = process.platform === "win32" ? "python" : "python3";
     const pythonCommand = process.env.PYTHON || process.env.HSX_PYTHON || defaultPython;
     const adapterPath = this.context.asAbsolutePath(path.join("debugAdapter", "hsx-dap.py"));
-    console.info(`[hsx-dap] launching adapter: interpreter=${pythonCommand}, script=${adapterPath}`);
-    return new vscode.DebugAdapterExecutable(pythonCommand, [adapterPath]);
+    const logFile = path.join(os.tmpdir(), "hsx-dap.log");
+    const args = [adapterPath, "--log-file", logFile, "--log-level", "DEBUG"];
+    console.info(`[hsx-dap] launching adapter: interpreter=${pythonCommand}, script=${adapterPath}, log=${logFile}`);
+    return new vscode.DebugAdapterExecutable(pythonCommand, args);
   }
 
   dispose() {}

@@ -7,12 +7,12 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 import threading
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
-
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
@@ -457,5 +457,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     protocol = DAPProtocol(sys.stdin.buffer, sys.stdout.buffer)
     adapter = HSXDebugAdapter(protocol)
-    adapter.serve()
-    return 0
+    logger = logging.getLogger("hsx-dap")
+    logger.info("HSX DAP adapter starting (pid=%s)", os.getpid())
+    try:
+        adapter.serve()
+        logger.info("HSX DAP adapter exiting normally")
+        return 0
+    except Exception:
+        logger.exception("HSX DAP adapter crashed")
+        raise
