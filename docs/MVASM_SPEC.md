@@ -213,7 +213,7 @@ Refer to `docs/abi_syscalls.md` for definitive module/function tables and argume
 
 ## Example
 ```
-.include "stdlib.mvasm"
+.include "lib/hsx_std/stdlib.mvasm"
 .text
 .entry main
 main:

@@ -697,13 +697,13 @@ Design mentions standard library with values/commands/mailboxes. Enables code re
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Design standard library structure
-- [ ] Create common value definitions (version, uptime, etc.)
-- [ ] Create common command definitions (reset, status, etc.)
-- [ ] Create common mailbox definitions (stdio, log, etc.)
-- [ ] Package library as linkable objects
-- [ ] Add library usage examples
-- [ ] Document library API
+- [x] Design standard library structure
+- [x] Create common value definitions (version, uptime, etc.)
+- [x] Create common command definitions (reset, status, etc.)
+- [x] Create common mailbox definitions (stdio, log, etc.)
+- [x] Package library as linkable objects
+- [x] Add library usage examples
+- [x] Document library API
 - [ ] Create library distribution package
 
 ---

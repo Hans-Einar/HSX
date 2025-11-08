@@ -1,0 +1,48 @@
+; HSX Standard Library - metadata bundle
+; Provides canonical value/command/mailbox descriptors plus tiny helper stubs.
+
+.export hsx_std_reset
+.export hsx_std_noop
+
+.text
+.entry __hsx_stdlib_init
+__hsx_stdlib_init:
+    RET
+
+; Command handler: request graceful shutdown via TASK_EXIT (mod 0x01, fn 0x00)
+hsx_std_reset:
+    LDI R0, 0
+    SVC MOD=0x1, FN=0x0
+    RET
+
+; Command handler: placeholder (returns success)
+hsx_std_noop:
+    RET
+
+; ---------------------------------------------------------------------------
+; Declarative metadata
+; ---------------------------------------------------------------------------
+
+; System value: semantic version (major.minor encoded as f16)
+.value {"group":240,"value":1,"name":"sys.version","flags":1,"auth":0,"unit":"rev","init":0.0}
+
+; System value: build identifier (tooling may patch this before provision)
+.value {"group":240,"value":2,"name":"sys.build","flags":1,"auth":0,"unit":"rev","init":0.0}
+
+; System value: uptime (seconds)
+.value {"group":240,"value":3,"name":"sys.uptime","flags":1,"auth":0,"unit":"s","rate_ms":1000,"init":0.0}
+
+; System value: health score (0.0 .. 1.0)
+.value {"group":240,"value":4,"name":"sys.health","flags":0,"auth":0,"unit":"pct","min":0.0,"max":1.0,"init":1.0}
+
+; Command: reset current task
+.cmd {"group":240,"cmd":16,"name":"sys.reset","flags":0,"auth":0,"handler":"hsx_std_reset","help":"Graceful task exit"}
+
+; Command: reserved noop
+.cmd {"group":240,"cmd":17,"name":"sys.noop","flags":0,"auth":0,"handler":"hsx_std_noop","help":"Reserved no-op command"}
+
+; Shared logging mailbox
+.mailbox {"target":"svc:log","capacity":128,"mode_mask":19,"flags":0}
+
+; Application telemetry channel
+.mailbox {"target":"app:telemetry","capacity":96,"mode_mask":3,"flags":0}

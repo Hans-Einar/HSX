@@ -420,3 +420,17 @@ Append sessions chronologically and ensure every entry references the relevant d
 
 ### Next Steps
 - Remaining 7.2 task: integrate the new metadata into debugger stepping flows (CLI/TUI) so “step over compiler frames” guarantees are validated.
+
+## 2025-11-09 - Codex (Session 23)
+
+### Scope
+- Plan item / phase addressed: Phase 7.3 Library Support
+- Design sections reviewed: docs/MVASM_SPEC.md (stdlib reference), 04.04--ValCmd (value/command metadata), hsx_value/command headers.
+
+### Work Summary
+- Introduced `lib/hsx_std/stdlib.mvasm`, a bundled MVASM module exporting canonical system values, commands, and mailbox descriptors alongside helper stubs (`hsx_std_reset`, `hsx_std_noop`).
+- Added `include/hsx_stdlib.h` with reserved group/value/command identifiers so payloads can reference the shared OIDs without hard-coding literals; documented usage in `lib/hsx_std/README.md`.
+- Updated `docs/MVASM_SPEC.md` to point to the new stdlib location and created an automated regression test (`python/tests/test_stdlib_metadata.py`) validating that linking the module injects the expected metadata into the final `.hxe`.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_stdlib_metadata.py`
