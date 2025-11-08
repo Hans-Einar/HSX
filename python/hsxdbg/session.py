@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
+from .events import EventBus
 from .transport import HSXTransport, TransportConfig
 
 
@@ -40,10 +41,21 @@ class SessionManager:
         *,
         transport_config: Optional[TransportConfig] = None,
         session_config: Optional[SessionConfig] = None,
+        event_bus: Optional[EventBus] = None,
     ) -> None:
         self.transport = transport or HSXTransport(transport_config or TransportConfig())
         self.session_config = session_config or SessionConfig()
+        self.event_bus = event_bus
         self.state = SessionState()
+        if event_bus is not None:
+            self.transport.set_event_handler(event_bus.publish)
+
+    def attach_event_bus(self, event_bus: Optional[EventBus]) -> None:
+        """Route transport events into the provided EventBus (or detach)."""
+
+        self.event_bus = event_bus
+        handler = event_bus.publish if event_bus is not None else None
+        self.transport.set_event_handler(handler)
 
     def open(self) -> SessionState:
         capabilities: Dict[str, object] = {

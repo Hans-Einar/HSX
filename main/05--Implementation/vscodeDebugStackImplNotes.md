@@ -35,3 +35,14 @@
 - Follow-ups:
   - Propagate session warnings and heartbeat guidance to CLI/DAP UX.
   - Begin command layer work so hsxdbg clients no longer craft raw RPC dictionaries.
+
+## 2025-11-10 — Event Bus Hookup
+
+- Scope: Toolkit plan Phase 2.1 groundwork—wire hsxdbg transport events into the shared EventBus so VS Code/DAP consumers can subscribe without custom socket plumbing.
+- Highlights:
+  - `SessionManager` now accepts/attaches an `EventBus`, calling `HSXTransport.set_event_handler` under the hood; `attach_event_bus()` lets adapters swap buses at runtime.
+  - Added regression `test_session_manager_event_bus_receives_events` validating that dummy executive events reach EventBus subscribers once `bus.pump()` runs.
+  - Tests executed: `PYTHONPATH=. pytest python/tests/test_hsxdbg_transport.py python/tests/test_hsxdbg_package.py`.
+- Follow-ups:
+  - Implement actual `events.subscribe` / `events.ack` RPC helpers plus background dispatcher thread so EventBus pumping becomes automatic.
+  - Define typed event objects (trace_step, debug_break, etc.) for the forthcoming state cache and DAP adapter.

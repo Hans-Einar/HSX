@@ -62,3 +62,21 @@ Append sessions chronologically and ensure every entry references the relevant d
 ### Next Steps
 - Surface session warnings/heartbeat into higher-level clients (CLI/DAP) once command layer is in place.
 - Hook the transport event handler into the upcoming event bus module so subscriptions no longer require direct socket access.
+
+## 2025-11-10 - Codex (Session 4)
+
+### Scope
+- Plan item / phase addressed: Toolkit Phase 2.1 prep – integrate `hsxdbg.events` with transport/session plumbing (per VS Code stack plan).
+- Design sections reviewed: `04.06--Toolkit.md` §5.2 (event streaming) and `04.09--Debugger.md` §5.2.
+
+### Work Summary
+- Extended `SessionManager` to accept/attach an `EventBus`, automatically routing HSXTransport’s async events into the shared dispatcher so frontends don’t have to override the low-level transport handler (`python/hsxdbg/session.py`).
+- Added public `attach_event_bus()` helper and new regression covering event delivery through the bus (dummy executive now drives `EventBus` subscribers via `bus.pump()` in `python/tests/test_hsxdbg_transport.py`).
+- Notes captured here; VS Code stack notes updated; plan remains referencing Phase 2 tasks.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_hsxdbg_transport.py python/tests/test_hsxdbg_package.py`
+
+### Next Steps
+- Finish the Toolkit Phase 2.1 checklist: event subscription RPCs + ACK plumbing, improved queue/back-pressure handling, and documentation.
+- Start wiring the command/state cache layers so DAP adapter can query breakpoints/stack without bespoke RPC calls each time.

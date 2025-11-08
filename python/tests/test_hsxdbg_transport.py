@@ -5,6 +5,7 @@ import time
 
 from python.hsxdbg.transport import HSXTransport, TransportConfig
 from python.hsxdbg.session import SessionManager, SessionConfig
+from python.hsxdbg.events import EventBus, EventSubscription
 
 
 class DummyDebuggerServer:
@@ -172,6 +173,30 @@ def test_session_manager_open_and_keepalive():
         assert state.heartbeat_s == 30
         assert state.warnings == ["max_events_clamped:256"]
         session.keepalive()
+        session.close()
+    finally:
+        server.stop()
+
+
+def test_session_manager_event_bus_receives_events():
+    server = DummyDebuggerServer()
+    try:
+        transport = HSXTransport(TransportConfig(port=server.port))
+        bus = EventBus()
+        received = []
+        bus.subscribe(EventSubscription(handler=lambda event: received.append(event)))
+        session = SessionManager(
+            transport=transport,
+            session_config=SessionConfig(client_name="bus-client", pid_lock=None),
+            event_bus=bus,
+        )
+        session.open()
+        transport.send_request({"cmd": "event.test"})
+        deadline = time.time() + 1.0
+        while not received and time.time() < deadline:
+            bus.pump()
+            time.sleep(0.01)
+        assert received and received[0]["type"] == "debug_break"
         session.close()
     finally:
         server.stop()
