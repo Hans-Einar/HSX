@@ -411,10 +411,12 @@ Append sessions chronologically and ensure every entry references the relevant d
 ### Work Summary
 - Updated `hsx-llc` to emit line-map entries for every MVASM instruction (including compiler-generated ones) and to record `line_coverage` statistics/warnings when ordinals are left unmapped.
 - Marked compiler-generated instructions with `source_kind="compiler"` plus instruction ids, enabling downstream tools to distinguish them from user code; added the same metadata to linker-generated `.sym` instruction entries.
-- Refreshed docs/plan plus regression tests (`python/tests/test_hsx_llc_debug.py`, `python/tests/test_linker.py`) to assert coverage summaries and compiler-tag presence.
+- Introduced `step --source-only` support (shell + executive) so manual stepping automatically skips compiler-only instructions using the `.sym` metadata, ensuring debugger single-step semantics align with user source.
+- Refreshed docs/plan plus regression tests (`python/tests/test_hsx_llc_debug.py`, `python/tests/test_linker.py`) to assert coverage summaries and compiler-tag presence, plus new shell/executive session tests covering source-only stepping.
 
 ### Testing
 - `PYTHONPATH=. pytest python/tests/test_hsx_llc_debug.py python/tests/test_linker.py`
+- `PYTHONPATH=. pytest python/tests/test_shell_client.py -k step python/tests/test_executive_sessions.py -k step`
 
 ### Next Steps
 - Remaining 7.2 task: integrate the new metadata into debugger stepping flows (CLI/TUI) so “step over compiler frames” guarantees are validated.

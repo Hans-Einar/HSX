@@ -1090,6 +1090,26 @@ class ExecutiveState:
                 if key in data:
                     line_block = data[key]
                     break
+            if line_block is None:
+                inst_block = data.get("instructions")
+                inst_lines: List[Dict[str, Any]] = []
+                if isinstance(inst_block, list):
+                    for item in inst_block:
+                        if not isinstance(item, dict):
+                            continue
+                        address = item.get("pc")
+                        line_value = item.get("line")
+                        if line_value is None:
+                            continue
+                        inst_lines.append(
+                            {
+                                "address": address,
+                                "file": item.get("file"),
+                                "line": line_value,
+                            }
+                        )
+                if inst_lines:
+                    line_block = inst_lines
         lines: List[Dict[str, Any]] = []
         if isinstance(line_block, list):
             for item in line_block:
@@ -1121,6 +1141,35 @@ class ExecutiveState:
                         }
                     )
         return lines
+
+    @staticmethod
+    def _extract_instruction_entries(data: Any) -> Tuple[List[Dict[str, Any]], Dict[int, Dict[str, Any]]]:
+        instructions: List[Dict[str, Any]] = []
+        lookup: Dict[int, Dict[str, Any]] = {}
+        if isinstance(data, dict):
+            block = data.get("instructions")
+            if isinstance(block, list):
+                for item in block:
+                    if not isinstance(item, dict):
+                        continue
+                    pc_value = item.get("pc")
+                    try:
+                        pc_int = int(pc_value, 0) if isinstance(pc_value, str) else int(pc_value)
+                    except (TypeError, ValueError):
+                        continue
+                    entry: Dict[str, Any] = {
+                        "pc": pc_int & 0xFFFFFFFF,
+                        "source_kind": (item.get("source_kind") or "").lower() or None,
+                        "line": item.get("line"),
+                        "column": item.get("column"),
+                        "function": item.get("function"),
+                        "file": item.get("file"),
+                        "directory": item.get("directory"),
+                    }
+                    instructions.append(entry)
+                    lookup[entry["pc"]] = entry
+        instructions.sort(key=lambda item: item["pc"])
+        return instructions, lookup
 
     @classmethod
     def _extract_local_entries(
@@ -1221,6 +1270,7 @@ class ExecutiveState:
         data = json.loads(path.read_text(encoding="utf-8"))
         entries = self._extract_symbol_entries(data)
         lines = self._extract_line_entries(data)
+        instructions, instruction_lookup = self._extract_instruction_entries(data)
         locals_entries, locals_by_function = self._extract_local_entries(data)
         by_name = {entry["name"]: entry for entry in entries if entry.get("name")}
         addresses = sorted(entries, key=lambda item: item.get("address", 0))
@@ -1233,6 +1283,8 @@ class ExecutiveState:
             "lines": line_index,
             "locals": locals_entries,
             "locals_by_function": locals_by_function,
+            "instructions": instructions,
+            "instructions_by_pc": instruction_lookup,
         }
 
     def load_symbols_for_pid(
@@ -1683,6 +1735,25 @@ class ExecutiveState:
             "description": description,
             "regs": regs,
         }
+
+    def _instruction_entry(self, pid: Optional[int], pc: Optional[int]) -> Optional[Dict[str, Any]]:
+        if pid is None or pc is None:
+            return None
+        with self.symbol_cache_lock:
+            table = self.symbol_tables.get(pid)
+            if not table:
+                return None
+            lookup = table.get("instructions_by_pc")
+            if not isinstance(lookup, dict):
+                return None
+            return lookup.get(int(pc) & 0xFFFFFFFF)
+
+    def _is_compiler_instruction(self, pid: Optional[int], pc: Optional[int]) -> bool:
+        entry = self._instruction_entry(pid, pc)
+        if not entry:
+            return False
+        kind = entry.get("source_kind")
+        return isinstance(kind, str) and kind.lower() == "compiler"
 
     def watch_add(
         self,
@@ -3254,7 +3325,54 @@ class ExecutiveState:
                     warnings.append("symbols_unavailable")
         return info
 
-    def step(self, steps: Optional[int] = None, *, pid: Optional[int] = None, source: str = "manual") -> Dict[str, Any]:
+    def step(
+        self,
+        steps: Optional[int] = None,
+        *,
+        pid: Optional[int] = None,
+        source: str = "manual",
+        source_only: bool = False,
+    ) -> Dict[str, Any]:
+        budget = steps if steps is not None else self.step_batch
+        if not source_only:
+            result, _ = self._step_once(budget, pid=pid, source=source)
+            return result
+        source_steps = steps if steps is not None else 1
+        iterations = max(1, source_steps)
+        aggregated_events: List[Dict[str, Any]] = []
+        total_executed = 0
+        final_result: Optional[Dict[str, Any]] = None
+        for _ in range(iterations):
+            while True:
+                result, trace_snapshot = self._step_once(1, pid=pid, source=source)
+                final_result = result
+                events = result.get("events") or []
+                if events:
+                    aggregated_events.extend(events)
+                exec_val = result.get("executed")
+                if isinstance(exec_val, int):
+                    total_executed += exec_val
+                pid_eval = self._optional_int(trace_snapshot.get("pid")) if isinstance(trace_snapshot, dict) else None
+                if pid_eval is None:
+                    pid_eval = self._optional_int(result.get("current_pid")) or pid
+                skip = False
+                if pid_eval is not None and isinstance(trace_snapshot, dict):
+                    pc_val = self._optional_int(trace_snapshot.get("pc"))
+                    if pc_val is not None and self._is_compiler_instruction(pid_eval, pc_val):
+                        skip = True
+                if not skip or not result.get("running"):
+                    break
+            if final_result is None or not final_result.get("running"):
+                break
+        if final_result is None:
+            return {"executed": 0, "running": False, "events": []}
+        final_events = aggregated_events or final_result.get("events") or []
+        final_result["events"] = final_events
+        if total_executed:
+            final_result["executed"] = total_executed
+        return final_result
+
+    def _step_once(self, steps: Optional[int], *, pid: Optional[int], source: str) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
         self._advance_sleeping_tasks()
         budget = steps if steps is not None else self.step_batch
         pre_event = self._check_breakpoint_before_step(pid)
@@ -3271,7 +3389,7 @@ class ExecutiveState:
                 "events": [pre_event],
             }
             self._refresh_tasks()
-            return result
+            return result, None
         with self.lock:
             result = self.vm.step(budget, pid=pid)
         executed_raw = result.get("executed", 0)
@@ -3326,7 +3444,7 @@ class ExecutiveState:
         watch_events = self._check_watches(pid if pid is not None else None)
         if watch_events:
             result.setdefault("events", []).extend(watch_events)
-        return result
+        return result, trace_last
 
     def start_auto(self) -> None:
         if self.auto_thread and self.auto_thread.is_alive():
@@ -4766,11 +4884,12 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
             if cmd == "step":
                 steps_value = request.get("steps")
                 pid_value = request.get("pid")
+                source_only_flag = bool(request.get("source_only") or request.get("source"))
                 steps_int = int(steps_value) if steps_value is not None else None
                 pid_int = int(pid_value) if pid_value is not None else None
                 if pid_int is not None:
                     self.state.ensure_pid_access(pid_int, session_id)
-                result = self.state.step(steps_int, pid=pid_int, source="manual")
+                result = self.state.step(steps_int, pid=pid_int, source="manual", source_only=source_only_flag)
                 status = self.state.get_clock_status()
                 return {"version": 1, "status": "ok", "result": result, "clock": status}
             if cmd == "bp":

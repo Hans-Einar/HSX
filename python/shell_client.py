@@ -2315,6 +2315,7 @@ def _build_payload(
         tokens = list(args)
         steps_value: Optional[int] = None
         target_pid: Optional[int] = None
+        source_only_flag = False
         i = 0
         while i < len(tokens):
             token = tokens[i]
@@ -2326,18 +2327,22 @@ def _build_payload(
                     target_pid = int(tokens[i], 0)
                 except ValueError as exc:
                     raise ValueError("step pid must be integer") from exc
+            elif token in {"--source", "--source-only"}:
+                source_only_flag = True
             elif steps_value is None:
                 try:
                     steps_value = int(token, 0)
                 except ValueError as exc:
                     raise ValueError("step count must be integer") from exc
             else:
-                raise ValueError("step usage: step [steps] [-p <pid>]")
+                raise ValueError("step usage: step [steps] [-p <pid>] [--source]")
             i += 1
         if steps_value is not None:
             payload["steps"] = steps_value
         if target_pid is not None:
             payload["pid"] = target_pid
+        if source_only_flag:
+            payload["source_only"] = True
         return payload
 
     if cmd == "reload":

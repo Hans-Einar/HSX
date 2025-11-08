@@ -1099,6 +1099,33 @@ def _seed_symbol_table(state: ExecutiveState, pid: int, entries: list[tuple[str,
         state.symbol_tables[pid] = table
 
 
+def _seed_instruction_table(state: ExecutiveState, pid: int, entries: list[dict]) -> None:
+    with state.symbol_cache_lock:
+        table = state.symbol_tables.get(pid)
+        if not table:
+            table = {
+                "path": "test.sym",
+                "symbols": [],
+                "addresses": [],
+                "by_name": {},
+                "lines": [],
+            }
+        instructions: list[dict] = []
+        lookup: Dict[int, dict] = {}
+        for entry in entries:
+            info = dict(entry)
+            pc_value = info.get("pc", 0)
+            pc = int(pc_value, 0) if isinstance(pc_value, str) else int(pc_value)
+            pc &= 0xFFFFFFFF
+            info["pc"] = pc
+            instructions.append(info)
+            lookup[pc] = info
+        instructions.sort(key=lambda item: item["pc"])
+        table["instructions"] = instructions
+        table["instructions_by_pc"] = lookup
+        state.symbol_tables[pid] = table
+
+
 def _inject_locals(state: ExecutiveState, pid: int, locals_entries: list[dict]) -> None:
     with state.symbol_cache_lock:
         table = state.symbol_tables.get(pid)
@@ -1288,6 +1315,32 @@ def test_watch_add_symbol_resolves_address():
     listing = state.watch_list(1)
     assert listing["count"] == 1
     assert listing["watches"][0]["symbol"] == "main"
+
+
+def test_step_source_only_skips_compiler_entries():
+    state, vm = make_debug_state()
+    _seed_instruction_table(
+        state,
+        1,
+        [
+            {"pc": 0x0000, "source_kind": "compiler"},
+            {"pc": 0x0010, "source_kind": "compiler"},
+            {"pc": 0x0020, "source_kind": "source"},
+        ],
+    )
+    vm.pc = 0
+    vm.step_delta = 0x10
+    result = state.step(pid=1, source_only=True)
+    assert vm.pc == 0x30
+    assert result["executed"] == 3
+
+
+def test_step_source_only_without_metadata_falls_back():
+    state, vm = make_debug_state()
+    vm.pc = 0
+    result = state.step(pid=1, source_only=True)
+    assert result["executed"] == 1
+    assert vm.pc == (0 + vm.step_delta) & 0xFFFF
 
 
 def test_watch_remove_and_cleanup():

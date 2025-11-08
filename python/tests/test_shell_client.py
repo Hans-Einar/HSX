@@ -87,6 +87,20 @@ def test_watch_remove_payload(tmp_path: Path) -> None:
     assert payload == {"cmd": "watch", "op": "remove", "pid": 9, "id": 3}
 
 
+def test_step_payload_accepts_source_flag(tmp_path: Path) -> None:
+    payload = shell_client._build_payload("step", ["--source"], tmp_path)
+    assert payload["cmd"] == "step"
+    assert payload["source_only"] is True
+    assert "steps" not in payload
+
+
+def test_step_payload_with_pid_count_and_source(tmp_path: Path) -> None:
+    payload = shell_client._build_payload("step", ["-p", "7", "3", "--source-only"], tmp_path)
+    assert payload["pid"] == 7
+    assert payload["steps"] == 3
+    assert payload["source_only"] is True
+
+
 def test_sched_payload_pid(tmp_path: Path) -> None:
     payload = shell_client._build_payload("sched", ["7", "priority", "2"], tmp_path)
     assert payload["pid"] == 7
