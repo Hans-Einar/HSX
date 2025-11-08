@@ -12,6 +12,7 @@
 | Date | Commit hash | Message | Author | Notes |
 | --- | --- | --- | --- | --- |
 | 2025-11-10 | `63eb9c2` | `toolkit: add hsxdbg package scaffold + smoke tests` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hsxdbg_package.py` |
+| 2025-11-10 | `9e7108a` | `Transport Layer` | Hans Einar | Tests: `PYTHONPATH=. pytest python/tests/test_hsxdbg_transport.py python/tests/test_hsxdbg_package.py` |
 
 ## Pull Request
 - PR URL / ID: `<link or ID>`

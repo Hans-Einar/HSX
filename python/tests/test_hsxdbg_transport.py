@@ -70,20 +70,29 @@ class DummyDebuggerServer:
 
     def _handle_command(self, cmd: str, msg: dict) -> dict:
         if cmd == "session.open":
+            caps = msg.get("capabilities") or {}
             return {
+                "version": 1,
                 "status": "ok",
-                "session_id": "sess-123",
-                "capabilities": {"features": ["events"]},
+                "session": {
+                    "id": "sess-123",
+                    "client": msg.get("client", ""),
+                    "heartbeat_s": 30,
+                    "features": caps.get("features", []),
+                    "max_events": caps.get("max_events", 128),
+                    "pid_lock": msg.get("pid_lock"),
+                    "warnings": ["max_events_clamped:256"],
+                },
             }
         if cmd == "session.keepalive":
-            return {"status": "ok"}
+            return {"version": 1, "status": "ok"}
         if cmd == "ping":
-            return {"status": "ok", "reply": "pong"}
+            return {"version": 1, "status": "ok", "reply": "pong"}
         if cmd == "event.test":
-            return {"status": "ok"}
+            return {"version": 1, "status": "ok"}
         if cmd == "force_close":
-            return {"status": "ok", "note": "closing"}
-        return {"status": "ok"}
+            return {"version": 1, "status": "ok", "note": "closing"}
+        return {"version": 1, "status": "ok"}
 
     def stop(self) -> None:
         self._stop.set()
@@ -159,6 +168,9 @@ def test_session_manager_open_and_keepalive():
         state = session.open()
         assert state.session_id == "sess-123"
         assert state.locked and state.pid == 2
+        assert state.pid_locks == [2]
+        assert state.heartbeat_s == 30
+        assert state.warnings == ["max_events_clamped:256"]
         session.keepalive()
         session.close()
     finally:

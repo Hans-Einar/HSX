@@ -109,14 +109,14 @@ Design specifies connection lifecycle and capability negotiation (section 5.1). 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
 - [ ] Create `hsxdbg/session.py` module
-- [ ] Implement session open (connect to executive)
-- [ ] Implement capability negotiation protocol
-- [ ] Implement PID attachment (exclusive or observer mode)
-- [ ] Track session state (PID, capabilities, lock status)
-- [ ] Implement keepalive/heartbeat mechanism
-- [ ] Implement session close (clean disconnect)
+- [x] Implement session open (connect to executive)
+- [x] Implement capability negotiation protocol
+- [x] Implement PID attachment (exclusive or observer mode)
+- [x] Track session state (PID, capabilities, lock status)
+- [x] Implement keepalive/heartbeat mechanism
+- [x] Implement session close (clean disconnect)
 - [ ] Handle session conflicts (PID already locked)
-- [ ] Add session manager tests
+- [x] Add session manager tests
 - [ ] Document session API
 
 ---

@@ -44,3 +44,21 @@ Append sessions chronologically and ensure every entry references the relevant d
 ### Next Steps
 - Extend session manager to match the executive’s real payloads (session object, capability warnings) and keepalive cadence.
 - Begin Phase 1.3 (command/session helpers) and wire the transport event hook into the upcoming event bus once implemented.
+
+## 2025-11-10 - Codex (Session 3)
+
+### Scope
+- Plan item / phase addressed: Toolkit Phase 1.3 – Session manager alignment with executive payloads.
+- Design sections reviewed: `04.06--Toolkit.md` §4.2.1, `04.09--Debugger.md` §5 (session lifecycle), `docs/executive_protocol.md` session RPCs.
+
+### Work Summary
+- Updated `SessionConfig`/`SessionState` to model executive fields (heartbeat, max_events, warnings, pid lock lists) and rewrote `SessionManager.open()` parsing to consume the real `session` payload returned by `execd`.
+- Keepalive/close flows now rely on the refreshed state object; `SessionState` tracks pid locks list plus derived `pid`, ensuring future attach/resume commands reference the negotiated lock rather than the requested pid.
+- Expanded dummy debugger server to mirror the executive response envelope and added assertions in `test_session_manager_open_and_keepalive` to verify heartbeat/warnings handling. Tests cover reconnect + event callbacks as before.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_hsxdbg_transport.py python/tests/test_hsxdbg_package.py`
+
+### Next Steps
+- Surface session warnings/heartbeat into higher-level clients (CLI/DAP) once command layer is in place.
+- Hook the transport event handler into the upcoming event bus module so subscriptions no longer require direct socket access.

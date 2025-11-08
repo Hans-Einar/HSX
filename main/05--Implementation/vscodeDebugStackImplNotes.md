@@ -24,3 +24,14 @@
 - Follow-ups:
   - Thread transport event hook into forthcoming `hsxdbg.events` module.
   - Align session manager payload parsing with executive responses before layering command helpers.
+
+## 2025-11-10 — Session Manager Alignment
+
+- Scope: Toolkit Implementation Plan Phase 1.3 (Session manager) in service of the VS Code adapter prerequisites.
+- Highlights:
+  - `SessionManager.open()` now parses the real executive envelope (`{status:\"ok\", session:{...}}`), tracking heartbeat, max_events, warnings, and pid lock lists inside `SessionState`. `SessionConfig` gained optional `max_events`/`heartbeat_s` knobs.
+  - Dummy debugger server/test harness updated to emit/validate the richer payload (`python/tests/test_hsxdbg_transport.py`), ensuring clients observe heartbeat + warning metadata.
+  - Implementation notes/plan updated; regressions run via `PYTHONPATH=. pytest python/tests/test_hsxdbg_transport.py python/tests/test_hsxdbg_package.py`.
+- Follow-ups:
+  - Propagate session warnings and heartbeat guidance to CLI/DAP UX.
+  - Begin command layer work so hsxdbg clients no longer craft raw RPC dictionaries.
