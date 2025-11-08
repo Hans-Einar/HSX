@@ -368,6 +368,8 @@ def _generate_symbol_payload(
                 instruction_record["line"] = line_entry["source_line"]
             if "source_column" in line_entry:
                 instruction_record["column"] = line_entry["source_column"]
+            if "source_kind" in line_entry:
+                instruction_record["source_kind"] = line_entry["source_kind"]
             instructions_section.append(instruction_record)
 
         for var_entry in debug_payload.get("variables", []):

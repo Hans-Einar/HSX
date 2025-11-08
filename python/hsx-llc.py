@@ -3216,34 +3216,42 @@ def compile_ll_to_mvasm(
 
         line_map_entries: List[Dict[str, Any]] = []
         instruction_line_map: Dict[str, List[int]] = defaultdict(list)
+        source_mapped_ordinals: Set[int] = set()
+        compiler_ordinals: Set[int] = set()
         for idx, tag in enumerate(line_tags):
             if not tag or not isinstance(tag, dict):
                 continue
             inst_id = tag.get("inst")
             if inst_id:
                 instruction_line_map.setdefault(inst_id, []).append(idx + 1)
-            dbg_id = tag.get("dbg")
-            if not dbg_id:
-                continue
-            loc_info = _resolve_location_ref(dbg_id)
-            if not loc_info:
-                continue
             entry: Dict[str, Any] = {
                 "mvasm_line": idx + 1,
-                "source_line": loc_info["line"],
             }
             ordinal_val = tag.get("ordinal")
             if ordinal_val is not None:
                 entry["mvasm_ordinal"] = ordinal_val
-            if loc_info.get("column") is not None:
-                entry["source_column"] = loc_info["column"]
-            file_entry = loc_info.get("file")
-            if file_entry:
-                entry["source_file"] = file_entry.get("filename")
-                directory = file_entry.get("directory")
-                if directory:
-                    entry["source_directory"] = directory
-                entry["source_file_id"] = file_entry.get("id")
+            if inst_id:
+                entry["instruction"] = inst_id
+            dbg_id = tag.get("dbg")
+            loc_info = _resolve_location_ref(dbg_id) if dbg_id else None
+            if loc_info:
+                entry["source_kind"] = "source"
+                entry["source_line"] = loc_info["line"]
+                if loc_info.get("column") is not None:
+                    entry["source_column"] = loc_info["column"]
+                file_entry = loc_info.get("file")
+                if file_entry:
+                    entry["source_file"] = file_entry.get("filename")
+                    directory = file_entry.get("directory")
+                    if directory:
+                        entry["source_directory"] = directory
+                    entry["source_file_id"] = file_entry.get("id")
+                if ordinal_val is not None:
+                    source_mapped_ordinals.add(ordinal_val)
+            else:
+                entry["source_kind"] = "compiler"
+                if ordinal_val is not None:
+                    compiler_ordinals.add(ordinal_val)
             line_map_entries.append(entry)
         line_map_entries.sort(key=lambda item: item["mvasm_line"])
 
@@ -3289,6 +3297,23 @@ def compile_ll_to_mvasm(
             if ordinals_for_inst:
                 entry["mvasm_ordinals"] = ordinals_for_inst
             llvm_map_entries.append(entry)
+
+        all_ordinals = set(line_to_ordinal.values())
+        unmapped_ordinals = sorted(
+            ord_val
+            for ord_val in all_ordinals
+            if ord_val not in source_mapped_ordinals and ord_val not in compiler_ordinals
+        )
+        line_coverage = {
+            "total_instructions": len(all_ordinals),
+            "source_mapped": len(source_mapped_ordinals),
+            "compiler_tagged": len(compiler_ordinals),
+            "unmapped": unmapped_ordinals,
+        }
+        if unmapped_ordinals:
+            sys.stderr.write(
+                f"[hsx-llc] warning: {len(unmapped_ordinals)} instruction(s) missing debug coverage\n"
+            )
 
         def _ordinal_from_line_hint(global_index: int) -> Optional[int]:
             if global_index < 0:
@@ -3374,6 +3399,7 @@ def compile_ll_to_mvasm(
             "llvm_to_mvasm": llvm_map_entries,
             "variables": variables_entries,
             "register_allocation_summary": allocation_summary,
+            "line_coverage": line_coverage,
         }
         return "\n".join(out) + "\n"
     finally:

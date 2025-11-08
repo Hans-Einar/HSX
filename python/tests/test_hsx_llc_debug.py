@@ -99,8 +99,12 @@ def test_compile_records_last_debug_info():
     assert isinstance(func.get("mvasm_end_ordinal"), int)
     line_map = debug_info.get("line_map")
     assert line_map, "expected instruction line map entries"
-    assert line_map[0].get("mvasm_ordinal") is not None
-    assert any(entry.get("source_line") == 5 for entry in line_map)
+    source_entries = [entry for entry in line_map if entry.get("source_kind") == "source"]
+    compiler_entries = [entry for entry in line_map if entry.get("source_kind") == "compiler"]
+    assert source_entries, "expected user-mapped line entries"
+    assert compiler_entries, "expected compiler-tagged line entries"
+    assert source_entries[0].get("mvasm_ordinal") is not None
+    assert any(entry.get("source_line") == 5 for entry in source_entries)
     llvm_map = debug_info.get("llvm_to_mvasm")
     assert llvm_map, "expected llvm_to_mvasm entries"
     entry = next((item for item in llvm_map if item.get("function") == "foo"), None)
@@ -147,9 +151,42 @@ def test_emit_debug_flag_writes_json(tmp_path):
     assert isinstance(emitted["mvasm_start_line"], int) and emitted["mvasm_start_line"] >= 1
     assert isinstance(emitted["mvasm_end_line"], int) and emitted["mvasm_end_line"] >= emitted["mvasm_start_line"]
     assert dbg_data.get("line_map"), "expected line_map in emitted debug file"
-    assert dbg_data["line_map"][0].get("mvasm_ordinal") is not None
+    src_entries = [item for item in dbg_data["line_map"] if item.get("source_kind") == "source"]
+    assert src_entries, "expected at least one source-mapped entry"
+    assert src_entries[0].get("mvasm_ordinal") is not None
+    assert any(item.get("source_kind") == "compiler" for item in dbg_data["line_map"])
     assert dbg_data.get("llvm_to_mvasm"), "expected llvm_to_mvasm mapping in debug file"
     assert dbg_data["llvm_to_mvasm"][0].get("mvasm_ordinals")
+
+
+def test_line_map_reports_coverage_and_compiler_entries():
+    ir = textwrap.dedent(
+        """
+        define dso_local i32 @foo(i32 %v) !dbg !1 {
+        entry:
+          %sum = add i32 %v, 1, !dbg !2
+          ret i32 %sum, !dbg !3
+        }
+
+        !0 = distinct !DICompileUnit(language: DW_LANG_C, file: !4, producer: "hsx", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+        !1 = distinct !DISubprogram(name: "foo", linkageName: "foo", scope: !4, file: !4, line: 10, scopeLine: 10, unit: !0, retainedNodes: !{})
+        !2 = !DILocation(line: 11, column: 5, scope: !1)
+        !3 = !DILocation(line: 12, column: 5, scope: !1)
+        !4 = !DIFile(filename: "foo.c", directory: "/proj")
+        """
+    ).strip()
+
+    HSX_LLC.compile_ll_to_mvasm(ir, trace=False)
+    dbg = HSX_LLC.LAST_DEBUG_INFO or {}
+    line_map = dbg.get("line_map") or []
+    assert any(entry.get("source_kind") == "compiler" for entry in line_map)
+    assert any(entry.get("source_kind") == "source" for entry in line_map)
+    coverage = dbg.get("line_coverage")
+    assert coverage, "expected line coverage summary"
+    assert coverage["total_instructions"] >= coverage["source_mapped"] + coverage["compiler_tagged"]
+    assert coverage["source_mapped"] >= 1
+    assert coverage["compiler_tagged"] >= 1
+    assert not coverage["unmapped"], f"unexpected unmapped ordinals: {coverage['unmapped']}"
 
 
 def test_variable_metadata_tracks_stack_and_register_locations():

@@ -133,6 +133,8 @@ def test_emit_sym_generates_symbol_file(tmp_path):
     assert "address" in fn_entry and "size" in fn_entry
     instructions = sym_data.get("instructions", [])
     assert any(inst.get("line") == 5 and inst.get("ordinal") is not None for inst in instructions)
+    assert any(inst.get("source_kind") == "source" for inst in instructions)
+    assert any(inst.get("source_kind") == "compiler" for inst in instructions)
     assert isinstance(sym_data["symbols"].get("variables"), list)
     locals_section = sym_data["symbols"].get("locals") or []
     assert locals_section, "expected locals section populated"

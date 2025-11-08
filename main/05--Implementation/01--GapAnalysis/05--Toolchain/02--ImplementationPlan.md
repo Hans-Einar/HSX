@@ -678,11 +678,11 @@ Map every MVASM instruction to source line (Phase 2 completion). Enables precise
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.05--Toolchain](../../../04--Design/04.05--Toolchain.md)
-- [ ] Ensure every MVASM instruction has source line mapping; emit warnings/failures when coverage is incomplete
-- [ ] Handle compiler-generated instructions (prologue/epilogue, synthesized loads) with explicit “compiler” tags so the debugger can step over them
-- [ ] Add line mapping completeness tests
+- [x] Ensure every MVASM instruction has source line mapping; emit warnings/failures when coverage is incomplete
+- [x] Handle compiler-generated instructions (prologue/epilogue, synthesized loads) with explicit “compiler” tags so the debugger can step over them
+- [x] Add line mapping completeness tests
 - [ ] Verify debugger stepping behavior (single-step, breakpoints) using `.dbg` output
-- [ ] Document line mapping guarantees and fallback behavior
+- [x] Document line mapping guarantees and fallback behavior
 
 ---
 

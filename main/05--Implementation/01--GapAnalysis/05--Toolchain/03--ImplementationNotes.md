@@ -401,3 +401,20 @@ Append sessions chronologically and ensure every entry references the relevant d
 
 ### Next Steps
 - Begin 7.2 (instruction-level line tracking completeness) once debugger integration stabilizes; consider VSCode adapter updates to surface the new location metadata.
+
+## 2025-11-09 - Codex (Session 22)
+
+### Scope
+- Plan item / phase addressed: Phase 7.2 Instruction-Level Line Tracking
+- Design sections reviewed: 04.05--Toolchain §4.2.1 (debug metadata), debug-metadata implementation doc, linker `.sym` schema.
+
+### Work Summary
+- Updated `hsx-llc` to emit line-map entries for every MVASM instruction (including compiler-generated ones) and to record `line_coverage` statistics/warnings when ordinals are left unmapped.
+- Marked compiler-generated instructions with `source_kind="compiler"` plus instruction ids, enabling downstream tools to distinguish them from user code; added the same metadata to linker-generated `.sym` instruction entries.
+- Refreshed docs/plan plus regression tests (`python/tests/test_hsx_llc_debug.py`, `python/tests/test_linker.py`) to assert coverage summaries and compiler-tag presence.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_hsx_llc_debug.py python/tests/test_linker.py`
+
+### Next Steps
+- Remaining 7.2 task: integrate the new metadata into debugger stepping flows (CLI/TUI) so “step over compiler frames” guarantees are validated.
