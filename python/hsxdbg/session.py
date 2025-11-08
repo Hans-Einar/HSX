@@ -8,6 +8,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
+from .cache import CacheController, RuntimeCache
 from .events import EventBus
 from .transport import HSXTransport, TransportConfig, TransportError
 
@@ -48,10 +49,12 @@ class SessionManager:
         transport_config: Optional[TransportConfig] = None,
         session_config: Optional[SessionConfig] = None,
         event_bus: Optional[EventBus] = None,
+        runtime_cache: Optional[RuntimeCache] = None,
     ) -> None:
         self.transport = transport or HSXTransport(transport_config or TransportConfig())
         self.session_config = session_config or SessionConfig()
-        self.event_bus = event_bus
+        self.runtime_cache = runtime_cache
+        self.event_bus = event_bus if event_bus is not None else (EventBus() if runtime_cache else None)
         self.state = SessionState()
         self.transport.set_event_handler(self._handle_transport_event)
 
@@ -63,11 +66,27 @@ class SessionManager:
         self._ack_thread: Optional[threading.Thread] = None
         self._ack_stop = threading.Event()
         self._ack_interval = 0.5
+        self._cache_controller: Optional[CacheController] = None
+        if self.event_bus and self.runtime_cache:
+            self._attach_cache_controller()
 
     def attach_event_bus(self, event_bus: Optional[EventBus]) -> None:
         """Route transport events into the provided EventBus (or detach)."""
 
+        self._detach_cache_controller()
         self.event_bus = event_bus
+        if self.event_bus is None and self.runtime_cache is not None:
+            self.event_bus = EventBus()
+        if self.event_bus and self.runtime_cache:
+            self._attach_cache_controller()
+
+    def attach_runtime_cache(self, cache: Optional[RuntimeCache]) -> None:
+        if cache is self.runtime_cache:
+            return
+        self._detach_cache_controller()
+        self.runtime_cache = cache
+        if self.runtime_cache and self.event_bus:
+            self._attach_cache_controller()
 
     def open(self) -> SessionState:
         capabilities: Dict[str, object] = {
@@ -169,6 +188,8 @@ class SessionManager:
         self._last_ack_seq = cursor
         if auto_ack:
             self._start_ack_thread()
+        if self.runtime_cache and self.event_bus:
+            self._attach_cache_controller()
         return events_info
 
     def unsubscribe_events(self) -> None:
@@ -179,6 +200,7 @@ class SessionManager:
         self._event_subscription_token = None
         with self._event_lock:
             self._last_event_seq = None
+        self._detach_cache_controller()
         if not self.state.session_id:
             return
         payload = {"cmd": "events.unsubscribe", "session": self.state.session_id}
@@ -239,3 +261,14 @@ class SessionManager:
             self._last_ack_seq = target
         else:
             logger.debug("events.ack failed: %s", response)
+
+    def _attach_cache_controller(self) -> None:
+        if not self.runtime_cache or not self.event_bus:
+            return
+        if self._cache_controller is None:
+            self._cache_controller = CacheController(self.runtime_cache, self.event_bus)
+
+    def _detach_cache_controller(self) -> None:
+        if self._cache_controller is not None:
+            self._cache_controller.detach()
+            self._cache_controller = None

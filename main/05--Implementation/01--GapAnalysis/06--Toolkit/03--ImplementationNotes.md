@@ -109,6 +109,7 @@ Append sessions chronologically and ensure every entry references the relevant d
 - Added typed event dataclasses plus `parse_event()` in `python/hsxdbg/events.py`, covering trace steps, debug breaks, scheduler/task-state, mailbox notifications, stdout/stderr streams, watch updates, and warnings. SessionManager/EventBus now normalize raw executive payloads before dispatch.
 - Exported the new dataclasses via `python/hsxdbg/__init__.py` and exercised them in a dedicated regression suite (`python/tests/test_hsxdbg_events.py`). Existing transport tests updated to expect typed events.
 - Build regressions fixed by ensuring stub stdlib assets in HSX builder tests (`python/tests/test_hsx_cc_build.py`, `python/tests/test_build_determinism.py`).
+- Authored `main/05--Implementation/01--GapAnalysis/06--Toolkit/EventSchemas.md` capturing the typed event field mappings for downstream consumers.
 
 ### Testing
 - `PYTHONPATH=. pytest python/tests/test_hsxdbg_events.py python/tests/test_hsxdbg_transport.py python/tests/test_hsxdbg_package.py python/tests/test_hsx_cc_build.py python/tests/test_build_determinism.py`
@@ -116,3 +117,69 @@ Append sessions chronologically and ensure every entry references the relevant d
 ### Next Steps
 - Document the event schemas in the Toolkit plan/docs and surface typed events through future cache/adapter layers.
 - Extend parsing helpers if/when new executive event categories land (e.g., stdout chunking, warning metadata).
+
+## 2025-11-10 - Codex (Session 7)
+
+### Scope
+- Plan item / phase addressed: Toolkit Phase 3.1 – Runtime cache module foundation.
+- Design sections reviewed: `04.06--Toolkit.md` §4.2.1 (state cache expectations) and Toolkit plan Phase 3 checklists.
+
+### Work Summary
+- Rebuilt `python/hsxdbg/cache.py` around typed dataclasses (`RegisterState`, `MemoryBlock`, `StackFrame`, `WatchValue`, `MailboxDescriptor`) and expanded `RuntimeCache` to track per-PID registers, memory ranges, call stacks, watch values, and mailbox descriptors. Added helpers to seed initial snapshots, clear PID state, and manage symbols/instructions.
+- Added dedicated coverage (`python/tests/test_hsxdbg_cache.py`) verifying register normalization, memory slicing, stack ingestion, watch/mailbox caching, and snapshot clearing. Broader hsxdbg suites still pass.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_hsxdbg_cache.py python/tests/test_hsxdbg_events.py python/tests/test_hsxdbg_transport.py python/tests/test_hsxdbg_package.py`
+
+### Next Steps
+- Phase 3.2: wire the cache to typed events (trace_step, watch_update, debug_break) for automatic invalidation.
+- Phase 3.3: expose cache query helpers and RPC fallbacks, plus document the cache API.
+
+## 2025-11-10 - Codex (Session 9)
+
+### Scope
+- Plan item / phase addressed: Toolkit Phase 3.3 – cache query API + fallbacks + documentation.
+
+### Work Summary
+- Added query helpers to `RuntimeCache` (registers, memory ranges, stack frames, watch values) with optional fallback loaders. `CacheAPI.md` documents the new surface.
+- `CommandClient` gained `get_register_state`, `get_call_stack`, `list_watches`, and `read_memory` methods that leverage the cache first and fall back to RPCs (`dumpregs`, `stack`, `watch list`, `peek`). Cache invalidation now covers these flows.
+- Added regression coverage (`python/tests/test_hsxdbg_commands.py`) verifying cache invalidation, refreshes, and fallback behavior.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_hsxdbg_cache.py python/tests/test_hsxdbg_session.py python/tests/test_hsxdbg_commands.py python/tests/test_hsxdbg_events.py python/tests/test_hsxdbg_transport.py python/tests/test_hsxdbg_package.py`
+
+### Next Steps
+- Integrate cache-backed queries into the upcoming VS Code adapter and extend command helpers for memory/register writes (so invalidation hooks can cover those mutations as well).
+
+## 2025-11-10 - Codex (Session 10)
+
+### Scope
+- Plan item / phase addressed: VS Code debug stack Phase 2 kickoff – scaffold hsx-dap adapter.
+
+### Work Summary
+- Added `python/hsx_dap/__init__.py` containing a minimal DAP implementation (`DAPProtocol`, `HSXDebugAdapter`) plus entry script `python/hsx-dap.py`. The adapter connects to the executive via `SessionManager`/`CommandClient`, translates core DAP requests (initialize/launch/continue/pause/step/stackTrace/scopes/variables/setBreakpoints), and streams events (stopped/output) via the existing EventBus + RuntimeCache.
+- Introduced tests for the DAP protocol framing (`python/tests/test_hsx_dap_protocol.py`). Existing hsxdbg suites were rerun to ensure regressions are caught.
+- Documentation updates: VS Code implementation notes capture the adapter scaffold milestone.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_hsx_dap_protocol.py python/tests/test_hsxdbg_cache.py python/tests/test_hsxdbg_session.py python/tests/test_hsxdbg_commands.py python/tests/test_hsxdbg_events.py python/tests/test_hsxdbg_transport.py python/tests/test_hsxdbg_package.py`
+
+### Next Steps
+- Flesh out additional DAP requests (variables/evaluate hover, readMemory/writeMemory) and integrate the adapter with a VS Code extension scaffold (Phase 3). Handle breakpoint mapping from source lines once the symbol infrastructure is plumbed through.
+
+## 2025-11-10 - Codex (Session 8)
+
+### Scope
+- Plan item / phase addressed: Toolkit Phase 3.2 – cache invalidation + event wiring.
+- Design sections reviewed: `04.06--Toolkit.md` §4.2.1 (cache lifetime) and the Phase 3.2 checklist.
+
+### Work Summary
+- `RuntimeCache.apply_event()` now consumes typed events (trace_step updates registers, watch_update refreshes cached values, debug_break invalidates stacks). Added `CacheController` helper plus optional runtime cache wiring in `SessionManager`, so attaching a cache automatically subscribes to the EventBus stream.
+- `CommandClient` invalidates caches after `step/pause/resume` (registers + stack) to avoid stale reads before new events arrive.
+- Added regression suites (`python/tests/test_hsxdbg_session.py`, `python/tests/test_hsxdbg_commands.py`) covering cache-controller wiring and invalidation behavior, alongside extended cache tests.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_hsxdbg_cache.py python/tests/test_hsxdbg_session.py python/tests/test_hsxdbg_commands.py python/tests/test_hsxdbg_events.py python/tests/test_hsxdbg_transport.py python/tests/test_hsxdbg_package.py`
+
+### Next Steps
+- Phase 3.3: surface cache query helpers + RPC fallbacks, and finish memory/register-write invalidation once the command layer exposes those mutations.

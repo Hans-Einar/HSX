@@ -212,7 +212,7 @@ Design requires event schemas for various event types (section 5.2). Structured 
 - [x] Define `scheduler` event schema (task state changes)
 - [x] Define `watch_update` event schema (watch_id, old_value, new_value)
 - [x] Define `stdout`/`stderr` event schemas (pid, text)
-- [ ] Document event schemas
+- [x] Document event schemas
 - [x] Add event parsing/serialization helpers
 - [x] Add event protocol tests
 
@@ -272,14 +272,14 @@ Design specifies mirroring registers, memory, stacks, watches, mailboxes (sectio
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
-- [ ] Create `hsxdbg/cache.py` module
-- [ ] Implement register cache (R0-R15, PC, SP, PSW)
-- [ ] Implement memory cache (address ranges)
-- [ ] Implement call stack cache
-- [ ] Implement watch value cache
-- [ ] Implement mailbox descriptor cache
-- [ ] Populate cache on initial query
-- [ ] Add cache tests
+- [x] Create `hsxdbg/cache.py` module
+- [x] Implement register cache (R0-R15, PC, SP, PSW)
+- [x] Implement memory cache (address ranges)
+- [x] Implement call stack cache
+- [x] Implement watch value cache
+- [x] Implement mailbox descriptor cache
+- [x] Populate cache on initial query
+- [x] Add cache tests
 - [ ] Document cache API
 
 ---
@@ -295,14 +295,14 @@ Update cache on events, invalidate on control operations. Ensures cache consiste
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
-- [ ] Update register cache on trace_step events
-- [ ] Update memory cache on memory_changed events
-- [ ] Update stack cache on debug_break events
-- [ ] Update watch cache on watch_update events
-- [ ] Invalidate cache on resume/step commands
-- [ ] Invalidate cache on memory/register writes
-- [ ] Add invalidation tests
-- [ ] Document invalidation behavior
+ - [x] Update register cache on trace_step events
+ - [ ] Update memory cache on memory_changed events
+ - [x] Update stack cache on debug_break events
+ - [x] Update watch cache on watch_update events
+ - [x] Invalidate cache on resume/step commands
+ - [ ] Invalidate cache on memory/register writes
+ - [x] Add invalidation tests
+ - [x] Document invalidation behavior
 
 ---
 
@@ -317,13 +317,13 @@ Efficient local queries without RPC round-trips. Improves frontend responsivenes
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
-- [ ] Implement register query from cache
-- [ ] Implement memory query from cache
-- [ ] Implement stack query from cache
-- [ ] Implement watch query from cache
-- [ ] Fall back to RPC if cache miss
-- [ ] Add query API tests
-- [ ] Document query API
+- [x] Implement register query from cache
+- [x] Implement memory query from cache
+- [x] Implement stack query from cache
+- [x] Implement watch query from cache
+- [x] Fall back to RPC if cache miss
+- [x] Add query API tests
+- [x] Document query API
 
 ---
 

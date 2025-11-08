@@ -68,3 +68,44 @@
 - Follow-ups:
   - Document the event schemas in the public toolkit docs and propagate them into the upcoming cache/state layers.
   - Add typed helpers for any future executive event categories (e.g., telemetry/logpoints).
+
+## 2025-11-10 — Runtime Cache Core
+
+- Scope: Toolkit Phase 3.1 – implement the shared state cache backing the VS Code debug adapter.
+- Highlights:
+  - `python/hsxdbg/cache.py` now tracks per-PID registers, memory blocks, call stacks, watch values, and mailbox descriptors via dataclasses, with helpers to seed/clear snapshots.
+  - Added coverage (`python/tests/test_hsxdbg_cache.py`) to ensure cache mutations work as expected; broader hsxdbg test suite still green.
+- Follow-ups:
+  - Wire the cache to typed events for automatic invalidation (Phase 3.2) and surface query helpers/fallbacks as part of Phase 3.3.
+
+## 2025-11-10 — Cache Invalidation
+
+- Scope: Toolkit Phase 3.2, ensuring cache stays coherent with executive events and control commands.
+- Highlights:
+  - `RuntimeCache.apply_event()` consumes typed events (trace_step/watch_update/debug_break), and `CacheController` + SessionManager wiring feed the cache via EventBus subscriptions automatically.
+  - `CommandClient` now invalidates register/stack caches on `step/pause/resume`, preventing stale reads before the next trace_step arrives.
+  - Added regression coverage for both SessionManager + CommandClient behaviors.
+- Follow-ups:
+  - Phase 3.3 to expose cache query APIs plus RPC fallbacks, and revisit memory/register write invalidation once those commands exist.
+
+## 2025-11-10 — Cache Query API
+
+- Scope: Toolkit Phase 3.3 – make cache data easily consumable by the VS Code adapter.
+- Highlights:
+  - `RuntimeCache` now exposes query helpers (registers/memory/stack/watches) with optional fallback loaders; documented in `CacheAPI.md`.
+  - `CommandClient` offers high-level accessors (`get_register_state`, `get_call_stack`, `list_watches`, `read_memory`) that tap the cache first and fall back to RPCs (`dumpregs`, `stack`, `watch list`, `peek`), auto-populating the cache when stale.
+  - Expanded unit tests confirm the fallbacks and cache updates.
+- Follow-ups:
+  - Wire these helpers into the upcoming VS Code debug adapter to avoid bespoke RPCs.
+  - Extend invalidation to cover memory/register mutation commands when those land.
+
+## 2025-11-10 — hsx-dap Scaffold
+
+- Scope: VS Code plan Phase 2 – create the initial debug adapter entry point.
+- Highlights:
+  - Added `python/hsx_dap/__init__.py` (with entry script `python/hsx-dap.py`), implementing a stdio-based DAP server that bridges to `SessionManager`/`CommandClient`. Supports initialize/launch/continue/pause/step/threads/stackTrace/scopes/variables/setBreakpoints requests, emits stopped/output events, and streams executive events via the shared `EventBus`.
+  - Reused the RuntimeCache + command helpers to satisfy DAP variable/scopes requests without redundant RPCs.
+  - Added protocol unit tests to verify Content-Length framing and JSON parsing.
+- Follow-ups:
+  - Build the VS Code extension skeleton that spawns this adapter and wires launch configurations.
+  - Enhance the adapter with variables/evaluate/memory requests plus better breakpoint line mapping.
