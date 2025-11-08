@@ -206,15 +206,15 @@ Design requires event schemas for various event types (section 5.2). Structured 
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
-- [ ] Define `trace_step` event schema (seq, ts, pid, pc, opcode, psw)
-- [ ] Define `debug_break` event schema (seq, ts, pid, reason, pc)
-- [ ] Define `mailbox_*` event schemas (message, send, receive)
-- [ ] Define `scheduler` event schema (task state changes)
-- [ ] Define `watch_update` event schema (watch_id, old_value, new_value)
-- [ ] Define `stdout`/`stderr` event schemas (pid, text)
+- [x] Define `trace_step` event schema (seq, ts, pid, pc, opcode, psw)
+- [x] Define `debug_break` event schema (seq, ts, pid, reason, pc)
+- [x] Define `mailbox_*` event schemas (message, send, receive)
+- [x] Define `scheduler` event schema (task state changes)
+- [x] Define `watch_update` event schema (watch_id, old_value, new_value)
+- [x] Define `stdout`/`stderr` event schemas (pid, text)
 - [ ] Document event schemas
-- [ ] Add event parsing/serialization helpers
-- [ ] Add event protocol tests
+- [x] Add event parsing/serialization helpers
+- [x] Add event protocol tests
 
 ---
 

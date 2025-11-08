@@ -25,6 +25,7 @@ def make_args(**kwargs):
         'directory': None,
         'build_dir': None,
         'debug': False,
+        'with_stdlib': False,
         'output': None,
         'app_name': None,
         'no_make': False,
@@ -34,6 +35,15 @@ def make_args(**kwargs):
     }
     defaults.update(kwargs)
     return argparse.Namespace(**defaults)
+
+
+def ensure_stdlib(root: Path) -> None:
+    """Create a dummy stdlib.mvasm for tests that enable --with-stdlib."""
+    stdlib_dir = Path(root) / "lib" / "hsx_std"
+    stdlib_dir.mkdir(parents=True, exist_ok=True)
+    stdlib_path = stdlib_dir / "stdlib.mvasm"
+    if not stdlib_path.exists():
+        stdlib_path.write_text("// stdlib stub", encoding="utf-8")
 
 
 class TestHSXBuilderInit:
@@ -253,6 +263,7 @@ class TestHSXBuilderLink:
     def test_link_to_hxe_basic(self, tmp_path):
         """Test linking HXO files to HXE"""
         args = make_args()
+        ensure_stdlib(tmp_path)
         with patch('os.getcwd', return_value=str(tmp_path)):
             builder = HSXBuilder(args)
             hxo_files = [builder.build_dir / "test.hxo"]
@@ -272,6 +283,7 @@ class TestHSXBuilderLink:
     def test_link_to_hxe_with_debug(self, tmp_path):
         """Test linking with debug info"""
         args = make_args(debug=True, output='test.hxe')
+        ensure_stdlib(tmp_path)
         with patch('os.getcwd', return_value=str(tmp_path)):
             builder = HSXBuilder(args)
             hxo_files = [builder.build_dir / "test.hxo"]

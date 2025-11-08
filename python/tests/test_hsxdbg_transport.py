@@ -221,7 +221,7 @@ def test_session_manager_event_bus_receives_events():
         while not received and time.time() < deadline:
             bus.pump()
             time.sleep(0.01)
-        assert received and received[0]["type"] == "debug_break"
+        assert received and received[0].type == "debug_break"
         session.close()
         bus.stop()
     finally:

@@ -57,3 +57,14 @@
 - Follow-ups:
   - Layer event schema parsing atop the raw events (Phase 2.2) so the VS Code adapter can bind typed handlers.
   - Explore exposing ACK metrics to frontends for slow-consumer diagnostics once back-pressure hooks land.
+
+## 2025-11-10 — Typed Event Schemas
+
+- Scope: Toolkit Phase 2.2 – define debugger event schemas & parsing helpers for the VS Code stack.
+- Highlights:
+  - Introduced dataclasses for core event categories (trace_step, debug_break, scheduler/task_state, mailbox_*, watch_update, stdout/stderr, warning) plus `parse_event()` so adapters consume structured data.
+  - EventBus now delivers typed events, and new unit tests cover both the parser and the background dispatcher (`python/tests/test_hsxdbg_events.py`).
+  - HSX builder tests adjusted to account for the stdlib flag to keep the suite green.
+- Follow-ups:
+  - Document the event schemas in the public toolkit docs and propagate them into the upcoming cache/state layers.
+  - Add typed helpers for any future executive event categories (e.g., telemetry/logpoints).

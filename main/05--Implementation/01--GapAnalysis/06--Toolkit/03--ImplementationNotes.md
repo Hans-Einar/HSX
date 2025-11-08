@@ -98,3 +98,21 @@ Append sessions chronologically and ensure every entry references the relevant d
 ### Next Steps
 - Flesh out event schema helpers (Phase 2.2) and expose richer filtering/subscription APIs to frontends.
 - Integrate the event bus with the upcoming command/state cache layers so stack/register watches react immediately to incoming events.
+
+## 2025-11-10 - Codex (Session 6)
+
+### Scope
+- Plan item / phase addressed: Toolkit Phase 2.2 – event schema definitions and parsing helpers for hsxdbg.
+- Design sections reviewed: `04.06--Toolkit.md` §5.2 and `docs/executive_protocol.md` (event schemas).
+
+### Work Summary
+- Added typed event dataclasses plus `parse_event()` in `python/hsxdbg/events.py`, covering trace steps, debug breaks, scheduler/task-state, mailbox notifications, stdout/stderr streams, watch updates, and warnings. SessionManager/EventBus now normalize raw executive payloads before dispatch.
+- Exported the new dataclasses via `python/hsxdbg/__init__.py` and exercised them in a dedicated regression suite (`python/tests/test_hsxdbg_events.py`). Existing transport tests updated to expect typed events.
+- Build regressions fixed by ensuring stub stdlib assets in HSX builder tests (`python/tests/test_hsx_cc_build.py`, `python/tests/test_build_determinism.py`).
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_hsxdbg_events.py python/tests/test_hsxdbg_transport.py python/tests/test_hsxdbg_package.py python/tests/test_hsx_cc_build.py python/tests/test_build_determinism.py`
+
+### Next Steps
+- Document the event schemas in the Toolkit plan/docs and surface typed events through future cache/adapter layers.
+- Extend parsing helpers if/when new executive event categories land (e.g., stdout chunking, warning metadata).

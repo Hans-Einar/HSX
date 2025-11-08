@@ -72,11 +72,17 @@ def test_toolchain_outputs_are_deterministic(tmp_path: Path) -> None:
 
 def _make_builder(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> HSXBuilder:
     monkeypatch.chdir(tmp_path)
+    stdlib_dir = tmp_path / "lib" / "hsx_std"
+    stdlib_dir.mkdir(parents=True, exist_ok=True)
+    stdlib_path = stdlib_dir / "stdlib.mvasm"
+    if not stdlib_path.exists():
+        stdlib_path.write_text("// stdlib stub\n", encoding="utf-8")
     args = Namespace(
         verbose=False,
         directory=None,
         build_dir=str(tmp_path / "build" / "debug"),
         debug=True,
+        with_stdlib=False,
         clean=False,
         app_name=None,
         output=None,

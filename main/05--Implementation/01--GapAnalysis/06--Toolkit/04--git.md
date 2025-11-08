@@ -15,6 +15,7 @@
 | 2025-11-10 | `9e7108a` | `Transport Layer` | Hans Einar | Tests: `PYTHONPATH=. pytest python/tests/test_hsxdbg_transport.py python/tests/test_hsxdbg_package.py` |
 | 2025-11-10 | `70ad91a` | `SessionManager alignment` | Hans Einar | Tests: `PYTHONPATH=. pytest python/tests/test_hsxdbg_transport.py python/tests/test_hsxdbg_package.py` |
 | 2025-11-10 | `c0da03e` | `Event bus hookup` | Hans Einar | Tests: `PYTHONPATH=. pytest python/tests/test_hsxdbg_transport.py python/tests/test_hsxdbg_package.py` |
+| 2025-11-10 | `77c27b8` | `Event subscribe + ACK loop` | Hans Einar | Tests: `PYTHONPATH=. pytest python/tests/test_hsxdbg_transport.py python/tests/test_hsxdbg_package.py` |
 
 ## Pull Request
 - PR URL / ID: `<link or ID>`

@@ -17,7 +17,20 @@ Implementation follows the plan captured in `main/05--Implementation/vscodeDebug
 
 from .transport import HSXTransport, TransportConfig, TransportError  # noqa: F401
 from .session import SessionManager, SessionConfig, SessionState  # noqa: F401
-from .events import EventBus, EventSubscription  # noqa: F401
+from .events import (  # noqa: F401
+    BaseEvent,
+    DebugBreakEvent,
+    EventBus,
+    EventSubscription,
+    MailboxEvent,
+    SchedulerEvent,
+    StdStreamEvent,
+    TaskStateEvent,
+    TraceStepEvent,
+    WarningEvent,
+    WatchUpdateEvent,
+    parse_event,
+)
 from .cache import RuntimeCache  # noqa: F401
 from .commands import CommandClient  # noqa: F401
 
@@ -30,6 +43,16 @@ __all__ = [
     "SessionState",
     "EventBus",
     "EventSubscription",
+    "BaseEvent",
+    "TraceStepEvent",
+    "DebugBreakEvent",
+    "SchedulerEvent",
+    "TaskStateEvent",
+    "MailboxEvent",
+    "WatchUpdateEvent",
+    "StdStreamEvent",
+    "WarningEvent",
+    "parse_event",
     "RuntimeCache",
     "CommandClient",
 ]
