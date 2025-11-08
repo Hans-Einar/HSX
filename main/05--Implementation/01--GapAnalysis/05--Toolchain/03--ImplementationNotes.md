@@ -431,6 +431,7 @@ Append sessions chronologically and ensure every entry references the relevant d
 - Introduced `lib/hsx_std/stdlib.mvasm`, a bundled MVASM module exporting canonical system values, commands, and mailbox descriptors alongside helper stubs (`hsx_std_reset`, `hsx_std_noop`).
 - Added `include/hsx_stdlib.h` with reserved group/value/command identifiers so payloads can reference the shared OIDs without hard-coding literals; documented usage in `lib/hsx_std/README.md`.
 - Updated `docs/MVASM_SPEC.md` to point to the new stdlib location and created an automated regression test (`python/tests/test_stdlib_metadata.py`) validating that linking the module injects the expected metadata into the final `.hxe`.
+- Extended `python/hsx-cc-build.py` with a `--with-stdlib` flag (enabled automatically for `--debug`) so packaged builds pull in the bundle by default.
 
 ### Testing
 - `PYTHONPATH=. pytest python/tests/test_stdlib_metadata.py`

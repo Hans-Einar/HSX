@@ -118,6 +118,10 @@ class HSXBuilder:
                 "DEBUG_PREFIX_MAP": self.debug_prefix_map,
             }
 
+        self.stdlib_mvasm = (self.project_root / "lib" / "hsx_std" / "stdlib.mvasm").resolve()
+        self.use_stdlib = bool(args.with_stdlib or args.debug)
+        self._stdlib_obj: Optional[Path] = None
+
     def _compute_build_timestamp(self) -> str:
         epoch = os.environ.get("SOURCE_DATE_EPOCH")
         if epoch is None or epoch == "":
@@ -286,18 +290,44 @@ class HSXBuilder:
         
         self.run_command(asm_cmd)
         return hxo_file
+
+    def _ensure_stdlib_object(self) -> Optional[Path]:
+        """Assemble the standard library bundle when requested."""
+        if not self.use_stdlib:
+            return None
+        if not self.stdlib_mvasm.exists():
+            raise HSXBuildError(f"Standard library not found: {self.stdlib_mvasm}")
+        if self._stdlib_obj is None:
+            obj_path = self.build_dir / "hsx_stdlib.hxo"
+            asm_tool = self.find_tool('asm.py')
+            asm_cmd = [
+                sys.executable,
+                str(asm_tool),
+                str(self.stdlib_mvasm),
+                '-o',
+                str(obj_path),
+            ]
+            self.log(f"Assembling stdlib {self.stdlib_mvasm} -> {obj_path}")
+            self.run_command(asm_cmd)
+            self._stdlib_obj = obj_path
+        return self._stdlib_obj
     
     def link_to_hxe(self, hxo_files: List[Path], dbg_files: List[Path]) -> Path:
         """Link HXO files to HXE"""
         output_name = self.args.output or 'app.hxe'
         hxe_file = self.build_dir / output_name
         
-        self.log(f"Linking {len(hxo_files)} object files to HXE...")
+        stdlib_obj = self._ensure_stdlib_object()
+        all_hxo = list(hxo_files)
+        if stdlib_obj is not None:
+            all_hxo.append(stdlib_obj)
+
+        self.log(f"Linking {len(all_hxo)} object files to HXE...")
         
         linker = self.find_tool('hld.py')
         
         link_cmd = [sys.executable, str(linker)]
-        link_cmd.extend(str(f) for f in hxo_files)
+        link_cmd.extend(str(f) for f in all_hxo)
         link_cmd.extend(['-o', str(hxe_file)])
         
         # Add app name
@@ -515,6 +545,12 @@ def main():
         '--app-name',
         metavar='NAME',
         help='Application name for HXE header'
+    )
+
+    parser.add_argument(
+        '--with-stdlib',
+        action='store_true',
+        help='Link lib/hsx_std/stdlib.mvasm into the final image'
     )
     
     parser.add_argument(

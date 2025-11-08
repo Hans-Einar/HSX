@@ -62,6 +62,10 @@ channels, …) so every project does not have to duplicate the same
    uint16_t sys_reset_oid = HSX_STD_OID_SYS_RESET;
    ```
 
+4. When using `hsx-cc-build.py`, pass `--with-stdlib` (enabled automatically
+   for `--debug` builds) to pull in the module without editing your project
+   files.
+
 No additional code is required—linking the MVASM module adds the metadata to
 the final `.hxe`.  The helper stubs (`hsx_std_reset`, `hsx_std_noop`) are
 available as callable symbols should a payload need to invoke them directly.

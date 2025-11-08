@@ -704,7 +704,7 @@ Design mentions standard library with values/commands/mailboxes. Enables code re
 - [x] Package library as linkable objects
 - [x] Add library usage examples
 - [x] Document library API
-- [ ] Create library distribution package
+- [x] Create library distribution package
 
 ---
 
