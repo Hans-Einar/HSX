@@ -84,16 +84,16 @@ Design specifies JSON-over-TCP RPC client with connection management (section 5)
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.06--Toolkit](../../../04--Design/04.06--Toolkit.md)
-- [ ] Create `hsxdbg/transport.py` module
-- [ ] Implement TCP socket connection with timeout
-- [ ] Implement JSON message framing (length-prefixed or newline-delimited)
-- [ ] Implement request/response correlation (message IDs)
-- [ ] Add connection retry logic with exponential backoff
-- [ ] Implement connection state tracking (disconnected, connecting, connected)
-- [ ] Add connection lifecycle callbacks (on_connect, on_disconnect)
-- [ ] Handle socket errors gracefully
-- [ ] Add transport tests (mock server)
-- [ ] Document transport API
+- [x] Create `hsxdbg/transport.py` module
+- [x] Implement TCP socket connection with timeout
+- [x] Implement JSON message framing (length-prefixed or newline-delimited)
+- [x] Implement request/response correlation (message IDs)
+- [x] Add connection retry logic with exponential backoff
+- [x] Implement connection state tracking (disconnected, connecting, connected)
+- [x] Add connection lifecycle callbacks (on_connect, on_disconnect)
+- [x] Handle socket errors gracefully
+- [x] Add transport tests (mock server)
+- [x] Document transport API
 
 ---
 

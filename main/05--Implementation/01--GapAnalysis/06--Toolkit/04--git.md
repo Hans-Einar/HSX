@@ -11,7 +11,7 @@
 ## Commit Log
 | Date | Commit hash | Message | Author | Notes |
 | --- | --- | --- | --- | --- |
-| <YYYY-MM-DD> | <commit-hash> | <short message> | <author> | Tests: `<command>` |
+| 2025-11-10 | `63eb9c2` | `toolkit: add hsxdbg package scaffold + smoke tests` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hsxdbg_package.py` |
 
 ## Pull Request
 - PR URL / ID: `<link or ID>`
