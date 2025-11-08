@@ -25,7 +25,13 @@ class HSXAdapterFactory {
     const defaultPython = process.platform === "win32" ? "python" : "python3";
     const pythonCommand = process.env.PYTHON || process.env.HSX_PYTHON || defaultPython;
     const adapterPath = this.context.asAbsolutePath(path.join("debugAdapter", "hsx-dap.py"));
-    const logFile = path.join(os.tmpdir(), "hsx-dap.log");
+    const logDir = path.join(os.tmpdir(), "hsx_debug");
+    try {
+      require("fs").mkdirSync(logDir, { recursive: true });
+    } catch (e) {
+      console.warn(`[hsx-dap] failed to create log directory ${logDir}: ${e}`);
+    }
+    const logFile = path.join(logDir, `hsx-dap-${Date.now()}.log`);
     const args = [adapterPath, "--log-file", logFile, "--log-level", "DEBUG"];
     console.info(`[hsx-dap] launching adapter: interpreter=${pythonCommand}, script=${adapterPath}, log=${logFile}`);
     return new vscode.DebugAdapterExecutable(pythonCommand, args);
