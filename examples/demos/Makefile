@@ -32,6 +32,7 @@ endif
 CLANG ?= $(if $(HSX_CLANG),$(HSX_CLANG),clang)
 VM := $(REPO_ROOT)/platforms/python/host_vm.py
 BUILD_DIR ?= build
+BUILD_DIR ?= build
 CLANGFLAGS ?= -S -emit-llvm -O0 -fno-builtin
 RUN_ARGS ?=
 
@@ -40,6 +41,12 @@ MKDIR_CMD = "$(PYTHON)" -c "import os,sys; p=os.path.abspath(sys.argv[1]); os.ma
 
 LIB_DIR := $(REPO_ROOT)/examples/lib
 INCLUDE_DIR := $(REPO_ROOT)/include
+DEBUG ?= 0
+
+ifeq ($(DEBUG),1)
+  BUILD_DIR := build/debug
+  CLANGFLAGS += -g
+endif
 
 HSX_EXTRA_MVASM_mailbox_producer := \
 	examples/lib/hsx_mailbox.mvasm \
@@ -48,14 +55,28 @@ HSX_EXTRA_MVASM_mailbox_consumer := \
 	examples/lib/hsx_mailbox.mvasm \
 	examples/lib/hsx_stdio.mvasm
 
+# Debug artifacts
+ifeq ($(DEBUG),1)
+  LONGRUN_DBG := --debug-info "$(BUILD_DIR)/longrun/main.dbg" --emit-sym "$(BUILD_DIR)/longrun/main.sym"
+  MAILBOX_PRODUCER_DBG := --debug-info "$(BUILD_DIR)/mailbox/producer.dbg"
+  MAILBOX_CONSUMER_DBG := --debug-info "$(BUILD_DIR)/mailbox/consumer.dbg"
+else
+  LONGRUN_DBG :=
+  MAILBOX_PRODUCER_DBG :=
+  MAILBOX_CONSUMER_DBG :=
+endif
+
 .SECONDARY:
-.PHONY: all longrun runlongrun mailbox_producer mailbox_consumer run_mailbox_producer run_mailbox_consumer shell runshell clean print-root
+.PHONY: all debug longrun runlongrun mailbox_producer mailbox_consumer run_mailbox_producer run_mailbox_consumer shell runshell clean print-root
 
 print-root:
 	@echo REPO_ROOT="$(REPO_ROOT)"
 	@echo PYTHON   ="$(PYTHON)"
 
 all: longrun mailbox_producer mailbox_consumer
+
+debug:
+	$(MAKE) DEBUG=1 all
 
 longrun: $(BUILD_DIR)/longrun/main.hxe
 
@@ -68,11 +89,11 @@ $(BUILD_DIR)/longrun/main.hxe: $(BUILD_DIR)/longrun/main.mvasm
 		--asm "$(REPO_ROOT)/python/asm.py" \
 		--linker "$(REPO_ROOT)/python/hld.py" \
 		--main "$<" \
-		--out "$@"
+		--out "$@" $(LONGRUN_DBG)
 
 $(BUILD_DIR)/longrun/main.mvasm: $(BUILD_DIR)/longrun/main.ll
 	$(MKDIR_CMD)
-	"$(PYTHON)" "$(REPO_ROOT)/python/hsx-llc.py" "$<" -o "$@"
+	"$(PYTHON)" "$(REPO_ROOT)/python/hsx-llc.py" "$<" -o "$@" $(if $(DEBUG),--emit-debug "$(BUILD_DIR)/longrun/main.dbg",)
 
 $(BUILD_DIR)/longrun/main.ll: longrun/main.c
 	$(MKDIR_CMD)
@@ -93,11 +114,12 @@ $(BUILD_DIR)/mailbox/producer.hxe: $(BUILD_DIR)/mailbox/producer.mvasm
 		--asm "$(REPO_ROOT)/python/asm.py" \
 		--linker "$(REPO_ROOT)/python/hld.py" \
 		--main "$<" \
-		--out "$@" $(foreach lib,$(HSX_EXTRA_MVASM_mailbox_producer), --extra "$(REPO_ROOT)/$(lib)")
+		--out "$@" $(MAILBOX_PRODUCER_DBG) \
+		$(foreach lib,$(HSX_EXTRA_MVASM_mailbox_producer), --extra "$(REPO_ROOT)/$(lib)")
 
 $(BUILD_DIR)/mailbox/producer.mvasm: $(BUILD_DIR)/mailbox/producer.ll
 	$(MKDIR_CMD)
-	"$(PYTHON)" "$(REPO_ROOT)/python/hsx-llc.py" "$<" -o "$@"
+	"$(PYTHON)" "$(REPO_ROOT)/python/hsx-llc.py" "$<" -o "$@" $(if $(DEBUG),--emit-debug "$(BUILD_DIR)/mailbox/producer.dbg",)
 
 $(BUILD_DIR)/mailbox/producer.ll: mailbox/producer.c
 	$(MKDIR_CMD)
@@ -109,11 +131,12 @@ $(BUILD_DIR)/mailbox/consumer.hxe: $(BUILD_DIR)/mailbox/consumer.mvasm
 		--asm "$(REPO_ROOT)/python/asm.py" \
 		--linker "$(REPO_ROOT)/python/hld.py" \
 		--main "$<" \
-		--out "$@" $(foreach lib,$(HSX_EXTRA_MVASM_mailbox_consumer), --extra "$(REPO_ROOT)/$(lib)")
+		--out "$@" $(MAILBOX_CONSUMER_DBG) \
+		$(foreach lib,$(HSX_EXTRA_MVASM_mailbox_consumer), --extra "$(REPO_ROOT)/$(lib)")
 
 $(BUILD_DIR)/mailbox/consumer.mvasm: $(BUILD_DIR)/mailbox/consumer.ll
 	$(MKDIR_CMD)
-	"$(PYTHON)" "$(REPO_ROOT)/python/hsx-llc.py" "$<" -o "$@"
+	"$(PYTHON)" "$(REPO_ROOT)/python/hsx-llc.py" "$<" -o "$@" $(if $(DEBUG),--emit-debug "$(BUILD_DIR)/mailbox/consumer.dbg",)
 
 $(BUILD_DIR)/mailbox/consumer.ll: mailbox/consumer.c
 	$(MKDIR_CMD)

@@ -11,14 +11,22 @@ import argparse
 import subprocess
 import sys
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 
 def run(cmd: List[str]) -> None:
     subprocess.run(cmd, check=True)
 
 
-def build(main_mvasm: Path, output: Path, asm_tool: Path, linker_tool: Path, extras: List[Path]) -> None:
+def build(
+    main_mvasm: Path,
+    output: Path,
+    asm_tool: Path,
+    linker_tool: Path,
+    extras: List[Path],
+    debug_infos: Optional[List[Path]] = None,
+    emit_sym: Optional[Path] = None,
+) -> None:
     """Build HXE by assembling to objects and linking.
     
     Following standard toolchain practice:
@@ -42,7 +50,15 @@ def build(main_mvasm: Path, output: Path, asm_tool: Path, linker_tool: Path, ext
         extra_objs.append(str(obj))
     
     # Link all objects into final executable
-    run([str(python_exe), str(linker_tool), '-o', str(output), *extra_objs, str(main_obj)])
+    link_cmd = [str(python_exe), str(linker_tool), '-o', str(output), *extra_objs, str(main_obj)]
+    if debug_infos:
+        link_cmd.append('--debug-info')
+        link_cmd.extend(str(info) for info in debug_infos)
+        if emit_sym:
+            link_cmd.extend(['--emit-sym', str(emit_sym)])
+    elif emit_sym:
+        link_cmd.extend(['--emit-sym', str(emit_sym)])
+    run(link_cmd)
 
 
 def main() -> None:
@@ -52,6 +68,8 @@ def main() -> None:
     parser.add_argument('--asm', dest='asm_tool', required=True)
     parser.add_argument('--linker', dest='linker_tool', required=True)
     parser.add_argument('--extra', dest='extras', action='append', default=[])
+    parser.add_argument('--debug-info', dest='debug_infos', action='append', default=[])
+    parser.add_argument('--emit-sym', dest='emit_sym')
     args = parser.parse_args()
 
     main_mvasm = Path(args.main_mvasm)
@@ -59,8 +77,10 @@ def main() -> None:
     asm_tool = Path(args.asm_tool)
     linker_tool = Path(args.linker_tool)
     extras = [Path(x) for x in args.extras if x]
+    debug_infos = [Path(x) for x in args.debug_infos if x]
+    emit_sym = Path(args.emit_sym) if args.emit_sym else None
 
-    build(main_mvasm, output, asm_tool, linker_tool, extras)
+    build(main_mvasm, output, asm_tool, linker_tool, extras, debug_infos or None, emit_sym)
 
 
 if __name__ == '__main__':
