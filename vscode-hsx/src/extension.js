@@ -21,7 +21,8 @@ class HSXAdapterFactory {
   }
 
   createDebugAdapterDescriptor(session) {
-    const pythonCommand = process.env.PYTHON || process.env.HSX_PYTHON || "python3";
+    const defaultPython = process.platform === "win32" ? "python" : "python3";
+    const pythonCommand = process.env.PYTHON || process.env.HSX_PYTHON || defaultPython;
     const adapterPath = this.context.asAbsolutePath(path.join("debugAdapter", "hsx-dap.py"));
     return new vscode.DebugAdapterExecutable(pythonCommand, [adapterPath]);
   }
