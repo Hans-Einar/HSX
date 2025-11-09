@@ -8,7 +8,8 @@
             "pid": 1,                 // whichever PID your app uses
             "host": "127.0.0.1",      // executive host
             "port": 9998,             // executive port
-            "pythonPath": "C:\\Users\\hanse\\miniconda3\\python.exe"
+            "pythonPath": "C:\\Users\\hanse\\miniconda3\\python.exe",
+            "symPath": "C:\\Users\\hanse\\GIT\\HSX\\examples\\demos\\build\\debug\\longrun\\main.sym"
         }
     ]
 }
