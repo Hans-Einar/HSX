@@ -1,5 +1,23 @@
 import * as assert from "assert";
-import { HSXConfigurationProvider, HSXDebugConfiguration } from "../extension";
+import Module = require("module");
+
+const originalRequire = Module.prototype.require;
+Module.prototype.require = function patchedRequire(request: string) {
+  if (request === "vscode") {
+    return {
+      debug: {
+        registerDebugConfigurationProvider: () => ({ dispose() {} }),
+        registerDebugAdapterDescriptorFactory: () => ({ dispose() {} }),
+      },
+    };
+  }
+  return originalRequire.apply(this, [request]);
+};
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const extension = require("../extension") as typeof import("../extension");
+const { HSXConfigurationProvider } = extension;
+type HSXDebugConfiguration = import("../extension").HSXDebugConfiguration;
 
 const provider = new HSXConfigurationProvider();
 
