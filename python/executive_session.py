@@ -120,27 +120,35 @@ class ExecutiveSession:
         retries once if the server reports ``session_required`` and the session
         can be re-established.
         """
-        payload = dict(payload)
-        payload.setdefault("version", 1)
-        if use_session and not self.session_disabled:
-            self._ensure_session()
-            if self.session_id:
-                payload.setdefault("session", self.session_id)
-        response = self._send_raw(payload)
-        if (
-            use_session
-            and not self.session_disabled
-            and response.get("status") == "error"
-            and isinstance(response.get("error"), str)
-            and response["error"].startswith("session_required")
-            and retry
-        ):
-            # Session timed out – try to reopen once.
-            self._ensure_session(force=True)
-            if self.session_id:
-                payload["session"] = self.session_id
+        attempts = 2 if retry else 1
+        last_error: Optional[Exception] = None
+        for attempt in range(attempts):
+            payload = dict(payload)
+            payload.setdefault("version", 1)
+            if use_session and not self.session_disabled:
+                self._ensure_session(force=attempt > 0)
+                if self.session_id:
+                    payload.setdefault("session", self.session_id)
+            try:
                 response = self._send_raw(payload)
-        return response
+            except ExecutiveSessionError as exc:
+                last_error = exc
+                if attempt + 1 >= attempts:
+                    break
+                continue
+            if (
+                use_session
+                and not self.session_disabled
+                and response.get("status") == "error"
+                and isinstance(response.get("error"), str)
+                and response["error"].startswith("session_required")
+                and attempt + 1 < attempts
+            ):
+                continue
+            return response
+        if last_error:
+            raise last_error
+        return {"status": "error", "error": "session_failed"}
 
     def start_event_stream(
         self,
@@ -515,16 +523,22 @@ class ExecutiveSession:
 
     def _send_raw(self, payload: JsonDict) -> JsonDict:
         data = _json_dumps(payload)
-        with socket.create_connection((self.host, self.port), timeout=self.timeout) as sock:
-            with sock.makefile("w", encoding="utf-8", newline="\n") as wfile, sock.makefile(
-                "r", encoding="utf-8", newline="\n"
-            ) as rfile:
-                wfile.write(data + "\n")
-                wfile.flush()
-                line = rfile.readline()
-                if not line:
-                    raise RuntimeError("executive closed connection")
-                return json.loads(line)
+        try:
+            with socket.create_connection((self.host, self.port), timeout=self.timeout) as sock:
+                sock.settimeout(self.timeout)
+                with sock.makefile("w", encoding="utf-8", newline="\n") as wfile, sock.makefile(
+                    "r", encoding="utf-8", newline="\n"
+                ) as rfile:
+                    wfile.write(data + "\n")
+                    wfile.flush()
+                    line = rfile.readline()
+                    if not line:
+                        raise ExecutiveSessionError("executive closed connection")
+                    return json.loads(line)
+        except socket.timeout as exc:
+            raise ExecutiveSessionError("transport timeout") from exc
+        except OSError as exc:
+            raise ExecutiveSessionError(f"transport error: {exc}") from exc
 
     def _ensure_session(self, *, force: bool = False) -> None:
         if self.session_disabled:
@@ -733,4 +747,3 @@ class ExecutiveSession:
 
 
 __all__ = ["ExecutiveSession", "ExecutiveSessionError"]
-

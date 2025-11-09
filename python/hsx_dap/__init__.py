@@ -422,7 +422,7 @@ class HSXDebugAdapter:
             except Exception as exc:
                 return {"result": f"watch error: {exc}", "variablesReference": 0}
             if not watch:
-                return {"result": "unavailable", "variablesReference": 0}
+                return {"result": "watch unavailable", "variablesReference": 0}
             return {"result": self._describe_watch_value(watch), "variablesReference": 0}
         return {"result": "not supported", "variablesReference": 0}
 
@@ -663,6 +663,7 @@ class HSXDebugAdapter:
         expr = expression.strip()
         if not expr or not self.client:
             return None
+        self._ensure_symbol_mapper()
         watch_id = self._watch_expr_to_id.get(expr)
         if watch_id is None:
             record = self.client.add_watch(expr, pid=self.current_pid)
@@ -677,7 +678,7 @@ class HSXDebugAdapter:
         for watch in watches:
             if getattr(watch, "watch_id", None) == watch_id:
                 return watch
-        return None
+        raise RuntimeError("watch registered but not returned by executive")
 
     def _describe_watch_value(self, watch) -> str:
         value = getattr(watch, "value", None) or ""

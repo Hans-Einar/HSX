@@ -117,6 +117,7 @@ _LAST_VALUE_CONTEXT: Dict[str, Any] = {}
 _LAST_COMMAND_CONTEXT: Dict[str, Any] = {}
 _SESSION_INDEX_LOCK = threading.Lock()
 _SESSION_INDEX_CACHE: Dict[int, str] = {}
+_SESSION_REVERSE_CACHE: Dict[str, int] = {}
 _SESSION_CMD_CONTEXT: Dict[str, Any] = {}
 def _set_session_context(op: str, **extra: Any) -> None:
     _SESSION_CMD_CONTEXT.clear()
@@ -1628,13 +1629,20 @@ def _pretty_dmesg(payload: dict) -> None:
         event_type = message
         if isinstance(event, dict):
             event_type = event.get("type", event_type)
-        session_id = entry.get("session_id") or "-"
+        session_id = entry.get("session_id")
+        session_number = _session_number_for(session_id)
+        if session_number is not None and session_id:
+            session_text = f"{session_number}({session_id})"
+        elif session_id:
+            session_text = session_id
+        else:
+            session_text = "-"
         parts = [
             f"[{seq}]",
             timestamp,
             level or "-",
             f"pid={pid_text}",
-            f"session={session_id}",
+            f"session={session_text}",
             f"clock={clock_text}",
             f"event={event_type}",
             f"msg={message}",
@@ -3217,10 +3225,12 @@ def main() -> None:
 def _remember_session_list(entries: Sequence[Dict[str, Any]]) -> None:
     with _SESSION_INDEX_LOCK:
         _SESSION_INDEX_CACHE.clear()
+        _SESSION_REVERSE_CACHE.clear()
         for idx, entry in enumerate(entries, 1):
             session_id = entry.get("id")
             if isinstance(session_id, str) and session_id:
                 _SESSION_INDEX_CACHE[idx] = session_id
+                _SESSION_REVERSE_CACHE[session_id] = idx
 
 
 def _lookup_session_by_index(index: int) -> Optional[str]:
@@ -3563,3 +3573,9 @@ def _build_cmd_command_payload(cmd: str, args: list[str], host: str, port: int) 
         return payload
 
     raise ValueError(f"unsupported cmd.* command '{cmd}'")
+def _session_number_for(session_id: Optional[str]) -> Optional[int]:
+    if not session_id:
+        return None
+    with _SESSION_INDEX_LOCK:
+        number = _SESSION_REVERSE_CACHE.get(session_id)
+    return number

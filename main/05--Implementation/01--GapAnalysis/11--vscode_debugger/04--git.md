@@ -3,15 +3,15 @@
 > File name: `04--git.md`. Use this log to capture branch, commits, and PR status for the vscode debugger implementation track.
 
 ## Branch
-- Name: `<branch-name>`
-- Created on: `<YYYY-MM-DD>`
-- Owner: `<team or lead>`
-- Based on commit: `<commit-id>`
+- Name: `Implementation/vscode`
+- Created on: `2025-11-09`
+- Owner: `Debugger Team`
+- Based on commit: `6b5be80` (Session Resilience & Symbols)
 
 ## Commit Log
 | Date | Commit hash | Message | Author | Notes |
 | --- | --- | --- | --- | --- |
-| <YYYY-MM-DD> | <commit-hash> | <short message> | <author> | Tests: `<command>` |
+| 2025-11-09 | `6b5be80` | `Session Resilience & Symbols` | Hans Einar | Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dap_symbol_mapper.py` |
 
 ## Pull Request
 - PR URL / ID: `<link or ID>`

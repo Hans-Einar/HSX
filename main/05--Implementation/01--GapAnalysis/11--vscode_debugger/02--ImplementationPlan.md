@@ -746,8 +746,8 @@ VS Code pauses/watches currently lose executive sessions and cannot resolve expr
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.11--vscode_debugger](../../../04--Design/04.11--vscode_debugger.md)
-- [ ] Add session heartbeat + reconnection logic to hsx-dap (CommandClient + SessionManager)
-- [ ] Ensure DAP adapter re-subscribes to events on reconnect
+- [x] Add session heartbeat + reconnection logic to hsx-dap (CommandClient + SessionManager)
+- [x] Ensure DAP adapter re-subscribes to events on reconnect
 - [ ] Translate VS Code watch expressions to `watch add`/`list` with graceful errors
 - [ ] Surface watch updates in Variables/Watch panes (invalidate scopes on updates)
 - [ ] Add regression tests covering session timeout + reconnect
