@@ -2832,7 +2832,7 @@ def _build_dmesg_payload(args: list[str], host: str | None, port: int | None) ->
         session_id = _resolve_session_identifier(session_token, host, port)
         if not session_id:
             raise ValueError(f"unknown session reference '{session_token}'")
-        payload["session"] = session_id
+        payload["filter_session"] = session_id
     return payload
 
 

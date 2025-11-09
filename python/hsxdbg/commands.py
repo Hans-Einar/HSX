@@ -22,8 +22,19 @@ class CommandClient:
     def _request(self, payload: Dict) -> Dict:
         if not self.session.state.session_id:
             self.session.open()
+        payload = dict(payload)
         payload.setdefault("session", self.session.state.session_id)
-        return self.session.transport.send_request(payload)
+        response = self.session.transport.send_request(payload)
+        if (
+            isinstance(response, dict)
+            and response.get("status") == "error"
+            and isinstance(response.get("error"), str)
+            and response["error"].startswith("session_required")
+        ):
+            self.session.reopen()
+            payload["session"] = self.session.state.session_id
+            response = self.session.transport.send_request(payload)
+        return response
 
     def pause(self, pid: Optional[int] = None) -> Dict:
         target = pid or self.session.state.pid

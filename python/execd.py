@@ -3287,13 +3287,13 @@ class ExecutiveState:
         self.log_buffer.append(entry)
         self._next_log_seq += 1
 
-    def get_logs(self, limit: Optional[int] = None, *, session_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_logs(self, limit: Optional[int] = None, *, filter_session: Optional[str] = None) -> List[Dict[str, Any]]:
         if limit is None or limit <= 0 or limit >= len(self.log_buffer):
             logs = list(self.log_buffer)
         else:
             logs = list(self.log_buffer)[-limit:]
-        if session_id:
-            logs = [entry for entry in logs if entry.get("session_id") == session_id]
+        if filter_session:
+            logs = [entry for entry in logs if entry.get("session_id") == filter_session]
         return logs
 
     def attach(self) -> Dict[str, Any]:
@@ -5259,9 +5259,9 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
             if cmd == "dmesg":
                 limit = request.get("limit")
                 limit_int = int(limit) if limit is not None else None
-                session_filter = request.get("session")
-                session_str = str(session_filter) if session_filter else None
-                logs = self.state.get_logs(limit=limit_int, session_id=session_str)
+                filter_session = request.get("filter_session")
+                filter_str = str(filter_session) if filter_session else None
+                logs = self.state.get_logs(limit=limit_int, filter_session=filter_str)
                 return {"version": 1, "status": "ok", "logs": logs}
             if cmd == "stdio_fanout":
                 pid_raw = request.get("pid")

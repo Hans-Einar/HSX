@@ -150,6 +150,20 @@ class SessionManager:
         finally:
             self.state = SessionState()
 
+    def reopen(self) -> None:
+        """Re-open the session and restore event subscriptions if needed."""
+
+        filters = self._event_filters
+        auto_ack = self._ack_thread is not None
+        ack_interval = self._ack_interval
+        self.close()
+        self.open()
+        if filters is not None:
+            try:
+                self.subscribe_events(filters, auto_ack=auto_ack, ack_interval=ack_interval)
+            except Exception:
+                logger.exception("failed to resubscribe events after session reopen")
+
     # ------------------------------------------------------------------
     # Event streaming helpers
     # ------------------------------------------------------------------
