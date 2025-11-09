@@ -1,0 +1,4 @@
+val.get <identifier> [--pid <pid>]
+    Read a value from the executive registry. The identifier can be an OID
+    (e.g. 0x0201), a numeric pair (group:value), or a named entry such as
+    motor:speed. Use --pid when reading on behalf of another task.

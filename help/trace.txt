@@ -1,2 +1,14 @@
 trace <pid> [on|off]
+trace <pid> records [limit]
+trace <pid> export [limit]
+trace <pid> import <file> [--append]
+trace config changed-regs <on|off>
+trace config buffer <size>
+
 Toggle instruction tracing for the specified task. Without a mode it flips the current state; use 'on' or 'off' to force a value.
+
+	race <pid> records dumps the most recent trace entries for that task (optionally limiting how many entries are returned).
+	race <pid> export behaves like ecords but marks the payload with the hsx.trace/1 format so tooling can persist it verbatim.
+	race <pid> import loads trace records from a JSON file (either a list of records or an object with a ecords key). By default the buffer is replaced; pass --append to keep existing entries and extend the buffer instead.
+
+	race config adjusts global trace settings. Use 	race config changed-regs off to suppress per-instruction register diffs (and ... on to re-enable them). 	race config buffer <size> changes the per-task ring buffer capacity (set size=0 to disable retention).

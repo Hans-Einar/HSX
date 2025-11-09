@@ -1,0 +1,477 @@
+# Executive Implementation Notes
+
+Use this file to record progress per session.
+
+## Template
+
+```
+## YYYY-MM-DD - Name/Initials (Session N)
+
+### Focus
+- Task(s) tackled: ...
+- Dependencies touched: ...
+
+### Status
+- TODO / IN PROGRESS / DONE / BLOCKED
+
+### Details
+- Summary of code changes / key decisions.
+- Tests run (commands + result).
+- Follow-up actions / hand-off notes.
+```
+
+Start new sections chronologically. Keep notes concise but actionable so the next agent can resume quickly.
+
+## 2025-11-01 - Codex (Session 1)
+
+### Focus
+- Task(s) tackled: Implement Phase 1 session management (session.open/keepalive/close, PID locks, heartbeat/feature negotiation).
+- Dependencies touched: `python/execd.py`, `docs/executive_protocol.md`, new unit tests under `python/tests/`.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions.
+  - Added session registry with lock enforcement and timeout pruning in `python/execd.py:37-255`.
+  - Wired TCP handler to honour session contexts and reject PID operations without ownership (`python/execd.py:993-1188`).
+  - Documented clamped capability warnings + lock semantics (`docs/executive_protocol.md:142-206`).
+  - Added pytest coverage for session lifecycles and lock enforcement (`python/tests/test_executive_sessions.py`).
+- Tests run (commands + result).
+  - `python -m pytest python/tests/test_executive_sessions.py` → PASS
+- Follow-up actions / hand-off notes.
+  - Shell/executive clients must attach sessions before sending PID-specific RPCs.
+
+## 2025-11-01 - Codex (Session 2)
+
+### Focus
+- Task(s) tackled: Implement Phase 1 event streaming foundation (bounded queues, subscribe/unsubscribe/ack, warning events).
+- Dependencies touched: `python/execd.py`, `docs/executive_protocol.md`, `python/tests/test_executive_sessions.py`.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions.
+  - Added fan-out broadcaster with per-session filters, queue limits, ACK handling, and warning emissions (`python/execd.py:305-520`, `python/execd.py:949-1009`, `python/execd.py:1210-1262`).
+  - Streamlined `_ShellHandler` to support long-lived event streams via subscription tokens.
+  - Updated protocol doc with subscription token semantics and teardown behaviour (`docs/executive_protocol.md:164-200`).
+  - Extended pytest suite with event delivery, ack, and overflow scenarios.
+- Tests run (commands + result).
+  - `python -m pytest python/tests/test_executive_sessions.py` → PASS
+- Follow-up actions / hand-off notes.
+  - Update shell clients (`python/shell_client.py`, `python/blinkenlights.py`, etc.) to negotiate sessions, send keepalives, and consume the streaming socket.
+
+
+## 2025-11-01 - Codex (Session 3)
+
+### Focus
+- Task(s) tackled: Wire shell/blinkenlights/manager smoke clients to new session/event-stream APIs via `ExecutiveSession` helper; expose event buffers in CLI.
+- Dependencies touched: `python/shell_client.py`, `python/blinkenlights.py`, `python/exec_smoke.py`, `python/hsx_manager.py`, new `python/executive_session.py` module, documentation/help assets.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions.
+  - Introduced shared `ExecutiveSession` helper for session negotiation, keepalive, and event streaming; replaced ad-hoc socket usage across CLI utilities.
+  - Updated shell client to auto-open sessions, maintain an event buffer, add an `events` command, and refresh help topics; blinkenlights/manager/exec_smoke reuse the helper.
+  - Added small help stubs (`help/events.txt`, `help/bp.txt`) to document new commands.
+- Tests run (commands + result).
+  - `python -m pytest python/tests/test_executive_sessions.py` → PASS
+- Follow-up actions / hand-off notes.
+  - Port remaining debugger frontends (TUI/VSCode) to `ExecutiveSession` during their milestones.
+
+## 2025-11-01 - Codex (Session 4)
+
+### Focus
+- Task(s) tackled: Phase 1 breakpoint management (exec-side data structures, RPC exposure, CLI/doc/test coverage).
+- Dependencies touched: `python/execd.py`, `python/shell_client.py`, `docs/executive_protocol.md`, `python/tests/test_executive_sessions.py`.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions.
+  - Added per-PID breakpoint tracking with VM debug attach/detach helpers plus new `bp` RPC handling (list/set/clear/clear_all).
+  - Extended shell client with a dedicated `bp` command, pretty-printer, and documentation; updated protocol docs accordingly.
+  - Added unit tests using a debug VM stub to validate add/list/clear flows and local state updates.
+- Tests run (commands + result).
+  - `python -m pytest python/tests/test_executive_sessions.py` → PASS
+- Follow-up actions / hand-off notes.
+  - Surface breakpoint info in downstream debugger UI/UX components in later milestones.
+
+
+## 2025-11-01 - Codex (Session 5)
+
+### Focus
+- Task(s) tackled: Phase 1.4 symbol loading (schema, loader, lookups, CLI/doc integration).
+- Dependencies touched: `python/execd.py`, `python/shell_client.py`, `python/tests/test_executive_sessions.py`, `docs/asm.md`, `docs/executive_protocol.md`, new helper `python/executive_session.py` and `help/sym.txt`.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions.
+  - Added symbol table loader/caching with address & name lookups, plus `sym` RPC for info/address/name/line queries and manual path overrides.
+  - Updated shell tooling (CLI + interactive) with `sym` commands and symbol-aware loads (`--symbols`); auto-loads `<program>.sym` when present.
+  - Documented `.sym` JSON format in `docs/asm.md` and expanded the protocol guide with `sym` usage.
+- Tests run (commands + result).
+  - `python -m pytest python/tests/test_executive_sessions.py` → PASS
+- Follow-up actions / hand-off notes.
+  - Integrate symbol lookups into future TUI/IDE debugger features (stack traces, watch panes).
+
+## 2025-11-01 - Codex (Session 6)
+
+### Focus
+- Task(s) tackled: Phase 1.5 stack reconstruction (`stack.info` RPC, CLI wiring, docs) plus auto-load warnings for missing symbols.
+- Dependencies touched: `python/execd.py`, `python/shell_client.py`, `python/tests/test_executive_sessions.py`, `docs/executive_protocol.md`, `docs/asm.md`, `help/stack.txt`.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions.
+  - Hardened `ExecutiveState.stack_info` with ABI-aware frame walking, error diagnostics, and metadata (func/line/return_pc) while surfacing warnings when symbol auto-load fails.
+  - Added stack RPC/CLI plumbing (`stack <pid> [frames]`), pretty-printer updates, and a dedicated help topic; stack prerequisites called out in `docs/asm.md` plus protocol documentation.
+  - Expanded test coverage for stack reconstruction (multi-frame walk, FP cycle detection, read failures) under `python/tests/test_executive_sessions.py`.
+- Tests run (commands + result).
+  - `/mnt/c/Windows/py.exe -3.14 -m pytest python/tests/test_executive_sessions.py` → PASS
+- Follow-up actions / hand-off notes.
+  - Expose stack helper via higher-level client APIs (ExecutiveSession consumers) and feed frames into downstream debugger UIs once available.
+
+## 2025-11-01 - Codex (Session 7)
+
+### Focus
+- Task(s) tackled: Expose stack RPC via ExecutiveSession and surface traces in higher-level clients (Blinkenlights UI, smoke tests, manager CLI).
+- Dependencies touched: `python/executive_session.py`, `python/blinkenlights.py`, `python/exec_smoke.py`, `python/hsx_manager.py`, `python/tests/test_executive_session_helpers.py`.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions.
+  - Added cached `stack.info` helpers to `ExecutiveSession` with graceful fallback when unsupported, plus targeted unit tests for success/error paths.
+  - Updated Blinkenlights to render per-task stack summaries and extended exec_smoke/manager tooling with stack-aware commands and summaries.
+  - Ensured all front-ends request the stack capability and reuse shared helper methods.
+- Tests run (commands + result).
+  - `/mnt/c/Windows/py.exe -3.14 -m pytest python/tests/test_executive_session_helpers.py python/tests/test_executive_sessions.py` → PASS
+- Follow-up actions / hand-off notes.
+  - Consider richer UI affordances (frame drill-down, symbol hover) once extended metadata becomes available.
+
+## 2025-11-01 - Codex (Session 8)
+
+### Focus
+- Task(s) tackled: Phase 1.6 disassembly API (disasm.read RPC, shell integration, documentation).
+- Dependencies touched: `python/execd.py`, `python/executive_session.py`, `python/shell_client.py`, `python/disasm_util.py`, `docs/executive_protocol.md`, `python/tests/test_executive_sessions.py`, new `help/disasm.txt`.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions.
+  - Added `disasm.read` RPC with caching support plus symbol/line annotations and target hints, exposing it through ExecutiveSession and the shell CLI.
+  - Hooked CLI/help layers with a formatter and command parser; consumers request the new `disasm` capability and can reuse cached listings.
+  - Extended unit coverage for disassembly decoding and updated protocol docs/help assets.
+- Tests run (commands + result).
+  - `/mnt/c/Windows/py.exe -3.14 -m pytest python/tests/test_executive_session_helpers.py python/tests/test_executive_sessions.py` ? PASS
+- Follow-up actions / hand-off notes.
+  - Consider richer CLI filters (e.g., symbol/breakpoint overlays) once downstream tooling consumes the API.
+
+## 2025-11-02 - Codex (Session 9)
+
+### Focus
+- Task(s) tackled: Phase 2.1 symbol enumeration coverage and ExecutiveSession support (`symbols.list`, client helpers, regression tests).
+- Dependencies touched: `python/execd.py`, `python/executive_session.py`, `python/tests/test_executive_sessions.py`, `python/tests/test_executive_session_helpers.py`, implementation docs.
+
+### Status
+- DONE
+
+### Details
+- Summary of code changes / key decisions.
+  - Extended the test harness with symbol enumeration coverage (filtering, pagination, invalid kind handling) and enhanced seed helper to accept typed entries.
+  - Added ExecutiveSession support for symbol enumeration (`supports_symbols`, `symbols_list`) with comprehensive unit tests, including transport error handling.
+  - Restored the session helper file to the committed layout and wired `_symbols_supported` reset paths to keep feature negotiation consistent.
+- Tests run (commands + result).
+  - `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py python/tests/test_executive_session_helpers.py` ✅ PASS
+- Follow-up actions / hand-off notes.
+  - Next up: tackle Phase 2.2 memory region reporting and continue plumbing symbol metadata into higher-level clients.
+## 2025-11-02 - Codex (Session 10)
+
+### Focus
+- Task(s) tackled: Phase 2.2 memory region reporting (RPC, client plumbing, docs/tests).
+- Dependencies touched: `python/execd.py`, `python/executive_session.py`, `python/shell_client.py`, `help/memory.txt`, `docs/executive_protocol.md`, `python/tests/test_executive_sessions.py`, `python/tests/test_executive_session_helpers.py`.
+
+### Status
+- DONE
+
+### Details
+- Added `memory.regions` RPC handling with HXE segment extraction + VM-context stack/register slices and sorted reporting.
+- Extended ExecutiveSession & shell client to request/report memory regions (interactive + CLI) and documented the API/help entry.
+- Backfilled unit tests covering server-side computation and session helper behaviour; refreshed protocol docs.
+- Tests run (commands + result).
+  - `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py python/tests/test_executive_session_helpers.py`
+- Follow-up actions / hand-off notes.
+  - Future: consider enriching region list with `.sym` metadata (heap/data aliases) once format is defined.
+
+## 2025-11-02 - Codex (Session 11)
+
+### Focus
+- Task(s) tackled: Phase 2.3 watch expressions (RPC/events, client CLI, docs, tests).
+- Dependencies touched: `python/execd.py`, `python/executive_session.py`, `python/shell_client.py`, `help/watch.txt`, `docs/executive_protocol.md`, `python/tests/test_executive_sessions.py`, `python/tests/test_executive_session_helpers.py`, `python/tests/test_shell_client.py`.
+
+### Status
+- DONE
+
+### Details
+- Added watch manager with address/symbol resolution, change detection, and `watch_update` events plus cleanup on task termination.
+- Exposed `watch.add/remove/list` RPCs, session helpers, and shell commands with corresponding help/docs updates.
+- Expanded unit coverage across executive state, session stubs, and CLI payload builders.
+- Tests run (commands + result).
+  - `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py python/tests/test_executive_session_helpers.py python/tests/test_shell_client.py`
+- Follow-up actions / hand-off notes.
+  - Monitor watch event volume; consider batching/filtering if tooling subscribes heavily in later phases.
+
+## 2025-11-03 - Codex (Session 12)
+
+### Focus
+- Task(s) tackled: Phase 2.4 event back-pressure (ACK tracking, slow-consumer handling, metrics, protocol docs/tests).
+- Dependencies touched: `python/execd.py`, `docs/executive_protocol.md`, `python/tests/test_executive_sessions.py`, `main/05--Implementation/01--GapAnalysis/02--Executive/02--ImplementationPlan.md`.
+
+### Status
+- DONE
+
+### Details
+- Hardened `EventSubscription` bookkeeping with delivered/ack tracking, drop counters, and high-water metrics; wired `_apply_backpressure` to emit `slow_consumer` / `slow_consumer_drop` warnings and auto-unsubscribe lagging clients.
+- Added `events_metrics` helper plus augmented `events.subscribe`/`events.ack` replies to surface backlog statistics; queue drops now log warnings with cumulative counts.
+- Expanded plan/doc coverage and added targeted pytest cases for slow-consumer warnings, drop shutdowns, and metrics reset behaviour.
+
+### Tests run (commands + result)
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py`
+
+### Follow-up actions / hand-off notes
+- Thread backlog metrics into higher-level clients/telemetry dashboards and tune thresholds once real workloads exercise the stream.
+
+## 2025-11-03 - Codex (Session 13)
+
+### Focus
+- Task(s) tackled: Phase 2.5 task_state events (state tracking, reason codes, docs/CLI updates, regression tests).
+- Dependencies touched: `python/execd.py`, `python/shell_client.py`, `docs/executive_protocol.md`, `help/events.txt`, `python/tests/test_executive_sessions.py`, `main/05--Implementation/01--GapAnalysis/02--Executive/02--ImplementationPlan.md`.
+
+### Status
+- DONE
+
+### Details
+- Added task-state bookkeeping with pending-reason map, emitted `task_state` events for loads, mailbox waits/wakes, sleeps, debug breaks, exits, and kills, plus optional metadata payloads.
+- Extended CLI formatting so `events` summarises transitions (`prev -> new reason=...`), refreshed help/docs with the expanded schema, and introduced a targeted TaskStateVM stub with pytest coverage for all core reasons.
+- Ensured removal paths publish a terminal `"terminated"` event and wired user pause/resume flows to produce informative reasons.
+
+### Tests run (commands + result)
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py`
+
+### Follow-up actions / hand-off notes
+- Surface the new task_state stream inside higher-level debugger front-ends (IDE/TUI) and consider richer reason/detail taxonomies once telemetry is captured in practice.
+
+## 2025-11-03 - Codex (Session 14)
+
+### Focus
+- Task(s) tackled: Phase 2.6 register change tracking (trace_step diffing, CLI/doc integration, regression tests).
+- Dependencies touched: `python/execd.py`, `python/shell_client.py`, `docs/executive_protocol.md`, `python/tests/test_executive_sessions.py`, `main/05--Implementation/01--GapAnalysis/02--Executive/02--ImplementationPlan.md`.
+
+### Status
+- DONE
+
+### Details
+- Added per-task register snapshots and `_handle_trace_step_event` to compute `changed_regs`, including PSW tracking; cleared snapshots when tasks terminate and excluded the implicit PC delta to reduce noise.
+- Updated shell `events` formatter to highlight the trimmed register list, refreshed protocol docs to document the field, and introduced regression tests covering diffs, toggle behaviour, and baseline handling.
+- Added `trace config changed-regs <on|off>` RPC/CLI plumbing so clients can toggle register diff emission without touching internal attributes.
+- Cross-checked `04--Design/04.02--Executive.md` trace-step requirements to confirm optional `changed_regs` semantics and ensured implementation stayed aligned with spec.
+
+### Tests run (commands + result)
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py`
+
+### Follow-up actions / hand-off notes
+- Consider surfacing `changed_regs` in higher-level debugger views (e.g., selective register refresh) and exposing a configuration knob once client requirements solidify.
+## 2025-11-03 - Codex (Session 15)
+
+### Focus
+- Task(s) tackled: Phase 3.1 HXE v2 loader + metadata exposure (MiniVM loader updates, executive plumbing, regression coverage).
+- Dependencies touched: `platforms/python/host_vm.py`, `python/execd.py`, `python/tests/test_hxe_v2_metadata.py`, `python/tests/test_vm_stream_loader.py`, `python/tests/test_hxe_fuzz.py`, `main/05--Implementation/01--GapAnalysis/02--Executive/02--ImplementationPlan.md`.
+
+### Status
+- DONE
+
+### Details
+- Taught `load_hxe_bytes()` to detect v1/v2 headers, decode app names, allow_multiple flags, and parse metadata tables into canonical descriptors (value/cmd/mailbox) with string resolution and CRC validation that excludes the extended header fields.
+- Updated `VMController` to assign unique app instance names, surface metadata/app fields in task records and return payloads, maintain `metadata_by_pid`, and adapt streaming loads for variable header sizes.
+- Extended `ExecutiveState.load()` to capture metadata summaries, register declarative resources (values/commands/mailboxes) with duplicate/conflict validation, and keep per-PID registries alongside mailbox bindings invoked via the VM RPC layer.
+- Added regression coverage for the new behaviour (v2 metadata unit test, streaming loader assertions, fuzz test adjustments) plus dedicated metadata preprocessing tests covering success, duplicate detection, and mailbox binding failures.
+
+### Tests run (commands + result)
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_hxe_v2_metadata.py`
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_vm_stream_loader.py`
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_hxe_fuzz.py`
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_metadata_preprocess.py`
+
+### Follow-up actions / hand-off notes
+- Wire the declarative value/command registries into the SVC backends (authorisation, persistence, async publication) so runtime behaviour mirrors the metadata.
+- Consider adding RPC/helpers for clients to query full metadata descriptors (names, units, ranges) when richer UI support is required.
+## 2025-11-02 - Codex (Session 16)
+
+### Focus
+- Task(s) tackled: Phase 3.3 app naming (instance policy, task snapshots, regression tests).
+- Dependencies touched: `platforms/python/host_vm.py`, `python/tests/test_app_names.py`, `main/05--Implementation/01--GapAnalysis/02--Executive/02--ImplementationPlan.md`.
+
+### Status
+- DONE
+
+### Details
+- Ensured MiniVM loader keeps the declarative `app_name` from v2 headers, added suffix management for multi-instance loads, and wired the resolved names + metadata summaries into task snapshots returned by `task_list()` / `ps`.
+- Added regression coverage verifying single/multiple instance flows and conflict handling; confirmed the executive raises an explicit `app_exists:<name>` error when policies forbid duplicates.
+
+### Tests run (commands + result)
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_app_names.py`
+
+### Follow-up actions / hand-off notes
+- Propagate the app-name metadata through higher-level tooling (CLI/TUI) where helpful (e.g., list commands) during later debugger milestones.
+## 2025-11-02 - Codex (Session 17)
+
+### Focus
+- Task(s) tackled: Phase 4.1 scheduler state machine (TaskState enum, validation, docs/tests).
+- Dependencies touched: `python/execd.py`, `python/tests/test_scheduler_state_machine.py`, `docs/04--Design/04.02--Executive.md`, `main/05--Implementation/01--GapAnalysis/02--Executive/02--ImplementationPlan.md`.
+
+### Status
+- DONE
+
+### Details
+- Introduced a canonical `TaskState` enum with alias handling and transition validation; the executive now records state transitions for debugging and emits consistent string values for downstream clients.
+- Updated `_refresh_tasks` to enforce the state machine, track enum values alongside legacy strings, and log the most recent transition per PID for diagnostics.
+- Added regression tests covering allowed transitions and invalid transition rejection, plus documentation updates describing the enforced state machine.
+
+### Tests run (commands + result)
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest`
+
+### Follow-up actions / hand-off notes
+- Leverage the recorded transition metadata in future debugger tooling (CLI/TUI) to display why tasks moved between states.
+## 2025-11-02 - Codex (Session 18)
+
+### Focus
+- Task(s) tackled: Phase 4.2 wait/wake improvements (sleep timer heap, scheduler integration, docs/tests).
+- Dependencies touched: `platforms/python/host_vm.py`, `python/execd.py`, `python/tests/test_scheduler_state_machine.py`, `docs/04--Design/04.02--Executive.md`, `main/05--Implementation/01--GapAnalysis/02--Executive/02--ImplementationPlan.md`.
+
+### Status
+- DONE
+
+### Details
+- Reworked MiniVM sleep handling to be non-blocking: sleep requests now set deadlines and yield control, allowing the executive to manage wake timing.
+- Added timer-heap tracking in `ExecutiveState`, with deadline-driven wake-ups, scheduler throttle adjustments, and recorded state transitions; sleeping tasks now participate in the formal state machine.
+- Extended tests to cover sleep tracking/wake behaviour and refreshed design docs to describe executive-managed wait/wake semantics.
+
+### Tests run (commands + result)
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest`
+
+### Follow-up actions / hand-off notes
+- Consider richer mailbox wait instrumentation (per-descriptor backlog metrics) during later scheduler upgrades.
+## 2025-11-02 - Codex (Session 19)
+
+### Focus
+- Task(s) tackled: Phase 4.3 scheduler events (context-switch emission, reason codes, docs/tests).
+- Dependencies touched: `python/execd.py`, `python/tests/test_scheduler_state_machine.py`, `docs/executive_protocol.md`, `main/04--Design/04.02--Executive.md`, `main/05--Implementation/01--GapAnalysis/02--Executive/02--ImplementationPlan.md`.
+
+### Status
+- DONE
+
+### Details
+- Added `_maybe_emit_scheduler_event` to infer context switches from `ps()` snapshots, emit `scheduler` events with reason codes, quantum remainder, and before/after state metadata, and wired baseline context capture into `step()`.
+- Ensured scheduler snapshot handling retains the previous active PID so switches can be detected without VM assistance; `_optional_int` and `_update_scheduler_context` provide safe coercion and hint accumulation.
+- Expanded unit coverage with new scheduler-event tests (quantum rotation, sleep transitions, PID removal) and refreshed protocol/design docs to describe the enriched payload and reason taxonomy.
+
+### Tests run (commands + result)
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_scheduler_state_machine.py`
+
+### Follow-up actions / hand-off notes
+- Surface the new scheduler event data in CLI/TUI tooling when those milestones begin (e.g., highlight reason + quantum remainder alongside task timelines).
+
+## 2025-11-02 - Codex (Session 20)
+
+### Focus
+- Task(s) tackled: Phase 4.4 context isolation (register RPCs, executive guards, tests/docs).
+- Dependencies touched: `python/execd.py`, `platforms/python/host_vm.py`, `python/vmclient.py`, `python/tests/test_scheduler_state_machine.py`, `python/tests/test_vmclient_reg_api.py`, `docs/executive_protocol.md`, `main/04--Design/04.02--Executive.md`.
+
+### Status
+- DONE
+
+### Details
+- Added `vm_reg_get` / `vm_reg_set` (and `*_for`) RPCs to the VM controller + client so debuggers operate via explicit APIs rather than cached task snapshots; responses are exposed to shell tooling with consistent payloads.
+- Hardened `_refresh_tasks` to drop cached register arrays, normalise base/limit fields, and enforce context invariants (`reg_base`, `stack_base`, `stack_limit`/`stack_size`) via a new `_assert_context_isolation` guard that logs and raises on violation (toggle via `enforce_context_isolation`).
+- Extended scheduler-state tests with default base/limit fixtures plus new coverage for context assertions (including an opt-out path) and introduced unit tests covering the new VM client helpers.
+- Documented the runtime guard and new RPCs in the Executive design + protocol references, explicitly cross-linking the scheduler remediation in `issues/#2_scheduler`.
+
+### Tests run (commands + result)
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_scheduler_state_machine.py python/tests/test_vmclient_reg_api.py`
+
+### Follow-up actions / hand-off notes
+- When the TUI/IDE debugger milestones land, ensure they consume the new register APIs instead of relying on full `dumpregs` snapshots, and keep the context isolation flag enabled in CI.
+
+## 2025-11-03 - Codex (Session 21)
+
+### Focus
+- Task(s) tackled: Event-stream handshake regression (Blinkenlights hang) and runtime validation.
+- Dependencies touched: `python/executive_session.py`, `python/tests/test_executive_session_helpers.py`, `python/blinkenlights.py`, runtime smoke setup.
+
+### Status
+- DONE
+
+### Details
+- Identified lock re-entrancy deadlock in `ExecutiveSession.start_event_stream`; moved session negotiation outside the held mutex and added socket timeout reset to unblock subscribers.
+- Hardened `_event_stream_worker` to tolerate socket timeouts so long-polling readers stay alive.
+- Added regression coverage ensuring `_open_event_stream` is invoked once per session and records filter/ack parameters.
+- Validated shell and Blinkenlights clients establish event streams and receive updates without hanging.
+
+### Tests run (commands + result)
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_session_helpers.py` ✅
+- Manual: `python python/shell_client.py --host 127.0.0.1 --port 9998` (events command), `python python/blinkenlights.py --debug`
+
+### Follow-up actions / hand-off notes
+- Add an integration test harness that runs executive + VM to exercise event streaming under load once infrastructure permits.
+
+## 2025-11-03 - Codex (Session 22)
+
+### Focus
+- Task(s) tackled: Phase 5.1 trace storage (ring buffer, query/config plumbing, CLI/docs/tests).
+- Dependencies touched: `python/execd.py`, `python/shell_client.py`, `python/executive_session.py`, `python/tests/test_executive_sessions.py`, `python/tests/test_shell_client.py`, `docs/executive_protocol.md`, `help/trace.txt`.
+
+### Status
+- DONE
+
+### Details
+- Added per-task trace ring buffers with configurable capacity, sequence counters, and capture hooks wired into `trace_step` processing.
+- Exposed `trace.records` RPC plus CLI plumbing (`trace <pid> records [limit]`) and `trace config buffer <size>`; updated pretty-printers, help text, and protocol docs.
+- Extended unit coverage for trace buffering (capture, trimming, disable path) and CLI payload builders/output formatting.
+- Hardened ExecutiveSession stream worker to reset socket timeouts after the subscribe handshake (regression from prior session) and updated tests accordingly.
+
+### Tests run (commands + result)
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py python/tests/test_shell_client.py` ✅
+
+### Follow-up actions / hand-off notes
+- Build on the stored trace records for downstream debugger visualisations (Phase 5.2/5.3); consider adding integration coverage once the VM-side trace APIs grow beyond polling events.
+
+## 2025-11-03 - Codex (Session 23)
+
+### Focus
+- Task(s) tackled: Phase 5.2 trace record format (standard schema, export/import, docs/tests).
+- Dependencies touched: `platforms/python/host_vm.py`, `python/execd.py`, `python/executive_session.py`, `python/shell_client.py`, `python/trace_format.py`, `python/tests/test_executive_sessions.py`, `python/tests/test_shell_client.py`, `python/tests/test_trace_format.py`, `docs/executive_protocol.md`, `help/trace.txt`.
+
+### Status
+- DONE
+
+### Details
+- Standardised trace record schema via `python/trace_format.py`, covering required/optional fields and sanitising register snapshots plus memory-access metadata.
+- Instrumented VM trace events with `mem_access` payloads; executive now captures/export/imports normalised trace bundles (`export`/`import` RPCs, CLI support) and exposes helpers in `ExecutiveSession`.
+- Updated docs/help to describe the `hsx.trace/1` format, new CLI subcommands, and the optional `mem_access` event data; added comprehensive unit tests for format encode/decode, CLI payloads, and executive import/export flows.
+
+### Tests run (commands + result)
+- `C:/appz/miniconda/envs/py312/python.exe -m pytest python/tests/test_executive_sessions.py python/tests/test_shell_client.py python/tests/test_trace_format.py` ✅
+
+### Follow-up actions / hand-off notes
+- Consider adding file-based export helpers (CLI convenience) and ensure future VM trace polling (Phase 5.3) reuses the normalised format to avoid schema drift.

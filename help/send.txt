@@ -1,2 +1,2 @@
-send <pid> [channel] <data>
-Send UTF-8 data to the task's stdin mailbox. Provide an explicit mailbox target in 'channel' (for example svc:stdio.in@4) to reach other endpoints.
+send <pid> [channel] <data>
+Send UTF-8 data to the task's stdin mailbox. Provide an explicit mailbox target in 'channel' (for example svc:stdio.in@4) to reach other endpoints.

@@ -1,0 +1,10 @@
+bp: manage breakpoints for a task.
+
+Usage:
+  bp list <pid>
+  bp set <pid> <addr>
+  bp clear <pid> <addr>
+  bp clearall <pid>
+
+Addresses accept decimal or 0x-prefixed hexadecimal values. Commands
+respect PID locks: the controlling session must own the target PID.

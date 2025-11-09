@@ -1,2 +1,2 @@
-detach
-Release control of the VM and stop auto stepping. Use before shutting down or when the VM should run standalone.
+detach
+Release control of the VM and stop auto stepping. Use before shutting down or when the VM should run standalone.

@@ -1,7 +1,12 @@
+import errno
 import importlib.util
 from pathlib import Path
+from typing import Any, Dict, List
+
+import pytest
 
 from python.mailbox import MailboxManager, MailboxError
+from python import mailbox as mailbox_module
 from python import hsx_mailbox_constants as mbx_const
 
 
@@ -59,23 +64,17 @@ def test_send_raises_when_message_exceeds_capacity():
     mgr = MailboxManager()
     mgr.bind_target(pid=1, target="svc:small", capacity=16)
     handle = mgr.open(pid=1, target="svc:small")
-    try:
+    with pytest.raises(MailboxError) as exc:
         mgr.send(pid=1, handle=handle, payload=b"123456789012", flags=0)
-    except MailboxError:
-        pass
-    else:
-        raise AssertionError("expected MailboxError for oversize message")
+    assert exc.value.code == mbx_const.HSX_MBX_STATUS_MSG_TOO_LARGE
 
 
 def test_close_unknown_handle_raises():
     mgr = MailboxManager()
     mgr.open(pid=1, target="svc:stdio")
-    try:
+    with pytest.raises(MailboxError) as exc:
         mgr.close(pid=1, handle=99)
-    except MailboxError:
-        pass
-    else:
-        raise AssertionError("expected failure for invalid handle")
+    assert exc.value.code == mbx_const.HSX_MBX_STATUS_INVALID_HANDLE
 
 def test_recv_records_waiter():
     mgr = MailboxManager()
@@ -174,6 +173,187 @@ def test_fanout_block_policy_prevents_overfill():
 
     ok, _ = mgr.send(pid=1, handle=producer, payload=b"third")
     assert ok is True
+
+
+def test_descriptor_pool_exhaustion_raises_with_status():
+    mgr = MailboxManager(max_descriptors=4)
+    # Create descriptors up to the limit
+    mgr.register_task(1)  # consumes 4 descriptors for pid:1 stdio + control
+    assert mgr.descriptor_count == mgr.max_descriptors
+
+    with pytest.raises(MailboxError) as exc:
+        mgr.bind_target(pid=1, target="app:overflow")
+
+    assert exc.value.code == mbx_const.HSX_MBX_STATUS_NO_DESCRIPTOR
+
+
+def test_resource_stats_initial_state():
+    mgr = MailboxManager(max_descriptors=32)
+    stats = mgr.resource_stats()
+    assert stats["max_descriptors"] == 32
+    assert stats["active_descriptors"] == 0
+    assert stats["handles_total"] == 0
+    assert stats["handles_per_pid"] == {}
+    assert stats["tap_count"] == 0
+    assert stats["tap_queue_depth"] == 0
+
+
+def test_resource_stats_with_handles_and_messages():
+    mgr = MailboxManager(max_descriptors=8)
+    mgr.register_task(1)
+    handle = mgr.open(pid=1, target="svc:stdio.out")
+    ok, _ = mgr.send(pid=1, handle=handle, payload=b"ping")
+    assert ok is True
+    stats = mgr.resource_stats()
+    assert stats["active_descriptors"] >= 1
+    assert stats["handles_total"] >= 1
+    assert stats["handles_per_pid"].get(1) >= 1
+    assert stats["bytes_used"] >= len("ping")
+    assert stats["queue_depth"] >= 1
+    assert stats["tap_count"] == 0
+    assert stats["tap_queue_depth"] == 0
+
+
+
+def test_open_enforces_per_pid_handle_limit_and_recovers_after_close():
+    mgr = MailboxManager(per_pid_handle_limit=4)
+    mgr.register_task(1)
+
+    extra = mgr.open(pid=1, target="app:extra")
+    with pytest.raises(MailboxError) as exc:
+        mgr.open(pid=1, target="app:overflow")
+    assert exc.value.code == errno.ENOSPC
+
+    mgr.close(pid=1, handle=extra)
+    reopened = mgr.open(pid=1, target="app:reopen")
+    assert reopened > 0
+
+    # Other PIDs should have independent quotas
+    other = mgr.open(pid=2, target="svc:stdio.out")
+    assert other == 1
+
+
+def test_tap_rate_limit_drops_messages(monkeypatch):
+    events: List[Dict[str, Any]] = []
+    mgr = MailboxManager(tap_rate_limit=2, event_hook=events.append)
+    desc = mgr.bind_target(pid=1, target="svc:stdio.out")
+    owner = mgr.open(pid=1, target="svc:stdio.out")
+    tap_handle = mgr.open(pid=0, target="svc:stdio.out@1")
+    mgr.tap(pid=0, handle=tap_handle, enable=True)
+
+    now = [0.0]
+
+    def fake_monotonic() -> float:
+        return now[0]
+
+    monkeypatch.setattr(mailbox_module.time, "monotonic", fake_monotonic)
+
+    payload = b"x"
+    for _ in range(3):
+        ok, _ = mgr.send(pid=1, handle=owner, payload=payload)
+        assert ok is True
+
+    state = mgr._handles[0][tap_handle]
+    assert state.is_tap is True
+    assert events, "expected at least one event from backpressure"
+    assert any(ev.get("type") == "mailbox_backpressure" and ev.get("policy") == "tap_rate_limit" for ev in events)
+
+    received = [mgr.recv(pid=0, handle=tap_handle, record_waiter=False) for _ in range(3)]
+    non_none = [msg for msg in received if msg is not None]
+    assert len(non_none) == 2
+    assert all(msg.payload == payload for msg in non_none)
+    assert non_none[0].flags & mbx_const.HSX_MBX_FLAG_OVERRUN
+    assert not (non_none[1].flags & mbx_const.HSX_MBX_FLAG_OVERRUN)
+    assert mgr.recv(pid=0, handle=tap_handle, record_waiter=False) is None
+
+    # Advance window and ensure delivery resumes
+    now[0] = 1.5
+    state.pending_tap_overrun = False
+    ok, _ = mgr.send(pid=1, handle=owner, payload=payload)
+    assert ok is True
+    assert mgr.recv(pid=0, handle=tap_handle, record_waiter=False) is not None
+
+def test_fanout_reclaims_after_all_consumers_ack():
+    mgr = MailboxManager()
+    desc = mgr.bind(
+        namespace=mbx_const.HSX_MBX_NAMESPACE_SHARED,
+        name="fan_reclaim",
+        capacity=64,
+        mode_mask=(
+            mbx_const.HSX_MBX_MODE_RDWR
+            | mbx_const.HSX_MBX_MODE_FANOUT
+            | mbx_const.HSX_MBX_MODE_FANOUT_BLOCK
+        ),
+    )
+    producer = mgr.open(pid=1, target="shared:fan_reclaim")
+    consumer_a = mgr.open(pid=2, target="shared:fan_reclaim")
+    consumer_b = mgr.open(pid=3, target="shared:fan_reclaim")
+
+    ok, descriptor_id = mgr.send(pid=1, handle=producer, payload=b"data", flags=0)
+    assert ok is True
+    desc_obj = mgr.descriptor_by_id(descriptor_id)
+    assert len(desc_obj.queue) == 1
+
+    msg_a = mgr.recv(pid=2, handle=consumer_a)
+    assert msg_a is not None and msg_a.payload == b"data"
+    desc_obj = mgr.descriptor_by_id(descriptor_id)
+    assert len(desc_obj.queue) == 1
+
+    msg_b = mgr.recv(pid=3, handle=consumer_b)
+    assert msg_b is not None and msg_b.payload == b"data"
+    desc_obj = mgr.descriptor_by_id(descriptor_id)
+    assert len(desc_obj.queue) == 0
+
+
+def test_tap_receives_copy_without_blocking_owner():
+    mgr = MailboxManager()
+    desc = mgr.bind(namespace=mbx_const.HSX_MBX_NAMESPACE_SHARED, name="tap_demo", capacity=64, mode_mask=mbx_const.HSX_MBX_MODE_RDWR)
+    owner = mgr.open(pid=1, target="shared:tap_demo")
+    tap_handle = mgr.open(pid=2, target="shared:tap_demo")
+    mgr.tap(pid=2, handle=tap_handle, enable=True)
+
+    ok, descriptor_id = mgr.send(pid=1, handle=owner, payload=b"hello")
+    assert ok is True
+    owner_msg = mgr.recv(pid=1, handle=owner)
+    assert owner_msg is not None and owner_msg.payload == b"hello"
+
+    tap_msg = mgr.recv(pid=2, handle=tap_handle)
+    assert tap_msg is not None and tap_msg.payload == b"hello"
+    assert not (tap_msg.flags & mbx_const.HSX_MBX_FLAG_OVERRUN)
+
+
+def test_fanout_overrun_sets_flag_and_triggers_event():
+    events: List[Dict[str, Any]] = []
+    mgr = MailboxManager()
+    mgr.set_event_hook(events.append)
+    desc = mgr.bind(
+        namespace=mbx_const.HSX_MBX_NAMESPACE_SHARED,
+        name="fan_overrun",
+        capacity=16,
+        mode_mask=(
+            mbx_const.HSX_MBX_MODE_RDWR
+            | mbx_const.HSX_MBX_MODE_FANOUT
+            | mbx_const.HSX_MBX_MODE_FANOUT_DROP
+        ),
+    )
+    producer = mgr.open(pid=1, target="shared:fan_overrun")
+    consumer = mgr.open(pid=2, target="shared:fan_overrun")
+
+    ok, _ = mgr.send(pid=1, handle=producer, payload=b"msg1")
+    assert ok is True
+
+    ok, _ = mgr.send(pid=1, handle=producer, payload=b"msg2")
+    assert ok is True
+
+    overrun_events = [evt for evt in events if evt.get("type") == "mailbox_overrun"]
+    assert overrun_events, "expected mailbox_overrun event"
+    event = overrun_events[-1]
+    assert event["descriptor"] == desc.descriptor_id
+
+    msg = mgr.recv(pid=2, handle=consumer)
+    assert msg is not None
+    assert msg.payload == b"msg2"
+    assert msg.flags & mbx_const.HSX_MBX_FLAG_OVERRUN
 
 
 def test_app_namespace_reused_across_pids():

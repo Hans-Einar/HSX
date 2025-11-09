@@ -1,2 +1,2 @@
-resume <pid>
-Resume a previously paused task so it re-enters the ready queue.
+resume <pid>
+Resume a previously paused task so it re-enters the ready queue.

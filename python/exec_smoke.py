@@ -7,44 +7,40 @@ Example:
 
 import argparse
 import json
-import socket
 import sys
 from pathlib import Path
 from typing import Dict
 
+from executive_session import ExecutiveSession, ExecutiveSessionError
+
 
 class ExecClient:
     def __init__(self, host: str, port: int, timeout: float = 5.0) -> None:
-        self.host = host
-        self.port = port
-        self.timeout = timeout
-        self.sock = socket.create_connection((host, port), timeout=timeout)
-        self.rfile = self.sock.makefile("r", encoding="utf-8", newline="\n")
-        self.wfile = self.sock.makefile("w", encoding="utf-8", newline="\n")
+        self.session = ExecutiveSession(
+            host,
+            port,
+            client_name="hsx-exec-smoke",
+            features=["events", "stack", "symbols", "disasm"],
+            timeout=timeout,
+        )
 
     def close(self) -> None:
-        try:
-            self.rfile.close()
-        finally:
-            try:
-                self.wfile.close()
-            finally:
-                self.sock.close()
+        self.session.close()
 
     def request(self, payload: Dict[str, object]) -> Dict[str, object]:
-        payload = dict(payload)
-        payload.setdefault("version", 1)
-        self.wfile.write(json.dumps(payload, separators=(",", ":")) + "\n")
-        self.wfile.flush()
-        line = self.rfile.readline()
-        if not line:
-            raise RuntimeError("executive closed connection")
-        resp = json.loads(line)
-        if resp.get("version", 1) != 1:
-            raise RuntimeError(f"unsupported protocol version {resp.get('version')}")
-        if resp.get("status") != "ok":
-            raise RuntimeError(str(resp.get("error", "exec error")))
-        return resp
+        response = self.session.request(payload)
+        if response.get("status") != "ok":
+            raise RuntimeError(str(response.get("error", "exec error")))
+        return response
+
+    def stack_info(self, pid: int, *, max_frames: int = 5) -> Dict[str, object]:
+        try:
+            info = self.session.stack_info(pid, max_frames=max_frames)
+        except ExecutiveSessionError:
+            return {}
+        if not info:
+            return {}
+        return info
 
 
 def main(argv=None) -> int:
@@ -93,6 +89,49 @@ def main(argv=None) -> int:
         summary.append(f"step -> executed={executed} instruction(s)")
 
         if pid is not None:
+            stack_block = client.stack_info(pid)
+            frames = stack_block.get("frames") if isinstance(stack_block, dict) else None
+            if frames:
+                lines = []
+                for idx, frame in enumerate(frames[:3]):
+                    func = frame.get("func_name")
+                    if not func:
+                        symbol = frame.get("symbol")
+                        if isinstance(symbol, dict):
+                            func = symbol.get("name")
+                    pc = frame.get("pc")
+                    if func:
+                        if frame.get("func_offset"):
+                            func_text = f"{func}+0x{int(frame['func_offset']):X}"
+                        else:
+                            func_text = func
+                    elif isinstance(pc, int):
+                        func_text = f"0x{pc & 0xFFFF:04X}"
+                    else:
+                        func_text = "<unknown>"
+                    details = []
+                    line_info = frame.get("line")
+                    if isinstance(line_info, dict):
+                        file = line_info.get("file")
+                        line_no = line_info.get("line")
+                        if file and line_no is not None:
+                            details.append(f"{file}:{line_no}")
+                        elif file:
+                            details.append(file)
+                    ret_pc = frame.get("return_pc")
+                    if isinstance(ret_pc, int) and ret_pc:
+                        details.append(f"ret=0x{ret_pc & 0xFFFF:04X}")
+                    suffix = f" ({'; '.join(details)})" if details else ""
+                    lines.append(f"[{idx}] {func_text}{suffix}")
+                stack_line = "; ".join(lines)
+                if stack_block.get("truncated"):
+                    stack_line += " …"
+                errors = stack_block.get("errors")
+                if isinstance(errors, list) and errors:
+                    stack_line += f" [errors: {', '.join(str(err) for err in errors[:2])}]"
+                summary.append(f"stack -> {stack_line}")
+            else:
+                summary.append("stack -> unavailable")
             pause_resp = client.request({"cmd": "pause", "pid": pid})
             summary.append(f"pause -> state={pause_resp.get('task', {}).get('state')}")
             resume_resp = client.request({"cmd": "resume", "pid": pid})

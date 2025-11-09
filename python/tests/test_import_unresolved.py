@@ -43,6 +43,7 @@ def _build_object(source: str, path: Path) -> Path:
         relocs=relocs,
         exports=exports,
         local_symbols=local_symbols,
+        metadata=ASM.LAST_METADATA,
     )
     return path
 

@@ -1,2 +1,2 @@
-pwd
-Print the current shell working directory.
+pwd
+Print the current shell working directory.

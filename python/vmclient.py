@@ -64,6 +64,30 @@ class VMClient:
             payload["pid"] = pid
         return _check_ok(self.request(payload)).get("registers", {})
 
+    def reg_get(self, reg: int, pid: int | None = None) -> int:
+        payload: Dict[str, Any] = {"cmd": "vm_reg_get", "reg": int(reg)}
+        if pid is not None:
+            payload["pid"] = pid
+        resp = _check_ok(self.request(payload))
+        return int(resp.get("value", 0)) & 0xFFFFFFFF
+
+    def reg_get_for(self, pid: int, reg: int) -> int:
+        return self.reg_get(reg, pid=pid)
+
+    def reg_set(self, reg: int, value: int, pid: int | None = None) -> int:
+        payload: Dict[str, Any] = {
+            "cmd": "vm_reg_set",
+            "reg": int(reg),
+            "value": int(value) & 0xFFFFFFFF,
+        }
+        if pid is not None:
+            payload["pid"] = pid
+        resp = _check_ok(self.request(payload))
+        return int(resp.get("value", 0)) & 0xFFFFFFFF
+
+    def reg_set_for(self, pid: int, reg: int, value: int) -> int:
+        return self.reg_set(reg, value, pid=pid)
+
     def write_regs(self, registers: Dict[str, Any], pid: int | None = None) -> Dict[str, Any]:
         payload = {"cmd": "write_regs", "registers": registers}
         if pid is not None:
@@ -125,6 +149,12 @@ class VMClient:
             payload["mode"] = 1 if enable else 0
         return _check_ok(self.request(payload)).get("trace", {})
 
+    def trace_last(self, pid: int | None = None) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {"cmd": "vm_trace_last"}
+        if pid is not None:
+            payload["pid"] = pid
+        return _check_ok(self.request(payload)).get("trace", {})
+
     def restart(self, targets: list[str] | None = None) -> Dict[str, Any]:
         payload: Dict[str, Any] = {"cmd": "restart"}
         if targets:
@@ -168,6 +198,72 @@ class VMClient:
         if default_only:
             payload["default_only"] = 1
         return _check_ok(self.request(payload)).get("summary", {})
+
+    def val_list(
+        self,
+        *,
+        pid: int | None = None,
+        group: int | None = None,
+        oid: int | None = None,
+        name: str | None = None,
+    ) -> list[dict]:
+        payload: Dict[str, Any] = {"cmd": "val_list"}
+        if pid is not None:
+            payload["pid"] = pid
+        if group is not None:
+            payload["group"] = group
+        if oid is not None:
+            payload["oid"] = oid
+        if name is not None:
+            payload["name"] = name
+        return _check_ok(self.request(payload)).get("values", [])
+
+    def val_get(self, oid: int, *, pid: int | None = None) -> dict:
+        payload: Dict[str, Any] = {"cmd": "val_get", "oid": oid}
+        if pid is not None:
+            payload["pid"] = pid
+        return _check_ok(self.request(payload)).get("value", {})
+
+    def val_set(self, oid: int, value: Any, *, pid: int | None = None) -> dict:
+        payload: Dict[str, Any] = {"cmd": "val_set", "oid": oid, "value": value}
+        if pid is not None:
+            payload["pid"] = pid
+        return _check_ok(self.request(payload)).get("value", {})
+
+    def val_stats(self) -> dict:
+        payload: Dict[str, Any] = {"cmd": "val_stats"}
+        return _check_ok(self.request(payload)).get("stats", {})
+
+    def cmd_list(
+        self,
+        *,
+        pid: int | None = None,
+        group: int | None = None,
+        oid: int | None = None,
+        name: str | None = None,
+    ) -> list[dict]:
+        payload: Dict[str, Any] = {"cmd": "cmd_list"}
+        if pid is not None:
+            payload["pid"] = pid
+        if group is not None:
+            payload["group"] = group
+        if oid is not None:
+            payload["oid"] = oid
+        if name is not None:
+            payload["name"] = name
+        return _check_ok(self.request(payload)).get("commands", [])
+
+    def cmd_call(self, oid: int, *, pid: int | None = None, async_call: bool = False) -> dict:
+        payload: Dict[str, Any] = {"cmd": "cmd_call", "oid": oid}
+        if pid is not None:
+            payload["pid"] = pid
+        if async_call:
+            payload["async"] = 1
+        return _check_ok(self.request(payload)).get("command", {})
+
+    def cmd_stats(self) -> dict:
+        payload: Dict[str, Any] = {"cmd": "cmd_stats"}
+        return _check_ok(self.request(payload)).get("stats", {})
 
     def mailbox_send(self, pid: int, handle: int, *, data: str | None = None, data_hex: str | None = None, flags: int = 0, channel: int = 0) -> dict:
         payload: Dict[str, Any] = {"cmd": "mailbox_send", "pid": pid, "handle": handle, "flags": flags, "channel": channel}

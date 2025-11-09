@@ -36,8 +36,26 @@
 ### Overheads & buffers
 
 - Mailbox descriptor pool: start with 16 descriptors × 64 B metadata ≈ 1 KiB SRAM. Each message buffer lives in caller-owned RAM; no global payload copies beyond staging.
+- Mailbox quotas: embedded profile enforces ≤16 descriptors and ≤8 handles per task; host prototype defaults to 256 descriptors and a 64 handle-per-task ceiling. Both limits are configurable via the Python `MailboxManager` profile knobs (`max_descriptors`, `handle_limit_per_pid`).
+- Exhaustion handling: when the CLI reports `descriptor pool: exhausted` or `mailbox_exhausted` events appear, close surplus mailboxes/taps or increase the active profile limits before retrying the operation.
+
+### Mailbox profile defaults
+
+| Profile  | Descriptors | Handle limit / PID | Default capacity | Notes |
+|----------|-------------|--------------------|------------------|-------|
+| desktop  | 256         | 64                 | 64 bytes         | Development hosts; ample descriptors for tooling and taps. |
+| embedded | 16          | 8                  | 64 bytes         | AVR reference budget; mirrors Section 4.6 fairness requirements. |
+
+Set `HSX_MAILBOX_PROFILE=embedded` (or pass `mailbox_profile="embedded"` to `VMController`) to apply the constrained profile. Override any field by supplying a custom dict—for example `{ "max_descriptors": 32, "handle_limit_per_pid": 12 }` for mid-range MCUs.
 - Event stream buffer: cap at 256 events × 16 B ≈ 4 KiB on desktop builds; shrink to 64 events × 12 B (~768 B) on AVR.
 - FS cache: reuse existing HEOS buffer (already counted in baseline). Avoid duplicate buffers inside the HSX port.
+
+### Value/command registry budgets
+
+- Desktop reference builds target 256 values, 128 commands, and a 16 KiB string table. The embedded profile trims these to the design minimums (64 / 16 / 2 KiB) to stay within SRAM limits.
+- The executive now exposes `val.stats` and `cmd.stats` RPCs; poll them during long-running tests to watch occupancy and string usage without instrumenting guest code.
+- Warnings are logged via the `hsx.valcmd` logger when utilisation crosses ~80 % of capacity and clear automatically once usage falls below ~70 %.
+- Maintain ≥20 % headroom in shipping profiles so descriptor churn and transient allocations never hit hard limits mid-flight.
 
 ## Action items / validation plan
 

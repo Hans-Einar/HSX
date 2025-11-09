@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 import argparse
+import errno
 import json
 import socketserver
 import time
 import os
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from pathlib import Path
 import struct
 import sys
 import zlib
 from pathlib import PurePosixPath
-from typing import Any, Callable, Dict, Optional, List, Set, Tuple
+from typing import Any, Callable, Dict, Optional, List, Set, Tuple, Union
 from collections import defaultdict, deque
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -21,12 +22,19 @@ if str(REPO_ROOT) not in sys.path:
 try:
     from python.mailbox import MailboxManager, MailboxError, MailboxMessage
     from python import hsx_mailbox_constants as mbx_const
+    from python.persistence import PersistenceStore
+    from python.valcmd import ValCmdRegistry, float_to_f16, f16_to_float
+    from python import hsx_value_constants as val_const
+    from python import hsx_command_constants as cmd_const
     from python.disasm_util import OPCODE_NAMES, format_operands
 except ImportError as exc:  # pragma: no cover - require repo sources
     raise ImportError("HSX repo modules not found; ensure repository root on PYTHONPATH") from exc
 
 HSX_MAGIC = 0x48535845  # 'HSXE'
-HSX_VERSION = 0x0001
+HSX_VERSION_V1 = 0x0001
+HSX_VERSION_V2 = 0x0002
+HSX_VERSION = HSX_VERSION_V1
+SUPPORTED_HSX_VERSIONS = {HSX_VERSION_V1, HSX_VERSION_V2}
 MAX_CODE_LEN = 0x10000
 MAX_RODATA_LEN = 0x10000
 MAX_BSS_SIZE = 0x10000
@@ -34,8 +42,9 @@ HSX_ERR_ENOSYS = 0xFFFF_FF01
 HSX_ERR_STACK_UNDERFLOW = 0xFFFF_FF02
 HSX_ERR_STACK_OVERFLOW = 0xFFFF_FF03
 HSX_ERR_MEM_FAULT = 0xFFFF_FF04
-HEADER = struct.Struct(">IHHIIIIII")
-HEADER_FIELDS = (
+HSX_ERR_DIV_ZERO = 0xFFFF_FF05
+HEADER_V1 = struct.Struct(">IHHIIIIII")
+HEADER_V1_FIELDS = (
     "magic",
     "version",
     "flags",
@@ -46,14 +55,422 @@ HEADER_FIELDS = (
     "req_caps",
     "crc32",
 )
+HEADER_V2 = struct.Struct(">IHHIIIIII32sII24s")
+HEADER_V2_FIELDS = (
+    "magic",
+    "version",
+    "flags",
+    "entry",
+    "code_len",
+    "ro_len",
+    "bss_size",
+    "req_caps",
+    "crc32",
+    "app_name_raw",
+    "meta_offset",
+    "meta_count",
+    "reserved",
+)
+META_ENTRY_STRUCT = struct.Struct(">IIII")
+VALUE_ENTRY_STRUCT = struct.Struct(">BBBBHHHHHHHH")
+CMD_ENTRY_STRUCT = struct.Struct(">BBBBIHHI")
+MAILBOX_ENTRY_STRUCT = struct.Struct(">IHHQ")
+FLAG_MANIFEST_PRESENT = 0x0001
+FLAG_ALLOW_MULTIPLE = 0x0002
+METADATA_SECTION_VALUE = 1
+METADATA_SECTION_COMMAND = 2
+METADATA_SECTION_MAILBOX = 3
+CRC_FIELD_OFFSET = 0x1C
+CRC_FIELD_SIZE = 4
+
+# Backwards compatibility exports for existing tests/utilities that still import HEADER/HEADER_FIELDS.
+HEADER = HEADER_V1
+HEADER_FIELDS = HEADER_V1_FIELDS
 
 RECV_INFO_STRUCT = struct.Struct("<iiIII")
 
-REGISTER_BANK_BYTES = 16 * 4  # 16 GPRs × 32-bit
+MAILBOX_PROFILES: Dict[str, Dict[str, Any]] = {
+    "desktop": {
+        "max_descriptors": 256,
+        "handle_limit_per_pid": 64,
+        "default_capacity": mbx_const.HSX_MBX_DEFAULT_RING_CAPACITY,
+        "tap_rate_limit": 0,
+    },
+    "embedded": {
+        "max_descriptors": 16,
+        "handle_limit_per_pid": 8,
+        "default_capacity": mbx_const.HSX_MBX_DEFAULT_RING_CAPACITY,
+        "tap_rate_limit": 20,
+    },
+}
+MAILBOX_COUNTER_FIELDS = ("MAILBOX_STEP", "MAILBOX_WAKE", "MAILBOX_TIMEOUT")
+
+
+@dataclass
+class HXEMetadata:
+    sections: List[Dict[str, Any]] = field(default_factory=list)
+    values: List[Dict[str, Any]] = field(default_factory=list)
+    commands: List[Dict[str, Any]] = field(default_factory=list)
+    mailboxes: List[Dict[str, Any]] = field(default_factory=list)
+
+
+def _empty_metadata() -> HXEMetadata:
+    return HXEMetadata()
+
+
+def _decode_metadata_string(section: bytes, offset: int) -> Optional[str]:
+    if offset == 0:
+        return None
+    if offset < 0 or offset >= len(section):
+        raise ValueError(f"metadata string offset {offset} out of range (size={len(section)})")
+    end = section.find(b"\x00", offset)
+    if end == -1:
+        raise ValueError("metadata string is not null-terminated")
+    raw = section[offset:end]
+    if not raw:
+        return ""
+    return raw.decode("utf-8")
+
+
+def _parse_value_metadata(section: bytes, entry_count: int) -> List[Dict[str, Any]]:
+    entry_size = VALUE_ENTRY_STRUCT.size
+    required = entry_count * entry_size
+    if required > len(section):
+        raise ValueError("value metadata table truncated")
+    entries: List[Dict[str, Any]] = []
+    for idx in range(entry_count):
+        start = idx * entry_size
+        (
+            group_id,
+            value_id,
+            flags,
+            auth_level,
+            init_raw,
+            name_offset,
+            unit_offset,
+            epsilon_raw,
+            min_raw,
+            max_raw,
+            persist_key,
+            group_name_offset,
+        ) = VALUE_ENTRY_STRUCT.unpack_from(section, start)
+        entry = {
+            "group_id": group_id,
+            "value_id": value_id,
+            "flags": flags,
+            "auth_level": auth_level,
+            "init_raw": init_raw,
+            "init_value": f16_to_f32(init_raw),
+            "name": _decode_metadata_string(section, name_offset),
+            "unit": _decode_metadata_string(section, unit_offset),
+            "epsilon_raw": epsilon_raw,
+            "epsilon": f16_to_f32(epsilon_raw),
+            "min_raw": min_raw,
+            "min": f16_to_f32(min_raw),
+            "max_raw": max_raw,
+            "max": f16_to_f32(max_raw),
+            "persist_key": persist_key,
+            "group_name": _decode_metadata_string(section, group_name_offset),
+        }
+        entries.append(entry)
+    return entries
+
+
+def _parse_command_metadata(section: bytes, entry_count: int) -> List[Dict[str, Any]]:
+    entry_size = CMD_ENTRY_STRUCT.size
+    required = entry_count * entry_size
+    if required > len(section):
+        raise ValueError("command metadata table truncated")
+    entries: List[Dict[str, Any]] = []
+    for idx in range(entry_count):
+        start = idx * entry_size
+        (
+            group_id,
+            cmd_id,
+            flags,
+            auth_level,
+            handler_offset,
+            name_offset,
+            help_offset,
+            reserved,
+        ) = CMD_ENTRY_STRUCT.unpack_from(section, start)
+        group_name_offset = reserved & 0xFFFF
+        reserved_high = (reserved >> 16) & 0xFFFF
+        entry = {
+            "group_id": group_id,
+            "cmd_id": cmd_id,
+            "flags": flags,
+            "auth_level": auth_level,
+            "handler_offset": handler_offset,
+            "name": _decode_metadata_string(section, name_offset),
+            "help": _decode_metadata_string(section, help_offset),
+            "group_name": _decode_metadata_string(section, group_name_offset),
+            "reserved": reserved_high,
+        }
+        entries.append(entry)
+    return entries
+
+
+def _normalise_mailbox_capacity(value: Any) -> Optional[int]:
+    if value in (None, "", 0):
+        return None
+    try:
+        capacity = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("mailbox metadata capacity must be an integer") from exc
+    if capacity < 0:
+        raise ValueError("mailbox metadata capacity must be non-negative")
+    return capacity
+
+
+_MODE_NAME_TO_MASK: Dict[str, int] = {
+    "RDONLY": mbx_const.HSX_MBX_MODE_RDONLY,
+    "READONLY": mbx_const.HSX_MBX_MODE_RDONLY,
+    "RO": mbx_const.HSX_MBX_MODE_RDONLY,
+    "WRONLY": mbx_const.HSX_MBX_MODE_WRONLY,
+    "WRITEONLY": mbx_const.HSX_MBX_MODE_WRONLY,
+    "WO": mbx_const.HSX_MBX_MODE_WRONLY,
+    "RDWR": mbx_const.HSX_MBX_MODE_RDWR,
+    "RW": mbx_const.HSX_MBX_MODE_RDWR,
+    "FANOUT": mbx_const.HSX_MBX_MODE_FANOUT,
+    "FANOUT_DROP": mbx_const.HSX_MBX_MODE_FANOUT_DROP,
+    "FANOUT_BLOCK": mbx_const.HSX_MBX_MODE_FANOUT_BLOCK,
+    "TAP": mbx_const.HSX_MBX_MODE_TAP,
+}
+
+
+def _normalise_mode_mask(value: Any) -> int:
+    if value in (None, "", 0):
+        return mbx_const.HSX_MBX_MODE_RDWR
+    if isinstance(value, str):
+        tokenised = value.replace(",", "|")
+        mask = 0
+        for token in tokenised.split("|"):
+            name = token.strip().upper()
+            if not name:
+                continue
+            mapped = _MODE_NAME_TO_MASK.get(name)
+            if mapped is None:
+                raise ValueError(f"unknown mailbox mode '{token}'")
+            mask |= mapped
+        if mask == 0:
+            return mbx_const.HSX_MBX_MODE_RDWR
+        return mask & 0xFFFF
+    try:
+        mode_mask = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("mailbox metadata mode_mask must be an integer") from exc
+    if mode_mask < 0:
+        raise ValueError("mailbox metadata mode_mask must be non-negative")
+    return mode_mask & 0xFFFF
+
+
+def _normalise_mailbox_bindings(value: Any) -> List[Dict[str, Any]]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ValueError("mailbox metadata bindings must be a list")
+    bindings: List[Dict[str, Any]] = []
+    for entry in value:
+        if not isinstance(entry, dict):
+            raise ValueError("mailbox metadata binding entries must be objects")
+        if "pid" not in entry:
+            raise ValueError("mailbox metadata binding missing pid")
+        try:
+            pid_val = int(entry.get("pid"))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("mailbox metadata binding pid must be an integer") from exc
+        try:
+            flags_val = int(entry.get("flags", 0))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("mailbox metadata binding flags must be an integer") from exc
+        normalised = dict(entry)
+        normalised["pid"] = pid_val
+        normalised["flags"] = flags_val & 0xFFFF
+        bindings.append(normalised)
+    return bindings
+
+
+def _mailbox_record(
+    *,
+    target: str,
+    capacity: Optional[int],
+    mode_mask: int,
+    reserved: Any = None,
+    owner_pid: Optional[int] = None,
+    bindings: Optional[List[Dict[str, Any]]] = None,
+    source: str,
+    raw: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    queue_depth = capacity if capacity is not None else 0
+    record: Dict[str, Any] = {
+        "target": target,
+        "name": target,
+        "capacity": capacity,
+        "queue_depth": queue_depth,
+        "mode_mask": mode_mask,
+        "flags": mode_mask,
+        "reserved": reserved,
+        "owner_pid": owner_pid,
+        "bindings": bindings or [],
+        "_source": source,
+    }
+    if raw is not None:
+        record["raw"] = raw
+    return record
+
+
+def _parse_mailbox_metadata_legacy(section: bytes, entry_count: int) -> List[Dict[str, Any]]:
+    entry_size = MAILBOX_ENTRY_STRUCT.size
+    required = entry_count * entry_size
+    if required > len(section):
+        raise ValueError("mailbox metadata table truncated")
+    entries: List[Dict[str, Any]] = []
+    for idx in range(entry_count):
+        start = idx * entry_size
+        name_offset, queue_depth, flags, reserved = MAILBOX_ENTRY_STRUCT.unpack_from(section, start)
+        name = _decode_metadata_string(section, name_offset)
+        if not name:
+            raise ValueError("mailbox metadata missing name")
+        capacity = _normalise_mailbox_capacity(queue_depth)
+        mode_mask = _normalise_mode_mask(flags)
+        record = _mailbox_record(
+            target=name,
+            capacity=capacity,
+            mode_mask=mode_mask,
+            reserved=reserved,
+            source="legacy",
+            raw={
+                "name_offset": name_offset,
+                "queue_depth": queue_depth,
+                "flags": flags,
+                "reserved": reserved,
+            },
+        )
+        entries.append(record)
+    return entries
+
+
+def _parse_mailbox_metadata_json(section: bytes) -> List[Dict[str, Any]]:
+    try:
+        text = section.decode("utf-8").strip()
+    except UnicodeDecodeError as exc:
+        raise ValueError("mailbox metadata JSON must be UTF-8") from exc
+    if not text:
+        return []
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ValueError("mailbox metadata JSON invalid") from exc
+    if isinstance(payload, dict):
+        version = payload.get("version")
+        if version not in (None, 1):
+            raise ValueError("mailbox metadata JSON version not supported")
+        entries_data = payload.get("mailboxes") or payload.get("entries") or []
+    elif isinstance(payload, list):
+        entries_data = payload
+    else:
+        raise ValueError("mailbox metadata JSON must be an object or array")
+    if not isinstance(entries_data, list):
+        raise ValueError("mailbox metadata entries must be a list")
+
+    entries: List[Dict[str, Any]] = []
+    for idx, raw_entry in enumerate(entries_data):
+        if not isinstance(raw_entry, dict):
+            raise ValueError(f"mailbox metadata entry {idx} must be an object")
+        target_val = raw_entry.get("target") or raw_entry.get("name")
+        if not isinstance(target_val, str) or not target_val.strip():
+            raise ValueError(f"mailbox metadata entry {idx} missing target")
+        target = target_val.strip()
+        capacity = _normalise_mailbox_capacity(
+            raw_entry.get("capacity", raw_entry.get("queue_depth"))
+        )
+        mode_mask = _normalise_mode_mask(
+            raw_entry.get("mode_mask", raw_entry.get("mode", raw_entry.get("flags")))
+        )
+        owner_val = raw_entry.get("owner_pid")
+        owner_pid: Optional[int]
+        if owner_val in (None, ""):
+            owner_pid = None
+        else:
+            try:
+                owner_pid = int(owner_val)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"mailbox metadata entry {idx} owner_pid must be an integer") from exc
+        bindings = _normalise_mailbox_bindings(raw_entry.get("bindings"))
+        record = _mailbox_record(
+            target=target,
+            capacity=capacity,
+            mode_mask=mode_mask,
+            reserved=raw_entry.get("reserved"),
+            owner_pid=owner_pid,
+            bindings=bindings,
+            source="json",
+            raw=dict(raw_entry),
+        )
+        entries.append(record)
+    return entries
+
+
+def _parse_mailbox_metadata(section: bytes, entry_count: int) -> List[Dict[str, Any]]:
+    if not section:
+        return []
+    trimmed = section.rstrip(b"\x00")
+    if not trimmed:
+        return []
+    probe = trimmed.lstrip()
+    if probe.startswith(b"{") or probe.startswith(b"["):
+        return _parse_mailbox_metadata_json(trimmed)
+    return _parse_mailbox_metadata_legacy(section, entry_count)
+
+
+def _parse_metadata_sections(data: bytes, header: Dict[str, Any], header_size: int) -> HXEMetadata:
+    meta_count = int(header.get("meta_count") or 0)
+    meta_offset = int(header.get("meta_offset") or 0)
+    if meta_count <= 0 or meta_offset <= 0:
+        return _empty_metadata()
+
+    table_size = meta_count * META_ENTRY_STRUCT.size
+    if meta_offset < header_size or meta_offset + table_size > len(data):
+        raise ValueError("metadata table outside HXE payload bounds")
+
+    bundle = HXEMetadata()
+    for index in range(meta_count):
+        entry_offset = meta_offset + index * META_ENTRY_STRUCT.size
+        section_type, section_offset, section_size, entry_count = META_ENTRY_STRUCT.unpack_from(data, entry_offset)
+        if section_offset < header_size or section_offset + section_size > len(data):
+            raise ValueError(f"metadata section {index} exceeds HXE length")
+        section_bytes = data[section_offset : section_offset + section_size]
+        section_info = {
+            "type": section_type,
+            "offset": section_offset,
+            "size": section_size,
+            "entry_count": entry_count,
+        }
+        if section_type == METADATA_SECTION_VALUE:
+            section_info["entries"] = _parse_value_metadata(section_bytes, entry_count)
+            bundle.values.extend(section_info["entries"])
+        elif section_type == METADATA_SECTION_COMMAND:
+            section_info["entries"] = _parse_command_metadata(section_bytes, entry_count)
+            bundle.commands.extend(section_info["entries"])
+        elif section_type == METADATA_SECTION_MAILBOX:
+            section_info["entries"] = _parse_mailbox_metadata(section_bytes, entry_count)
+            bundle.mailboxes.extend(section_info["entries"])
+        else:
+            section_info["entries"] = []
+        bundle.sections.append(section_info)
+    return bundle
+
+REGISTER_BANK_BYTES = 16 * 4  # 16 GPRs x 32-bit
 DEFAULT_STACK_BYTES = 0x1000  # 4 KiB per task (tunable)
 REGISTER_REGION_START = 0x1000  # leave lower memory for code/data
 VM_ADDRESS_SPACE_SIZE = 0x10000  # 64 KiB
 STACK_ALIGNMENT = 4
+
+FLAG_Z = 0x01  # Zero
+FLAG_C = 0x02  # Carry / !borrow
+FLAG_N = 0x04  # Negative
+FLAG_V = 0x08  # Overflow
 
 
 def _align_down(value: int, alignment: int) -> int:
@@ -383,6 +800,10 @@ class FSStub:
     def mkdir(self, path): return 0
 
 class MiniVM:
+    FLAG_Z = FLAG_Z
+    FLAG_C = FLAG_C
+    FLAG_N = FLAG_N
+    FLAG_V = FLAG_V
     def __init__(
         self,
         code: bytes,
@@ -408,12 +829,20 @@ class MiniVM:
         self.pending_events: List[Dict[str, Any]] = []
         self.attached = False
         self.trace_out = trace_file
-        self.mailboxes = mailboxes or MailboxManager()
+        if mailboxes is None:
+            self.mailboxes = MailboxManager(event_hook=lambda event, vm=self: vm.emit_event(event))
+        else:
+            self.mailboxes = mailboxes
         self._mailbox_handler: Optional[Callable[[int], None]] = mailbox_handler
+        self._value_handler: Optional[Callable[[int], None]] = None
+        self._command_handler: Optional[Callable[[int], None]] = None
         self.pid: Optional[int] = None
         self.call_stack: List[int] = []
         self._last_pc: Optional[int] = None
         self._repeat_pc_count: int = 0
+        self._last_opcode: Optional[int] = None
+        self._last_regs: List[int] = [0] * 16
+        self._last_mem_access: Optional[Dict[str, Any]] = None
         self._legacy_exec_module_warned: bool = False
         self.debug_enabled: bool = False
         self.debug_breakpoints: Set[int] = set()
@@ -546,6 +975,12 @@ class MiniVM:
 
     def set_mailbox_handler(self, handler: Optional[Callable[[int], None]]) -> None:
         self._mailbox_handler = handler
+
+    def set_value_handler(self, handler: Optional[Callable[[int], None]]) -> None:
+        self._value_handler = handler
+
+    def set_command_handler(self, handler: Optional[Callable[[int], None]]) -> None:
+        self._command_handler = handler
 
     def _load_regs_from_memory(self) -> None:
         ctx = self.context
@@ -685,12 +1120,16 @@ class MiniVM:
         ms = max(int(ms), 0)
         if ms <= 0:
             self.sleep_pending_ms = None
+            self.sleep_until = None
+            self.context.state = "ready"
+            self.running = True
             return
         self.sleep_pending_ms = ms
-        self.emit_event({"type": "sleep_request", "ms": ms})
-        if self.attached:
-            return
         self.sleep_until = time.monotonic() + (ms / 1000.0)
+        self.context.state = "sleeping"
+        self.emit_event({"type": "sleep_request", "ms": ms, "deadline": self.sleep_until})
+        self.running = False
+        self.save_context()
 
     def read_mem(self, addr: int, length: int) -> bytes:
         if length <= 0:
@@ -725,11 +1164,14 @@ class MiniVM:
         if self.sleep_until is not None:
             remaining = self.sleep_until - time.monotonic()
             if remaining > 0:
-                time.sleep(min(remaining, 0.005))
+                self.running = False
+                self.context.state = "sleeping"
                 self.save_context()
                 return
             self.sleep_until = None
             self.sleep_pending_ms = None
+            self.context.state = "ready"
+            self.running = True
             self.emit_event({"type": "sleep_complete"})
 
         prev_pc = self.pc
@@ -764,10 +1206,58 @@ class MiniVM:
         if imm & 0x800:
             imm -= 0x1000
 
-        def set_flags(v):
-            self.flags = 0
-            if v == 0:
-                self.flags |= 1  # Z flag
+        def set_flags(value, *, carry=None, overflow=None):
+            masked = value & 0xFFFFFFFF
+            flags = self.flags & 0xFF
+
+            if masked == 0:
+                flags |= FLAG_Z
+            else:
+                flags &= ~FLAG_Z
+
+            if masked & 0x80000000:
+                flags |= FLAG_N
+            else:
+                flags &= ~FLAG_N
+
+            if carry is not None:
+                if carry:
+                    flags |= FLAG_C
+                else:
+                    flags &= ~FLAG_C
+
+            if overflow is not None:
+                if overflow:
+                    flags |= FLAG_V
+                else:
+                    flags &= ~FLAG_V
+
+            self.flags = flags & 0xFF
+
+        def add_with_flags(a, b):
+            ua = a & 0xFFFFFFFF
+            ub = b & 0xFFFFFFFF
+            total = ua + ub
+            result = total & 0xFFFFFFFF
+            carry = (total >> 32) & 0x1
+            overflow = (~(ua ^ ub) & (ua ^ result) & 0x80000000) != 0
+            return result, bool(carry), overflow
+
+        def sub_with_flags(a, b):
+            ua = a & 0xFFFFFFFF
+            ub = b & 0xFFFFFFFF
+            diff = (ua - ub) & 0xFFFFFFFF
+            carry = ua >= ub
+            overflow = ((ua ^ ub) & (ua ^ diff) & 0x80000000) != 0
+            return diff, carry, overflow
+
+        def to_signed32(v):
+            v &= 0xFFFFFFFF
+            return v if v < 0x80000000 else v - 0x100000000
+
+        def div_trunc(a, b):
+            abs_q = abs(a) // abs(b)
+            return -abs_q if (a < 0) ^ (b < 0) else abs_q
 
         def ensure_range(addr, size):
             if addr < 0 or addr + size > len(self.mem):
@@ -845,79 +1335,230 @@ class MiniVM:
             self._log(
                 f"[TRACE] 0x{self.pc & 0xFFFF:04X}: 0x{ins:08X} {mnemonic}{operand_text}"
             )
+        self._last_pc = self.pc & 0xFFFFFFFF
+        self._last_opcode = ins & 0xFFFFFFFF
+        qb = {
+            "type": "trace_step",
+            "pc": self._last_pc,
+            "opcode": self._last_opcode,
+            "flags": self.flags & 0xFF,
+            "regs": [self.regs[i] & 0xFFFFFFFF for i in range(16)],
+            "steps": self.steps,
+        }
+        ctx = self.context
+        if ctx and ctx.pid is not None:
+            qb["pid"] = ctx.pid
+        mem_access = None
 
         adv = 4
         if op == 0x01:  # LDI
             self.regs[rd] = imm & 0xFFFFFFFF
         elif op == 0x02:  # LD
+            addr = (self.regs[rs1] + imm) & 0xFFFFFFFF
             try:
-                self.regs[rd] = ld32((self.regs[rs1] + imm) & 0xFFFFFFFF)
+                value = ld32(addr)
             except MemoryError:
                 trap_memory_fault()
                 return
+            else:
+                self.regs[rd] = value
+                mem_access = {
+                    "op": "read",
+                    "address": addr & 0xFFFFFFFF,
+                    "width": 4,
+                    "value": value & 0xFFFFFFFF,
+                }
         elif op == 0x03:  # ST
+            addr = (self.regs[rs1] + imm) & 0xFFFFFFFF
+            value = self.regs[rs2] & 0xFFFFFFFF
             try:
-                st32((self.regs[rs1] + imm) & 0xFFFFFFFF, self.regs[rs2])
+                st32(addr, value)
             except MemoryError:
                 trap_memory_fault()
                 return
+            else:
+                mem_access = {
+                    "op": "write",
+                    "address": addr & 0xFFFFFFFF,
+                    "width": 4,
+                    "value": value,
+                }
         elif op == 0x04:  # MOV
             self.regs[rd] = self.regs[rs1]
         elif op == 0x06:  # LDB
+            addr = (self.regs[rs1] + imm) & 0xFFFFFFFF
             try:
-                self.regs[rd] = ld8((self.regs[rs1] + imm) & 0xFFFFFFFF)
+                value = ld8(addr)
             except MemoryError:
                 trap_memory_fault()
                 return
+            else:
+                self.regs[rd] = value
+                mem_access = {
+                    "op": "read",
+                    "address": addr & 0xFFFFFFFF,
+                    "width": 1,
+                    "value": value & 0xFF,
+                }
         elif op == 0x07:  # LDH
+            addr = (self.regs[rs1] + imm) & 0xFFFFFFFF
             try:
-                self.regs[rd] = ld16((self.regs[rs1] + imm) & 0xFFFFFFFF)
+                value = ld16(addr)
             except MemoryError:
                 trap_memory_fault()
                 return
+            else:
+                self.regs[rd] = value & 0xFFFFFFFF
+                mem_access = {
+                    "op": "read",
+                    "address": addr & 0xFFFFFFFF,
+                    "width": 2,
+                    "value": value & 0xFFFF,
+                }
         elif op == 0x08:  # STB
+            addr = (self.regs[rs1] + imm) & 0xFFFFFFFF
+            value = self.regs[rs2] & 0xFF
             try:
-                st8((self.regs[rs1] + imm) & 0xFFFFFFFF, self.regs[rs2])
+                st8(addr, value)
             except MemoryError:
                 trap_memory_fault()
                 return
+            else:
+                mem_access = {
+                    "op": "write",
+                    "address": addr & 0xFFFFFFFF,
+                    "width": 1,
+                    "value": value,
+                }
         elif op == 0x09:  # STH
+            addr = (self.regs[rs1] + imm) & 0xFFFFFFFF
+            value = self.regs[rs2] & 0xFFFF
             try:
-                st16((self.regs[rs1] + imm) & 0xFFFFFFFF, self.regs[rs2])
+                st16(addr, value)
             except MemoryError:
                 trap_memory_fault()
                 return
+            else:
+                mem_access = {
+                    "op": "write",
+                    "address": addr & 0xFFFFFFFF,
+                    "width": 2,
+                    "value": value,
+                }
         elif op == 0x10:  # ADD
-            v = (self.regs[rs1] + self.regs[rs2]) & 0xFFFFFFFF
-            self.regs[rd] = v
-            set_flags(v)
+            result, carry, overflow = add_with_flags(self.regs[rs1], self.regs[rs2])
+            self.regs[rd] = result
+            set_flags(result, carry=carry, overflow=overflow)
         elif op == 0x11:  # SUB
-            v = (self.regs[rs1] - self.regs[rs2]) & 0xFFFFFFFF
-            self.regs[rd] = v
-            set_flags(v)
+            result, carry, overflow = sub_with_flags(self.regs[rs1], self.regs[rs2])
+            self.regs[rd] = result
+            set_flags(result, carry=carry, overflow=overflow)
         elif op == 0x12:  # MUL
-            v = (self.regs[rs1] * self.regs[rs2]) & 0xFFFFFFFF
-            self.regs[rd] = v
-            set_flags(v)
+            ua = self.regs[rs1] & 0xFFFFFFFF
+            ub = self.regs[rs2] & 0xFFFFFFFF
+            product = ua * ub
+            result = product & 0xFFFFFFFF
+            carry = (product >> 32) != 0
+            self.regs[rd] = result
+            set_flags(result, carry=carry, overflow=carry)
+        elif op == 0x13:  # DIV
+            divisor_raw = self.regs[rs2] & 0xFFFFFFFF
+            if divisor_raw == 0:
+                if self.trace or self.trace_out:
+                    self._log("[VM] divide by zero")
+                self.regs[0] = HSX_ERR_DIV_ZERO
+                self.running = False
+                self.save_context()
+                return
+            dividend = to_signed32(self.regs[rs1])
+            divisor = to_signed32(self.regs[rs2])
+            quotient = div_trunc(dividend, divisor)
+            result = quotient & 0xFFFFFFFF
+            self.regs[rd] = result
+            set_flags(result, carry=False, overflow=False)
         elif op == 0x14:  # AND
             v = self.regs[rs1] & self.regs[rs2]
             self.regs[rd] = v & 0xFFFFFFFF
-            set_flags(v)
+            set_flags(v, carry=False, overflow=False)
         elif op == 0x15:  # OR
             v = self.regs[rs1] | self.regs[rs2]
             self.regs[rd] = v & 0xFFFFFFFF
-            set_flags(v)
+            set_flags(v, carry=False, overflow=False)
         elif op == 0x16:  # XOR
             v = self.regs[rs1] ^ self.regs[rs2]
             self.regs[rd] = v & 0xFFFFFFFF
-            set_flags(v)
+            set_flags(v, carry=False, overflow=False)
         elif op == 0x17:  # NOT
             v = (~self.regs[rs1]) & 0xFFFFFFFF
             self.regs[rd] = v
-            set_flags(v)
+            set_flags(v, carry=False, overflow=False)
+        elif op == 0x31:  # LSL
+            shift = self.regs[rs2] & 0x1F
+            value = self.regs[rs1] & 0xFFFFFFFF
+            if shift:
+                carry = ((value << shift) >> 32) & 0x1
+            else:
+                carry = None
+            v = (value << shift) & 0xFFFFFFFF
+            self.regs[rd] = v
+            set_flags(v, carry=bool(carry) if shift else None, overflow=False)
+        elif op == 0x32:  # LSR
+            shift = self.regs[rs2] & 0x1F
+            value = self.regs[rs1] & 0xFFFFFFFF
+            if shift:
+                carry = (value >> (shift - 1)) & 0x1
+            else:
+                carry = None
+            v = (value >> shift) & 0xFFFFFFFF
+            self.regs[rd] = v
+            set_flags(v, carry=bool(carry) if shift else None, overflow=False)
+        elif op == 0x33:  # ASR
+            shift = self.regs[rs2] & 0x1F
+            value = self.regs[rs1] & 0xFFFFFFFF
+            if value & 0x80000000:
+                signed = value - 0x100000000
+            else:
+                signed = value
+            if shift:
+                carry = (value >> (shift - 1)) & 0x1
+            else:
+                carry = None
+            v = (signed >> shift) & 0xFFFFFFFF
+            self.regs[rd] = v
+            set_flags(v, carry=bool(carry) if shift else None, overflow=False)
+        elif op == 0x34:  # ADC
+            carry_in = 1 if (self.flags & FLAG_C) else 0
+            ua = self.regs[rs1] & 0xFFFFFFFF
+            ub = self.regs[rs2] & 0xFFFFFFFF
+            total = ua + ub + carry_in
+            result = total & 0xFFFFFFFF
+            carry_out = (total >> 32) & 0x1
+            operand_signed = ((ub + carry_in) & 0xFFFFFFFF)
+            sa = ua if ua < 0x80000000 else ua - 0x100000000
+            sb = operand_signed if operand_signed < 0x80000000 else operand_signed - 0x100000000
+            sr = result if result < 0x80000000 else result - 0x100000000
+            overflow = (sa >= 0 and sb >= 0 and sr < 0) or (sa < 0 and sb < 0 and sr >= 0)
+            self.regs[rd] = result
+            set_flags(result, carry=bool(carry_out), overflow=overflow)
+        elif op == 0x35:  # SBC
+            carry_in = 1 if (self.flags & FLAG_C) else 0
+            borrow = 1 - carry_in
+            ua = self.regs[rs1] & 0xFFFFFFFF
+            ub = self.regs[rs2] & 0xFFFFFFFF
+            operand = ub + borrow
+            total = ua - operand
+            result = total & 0xFFFFFFFF
+            carry_out = total >= 0
+            operand32 = operand & 0xFFFFFFFF
+            sa = ua if ua < 0x80000000 else ua - 0x100000000
+            sb = operand32 if operand32 < 0x80000000 else operand32 - 0x100000000
+            sr = result if result < 0x80000000 else result - 0x100000000
+            overflow = (sa >= 0 and sb < 0 and sr < 0) or (sa < 0 and sb >= 0 and sr >= 0)
+            self.regs[rd] = result
+            set_flags(result, carry=carry_out, overflow=overflow)
         elif op == 0x20:  # CMP
-            v = (self.regs[rs1] - self.regs[rs2]) & 0xFFFFFFFF
-            set_flags(v)
+            result, carry, overflow = sub_with_flags(self.regs[rs1], self.regs[rs2])
+            set_flags(result, carry=carry, overflow=overflow)
         elif op == 0x21:  # JMP
             self.pc = imm_raw & 0xFFFFFFFF
             adv = 0
@@ -1109,7 +1750,46 @@ class MiniVM:
                 )
         else:
             self._repeat_pc_count = 0
-        self._last_pc = self.pc
+        last_regs_snapshot = [self.regs[i] & 0xFFFFFFFF for i in range(16)]
+        self._last_pc = prev_pc & 0xFFFFFFFF
+        self._last_opcode = ins & 0xFFFFFFFF
+        self._last_regs = last_regs_snapshot
+
+        if self.trace or self.trace_out:
+            event = {
+                "type": "trace_step",
+                "pc": self._last_pc,
+                "next_pc": self.pc & 0xFFFFFFFF,
+                "opcode": self._last_opcode,
+                "flags": self.flags & 0xFF,
+                "regs": last_regs_snapshot,
+                "steps": self.steps,
+            }
+            ctx = self.context
+            if ctx and ctx.pid is not None:
+                event["pid"] = ctx.pid
+            if mem_access:
+                event["mem_access"] = dict(mem_access)
+            self.emit_event(event)
+        self._last_mem_access = dict(mem_access) if mem_access else None
+
+    def get_last_pc(self) -> int:
+        if self._last_pc is None:
+            return self.pc & 0xFFFFFFFF
+        return self._last_pc & 0xFFFFFFFF
+
+    def get_last_opcode(self) -> int:
+        if self._last_opcode is None:
+            return 0
+        return self._last_opcode & 0xFFFFFFFF
+
+    def get_last_regs(self) -> List[int]:
+        return list(self._last_regs)
+
+    def get_last_mem_access(self) -> Optional[Dict[str, Any]]:
+        if self._last_mem_access is None:
+            return None
+        return dict(self._last_mem_access)
 
     def handle_svc(self, mod, fn):
         if mod == 0x0 and fn == 0:
@@ -1146,18 +1826,10 @@ class MiniVM:
             self._svc_mailbox(fn)
         elif mod == 0x6:
             self._svc_exec(fn)
-        elif mod == 0x7:
-            if fn == 1:  # Legacy SLEEP_MS on module 0x07
-                if not self._legacy_exec_module_warned:
-                    self._log("[SVC] mod=0x07 exec traps are deprecated; use module 0x06")
-                    self._legacy_exec_module_warned = True
-                # Map legacy fn=1 to new fn=0 (SLEEP_MS)
-                self.regs[0] = self.regs[0]  # preserve sleep duration in R0
-                self._svc_exec(0)
-            else:
-                self._log(f"[SVC] mod=0x{mod:X} fn=0x{fn:X} (stub)")
-                self.regs[0] = HSX_ERR_ENOSYS
-            return
+        elif mod == val_const.HSX_VAL_MODULE_ID:  # 0x07 - VALUE module
+            self._svc_value(fn)
+        elif mod == cmd_const.HSX_CMD_MODULE_ID:  # 0x08 - COMMAND module
+            self._svc_command(fn)
         elif mod == 0x4:
             self._svc_fs(fn)
         else:
@@ -1228,9 +1900,11 @@ class MiniVM:
                                 "type": "mailbox_send",
                                 "pid": self.pid or 0,
                                 "descriptor": descriptor_id,
+                                "handle": mailbox_handle,
                                 "length": len(buf),
                                 "flags": flags,
                                 "channel": 0,
+                                "src_pid": self.pid or 0,
                             }
                         )
                     return
@@ -1343,9 +2017,64 @@ class MiniVM:
             return
         self.regs[0] = mbx_const.HSX_MBX_STATUS_INTERNAL_ERROR
 
+    def _svc_value(self, fn: int) -> None:
+        """Handle VALUE SVC calls (module 0x07)."""
+        handler = self._value_handler
+        if handler is not None:
+            handler(fn)
+        else:
+            self._log(f"[VALUE] fn=0x{fn:02X} - no handler (stub)")
+            self.regs[0] = val_const.HSX_VAL_STATUS_ENOENT
+
+    def _svc_command(self, fn: int) -> None:
+        """Handle COMMAND SVC calls (module 0x08)."""
+        handler = self._command_handler
+        if handler is not None:
+            handler(fn)
+        else:
+            self._log(f"[COMMAND] fn=0x{fn:02X} - no handler (stub)")
+            self.regs[0] = cmd_const.HSX_CMD_STATUS_ENOENT
+
 
 class VMController:
-    def __init__(self, *, trace: bool = False, svc_trace: bool = False, dev_libm: bool = False):
+    @staticmethod
+    def _resolve_mailbox_profile(profile: Optional[Union[str, Dict[str, Any]]]) -> Tuple[str, Dict[str, Any]]:
+        resolved: Optional[Union[str, Dict[str, Any]]] = profile
+        if resolved is None:
+            env_value = os.environ.get("HSX_MAILBOX_PROFILE")
+            resolved = env_value if env_value else "desktop"
+        if isinstance(resolved, str):
+            key = resolved.strip().lower()
+            if not key:
+                key = "desktop"
+            config = MAILBOX_PROFILES.get(key)
+            if config is None:
+                raise ValueError(f"unknown mailbox profile '{resolved}'")
+            return key, dict(config)
+        if isinstance(resolved, dict):
+            return "custom", dict(resolved)
+        raise TypeError("mailbox_profile must be None, str, or dict")
+
+    @staticmethod
+    def _read_token_bytes(vm: MiniVM, ptr: int) -> Optional[bytes]:
+        if ptr == 0:
+            return None
+        try:
+            text = vm._read_c_string(ptr)
+        except Exception:  # pylint: disable=broad-except
+            return None
+        if text is None:
+            return None
+        return text.encode("utf-8")
+
+    def __init__(
+        self,
+        *,
+        trace: bool = False,
+        svc_trace: bool = False,
+        dev_libm: bool = False,
+        mailbox_profile: Optional[Dict[str, Any]] = None,
+    ):
         self.trace = trace
         self.svc_trace = svc_trace
         self.dev_libm = dev_libm
@@ -1361,7 +2090,14 @@ class VMController:
         self.restart_requested: bool = False
         self.restart_targets: Optional[List[str]] = None
         self.server: Optional["VMServer"] = None
-        self.mailboxes = MailboxManager()
+        self._pending_mailbox_events: List[Dict[str, Any]] = []
+        profile_name, profile_config = self._resolve_mailbox_profile(mailbox_profile)
+        self.mailbox_profile_name = profile_name
+        self.mailbox_profile: Dict[str, Any] = profile_config
+        fram_path = os.environ.get("HSX_FRAM_PATH")
+        self.persistence_store = PersistenceStore(fram_path)
+        self.mailboxes = self._create_mailbox_manager()
+        self.valcmd = self._create_valcmd_registry()
         self.waiting_tasks: Dict[int, Dict[str, Any]] = {}
         self.default_trace = trace
         self.traced_pids: Set[int] = set()
@@ -1373,6 +2109,401 @@ class VMController:
         self._task_memory: Dict[int, Dict[str, int]] = {}
         self.scheduler_trace: deque[Dict[str, Any]] = deque(maxlen=256)
         self.scheduler_counters: Dict[int, Dict[str, int]] = defaultdict(dict)
+        self.mailbox_counters: Dict[int, Dict[str, int]] = defaultdict(dict)
+        self.streaming_sessions: Dict[int, Dict[str, Any]] = {}
+        self.metadata_by_pid: Dict[int, HXEMetadata] = {}
+
+    def _create_mailbox_manager(self) -> MailboxManager:
+        profile = getattr(self, "mailbox_profile", {}) or {}
+        kwargs: Dict[str, Any] = {"event_hook": self._handle_mailbox_manager_event}
+        max_descriptors = profile.get("max_descriptors")
+        if max_descriptors is not None:
+            kwargs["max_descriptors"] = int(max_descriptors)
+        handle_limit = profile.get("handle_limit_per_pid")
+        if handle_limit is not None:
+            kwargs["per_pid_handle_limit"] = int(handle_limit)
+        default_capacity = profile.get("default_capacity")
+        if default_capacity is not None:
+            kwargs["default_capacity"] = int(default_capacity)
+        tap_rate_limit = profile.get("tap_rate_limit")
+        if tap_rate_limit is not None:
+            kwargs["tap_rate_limit"] = int(tap_rate_limit)
+        mgr = MailboxManager(**kwargs)
+        return mgr
+
+    def _create_valcmd_registry(self) -> ValCmdRegistry:
+        """Create the value/command registry with event hook."""
+        registry = ValCmdRegistry()
+        registry.set_event_hook(self._handle_valcmd_event)
+        registry.set_persistence_backend(self.persistence_store)
+        registry.set_mailbox_dispatcher(self._dispatch_value_notification)
+        return registry
+
+    def _handle_valcmd_event(self, event_type: str, **kwargs):
+        """Handle ValCmd events by emitting them to the VM event stream."""
+        if self.vm:
+            self.vm.emit_event({'type': event_type, **kwargs})
+
+    def _dispatch_value_notification(self, subscriber: Any, oid: int, old_raw: int, new_raw: int) -> bool:
+        try:
+            sub_pid, handle, _target = subscriber
+        except (ValueError, TypeError):
+            try:
+                sub_pid, handle = subscriber  # tolerate (pid, handle)
+            except (ValueError, TypeError):
+                return False
+        payload = struct.pack("<HHH", oid & 0xFFFF, old_raw & 0xFFFF, new_raw & 0xFFFF)
+        try:
+            ok, _ = self.mailboxes.send(pid=int(sub_pid), handle=int(handle), payload=payload, flags=0, channel=0)
+        except MailboxError:
+            ok = False
+        if not ok:
+            try:
+                self.mailboxes.close(pid=int(sub_pid), handle=int(handle))
+            except MailboxError:
+                pass
+            return False
+        return True
+
+    @staticmethod
+    def _metadata_u8(name: str, value: Any) -> int:
+        try:
+            num = int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{name} must be an integer") from exc
+        if not (0 <= num <= 0xFF):
+            raise ValueError(f"{name} must be within 0..255")
+        return num
+
+    @staticmethod
+    def _metadata_u16(name: str, value: Any) -> int:
+        try:
+            num = int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{name} must be an integer") from exc
+        if not (0 <= num <= 0xFFFF):
+            raise ValueError(f"{name} must be within 0..65535")
+        return num
+
+    def _register_metadata_values(self, pid: int, entries: List[Dict[str, Any]], metadata_dict: Dict[str, Any]) -> None:
+        if not entries:
+            return
+        value_meta_list = metadata_dict.get("values")
+        for index, entry in enumerate(entries):
+            group_id = self._metadata_u8("value metadata group_id", entry.get("group_id", entry.get("group")))
+            value_id = self._metadata_u8("value metadata value_id", entry.get("value_id", entry.get("value")))
+            flags = self._metadata_u8("value metadata flags", entry.get("flags", 0))
+            persist_key = self._metadata_u16("value metadata persist_key", entry.get("persist_key", 0))
+            if persist_key and not (flags & val_const.HSX_VAL_FLAG_PERSIST):
+                flags |= val_const.HSX_VAL_FLAG_PERSIST
+            auth_level = self._metadata_u8("value metadata auth_level", entry.get("auth_level", entry.get("auth", 0)))
+            init_raw = entry.get("init_raw")
+            if init_raw is None:
+                init_value = entry.get("init_value", entry.get("init", 0.0))
+                init_raw = float_to_f16(float(init_value))
+            init_value = entry.get("init_value")
+            if init_value is None:
+                init_value = f16_to_float(int(init_raw) & 0xFFFF)
+            epsilon_raw = entry.get("epsilon_raw")
+            epsilon_value = entry.get("epsilon")
+            if epsilon_value is None:
+                epsilon_value = f16_to_float(int(epsilon_raw or 0) & 0xFFFF)
+            min_raw = entry.get("min_raw")
+            min_value = entry.get("min")
+            if min_value is None:
+                min_value = f16_to_float(int(min_raw or 0) & 0xFFFF)
+            max_raw = entry.get("max_raw")
+            max_value = entry.get("max")
+            if max_value is None:
+                max_value = f16_to_float(int(max_raw or 0) & 0xFFFF)
+            specs: List[Dict[str, Any]] = []
+            group_name = entry.get("group_name")
+            if group_name:
+                specs.append({"type": "group", "name": group_name, "group_id": group_id})
+            name_value = entry.get("name")
+            if name_value:
+                specs.append({"type": "name", "name": name_value})
+            unit_value = entry.get("unit")
+            rate_ms_value = int(entry.get("rate_ms", 0))
+            if unit_value or epsilon_value or rate_ms_value:
+                specs.append(
+                    {
+                        "type": "unit",
+                        "unit": unit_value or "",
+                        "epsilon": epsilon_value,
+                        "rate_ms": rate_ms_value,
+                    }
+                )
+            if min_raw not in (None, 0) or max_raw not in (None, 0):
+                specs.append({"type": "range", "min": min_value, "max": max_value})
+            if persist_key:
+                specs.append({"type": "persist", "key": persist_key, "debounce_ms": int(entry.get("debounce_ms", 0))})
+            status, oid = self.valcmd.value_register(
+                group_id,
+                value_id,
+                flags,
+                auth_level,
+                owner_pid=pid,
+                descriptors=specs,
+            )
+            if status != val_const.HSX_VAL_STATUS_OK:
+                raise ValueError(f"Failed to register value ({group_id},{value_id}): status=0x{status:04X}")
+            registry_entry = self.valcmd.get_value_entry(oid)
+            if registry_entry is not None:
+                registry_entry.set_value(float(init_value))
+                registry_entry.last_change_time = 0.0
+            entry["oid"] = oid
+            if isinstance(value_meta_list, list) and index < len(value_meta_list):
+                value_meta_list[index]["oid"] = oid
+
+    @staticmethod
+    def _metadata_u32(name: str, value: Any) -> int:
+        try:
+            num = int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{name} must be an integer") from exc
+        if not (0 <= num <= 0xFFFFFFFF):
+            raise ValueError(f"{name} must be within 0..4294967295")
+        return num & 0xFFFFFFFF
+
+    def _register_metadata_commands(self, pid: int, entries: List[Dict[str, Any]], metadata_dict: Dict[str, Any]) -> None:
+        if not entries:
+            return
+        command_meta_list = metadata_dict.get("commands")
+        for index, entry in enumerate(entries):
+            group_id = self._metadata_u8("command metadata group_id", entry.get("group_id", entry.get("group")))
+            cmd_id = self._metadata_u8("command metadata cmd_id", entry.get("cmd_id", entry.get("cmd")))
+            flags = self._metadata_u8("command metadata flags", entry.get("flags", 0))
+            auth_level = self._metadata_u8("command metadata auth_level", entry.get("auth_level", entry.get("auth", 0)))
+            handler_offset = self._metadata_u32("command metadata handler_offset", entry.get("handler_offset", entry.get("handler", 0)))
+            specs: List[Dict[str, Any]] = []
+            group_name = entry.get("group_name")
+            if group_name:
+                specs.append({"type": "group", "name": group_name, "group_id": group_id})
+            name_value = entry.get("name")
+            if name_value or entry.get("help"):
+                specs.append({"type": "name", "name": name_value or "", "help": entry.get("help", "")})
+            status, oid = self.valcmd.command_register(
+                group_id,
+                cmd_id,
+                flags,
+                auth_level,
+                owner_pid=pid,
+                handler_ref=handler_offset,
+                descriptors=specs,
+            )
+            if status != cmd_const.HSX_CMD_STATUS_OK:
+                raise ValueError(f"Failed to register command ({group_id},{cmd_id}): status=0x{status:04X}")
+            entry["oid"] = oid
+            if isinstance(command_meta_list, list) and index < len(command_meta_list):
+                command_meta_list[index]["oid"] = oid
+
+    def val_snapshot(
+        self,
+        *,
+        pid: Optional[int] = None,
+        group: Optional[int] = None,
+        oid: Optional[int] = None,
+        name: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        values = self.valcmd.describe_values(pid)
+        group_id = int(group) & 0xFF if group is not None else None
+        target_oid = int(oid) & 0xFFFF if oid is not None else None
+        name_token = str(name) if name else None
+        results: List[Dict[str, Any]] = []
+        for info in values:
+            if group_id is not None and info.get("group_id") != group_id:
+                continue
+            if target_oid is not None and info.get("oid") != target_oid:
+                continue
+            if name_token and info.get("name") != name_token:
+                continue
+            results.append(dict(info))
+        return results
+
+    def val_get(self, oid: int, *, pid: Optional[int] = None) -> Dict[str, Any]:
+        entry = self.valcmd.get_value_entry(oid)
+        if entry is None:
+            return {"status": val_const.HSX_VAL_STATUS_ENOENT}
+        caller_pid = int(pid) if pid is not None else entry.owner_pid
+        status, value = self.valcmd.value_get(oid, caller_pid=caller_pid)
+        result: Dict[str, Any] = {"status": status}
+        if status == val_const.HSX_VAL_STATUS_OK:
+            result.update({
+                "value": value,
+                "f16": float_to_f16(value),
+                "pid": caller_pid,
+            })
+        return result
+
+    def val_set(self, oid: int, value: Any, *, pid: Optional[int] = None) -> Dict[str, Any]:
+        entry = self.valcmd.get_value_entry(oid)
+        if entry is None:
+            return {"status": val_const.HSX_VAL_STATUS_ENOENT}
+        caller_pid = int(pid) if pid is not None else entry.owner_pid
+        try:
+            new_value = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("val_set requires numeric 'value'") from exc
+        status = self.valcmd.value_set(
+            oid,
+            new_value,
+            caller_pid=caller_pid,
+            current_time=time.monotonic(),
+        )
+        result: Dict[str, Any] = {"status": status}
+        if status == val_const.HSX_VAL_STATUS_OK:
+            updated = self.valcmd.get_value_entry(oid)
+            if updated is not None:
+                result.update({
+                    "value": updated.last_value,
+                    "f16": updated.last_f16_raw,
+                    "pid": caller_pid,
+                })
+        return result
+
+    def val_stats(self) -> Dict[str, Any]:
+        stats = self.valcmd.get_stats()
+        return {
+            "values": stats.get("values", {}),
+            "strings": stats.get("strings", {}),
+        }
+
+    def cmd_snapshot(
+        self,
+        *,
+        pid: Optional[int] = None,
+        group: Optional[int] = None,
+        oid: Optional[int] = None,
+        name: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        commands = self.valcmd.describe_commands(pid)
+        group_id = int(group) & 0xFF if group is not None else None
+        target_oid = int(oid) & 0xFFFF if oid is not None else None
+        name_token = str(name) if name else None
+        results: List[Dict[str, Any]] = []
+        for info in commands:
+            if group_id is not None and info.get("group_id") != group_id:
+                continue
+            if target_oid is not None and info.get("oid") != target_oid:
+                continue
+            if name_token and info.get("name") != name_token:
+                continue
+            results.append(dict(info))
+        return results
+
+    def cmd_call(self, oid: int, *, pid: Optional[int] = None, async_call: bool = False) -> Dict[str, Any]:
+        entry = self.valcmd.get_command_entry(oid)
+        if entry is None:
+            return {"status": cmd_const.HSX_CMD_STATUS_ENOENT, "result": None}
+        caller_pid = int(pid) if pid is not None else entry.owner_pid
+        if async_call:
+            status, _ = self.valcmd.command_call_async(
+                oid,
+                caller_pid=caller_pid,
+                on_complete=lambda _status, _result: None,
+            )
+            result = None
+        else:
+            status, result = self.valcmd.command_call(oid, caller_pid=caller_pid)
+        return {
+            "status": status,
+            "result": result,
+            "pid": caller_pid,
+        }
+
+    def cmd_stats(self) -> Dict[str, Any]:
+        stats = self.valcmd.get_stats()
+        return {
+            "commands": stats.get("commands", {}),
+            "strings": stats.get("strings", {}),
+        }
+
+    def _handle_mailbox_manager_event(self, event: Dict[str, Any]) -> None:
+        if not isinstance(event, dict):
+            return
+        vm = self.vm
+        if vm is not None:
+            vm.emit_event(dict(event))
+        else:
+            self._pending_mailbox_events.append(dict(event))
+
+    def _flush_pending_mailbox_events(self) -> None:
+        if not self._pending_mailbox_events:
+            return
+        vm = self.vm
+        if vm is None:
+            return
+        pending = self._pending_mailbox_events
+        self._pending_mailbox_events = []
+        for event in pending:
+            vm.emit_event(dict(event))
+
+    def _instantiate_metadata_mailboxes(self, pid: int, entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        results: List[Dict[str, Any]] = []
+        for entry in entries:
+            target_value = entry.get("target") or entry.get("name")
+            if not isinstance(target_value, str) or not target_value.strip():
+                results.append(
+                    {
+                        "target": target_value,
+                        "status": "error",
+                        "error": "missing_target",
+                    }
+                )
+                continue
+            target = target_value.strip()
+            capacity_value = entry.get("capacity", entry.get("queue_depth"))
+            if capacity_value in (None, "", 0):
+                capacity = None
+            else:
+                capacity = int(capacity_value)
+                if capacity <= 0:
+                    capacity = None
+            mode_value = entry.get("mode_mask", entry.get("mode", entry.get("flags", 0)))
+            mode_mask = int(mode_value) if mode_value not in (None, "") else 0
+            if mode_mask <= 0:
+                mode_mask = mbx_const.HSX_MBX_MODE_RDWR
+            else:
+                mode_mask &= 0xFFFF
+            owner_hint = entry.get("owner_pid")
+            try:
+                bind_pid = int(owner_hint) if owner_hint not in (None, "") else pid
+            except (TypeError, ValueError):
+                bind_pid = pid
+            try:
+                desc = self.mailboxes.bind_target(
+                    pid=bind_pid,
+                    target=target,
+                    capacity=capacity,
+                    mode_mask=mode_mask,
+                )
+            except MailboxError as exc:
+                results.append(
+                    {
+                        "target": target,
+                        "status": "error",
+                        "error": str(exc),
+                    }
+                )
+                continue
+            entry["descriptor"] = desc.descriptor_id
+            entry["capacity"] = desc.capacity
+            entry["queue_depth"] = desc.capacity
+            entry["flags"] = desc.mode_mask
+            entry["mode_mask"] = desc.mode_mask
+            entry["owner_pid"] = desc.owner_pid
+            results.append(
+                {
+                    "target": target,
+                    "status": "ok",
+                    "descriptor": desc.descriptor_id,
+                    "capacity": desc.capacity,
+                    "mode_mask": desc.mode_mask,
+                    "owner_pid": desc.owner_pid,
+                }
+            )
+        return results
 
     def _trace_mailbox_regs(self, label: str, vm: MiniVM, fn: int, *, extra: Optional[Dict[str, Any]] = None) -> None:
         """Append a compact register/PC snapshot to the mailbox trace log."""
@@ -1388,6 +2519,45 @@ class VMController:
         except OSError:
             pass
 
+    def _normalise_app_name(self, name: Optional[str]) -> str:
+        if not name:
+            return ""
+        clean = str(name).strip()
+        if len(clean) > 31:
+            clean = clean[:31]
+        return clean
+
+    def _default_app_name(self, program_path: Optional[str], pid: int) -> str:
+        if program_path:
+            stem = Path(program_path).stem
+            stem = self._normalise_app_name(stem)
+            if stem:
+                return stem
+        return f"task_{pid}"
+
+    def _assign_app_instance_name(self, base_name: str, allow_multiple: bool) -> str:
+        base = self._normalise_app_name(base_name)
+        if not base:
+            base = "app"
+        existing = {task.get("app_name") for task in self.tasks.values() if task.get("app_name")}
+        if base not in existing:
+            return base
+        if not allow_multiple:
+            raise ValueError(f"app_exists:{base}")
+        suffix = 0
+        max_len = 31
+        while True:
+            suffix_token = f"_#{suffix}"
+            trimmed = base
+            if len(trimmed) + len(suffix_token) > max_len:
+                trimmed = trimmed[: max_len - len(suffix_token)]
+                if not trimmed:
+                    trimmed = "app"
+            candidate = f"{trimmed}{suffix_token}"
+            if candidate not in existing:
+                return candidate
+            suffix += 1
+
     def reset(self) -> Dict[str, Any]:
         self.vm = None
         self.header = None
@@ -1397,7 +2567,8 @@ class VMController:
         self.tasks.clear()
         self.task_states.clear()
         self.waiting_tasks.clear()
-        self.mailboxes = MailboxManager()
+        self._pending_mailbox_events = []
+        self.mailboxes = self._create_mailbox_manager()
         self.current_pid = None
         self.next_pid = 1
         self.debug_sessions.clear()
@@ -1408,10 +2579,16 @@ class VMController:
         self._task_memory.clear()
         self.scheduler_trace.clear()
         self.scheduler_counters.clear()
+        self.mailbox_counters.clear()
+        self.streaming_sessions.clear()
+        self.metadata_by_pid.clear()
         return {"status": "ok"}
 
-    def mailbox_snapshot(self) -> List[Dict[str, Any]]:
-        return self.mailboxes.descriptor_snapshot()
+    def mailbox_snapshot(self) -> Dict[str, Any]:
+        return {
+            "descriptors": self.mailboxes.descriptor_snapshot(),
+            "stats": self.mailboxes.resource_stats(),
+        }
 
     def mailbox_open(self, pid: int, target: str, flags: int = 0) -> Dict[str, Any]:
         try:
@@ -1605,6 +2782,18 @@ class VMController:
             counters = self.scheduler_counters.setdefault(pid, {})
             counters[event] = counters.get(event, 0) + 1
 
+    def _mailbox_counters_for_pid(self, pid: int) -> Dict[str, int]:
+        counters = self.mailbox_counters.setdefault(pid, {})
+        for field in MAILBOX_COUNTER_FIELDS:
+            counters.setdefault(field, 0)
+        return counters
+
+    def _increment_mailbox_counter(self, pid: Optional[int], name: str) -> None:
+        if pid is None or name not in MAILBOX_COUNTER_FIELDS:
+            return
+        counters = self._mailbox_counters_for_pid(int(pid))
+        counters[name] = counters.get(name, 0) + 1
+
     def scheduler_trace_snapshot(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         trace = list(self.scheduler_trace)
         if limit is not None:
@@ -1613,6 +2802,17 @@ class VMController:
 
     def scheduler_stats(self) -> Dict[int, Dict[str, int]]:
         return {pid: dict(counts) for pid, counts in self.scheduler_counters.items()}
+
+    def mailbox_stats(self) -> Dict[int, Dict[str, int]]:
+        for pid in list(self.tasks.keys()):
+            try:
+                self._mailbox_counters_for_pid(int(pid))
+            except (TypeError, ValueError):
+                continue
+        return {
+            pid: {field: counts.get(field, 0) for field in MAILBOX_COUNTER_FIELDS}
+            for pid, counts in self.mailbox_counters.items()
+        }
 
     def mailbox_send(
         self,
@@ -1794,6 +2994,7 @@ class VMController:
                 length = vm.regs[3] & 0xFFFF
                 flags = vm.regs[4] & 0xFFFF
                 channel = vm.regs[5] & 0xFFFF
+                self._increment_mailbox_counter(pid, "MAILBOX_STEP")
                 self._trace_mailbox_regs(
                     "svc_send_pre",
                     vm,
@@ -1809,9 +3010,11 @@ class VMController:
                         "type": "mailbox_send",
                         "pid": pid,
                         "descriptor": descriptor_id,
+                        "handle": handle,
                         "length": len(payload),
                         "flags": flags,
                         "channel": channel,
+                        "src_pid": pid,
                     })
                     self._deliver_mailbox_messages(descriptor_id)
                     self._trace_mailbox_regs(
@@ -1830,6 +3033,7 @@ class VMController:
                 max_len = vm.regs[3] & 0xFFFF
                 timeout = vm.regs[4] & 0xFFFF
                 info_ptr = vm.regs[5] & 0xFFFF
+                self._increment_mailbox_counter(pid, "MAILBOX_STEP")
                 self._trace_mailbox_regs(
                     "svc_recv_pre",
                     vm,
@@ -1864,6 +3068,8 @@ class VMController:
                         pass
                     return
                 length = min(max_len, msg.length)
+                desc = self.mailboxes.descriptor_for_handle(pid, handle)
+                descriptor_id = desc.descriptor_id
                 vm.mem[ptr : ptr + length] = msg.payload[:length]
                 vm.regs[0] = mbx_const.HSX_MBX_STATUS_OK
                 vm.regs[1] = length
@@ -1889,6 +3095,8 @@ class VMController:
                 vm.emit_event({
                     "type": "mailbox_recv",
                     "pid": pid,
+                    "descriptor": descriptor_id,
+                    "handle": handle,
                     "length": length,
                     "flags": msg.flags,
                     "channel": msg.channel,
@@ -1901,13 +3109,16 @@ class VMController:
                     pass
                 return
         except MailboxError as exc:
+            status = getattr(exc, "code", None)
+            if status in (errno.ENOSPC, None):
+                status = mbx_const.HSX_MBX_STATUS_NO_DESCRIPTOR if status == errno.ENOSPC else mbx_const.HSX_MBX_STATUS_INTERNAL_ERROR
             try:
                 with open("/tmp/hsx_mailbox_trace.log", "a", encoding="utf-8") as trace_fp:
-                    trace_fp.write(f"[MAILBOX] error fn=0x{fn:02X} pid={pid}: {exc}\n")
+                    trace_fp.write(f"[MAILBOX] error fn=0x{fn:02X} pid={pid}: {exc} status=0x{status:04X}\n")
             except OSError:
                 pass
-            vm.regs[0] = mbx_const.HSX_MBX_STATUS_INTERNAL_ERROR
-            vm.emit_event({"type": "mailbox_error", "pid": pid, "fn": fn, "error": str(exc)})
+            vm.regs[0] = status
+            vm.emit_event({"type": "mailbox_error", "pid": pid, "fn": fn, "error": str(exc), "status": status})
             return
         vm.regs[0] = mbx_const.HSX_MBX_STATUS_INTERNAL_ERROR
 
@@ -1966,6 +3177,7 @@ class VMController:
                 "descriptor": descriptor_id,
                 "handle": handle,
                 "timeout": timeout,
+                "deadline": deadline,
             }
         )
         return True
@@ -1982,6 +3194,7 @@ class VMController:
         wait_info = self.waiting_tasks.pop(pid, None)
         if wait_info is None:
             return
+        handle_value = wait_info.get("handle")
         if descriptor_id is None:
             descriptor_id = wait_info.get("descriptor_id")
         if descriptor_id is not None:
@@ -2057,7 +3270,13 @@ class VMController:
             self.vm.context.wait_handle = None
             self.vm.context.wait_deadline = None
             self.vm.running = True
-        self._record_scheduler_event("wake", pid, descriptor=descriptor_id, length=length)
+        event_name = "timeout" if timed_out else "wake"
+        record_kwargs: Dict[str, Any] = {"descriptor": descriptor_id}
+        if not timed_out:
+            record_kwargs["length"] = length
+        counter_name = "MAILBOX_TIMEOUT" if timed_out else "MAILBOX_WAKE"
+        self._increment_mailbox_counter(pid, counter_name)
+        self._record_scheduler_event(event_name, pid, **record_kwargs)
         if info_ptr:
             self._write_mailbox_recv_info(
                 pid,
@@ -2073,6 +3292,7 @@ class VMController:
             "type": event_type,
             "pid": pid,
             "descriptor": descriptor_id,
+            "handle": handle_value,
             "status": status,
             "length": length,
             "flags": flags,
@@ -2158,28 +3378,63 @@ class VMController:
             desc = self.mailboxes.descriptor_by_id(descriptor_id)
         except MailboxError:
             return
-        while desc.waiters:
-            waiter_pid = desc.waiters[0]
-            wait_info = self.waiting_tasks.get(waiter_pid)
-            if wait_info is None:
-                desc.waiters.pop(0)
-                continue
-            handle = wait_info.get("handle")
-            try:
-                message = self.mailboxes.recv(pid=waiter_pid, handle=handle, record_waiter=False)
-            except MailboxError:
-                desc.waiters.pop(0)
-                self.waiting_tasks.pop(waiter_pid, None)
-                continue
-            if message is None:
-                break
-            self._complete_mailbox_wait(
-                waiter_pid,
-                status=mbx_const.HSX_MBX_STATUS_OK,
-                descriptor_id=descriptor_id,
-                message=message,
-                timed_out=False,
-            )
+        
+        # Check if descriptor is in fan-out mode
+        is_fanout = bool(desc.mode_mask & mbx_const.HSX_MBX_MODE_FANOUT)
+        
+        if is_fanout:
+            # Fan-out mode: attempt to deliver to ALL waiters who have pending data
+            # Process waiters in FIFO order but don't stop after first delivery
+            delivered_pids = []
+            for waiter_pid in list(desc.waiters):  # Copy list to allow modification
+                wait_info = self.waiting_tasks.get(waiter_pid)
+                if wait_info is None:
+                    delivered_pids.append(waiter_pid)
+                    continue
+                handle = wait_info.get("handle")
+                try:
+                    message = self.mailboxes.recv(pid=waiter_pid, handle=handle, record_waiter=False)
+                except MailboxError:
+                    delivered_pids.append(waiter_pid)
+                    self.waiting_tasks.pop(waiter_pid, None)
+                    continue
+                if message is not None:
+                    self._complete_mailbox_wait(
+                        waiter_pid,
+                        status=mbx_const.HSX_MBX_STATUS_OK,
+                        descriptor_id=descriptor_id,
+                        message=message,
+                        timed_out=False,
+                    )
+                    delivered_pids.append(waiter_pid)
+            # Remove delivered PIDs from waiters list while preserving FIFO order
+            for pid in delivered_pids:
+                if pid in desc.waiters:
+                    desc.waiters.remove(pid)
+        else:
+            # Single-reader mode: wake one waiter at a time in FIFO order
+            while desc.waiters:
+                waiter_pid = desc.waiters[0]
+                wait_info = self.waiting_tasks.get(waiter_pid)
+                if wait_info is None:
+                    desc.waiters.pop(0)
+                    continue
+                handle = wait_info.get("handle")
+                try:
+                    message = self.mailboxes.recv(pid=waiter_pid, handle=handle, record_waiter=False)
+                except MailboxError:
+                    desc.waiters.pop(0)
+                    self.waiting_tasks.pop(waiter_pid, None)
+                    continue
+                if message is None:
+                    break
+                self._complete_mailbox_wait(
+                    waiter_pid,
+                    status=mbx_const.HSX_MBX_STATUS_OK,
+                    descriptor_id=descriptor_id,
+                    message=message,
+                    timed_out=False,
+                )
 
     def _check_mailbox_timeouts(self) -> None:
         if not self.waiting_tasks:
@@ -2197,11 +3452,258 @@ class VMController:
             descriptor_id = info.get("descriptor_id")
             self._complete_mailbox_wait(
                 pid,
-                status=mbx_const.HSX_MBX_STATUS_NO_DATA,
+                status=mbx_const.HSX_MBX_STATUS_TIMEOUT,
                 descriptor_id=descriptor_id,
                 message=None,
                 timed_out=True,
             )
+
+    def _svc_value_controller(self, vm: MiniVM, fn: int) -> None:
+        """Handle VALUE SVC calls through the valcmd registry."""
+        pid = self.current_pid or vm.pid or (vm.context.pid if vm.context else 0) or 0
+        memory = memoryview(vm.mem)
+
+        try:
+            if fn == val_const.HSX_VAL_FN_REGISTER:
+                group_id = vm.regs[1] & 0xFF
+                value_id = vm.regs[2] & 0xFF
+                flags = vm.regs[3] & 0xFF
+                desc_ptr = vm.regs[4] & 0xFFFF
+                ok, specs = self.valcmd.parse_value_descriptors_from_memory(memory, desc_ptr)
+                if not ok:
+                    vm.regs[0] = val_const.HSX_VAL_STATUS_EINVAL
+                    return
+                status, oid = self.valcmd.value_register(
+                    group_id=group_id,
+                    value_id=value_id,
+                    flags=flags,
+                    auth_level=val_const.HSX_VAL_AUTH_PUBLIC,
+                    owner_pid=pid,
+                    descriptors=specs,
+                )
+                vm.regs[0] = status & 0xFFFF
+                if status == val_const.HSX_VAL_STATUS_OK:
+                    vm.regs[1] = oid
+                return
+
+            if fn == val_const.HSX_VAL_FN_LOOKUP:
+                group_id = vm.regs[1] & 0xFF
+                value_id = vm.regs[2] & 0xFF
+                status, oid = self.valcmd.value_lookup(group_id, value_id)
+                vm.regs[0] = status & 0xFFFF
+                if status == val_const.HSX_VAL_STATUS_OK:
+                    vm.regs[1] = oid
+                return
+
+            if fn == val_const.HSX_VAL_FN_GET:
+                oid = vm.regs[1] & 0xFFFF
+                status, value = self.valcmd.value_get(oid, caller_pid=pid)
+                if status == val_const.HSX_VAL_STATUS_OK:
+                    vm.regs[0] = ((status & 0xFFFF) << 16) | float_to_f16(value)
+                else:
+                    vm.regs[0] = status & 0xFFFF
+                return
+
+            if fn == val_const.HSX_VAL_FN_SET:
+                oid = vm.regs[1] & 0xFFFF
+                raw_value = vm.regs[2] & 0xFFFF
+                new_value = f16_to_float(raw_value)
+                status = self.valcmd.value_set(
+                    oid,
+                    new_value,
+                    caller_pid=pid,
+                    current_time=time.monotonic(),
+                )
+                vm.regs[0] = status & 0xFFFF
+                if status == val_const.HSX_VAL_STATUS_OK:
+                    entry = self.valcmd.get_value_entry(oid)
+                    if entry is not None:
+                        payload = struct.pack("<HH", oid & 0xFFFF, entry.last_f16_raw & 0xFFFF)
+                        for sub_pid, handle, _ in self.valcmd.get_value_subscribers(oid):
+                            try:
+                                self.mailboxes.send(
+                                    pid=sub_pid,
+                                    handle=handle,
+                                    payload=payload,
+                                    flags=0,
+                                    channel=0,
+                                )
+                            except MailboxError:
+                                continue
+                return
+
+            if fn == val_const.HSX_VAL_FN_LIST:
+                group_filter = vm.regs[1] & 0xFF
+                out_ptr = vm.regs[2] & 0xFFFF
+                max_items = vm.regs[3] & 0xFFFF
+                oids = self.valcmd.value_list(group_filter=group_filter, caller_pid=pid)
+                max_buffer = (len(vm.mem) - out_ptr) // 2 if out_ptr < len(vm.mem) else 0
+                count = min(len(oids), max_items, max_buffer)
+                for idx in range(count):
+                    offset = out_ptr + idx * 2
+                    vm.mem[offset : offset + 2] = (oids[idx] & 0xFFFF).to_bytes(2, "little")
+                vm.regs[0] = val_const.HSX_VAL_STATUS_OK
+                vm.regs[1] = count
+                return
+
+            if fn == val_const.HSX_VAL_FN_SUB:
+                oid = vm.regs[1] & 0xFFFF
+                target = vm._read_c_string(vm.regs[2])
+                if not target:
+                    vm.regs[0] = val_const.HSX_VAL_STATUS_EINVAL
+                    return
+                try:
+                    handle = self.mailboxes.open(pid=pid, target=target)
+                except MailboxError:
+                    vm.regs[0] = val_const.HSX_VAL_STATUS_EINVAL
+                    return
+                status = self.valcmd.value_subscribe(oid, mailbox_handle=(pid, handle, target))
+                vm.regs[0] = status & 0xFFFF
+                if status == val_const.HSX_VAL_STATUS_OK:
+                    vm.regs[1] = handle
+                return
+
+            if fn == val_const.HSX_VAL_FN_PERSIST:
+                oid = vm.regs[1] & 0xFFFF
+                mode = vm.regs[2] & 0xFF
+                status = self.valcmd.value_persist(oid, mode, caller_pid=pid)
+                vm.regs[0] = status & 0xFFFF
+                return
+
+            vm.regs[0] = val_const.HSX_VAL_STATUS_EINVAL
+
+        except Exception:
+            vm.regs[0] = val_const.HSX_VAL_STATUS_EINVAL
+
+    def _svc_command_controller(self, vm: MiniVM, fn: int) -> None:
+        """Handle COMMAND SVC calls through the valcmd registry."""
+        pid = self.current_pid or vm.pid or (vm.context.pid if vm.context else 0) or 0
+        memory = memoryview(vm.mem)
+
+        try:
+            if fn == cmd_const.HSX_CMD_FN_REGISTER:
+                group_id = vm.regs[1] & 0xFF
+                cmd_id = vm.regs[2] & 0xFF
+                flags = vm.regs[3] & 0xFF
+                desc_ptr = vm.regs[4] & 0xFFFF
+                ok, specs = self.valcmd.parse_command_descriptors_from_memory(memory, desc_ptr)
+                if not ok:
+                    vm.regs[0] = cmd_const.HSX_CMD_STATUS_EINVAL
+                    return
+                status, oid = self.valcmd.command_register(
+                    group_id=group_id,
+                    cmd_id=cmd_id,
+                    flags=flags,
+                    auth_level=val_const.HSX_VAL_AUTH_PUBLIC,
+                    owner_pid=pid,
+                    descriptors=specs,
+                )
+                vm.regs[0] = status & 0xFFFF
+                if status == cmd_const.HSX_CMD_STATUS_OK:
+                    vm.regs[1] = oid
+                return
+
+            if fn == cmd_const.HSX_CMD_FN_LOOKUP:
+                group_id = vm.regs[1] & 0xFF
+                cmd_id = vm.regs[2] & 0xFF
+                status, oid = self.valcmd.command_lookup(group_id, cmd_id)
+                vm.regs[0] = status & 0xFFFF
+                if status == cmd_const.HSX_CMD_STATUS_OK:
+                    vm.regs[1] = oid
+                return
+
+            if fn == cmd_const.HSX_CMD_FN_CALL:
+                oid = vm.regs[1] & 0xFFFF
+                token_ptr = vm.regs[2] & 0xFFFF
+                token_bytes = self._read_token_bytes(vm, token_ptr)
+                status, result = self.valcmd.command_call(oid, caller_pid=pid, token=token_bytes)
+                vm.regs[0] = status & 0xFFFF
+                if result is not None:
+                    vm.regs[1] = int(result) if isinstance(result, (int, float)) else 0
+                return
+
+            if fn == cmd_const.HSX_CMD_FN_CALL_ASYNC:
+                oid = vm.regs[1] & 0xFFFF
+                token_ptr = vm.regs[2] & 0xFFFF
+                token_bytes = self._read_token_bytes(vm, token_ptr)
+                target_ptr = vm.regs[3] & 0xFFFF
+                target = vm._read_c_string(target_ptr)
+                if not target:
+                    vm.regs[0] = cmd_const.HSX_CMD_STATUS_EINVAL
+                    return
+                try:
+                    handle = self.mailboxes.open(pid=pid, target=target)
+                except MailboxError:
+                    vm.regs[0] = cmd_const.HSX_CMD_STATUS_EINVAL
+                    return
+                def _async_complete(status_out: int, result_out: Any) -> None:
+                    payload = struct.pack("<HH", oid & 0xFFFF, status_out & 0xFFFF)
+                    if isinstance(result_out, (int, float)):
+                        payload += struct.pack("<I", int(result_out) & 0xFFFFFFFF)
+                    try:
+                        self.mailboxes.send(pid=pid, handle=handle, payload=payload, flags=0, channel=0)
+                    except MailboxError:
+                        self.log(
+                            "error",
+                            "cmd_async_mailbox_send_failed",
+                            pid=pid,
+                            handle=handle,
+                        )
+                        try:
+                            self.mailboxes.close(pid=pid, handle=handle)
+                        except MailboxError:
+                            self.log(
+                                "debug",
+                                "cmd_async_mailbox_close_failed",
+                                pid=pid,
+                                handle=handle,
+                            )
+
+                status, _ = self.valcmd.command_call_async(
+                    oid,
+                    caller_pid=pid,
+                    token=token_bytes,
+                    on_complete=_async_complete,
+                )
+                vm.regs[0] = status & 0xFFFF
+                if status != cmd_const.HSX_CMD_STATUS_OK:
+                    try:
+                        self.mailboxes.close(pid=pid, handle=handle)
+                    except MailboxError:
+                        self.log(
+                            "debug",
+                            "cmd_async_mailbox_close_failed",
+                            pid=pid,
+                            handle=handle,
+                        )
+                    return
+                vm.regs[1] = handle
+                return
+
+            if fn == cmd_const.HSX_CMD_FN_HELP:
+                oid = vm.regs[1] & 0xFFFF
+                out_ptr = vm.regs[2] & 0xFFFF
+                max_len = vm.regs[3] & 0xFFFF
+                help_text = self.valcmd.command_help_text(oid)
+                if help_text is None:
+                    vm.regs[0] = cmd_const.HSX_CMD_STATUS_ENOENT
+                    return
+                encoded = help_text.encode("utf-8")
+                if max_len == 0 or out_ptr >= len(vm.mem):
+                    vm.regs[0] = cmd_const.HSX_CMD_STATUS_OK
+                    vm.regs[1] = 0
+                    return
+                write_len = min(len(encoded), max_len - 1, len(vm.mem) - out_ptr - 1)
+                vm.mem[out_ptr : out_ptr + write_len] = encoded[:write_len]
+                vm.mem[out_ptr + write_len] = 0
+                vm.regs[0] = cmd_const.HSX_CMD_STATUS_OK
+                vm.regs[1] = write_len
+                return
+
+            vm.regs[0] = cmd_const.HSX_CMD_STATUS_EINVAL
+
+        except Exception:
+            vm.regs[0] = cmd_const.HSX_CMD_STATUS_EINVAL
 
     def info(self, pid: Optional[int] = None) -> Dict[str, Any]:
         vm = self.vm
@@ -2232,6 +3734,11 @@ class VMController:
         info["scheduler"] = {
             "trace": self.scheduler_trace_snapshot(limit=32),
             "counters": self.scheduler_stats(),
+            "mailbox_counters": self.mailbox_stats(),
+        }
+        info["mailbox_profile"] = {
+            "name": self.mailbox_profile_name,
+            "config": dict(self.mailbox_profile),
         }
         return info
 
@@ -2245,18 +3752,51 @@ class VMController:
         if self.server is not None:
             threading.Thread(target=self.server.shutdown, daemon=True).start()
 
-    def load_from_path(self, path: str, *, verbose: bool = False) -> Dict[str, Any]:
-        self._store_active_state()
-        header, code, rodata = load_hxe(path, verbose=verbose)
-        temp_vm = MiniVM(code, entry=header["entry"], rodata=rodata, trace=self.trace, svc_trace=self.svc_trace, dev_libm=self.dev_libm)
+    def _finalize_loaded_image(
+        self,
+        header: Dict[str, Any],
+        code: bytes,
+        rodata: bytes,
+        *,
+        pid: Optional[int] = None,
+        program_path: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        temp_vm = MiniVM(
+            code,
+            entry=header["entry"],
+            rodata=rodata,
+            trace=self.trace,
+            svc_trace=self.svc_trace,
+            dev_libm=self.dev_libm,
+        )
         state = temp_vm.snapshot_state()
-        pid = self.next_pid
-        self.next_pid += 1
+        if pid is None:
+            pid = self.next_pid
+            self.next_pid += 1
+        else:
+            # Ensure next_pid always advances beyond explicitly provided pid.
+            self.next_pid = max(self.next_pid, pid + 1)
+        if program_path is None:
+            program_label = f"<stream:{pid}>"
+        else:
+            program_label = str(program_path)
+
+        allow_multiple = bool(header.get("allow_multiple_instances", True))
+        base_app_name = header.get("app_name") or self._default_app_name(program_label, pid)
+        assigned_app_name = self._assign_app_instance_name(base_app_name, allow_multiple)
+        header["app_name_base"] = base_app_name
+        header["app_instance"] = assigned_app_name
+
         ctx = state["context"]
-        allocation = self._allocate_task_memory(pid)
+        allocation = self._task_memory.get(pid)
+        if allocation is None:
+            allocation = self._allocate_task_memory(pid)
         mem = state.get("mem")
         if mem is None:
             mem = bytearray(VM_ADDRESS_SPACE_SIZE)
+            state["mem"] = mem
+        elif not isinstance(mem, bytearray):
+            mem = bytearray(mem)
             state["mem"] = mem
         regs = list(ctx.get("regs", [0] * 16))
         for idx, value in enumerate(regs):
@@ -2281,9 +3821,14 @@ class VMController:
         ctx["sp"] = allocation["sp"]
         ctx["stack_size"] = allocation["stack_size"]
         state["context"] = ctx
+        metadata_dict = header.get("metadata") or {}
+        metadata_obj = header.get("_metadata_obj")
+        if isinstance(metadata_obj, HXEMetadata):
+            self._register_metadata_values(pid, metadata_obj.values, metadata_dict)
+            self._register_metadata_commands(pid, metadata_obj.commands, metadata_dict)
         self.tasks[pid] = {
             "pid": pid,
-            "program": str(Path(path).resolve()),
+            "program": program_label,
             "state": "running",
             "priority": ctx.get("priority", 10),
             "quantum": ctx.get("time_slice_steps", 1),
@@ -2297,10 +3842,48 @@ class VMController:
             "stack_base": allocation["stack_base"],
             "stack_limit": allocation["stack_limit"],
             "stack_size": allocation["stack_size"],
+            "app_name": assigned_app_name,
+            "app_name_base": base_app_name,
+            "allow_multiple_instances": allow_multiple,
+            "metadata": metadata_dict,
         }
         self.task_states[pid] = state
         self.mailboxes.register_task(pid)
         stdio_handles = self.mailboxes.ensure_stdio_handles(pid)
+        mailbox_creation: List[Dict[str, Any]] = []
+        if isinstance(metadata_obj, HXEMetadata) and metadata_obj.mailboxes:
+            mailbox_creation = self._instantiate_metadata_mailboxes(pid, metadata_obj.mailboxes)
+        metadata_mailboxes = metadata_dict.get("mailboxes")
+        if not isinstance(metadata_mailboxes, list):
+            metadata_mailboxes = None
+        if metadata_mailboxes is None and isinstance(metadata_obj, HXEMetadata) and metadata_obj.mailboxes:
+            metadata_mailboxes = [dict(entry) for entry in metadata_obj.mailboxes]
+            metadata_dict["mailboxes"] = metadata_mailboxes
+        if metadata_mailboxes is not None and isinstance(metadata_obj, HXEMetadata):
+            for idx, entry in enumerate(metadata_obj.mailboxes):
+                if idx >= len(metadata_mailboxes):
+                    metadata_mailboxes.append(dict(entry))
+                    continue
+                metadata_mailboxes[idx].update(
+                    {
+                        key: entry.get(key)
+                        for key in (
+                            "descriptor",
+                            "capacity",
+                            "queue_depth",
+                            "flags",
+                            "mode_mask",
+                            "owner_pid",
+                            "bindings",
+                            "target",
+                            "name",
+                        )
+                        if entry.get(key) is not None
+                    }
+                )
+        if mailbox_creation:
+            metadata_dict["_mailbox_creation"] = mailbox_creation
+            self.tasks[pid]["metadata_mailbox_creation"] = mailbox_creation
         fd_table = {int(k): int(v) for k, v in dict(ctx.get("fd_table", {})).items()}
         fd_table.update(
             {
@@ -2314,7 +3897,9 @@ class VMController:
             }
         )
         ctx["fd_table"] = fd_table
-        self.program_path = self.tasks[pid]["program"]
+        self.metadata_by_pid[pid] = metadata_obj if isinstance(metadata_obj, HXEMetadata) else _empty_metadata()
+        self.header = header
+        self.program_path = program_label
         self._activate_task(pid, state_override=state)
         return {
             "pid": pid,
@@ -2322,7 +3907,84 @@ class VMController:
             "code_len": header["code_len"],
             "ro_len": header["ro_len"],
             "bss": header["bss_size"],
+            "version": header["version"],
+            "flags": header["flags"],
+            "req_caps": header["req_caps"],
+            "app_name": assigned_app_name,
+            "app_name_base": base_app_name,
+            "allow_multiple_instances": allow_multiple,
+            "metadata": metadata_dict,
+            "meta_count": len(metadata_dict.get("sections", [])),
+            "manifest_present": bool(header.get("manifest_present")),
+            "mailbox_creation": mailbox_creation,
         }
+
+    def load_from_path(self, path: str, *, verbose: bool = False) -> Dict[str, Any]:
+        self._store_active_state()
+        header, code, rodata = load_hxe(path, verbose=verbose)
+        program_label = str(Path(path).resolve())
+        return self._finalize_loaded_image(header, code, rodata, program_path=program_label)
+
+    def load_stream_begin(self, *, label: Optional[str] = None) -> Dict[str, Any]:
+        pid = self.next_pid
+        self.next_pid += 1
+        self.streaming_sessions[pid] = {
+            "pid": pid,
+            "buffer": bytearray(),
+            "state": "writing",
+            "program": label,
+        }
+        return {"status": "ok", "pid": pid}
+
+    def load_stream_write(self, pid: int, chunk: bytes) -> Dict[str, Any]:
+        session = self.streaming_sessions.get(pid)
+        if session is None:
+            return {"status": "error", "error": "ESRCH", "message": f"unknown streaming pid {pid}"}
+        if session.get("state") != "writing":
+            return {"status": "error", "error": "EBUSY", "message": "streaming session not writable"}
+        if not chunk:
+            return {"status": "ok", "bytes": 0}
+        if not isinstance(chunk, (bytes, bytearray, memoryview)):
+            chunk = bytes(chunk)
+        buffer = session["buffer"]
+        buffer.extend(chunk)
+        return {"status": "ok", "bytes": len(chunk)}
+
+    def load_stream_end(self, pid: int, *, verbose: bool = False) -> Dict[str, Any]:
+        session = self.streaming_sessions.get(pid)
+        if session is None:
+            return {"status": "error", "error": "ESRCH", "message": f"unknown streaming pid {pid}"}
+        if session.get("state") == "error":
+            return {"status": "error", "error": "EBUSY", "message": "streaming session is in an error state"}
+        buffer = session["buffer"]
+        if len(buffer) < HEADER_V1.size:
+            return {"status": "error", "error": "EBADMSG", "message": "HXE payload incomplete"}
+        try:
+            header, code, rodata = load_hxe_bytes(bytes(buffer), verbose=verbose)
+        except ValueError as exc:
+            session["state"] = "error"
+            return {"status": "error", "error": "EBADMSG", "message": str(exc)}
+        self.streaming_sessions.pop(pid, None)
+        self._store_active_state()
+        program_label = session.get("program")
+        result = self._finalize_loaded_image(header, code, rodata, pid=pid, program_path=program_label)
+        result["status"] = "ok"
+        return result
+
+    def load_stream_abort(self, pid: int) -> Dict[str, Any]:
+        session = self.streaming_sessions.pop(pid, None)
+        if session is None:
+            return {"status": "error", "error": "ESRCH", "message": f"unknown streaming pid {pid}"}
+        buffer = session.get("buffer")
+        if isinstance(buffer, bytearray):
+            buffer.clear()
+        # Release any reserved memory if we allocated earlier.
+        if pid in self._task_memory:
+            self._release_task_memory(pid)
+        self.tasks.pop(pid, None)
+        self.task_states.pop(pid, None)
+        self.metadata_by_pid.pop(pid, None)
+        return {"status": "ok"}
 
     # ------------------------------------------------------------------
     # Task/context helpers
@@ -2372,6 +4034,14 @@ class VMController:
             task["vm_state"] = state
             task["pc"] = ctx.get("pc", task.get("pc"))
             task["sleep_pending"] = bool(self.vm.sleep_until or self.vm.sleep_pending_ms)
+            if self.vm.sleep_pending_ms is not None:
+                task["sleep_pending_ms"] = int(self.vm.sleep_pending_ms)
+            else:
+                task.pop("sleep_pending_ms", None)
+            if self.vm.sleep_until is not None:
+                task["sleep_deadline"] = float(self.vm.sleep_until)
+            else:
+                task.pop("sleep_deadline", None)
             exit_status = ctx.get("exit_status")
             if exit_status is not None:
                 task["exit_status"] = exit_status
@@ -2386,6 +4056,8 @@ class VMController:
                 new_state = "paused"
             elif exit_status is not None and ctx.get("state") in {"returned", "exited"}:
                 new_state = "returned"
+            elif self.vm.sleep_until is not None or self.vm.sleep_pending_ms is not None:
+                new_state = "sleeping"
             elif waiting:
                 new_state = "waiting_mbx"
             elif self.vm.running:
@@ -2400,15 +4072,23 @@ class VMController:
                     new_state = "stopped"
             task["state"] = new_state
             ctx["state"] = new_state
-        wait_info = self.waiting_tasks.get(self.current_pid)
-        if wait_info is not None:
-            state["wait_info"] = wait_info
-            ctx = state["context"]
-            ctx["wait_kind"] = "mailbox"
-            ctx["wait_mailbox"] = wait_info.get("descriptor_id")
-            ctx["wait_handle"] = wait_info.get("handle")
-            ctx["wait_deadline"] = wait_info.get("deadline")
-            state["context"] = ctx
+            if self.vm.sleep_pending_ms is not None:
+                ctx["sleep_pending_ms"] = int(self.vm.sleep_pending_ms)
+            else:
+                ctx.pop("sleep_pending_ms", None)
+            if self.vm.sleep_until is not None:
+                ctx["sleep_deadline"] = float(self.vm.sleep_until)
+            else:
+                ctx.pop("sleep_deadline", None)
+            wait_info = self.waiting_tasks.get(self.current_pid)
+            if wait_info is not None:
+                state["wait_info"] = wait_info
+                ctx = state["context"]
+                ctx["wait_kind"] = "mailbox"
+                ctx["wait_mailbox"] = wait_info.get("descriptor_id")
+                ctx["wait_handle"] = wait_info.get("handle")
+                ctx["wait_deadline"] = wait_info.get("deadline")
+                state["context"] = ctx
         else:
             state.pop("wait_info", None)
 
@@ -2422,6 +4102,7 @@ class VMController:
         ctx_dict = self._ensure_task_memory(pid, state)
         if not ctx_dict.get("reg_base") or not ctx_dict.get("stack_base"):
             raise RuntimeError(f"task {pid} missing register/stack base allocation")
+        preserved_events: List[Dict[str, Any]] = []
         if self.vm is None:
             initial_code = bytes(state.get("code", bytearray()))
             entry = state.get("context", {}).get("pc", task.get("pc", 0))
@@ -2433,8 +4114,15 @@ class VMController:
                 dev_libm=self.dev_libm,
                 mailboxes=self.mailboxes,
             )
+            self._flush_pending_mailbox_events()
+        else:
+            preserved_events = list(self.vm.pending_events)
         self.vm.set_mailbox_handler(lambda fn, vm=self.vm: self._svc_mailbox_controller(vm, fn))
+        self.vm.set_value_handler(lambda fn, vm=self.vm: self._svc_value_controller(vm, fn))
+        self.vm.set_command_handler(lambda fn, vm=self.vm: self._svc_command_controller(vm, fn))
         self.vm.restore_state(state)
+        if preserved_events:
+            self.vm.pending_events.extend(preserved_events)
         self.vm.trace = trace_enabled
         self.vm.attached = self.attached
         self._apply_debug_state(pid)
@@ -2469,18 +4157,39 @@ class VMController:
         task = self._get_task(pid)
         state = self.task_states.get(pid, {})
         ctx = state.get("context", {})
+        metadata_obj = self.metadata_by_pid.get(pid)
+        metadata_summary: Optional[Dict[str, int]] = None
+        if metadata_obj is not None:
+            try:
+                metadata_summary = {
+                    "sections": len(metadata_obj.sections),
+                    "values": len(metadata_obj.values),
+                    "commands": len(metadata_obj.commands),
+                    "mailboxes": len(metadata_obj.mailboxes),
+                }
+            except AttributeError:
+                pass
         return {
             "pid": pid,
             "program": task.get("program"),
             "state": task.get("state"),
+            "app_name": task.get("app_name"),
+            "app_name_base": task.get("app_name_base"),
             "pc": ctx.get("pc", task.get("pc")),
             "priority": task.get("priority"),
             "quantum": task.get("quantum"),
             "accounted_steps": ctx.get("accounted_steps", 0),
             "accounted_cycles": ctx.get("accounted_steps", 0),
             "sleep_pending": task.get("sleep_pending", False),
+             "sleep_pending_ms": task.get("sleep_pending_ms"),
+             "sleep_deadline": task.get("sleep_deadline"),
             "exit_status": task.get("exit_status"),
             "trace": task.get("trace"),
+            "metadata": metadata_summary if metadata_summary else None,
+            "reg_base": task.get("reg_base"),
+            "stack_base": task.get("stack_base"),
+            "stack_limit": task.get("stack_limit"),
+            "stack_size": task.get("stack_size"),
         }
 
     def trace_task(self, pid: int, enable: Optional[bool]) -> Dict[str, Any]:
@@ -2594,7 +4303,14 @@ class VMController:
             if dbg_state is not None:
                 dbg_state.halted = False
 
-        return {
+        trace_last = None
+        if self.vm is not None and last_pid is not None:
+            try:
+                trace_last = self.trace_last_snapshot(last_pid)
+            except Exception:
+                trace_last = None
+
+        result = {
             "executed": executed,
             "running": running_flag,
             "pc": last_snapshot.get("pc") if last_snapshot else None,
@@ -2607,6 +4323,33 @@ class VMController:
             "next_pid": next_pid,
             "debug_event": debug_event,
         }
+        if trace_last:
+            result["trace_last"] = trace_last
+        return result
+
+    def trace_last_snapshot(self, pid: Optional[int] = None) -> Dict[str, Any]:
+        vm = self._require_vm()
+        trace_pid = pid
+        if trace_pid is None:
+            ctx = vm.context
+            if ctx and ctx.pid is not None:
+                trace_pid = ctx.pid
+            else:
+                trace_pid = self.current_pid
+        snapshot: Dict[str, Any] = {
+            "pc": vm.get_last_pc(),
+            "next_pc": vm.pc & 0xFFFFFFFF,
+            "opcode": vm.get_last_opcode(),
+            "regs": vm.get_last_regs(),
+            "flags": vm.flags & 0xFF,
+            "steps": vm.steps,
+        }
+        mem_access = vm.get_last_mem_access()
+        if mem_access:
+            snapshot["mem_access"] = dict(mem_access)
+        if trace_pid is not None:
+            snapshot["pid"] = trace_pid
+        return snapshot
 
     def read_regs(self, pid: Optional[int] = None) -> Dict[str, Any]:
         pid = self.current_pid if pid is None else pid
@@ -2646,6 +4389,49 @@ class VMController:
             "sp_effective": (ctx.stack_base + sp16) & 0xFFFFFFFF,
             "context": context_dict,
         }
+
+    def reg_get(self, reg_id: int, pid: Optional[int] = None) -> Dict[str, Any]:
+        idx = int(reg_id)
+        if idx < 0 or idx >= 16:
+            raise ValueError("reg_id must be between 0 and 15")
+        regs_snapshot = self.read_regs(pid)
+        regs_list = list(regs_snapshot.get("regs") or [])
+        if len(regs_list) < 16:
+            regs_list.extend([0] * (16 - len(regs_list)))
+        value = int(regs_list[idx]) & 0xFFFFFFFF
+        context = regs_snapshot.get("context", {})
+        resolved_pid = pid
+        if resolved_pid is None:
+            if isinstance(context, dict) and context.get("pid") is not None:
+                try:
+                    resolved_pid = int(context.get("pid"))
+                except (TypeError, ValueError):
+                    resolved_pid = self.current_pid
+            else:
+                resolved_pid = self.current_pid
+        return {"pid": resolved_pid, "reg": idx, "value": value}
+
+    def reg_set(self, reg_id: int, value: int, pid: Optional[int] = None) -> Dict[str, Any]:
+        idx = int(reg_id)
+        if idx < 0 or idx >= 16:
+            raise ValueError("reg_id must be between 0 and 15")
+        regs_snapshot = self.read_regs(pid)
+        regs_list = list(regs_snapshot.get("regs") or [])
+        if len(regs_list) < 16:
+            regs_list.extend([0] * (16 - len(regs_list)))
+        regs_list[idx] = int(value) & 0xFFFFFFFF
+        self.write_regs({"regs": regs_list}, pid)
+        context = regs_snapshot.get("context", {})
+        resolved_pid = pid
+        if resolved_pid is None:
+            if isinstance(context, dict) and context.get("pid") is not None:
+                try:
+                    resolved_pid = int(context.get("pid"))
+                except (TypeError, ValueError):
+                    resolved_pid = self.current_pid
+            else:
+                resolved_pid = self.current_pid
+        return {"pid": resolved_pid, "reg": idx, "value": int(value) & 0xFFFFFFFF}
 
     def write_regs(self, payload: Dict[str, Any], pid: Optional[int] = None) -> Dict[str, Any]:
         pid = self.current_pid if pid is None else pid
@@ -2702,6 +4488,7 @@ class VMController:
         self.tasks.pop(pid, None)
         self.task_states.pop(pid, None)
         self.debug_sessions.pop(pid, None)
+        self.metadata_by_pid.pop(pid, None)
         summary["state"] = "terminated"
         if self.tasks:
             remaining = sorted(self.tasks)
@@ -3030,10 +4817,32 @@ class VMController:
                         raise ValueError("trace mode must be 'on' or 'off'")
                 trace_info = self.trace_task(int(pid_value), enable)
                 return {"status": "ok", "trace": trace_info}
+            if cmd == "vm_trace_last":
+                pid_value = request.get("pid")
+                pid = int(pid_value) if pid_value is not None else None
+                trace_snapshot = self.trace_last_snapshot(pid)
+                return {"status": "ok", "trace": trace_snapshot}
             if cmd == "read_regs":
                 pid_value = request.get("pid")
                 pid = int(pid_value) if pid_value is not None else None
                 return {"status": "ok", "registers": self.read_regs(pid)}
+            if cmd == "vm_reg_get":
+                reg_value = request.get("reg")
+                if reg_value is None:
+                    raise ValueError("vm_reg_get requires 'reg'")
+                pid_value = request.get("pid")
+                pid = int(pid_value) if pid_value is not None else None
+                info = self.reg_get(int(reg_value), pid)
+                return {"status": "ok", **info}
+            if cmd == "vm_reg_set":
+                reg_value = request.get("reg")
+                val_value = request.get("value")
+                if reg_value is None or val_value is None:
+                    raise ValueError("vm_reg_set requires 'reg' and 'value'")
+                pid_value = request.get("pid")
+                pid = int(pid_value) if pid_value is not None else None
+                info = self.reg_set(int(reg_value), int(val_value), pid)
+                return {"status": "ok", **info}
             if cmd == "write_regs":
                 payload = request.get("registers") or {}
                 if not isinstance(payload, dict):
@@ -3088,7 +4897,13 @@ class VMController:
                 task = self.set_task_attrs(pid, priority=priority, quantum=quantum)
                 return {"status": "ok", "task": task}
             if cmd == "mailbox_snapshot":
-                return {"status": "ok", "descriptors": self.mailbox_snapshot()}
+                snapshot = self.mailbox_snapshot()
+                payload = {"status": "ok"}
+                if isinstance(snapshot, dict):
+                    payload.update(snapshot)
+                else:
+                    payload["descriptors"] = snapshot
+                return payload
             if cmd == "mailbox_stdio_summary":
                 pid_value = request.get("pid")
                 stream_value = request.get("stream")
@@ -3170,6 +4985,76 @@ class VMController:
                 handle = int(request.get("handle"))
                 enable = bool(int(request.get("enable", 1)))
                 return self.mailbox_tap(pid, handle, enable=enable)
+            if cmd == "val_list":
+                pid_filter = request.get("pid")
+                group_filter = request.get("group")
+                name_filter = request.get("name")
+                oid_filter = request.get("oid")
+                pid_int = int(pid_filter) if pid_filter is not None else None
+                group_int = None
+                if group_filter is not None:
+                    group_int = int(group_filter, 0) if isinstance(group_filter, str) else int(group_filter)
+                oid_int = None
+                if oid_filter is not None:
+                    oid_int = int(oid_filter, 0) if isinstance(oid_filter, str) else int(oid_filter)
+                name_token = str(name_filter) if name_filter is not None else None
+                values = self.val_snapshot(pid=pid_int, group=group_int, oid=oid_int, name=name_token)
+                return {"status": "ok", "values": values}
+            if cmd == "val_get":
+                oid_value = request.get("oid")
+                if oid_value is None:
+                    raise ValueError("val_get requires 'oid'")
+                oid_int = int(oid_value, 0) if isinstance(oid_value, str) else int(oid_value)
+                pid_value = request.get("pid")
+                pid_int = int(pid_value) if pid_value is not None else None
+                result = self.val_get(oid_int, pid=pid_int)
+                return {"status": "ok", "value": result}
+            if cmd == "val_set":
+                oid_value = request.get("oid")
+                if oid_value is None:
+                    raise ValueError("val_set requires 'oid'")
+                oid_int = int(oid_value, 0) if isinstance(oid_value, str) else int(oid_value)
+                if "value" not in request:
+                    raise ValueError("val_set requires 'value'")
+                pid_value = request.get("pid")
+                pid_int = int(pid_value) if pid_value is not None else None
+                result = self.val_set(oid_int, request.get("value"), pid=pid_int)
+                return {"status": "ok", "value": result}
+            if cmd == "val_stats":
+                return {"status": "ok", "stats": self.val_stats()}
+            if cmd == "cmd_list":
+                pid_filter = request.get("pid")
+                group_filter = request.get("group")
+                name_filter = request.get("name")
+                oid_filter = request.get("oid")
+                pid_int = int(pid_filter) if pid_filter is not None else None
+                group_int = None
+                if group_filter is not None:
+                    group_int = int(group_filter, 0) if isinstance(group_filter, str) else int(group_filter)
+                oid_int = None
+                if oid_filter is not None:
+                    oid_int = int(oid_filter, 0) if isinstance(oid_filter, str) else int(oid_filter)
+                name_token = str(name_filter) if name_filter is not None else None
+                commands = self.cmd_snapshot(pid=pid_int, group=group_int, oid=oid_int, name=name_token)
+                return {"status": "ok", "commands": commands}
+            if cmd == "cmd_call":
+                oid_value = request.get("oid")
+                if oid_value is None:
+                    raise ValueError("cmd_call requires 'oid'")
+                oid_int = int(oid_value, 0) if isinstance(oid_value, str) else int(oid_value)
+                pid_value = request.get("pid")
+                pid_int = int(pid_value) if pid_value is not None else None
+                async_value = request.get("async")
+                if isinstance(async_value, str):
+                    async_call = async_value.strip().lower() in {"1", "true", "yes", "on"}
+                elif isinstance(async_value, (int, bool)):
+                    async_call = bool(async_value)
+                else:
+                    async_call = False
+                result = self.cmd_call(oid_int, pid=pid_int, async_call=async_call)
+                return {"status": "ok", "command": result}
+            if cmd == "cmd_stats":
+                return {"status": "ok", "stats": self.cmd_stats()}
             if cmd == "restart":
                 targets = request.get("targets")
                 if isinstance(targets, str):
@@ -3217,29 +5102,16 @@ class VMServer(socketserver.ThreadingTCPServer):
         self.controller = controller
         controller.server = self
 
-def load_hxe(path, *, verbose: bool = False):
-    data = Path(path).read_bytes()
-    if len(data) < HEADER.size:
-        raise ValueError(".hxe file too small")
-
-    fields = HEADER.unpack_from(data)
-    header = dict(zip(HEADER_FIELDS, fields))
-
+def _validate_hxe_header(header: Dict[str, Any]) -> None:
     if header["magic"] != HSX_MAGIC:
         raise ValueError(f"Bad magic 0x{header['magic']:08X}")
-    if header["version"] != HSX_VERSION:
-        raise ValueError(f"Unsupported HSXE version 0x{header['version']:04X}")
-
-    crc_input = data[: HEADER.size - 4] + data[HEADER.size :]
-    calc_crc = zlib.crc32(crc_input) & 0xFFFFFFFF
-    if calc_crc != header["crc32"]:
-        raise ValueError(f"CRC mismatch: file=0x{header['crc32']:08X} calc=0x{calc_crc:08X}")
-
-    code_len = header["code_len"]
-    ro_len = header["ro_len"]
-    bss_size = header["bss_size"]
-    entry = header["entry"]
-
+    version = int(header.get("version", -1))
+    if version not in SUPPORTED_HSX_VERSIONS:
+        raise ValueError(f"Unsupported HSXE version 0x{version:04X}")
+    code_len = int(header["code_len"])
+    ro_len = int(header["ro_len"])
+    bss_size = int(header["bss_size"])
+    entry = int(header["entry"])
     if code_len < 0 or ro_len < 0 or bss_size < 0:
         raise ValueError("Negative section length not permitted")
     if code_len > MAX_CODE_LEN:
@@ -3252,25 +5124,97 @@ def load_hxe(path, *, verbose: bool = False):
         raise ValueError("Code section must be 4-byte aligned")
     if entry % 4 != 0:
         raise ValueError("Entry address must be 4-byte aligned")
+    if version == HSX_VERSION_V2:
+        meta_offset = int(header.get("meta_offset") or 0)
+        meta_count = int(header.get("meta_count") or 0)
+        if meta_offset < 0 or meta_count < 0:
+            raise ValueError("Metadata offset/count must be non-negative")
 
-    code_start = HEADER.size
+
+def load_hxe_bytes(data: bytes, *, verbose: bool = False):
+    if len(data) < HEADER_V1.size:
+        raise ValueError(".hxe file too small")
+
+    base_values = dict(zip(HEADER_V1_FIELDS, HEADER_V1.unpack_from(data)))
+    version = base_values["version"]
+    header_size = HEADER_V1.size
+    header: Dict[str, Any] = dict(base_values)
+    header["manifest_present"] = bool(header["flags"] & FLAG_MANIFEST_PRESENT)
+    header["allow_multiple_instances"] = True
+    header["app_name"] = None
+    header["meta_offset"] = 0
+    header["meta_count"] = 0
+
+    if version == HSX_VERSION_V2:
+        if len(data) < HEADER_V2.size:
+            raise ValueError("HXE header truncated (v2 requires 96 bytes)")
+        v2_values = dict(zip(HEADER_V2_FIELDS, HEADER_V2.unpack_from(data)))
+        reserved = v2_values.pop("reserved")
+        if reserved.strip(b"\x00"):
+            raise ValueError("Reserved HXE header bytes must be zero")
+        app_name_raw = v2_values.pop("app_name_raw")
+        try:
+            app_name = app_name_raw.split(b"\x00", 1)[0].decode("ascii")
+        except UnicodeDecodeError as exc:
+            raise ValueError("HXE app_name must be ASCII") from exc
+        app_name = app_name.strip()
+        header.update(v2_values)
+        header["app_name"] = app_name or None
+        header["manifest_present"] = bool(header["flags"] & FLAG_MANIFEST_PRESENT)
+        header["allow_multiple_instances"] = bool(header["flags"] & FLAG_ALLOW_MULTIPLE)
+        header_size = HEADER_V2.size
+    elif version != HSX_VERSION_V1:
+        raise ValueError(f"Unsupported HSXE version 0x{version:04X}")
+
+    header["header_size"] = header_size
+    _validate_hxe_header(header)
+
+    crc_input = data[:CRC_FIELD_OFFSET] + data[header_size:]
+    calc_crc = zlib.crc32(crc_input) & 0xFFFFFFFF
+    if calc_crc != header["crc32"]:
+        raise ValueError(f"CRC mismatch: file=0x{header['crc32']:08X} calc=0x{calc_crc:08X}")
+
+    code_len = int(header["code_len"])
+    ro_len = int(header["ro_len"])
+    entry = int(header["entry"])
+
+    code_start = header_size
     code_end = code_start + code_len
     ro_end = code_end + ro_len
 
     if ro_end > len(data):
         raise ValueError(".hxe truncated: sections exceed file length")
-
     if entry < 0 or entry >= code_len:
         raise ValueError("Entry point outside code section")
+
+    if version == HSX_VERSION_V2 and header.get("meta_offset"):
+        meta_offset = int(header["meta_offset"])
+        if meta_offset < ro_end:
+            raise ValueError("Metadata table overlaps code or rodata sections")
 
     code = data[code_start:code_end]
     rodata = data[code_end:ro_end]
 
+    metadata_obj = (
+        _parse_metadata_sections(data, header, header_size)
+        if version == HSX_VERSION_V2
+        else _empty_metadata()
+    )
+    header["_metadata_obj"] = metadata_obj
+    header["metadata"] = asdict(metadata_obj)
+
     if verbose:
+        app_label = header.get("app_name") or "<unnamed>"
         print(
-            f"[HXE] entry=0x{entry:08X} code_len={code_len} ro_len={ro_len} bss={bss_size} caps=0x{header['req_caps']:08X}"
+            f"[HXE] version=0x{version:04X} app='{app_label}' entry=0x{entry:08X} "
+            f"code_len={code_len} ro_len={ro_len} bss={header['bss_size']} caps=0x{header['req_caps']:08X}"
         )
     return header, code, rodata
+
+
+def load_hxe(path, *, verbose: bool = False):
+    data = Path(path).read_bytes()
+    return load_hxe_bytes(data, verbose=verbose)
 
 def main():
     ap = argparse.ArgumentParser(description="HSX Python VM")

@@ -1,2 +1,2 @@
-reload <pid> [verbose]
-Kill the existing task and launch a fresh instance of the same .hxe image. Add 'verbose' to include loader metadata in the response.
+reload <pid> [verbose]
+Kill the existing task and launch a fresh instance of the same .hxe image. Add 'verbose' to include loader metadata in the response.

@@ -1,2 +1,2 @@
-start_auto
-Deprecated. Use `clock start` to enable the background stepping loop (or `clock stop` to halt it).
+start_auto
+Deprecated. Use `clock start` to enable the background stepping loop (or `clock stop` to halt it).

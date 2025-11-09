@@ -1,0 +1,16 @@
+memory
+======
+
+Show the memory regions known to the executive for a task.
+
+Usage::
+
+    memory regions <pid>
+
+Arguments:
+- ``pid``: Task id to inspect.
+
+The command prints each region with start/end addresses, length,
+permissions, and any source/context notes (e.g. register bank or
+current stack pointer).
+

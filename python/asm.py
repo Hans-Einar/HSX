@@ -1,27 +1,65 @@
 #!/usr/bin/env python3
 import sys, re, struct, zlib, argparse, json, subprocess
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List
+
+try:
+    import hsx_value_constants as val_const
+    import hsx_command_constants as cmd_const
+except ImportError:  # pragma: no cover - running as package
+    from python import hsx_value_constants as val_const
+    from python import hsx_command_constants as cmd_const
+
+try:  # pragma: no cover - prefer namespace package when available
+    import python.opcodes as _opcode_module
+except ImportError:  # pragma: no cover - running as top-level script
+    import opcodes as _opcode_module  # type: ignore[no-redef]
+else:  # pragma: no cover - align module aliases
+    if "opcodes" not in sys.modules:
+        sys.modules["opcodes"] = _opcode_module
+
+OPC = _opcode_module.OPCODES
 
 MAGIC = 0x48535845  # 'HSXE'
 VERSION = 0x0001
 RODATA_BASE = 0x4000
-
-OPC = {
-    "LDI":   0x01, "LD": 0x02, "ST": 0x03, "MOV": 0x04, "LDB": 0x06, "LDH": 0x07, "STB": 0x08, "STH": 0x09,
-    "ADD": 0x10, "SUB": 0x11, "MUL": 0x12, "DIV": 0x13,
-    "AND": 0x14, "OR": 0x15, "XOR": 0x16, "NOT": 0x17,
-    "CMP": 0x20, "JMP": 0x21, "JZ": 0x22, "JNZ": 0x23, "CALL": 0x24, "RET": 0x25,
-    "SVC": 0x30, "PUSH": 0x40, "POP": 0x41,
-    "FADD": 0x50, "FSUB": 0x51, "FMUL": 0x52, "FDIV": 0x53, "I2F": 0x54, "F2I": 0x55,
-    "LDI32": 0x60, "BRK": 0x7F
-}
 
 REGISTER_RE = re.compile(r"R([0-9]|1[0-5])\b", re.IGNORECASE)
 SYMBOL_TOKEN_RE = re.compile(r"[A-Za-z_.][A-Za-z0-9_.$]*")
 EXPR_TOKEN_RE = re.compile(r"(lo16|hi16|off16)\(([^)]+)\)")
 SECTION_TEXT = "text"
 SECTION_DATA = "data"
+
+LAST_METADATA: Dict[str, Any] = {}
+
+_VALUE_FLAG_ALIASES = {
+    "RO": val_const.HSX_VAL_FLAG_RO,
+    "READONLY": val_const.HSX_VAL_FLAG_RO,
+    "READ_ONLY": val_const.HSX_VAL_FLAG_RO,
+    "PERSIST": val_const.HSX_VAL_FLAG_PERSIST,
+    "STICKY": val_const.HSX_VAL_FLAG_STICKY,
+    "PIN": val_const.HSX_VAL_FLAG_PIN,
+    "BOOL": val_const.HSX_VAL_FLAG_BOOL,
+}
+
+_VALUE_AUTH_ALIASES = {
+    "PUBLIC": val_const.HSX_VAL_AUTH_PUBLIC,
+    "USER": val_const.HSX_VAL_AUTH_USER,
+    "ADMIN": val_const.HSX_VAL_AUTH_ADMIN,
+    "FACTORY": val_const.HSX_VAL_AUTH_FACTORY,
+}
+
+_COMMAND_FLAG_ALIASES = {
+    "PIN": cmd_const.HSX_CMD_FLAG_PIN,
+    "ASYNC": cmd_const.HSX_CMD_FLAG_ASYNC,
+}
+
+_COMMAND_AUTH_ALIASES = {
+    "PUBLIC": cmd_const.HSX_CMD_AUTH_PUBLIC,
+    "USER": cmd_const.HSX_CMD_AUTH_USER,
+    "ADMIN": cmd_const.HSX_CMD_AUTH_ADMIN,
+    "FACTORY": cmd_const.HSX_CMD_AUTH_FACTORY,
+}
 
 
 def regnum(tok):
@@ -43,6 +81,200 @@ def parse_int(token):
     if token.startswith("'") and token.endswith("'") and len(token) == 3:
         return ord(token[1])
     return int(token, 10)
+
+
+def _pop_any(mapping: Dict[str, Any], *keys: str) -> Any:
+    for key in keys:
+        if key in mapping:
+            return mapping.pop(key)
+    return None
+
+
+def _coerce_uint(name: str, value: Any, *, bits: int) -> int:
+    if value is None or value == "":
+        raise ValueError(f"{name} requires a value")
+    if isinstance(value, bool):
+        value = int(value)
+    if isinstance(value, (int, float)):
+        num = int(value)
+    elif isinstance(value, str):
+        try:
+            num = int(value, 0)
+        except ValueError as exc:
+            raise ValueError(f"{name} expects integer literal, got '{value}'") from exc
+    else:
+        raise ValueError(f"{name} expects integer literal, got {value!r}")
+    max_value = (1 << bits) - 1
+    if not (0 <= num <= max_value):
+        raise ValueError(f"{name} must be within 0..{max_value}")
+    return num
+
+
+def _coerce_float(name: str, value: Any) -> float:
+    if value is None or value == "":
+        raise ValueError(f"{name} requires a value")
+    if isinstance(value, bool):
+        return 1.0 if value else 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError as exc:
+            raise ValueError(f"{name} expects numeric literal, got '{value}'") from exc
+    raise ValueError(f"{name} expects numeric literal, got {value!r}")
+
+
+def _parse_flag_spec(raw: Any, aliases: Dict[str, int], field: str) -> int:
+    if raw is None or raw == "":
+        return 0
+    if isinstance(raw, bool):
+        return int(raw)
+    if isinstance(raw, (int, float)):
+        return int(raw)
+    if isinstance(raw, str):
+        mask = 0
+        tokens = [tok.strip().upper() for tok in re.split(r"[|]", raw) if tok.strip()]
+        if not tokens:
+            return 0
+        for tok in tokens:
+            value = aliases.get(tok)
+            if value is None:
+                raise ValueError(f"{field} uses unknown flag '{tok}'")
+            mask |= int(value)
+        return mask
+    raise ValueError(f"{field} expects integer or flag string, got {raw!r}")
+
+
+def _parse_auth_spec(raw: Any, aliases: Dict[str, int], field: str) -> int:
+    if raw is None or raw == "":
+        return 0
+    if isinstance(raw, bool):
+        return int(raw)
+    if isinstance(raw, (int, float)):
+        return int(raw)
+    if isinstance(raw, str):
+        token = raw.strip().upper()
+        if not token:
+            return 0
+        value = aliases.get(token)
+        if value is None:
+            raise ValueError(f"{field} uses unknown token '{raw}'")
+        return int(value)
+    raise ValueError(f"{field} expects integer or auth token, got {raw!r}")
+
+
+def _normalize_value_metadata_entry(entry: Any) -> Dict[str, Any]:
+    if not isinstance(entry, dict):
+        raise ValueError(".value directive expects JSON object entries")
+    data = dict(entry)
+    result: Dict[str, Any] = {}
+    group_raw = _pop_any(data, "group", "group_id", "groupId")
+    if group_raw is None:
+        raise ValueError(".value entry requires group/group_id")
+    result["group"] = _coerce_uint("value metadata group", group_raw, bits=8)
+    value_raw = _pop_any(data, "id", "value", "value_id", "valueId")
+    if value_raw is None:
+        raise ValueError(".value entry requires id/value")
+    result["value"] = _coerce_uint("value metadata id", value_raw, bits=8)
+    group_name = _pop_any(data, "group_name", "groupName")
+    if group_name is not None:
+        result["group_name"] = str(group_name)
+    name_value = _pop_any(data, "name")
+    if name_value is not None:
+        result["name"] = str(name_value)
+    unit_value = _pop_any(data, "unit", "unit_name", "unitName")
+    if unit_value is not None:
+        result["unit"] = str(unit_value)
+    flags_raw = _pop_any(data, "flags")
+    if flags_raw is not None:
+        result["flags"] = _parse_flag_spec(flags_raw, _VALUE_FLAG_ALIASES, "value metadata flags")
+    auth_raw = _pop_any(data, "auth", "auth_level", "authLevel")
+    if auth_raw is not None:
+        result["auth"] = _parse_auth_spec(auth_raw, _VALUE_AUTH_ALIASES, "value metadata auth")
+    persist_key = _pop_any(data, "persist_key", "persist")
+    if persist_key is not None:
+        result["persist_key"] = _coerce_uint("value metadata persist_key", persist_key, bits=16)
+    init_raw = _pop_any(data, "init_raw")
+    if init_raw is not None:
+        result["init_raw"] = _coerce_uint("value metadata init_raw", init_raw, bits=16)
+    init_value = _pop_any(data, "init", "init_value")
+    if init_value is not None:
+        result["init"] = _coerce_float("value metadata init", init_value)
+    epsilon_raw = _pop_any(data, "epsilon_raw")
+    if epsilon_raw is not None:
+        result["epsilon_raw"] = _coerce_uint("value metadata epsilon_raw", epsilon_raw, bits=16)
+    epsilon_value = _pop_any(data, "epsilon")
+    if epsilon_value is not None:
+        result["epsilon"] = _coerce_float("value metadata epsilon", epsilon_value)
+    min_raw = _pop_any(data, "min_raw")
+    if min_raw is not None:
+        result["min_raw"] = _coerce_uint("value metadata min_raw", min_raw, bits=16)
+    min_value = _pop_any(data, "min")
+    if min_value is not None:
+        result["min"] = _coerce_float("value metadata min", min_value)
+    max_raw = _pop_any(data, "max_raw")
+    if max_raw is not None:
+        result["max_raw"] = _coerce_uint("value metadata max_raw", max_raw, bits=16)
+    max_value = _pop_any(data, "max")
+    if max_value is not None:
+        result["max"] = _coerce_float("value metadata max", max_value)
+    rate_ms = _pop_any(data, "rate_ms", "rateMs")
+    if rate_ms is not None:
+        result["rate_ms"] = _coerce_uint("value metadata rate_ms", rate_ms, bits=32)
+    for key, value in data.items():
+        if key not in result:
+            result[key] = value
+    return result
+
+
+def _normalize_command_metadata_entry(entry: Any) -> Dict[str, Any]:
+    if not isinstance(entry, dict):
+        raise ValueError(".cmd directive expects JSON object entries")
+    data = dict(entry)
+    result: Dict[str, Any] = {}
+    group_raw = _pop_any(data, "group", "group_id", "groupId")
+    if group_raw is None:
+        raise ValueError(".cmd entry requires group/group_id")
+    result["group"] = _coerce_uint("command metadata group", group_raw, bits=8)
+    cmd_raw = _pop_any(data, "id", "cmd", "cmd_id", "command_id", "commandId")
+    if cmd_raw is None:
+        raise ValueError(".cmd entry requires id/cmd")
+    result["cmd"] = _coerce_uint("command metadata id", cmd_raw, bits=8)
+    group_name = _pop_any(data, "group_name", "groupName")
+    if group_name is not None:
+        result["group_name"] = str(group_name)
+    name_value = _pop_any(data, "name")
+    if name_value is not None:
+        result["name"] = str(name_value)
+    help_value = _pop_any(data, "help")
+    if help_value is not None:
+        result["help"] = str(help_value)
+    flags_raw = _pop_any(data, "flags")
+    if flags_raw is not None:
+        result["flags"] = _parse_flag_spec(flags_raw, _COMMAND_FLAG_ALIASES, "command metadata flags")
+    auth_raw = _pop_any(data, "auth", "auth_level", "authLevel")
+    if auth_raw is not None:
+        result["auth"] = _parse_auth_spec(auth_raw, _COMMAND_AUTH_ALIASES, "command metadata auth")
+    handler_offset_raw = _pop_any(data, "handler_offset")
+    if handler_offset_raw is not None:
+        result["handler_offset"] = _coerce_uint("command metadata handler_offset", handler_offset_raw, bits=32)
+    handler_raw = _pop_any(data, "handler")
+    if handler_raw is not None:
+        if isinstance(handler_raw, (int, float, bool)):
+            result["handler_offset"] = _coerce_uint("command metadata handler", handler_raw, bits=32)
+        else:
+            handler_name = str(handler_raw).strip()
+            if not handler_name:
+                raise ValueError("command metadata handler cannot be empty")
+            result["handler"] = handler_name
+    reserved_value = _pop_any(data, "reserved")
+    if reserved_value is not None:
+        result["reserved"] = _coerce_uint("command metadata reserved", reserved_value, bits=32)
+    for key, value in data.items():
+        if key not in result:
+            result[key] = value
+    return result
 
 
 def sign12(val):
@@ -264,6 +496,9 @@ def assemble(lines, *, include_base: Path | None = None, for_object: bool = Fals
     labels = {}
     fixups = []
     relocs = []
+    metadata_mailboxes: List[Dict[str, Any]] = []
+    metadata_values: List[Dict[str, Any]] = []
+    metadata_commands: List[Dict[str, Any]] = []
     entry_symbol = None
     externs = set()
     imports_decl = set()
@@ -359,6 +594,68 @@ def assemble(lines, *, include_base: Path | None = None, for_object: bool = Fals
             if len(parts) != 2:
                 raise ValueError(".import expects symbol")
             imports_decl.add(parts[1])
+            continue
+        if lower.startswith('.mailbox'):
+            parts = line.split(None, 1)
+            if len(parts) != 2:
+                raise ValueError(".mailbox expects JSON payload")
+            payload_str = parts[1].strip()
+            try:
+                payload = json.loads(payload_str)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"Invalid .mailbox payload: {exc}") from exc
+
+            def _normalize_mailbox(entry: Any) -> Dict[str, Any]:
+                if not isinstance(entry, dict):
+                    raise ValueError(".mailbox entry must be a JSON object")
+                normalized = dict(entry)
+                target = normalized.get("target") or normalized.get("name")
+                if not isinstance(target, str) or not target.strip():
+                    raise ValueError(".mailbox entry requires a non-empty 'target'")
+                normalized["target"] = target.strip()
+                return normalized
+
+            if isinstance(payload, list):
+                if not payload:
+                    raise ValueError(".mailbox JSON array must contain at least one entry")
+                for item in payload:
+                    metadata_mailboxes.append(_normalize_mailbox(item))
+            else:
+                metadata_mailboxes.append(_normalize_mailbox(payload))
+            continue
+        if lower.startswith('.value'):
+            parts = line.split(None, 1)
+            if len(parts) != 2:
+                raise ValueError(".value expects JSON payload")
+            payload_str = parts[1].strip()
+            try:
+                payload = json.loads(payload_str)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"Invalid .value payload: {exc}") from exc
+            if isinstance(payload, list):
+                if not payload:
+                    raise ValueError(".value JSON array must contain at least one entry")
+                for item in payload:
+                    metadata_values.append(_normalize_value_metadata_entry(item))
+            else:
+                metadata_values.append(_normalize_value_metadata_entry(payload))
+            continue
+        if lower.startswith('.cmd'):
+            parts = line.split(None, 1)
+            if len(parts) != 2:
+                raise ValueError(".cmd expects JSON payload")
+            payload_str = parts[1].strip()
+            try:
+                payload = json.loads(payload_str)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"Invalid .cmd payload: {exc}") from exc
+            if isinstance(payload, list):
+                if not payload:
+                    raise ValueError(".cmd JSON array must contain at least one entry")
+                for item in payload:
+                    metadata_commands.append(_normalize_command_metadata_entry(item))
+            else:
+                metadata_commands.append(_normalize_command_metadata_entry(payload))
             continue
         if lower.startswith('.entry'):
             if section != SECTION_TEXT:
@@ -485,7 +782,7 @@ def assemble(lines, *, include_base: Path | None = None, for_object: bool = Fals
         elif mnem == 'POP':
             rd = regnum(args[0])
             add_code_word(emit_word(op, rd, 0, 0, 0))
-        elif mnem in ('ADD', 'SUB', 'MUL', 'DIV', 'AND', 'OR', 'XOR', 'FADD', 'FSUB', 'FMUL', 'FDIV'):
+        elif mnem in ('ADD', 'SUB', 'MUL', 'DIV', 'AND', 'OR', 'XOR', 'LSL', 'LSR', 'ASR', 'ADC', 'SBC', 'FADD', 'FSUB', 'FMUL', 'FDIV'):
             rd, rs1, rs2 = regnum(args[0]), regnum(args[1]), regnum(args[2])
             add_code_word(emit_word(op, rd, rs1, rs2, 0))
         elif mnem in ('NOT', 'I2F', 'F2I'):
@@ -691,6 +988,17 @@ def assemble(lines, *, include_base: Path | None = None, for_object: bool = Fals
         for name, info in symtab.items()
     }
 
+    metadata: Dict[str, Any] = {}
+    if metadata_values:
+        metadata["values"] = metadata_values
+    if metadata_commands:
+        metadata["commands"] = metadata_commands
+    if metadata_mailboxes:
+        metadata["mailboxes"] = metadata_mailboxes
+
+    global LAST_METADATA
+    LAST_METADATA = json.loads(json.dumps(metadata)) if metadata else {}
+
     for sym in externs:
         if sym in labels:
             sec, offset = labels[sym]
@@ -717,7 +1025,20 @@ def write_hxe(code_words, entry, out_path, rodata=b"", bss_size=0, req_caps=0, f
         f.write(rodata)
 
 
-def write_hxo_object(out_path, *, code_words, rodata, entry, entry_symbol, externs, imports_decl, relocs, exports, local_symbols):
+def write_hxo_object(
+    out_path,
+    *,
+    code_words,
+    rodata,
+    entry,
+    entry_symbol,
+    externs,
+    imports_decl,
+    relocs,
+    exports,
+    local_symbols,
+    metadata: Dict[str, Any] | None = None,
+):
     obj = {
         "version": 1,
         "entry": entry,
@@ -730,6 +1051,8 @@ def write_hxo_object(out_path, *, code_words, rodata, entry, entry_symbol, exter
         "symbols": exports,
         "local_symbols": local_symbols,
     }
+    if metadata:
+        obj["metadata"] = metadata
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(obj, f, indent=2)
         f.write("\n")
@@ -755,7 +1078,8 @@ def main():
         include_base=input_path.parent,
         for_object=True,
     )
-    
+    metadata = LAST_METADATA
+
     if args.emit_hxe:
         # Convenience mode: create temporary .hxo and invoke linker
         import tempfile
@@ -776,6 +1100,7 @@ def main():
                 relocs=relocs,
                 exports=exports,
                 local_symbols=local_symbols,
+                metadata=metadata,
             )
             
             # Invoke linker to create .hxe from the temporary .hxo
@@ -810,6 +1135,7 @@ def main():
             relocs=relocs,
             exports=exports,
             local_symbols=local_symbols,
+            metadata=metadata,
         )
     if args.verbose:
         print(f"entry=0x{(entry or 0):08X} words={len(code)} bytes={len(code)*4} rodata={len(rodata)}")

@@ -1,2 +1,2 @@
-help [command]
-Show the command list, or display the contents of help/<command>.txt for detailed usage.
+help [command]
+Show the command list, or display the contents of help/<command>.txt for detailed usage.

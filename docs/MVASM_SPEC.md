@@ -35,6 +35,72 @@ main:
 | `.half v1, …` / `.hword` | literals | Emits 16-bit values. |
 | `.word v1, …` | literals or symbol refs | Emits 32-bit values. Symbol operands may use `symbol`, `lo16(symbol)`, `hi16(symbol)`, or `off16(symbol)` to request relocations. |
 | `.asciz "text"` / `.string "text"` | string literal | Emits UTF-8 bytes followed by `0x00`. Supports standard `\n`, `\r`, `\t`, `\\`, `\0`, `\xNN` escapes. |
+| `.value {…}` | JSON object/array | Declares value metadata consumed by the linker when emitting HXE metadata sections. See below. |
+| `.cmd {…}` | JSON object/array | Declares command metadata consumed by the linker when emitting HXE metadata sections. See below. |
+| `.mailbox {…}` | JSON object/array | Declares mailbox metadata to embed in the `.mailbox` section of the final HXE. See below. |
+
+**`.value` directive**
+
+The `.value` directive accepts a JSON object (or array of objects) that describes one declarative value entry. Keys mirror the loader schema and are case-sensitive. Required fields: `group`/`group_id`, `id`/`value`. Optional fields include `name`, `group_name`, `flags`, `auth`, `init`, `unit`, `epsilon`, `min`, `max`, and `persist_key`. Numeric values may be expressed as decimal or hexadecimal literals; floats use standard JSON syntax.
+
+Flag and auth strings are expanded automatically:
+
+| Field | Accepted tokens |
+|-------|-----------------|
+| `flags` | `RO`, `PERSIST`, `STICKY`, `PIN`, `BOOL` (combine with `|`) |
+| `auth`  | `PUBLIC`, `USER`, `ADMIN`, `FACTORY` |
+
+Example:
+
+```mvasm
+.value {
+  "group": 1,
+  "id": 5,
+  "name": "motor_rpm",
+  "group_name": "motor",
+  "unit": "rpm",
+  "flags": "PERSIST|PIN",
+  "auth": "USER",
+  "init": 0.0,
+  "epsilon": 0.1,
+  "min": 0.0,
+  "max": 8000.0,
+  "persist_key": 0x1205
+}
+```
+
+An array form (`.value [{...}, {...}]`) may be used to declare multiple entries in one directive.
+
+**`.cmd` directive**
+
+The `.cmd` directive mirrors `.value` but targets command metadata. Required fields: `group`/`group_id`, `id`/`cmd`. Optional fields include `name`, `group_name`, `flags`, `auth`, `handler`, and `help`. The `handler` field may be either an immediate code offset (`handler_offset`) or the name of a text-section symbol; the linker resolves symbol names to final offsets during HXE emission.
+
+Flag/auth tokens match the value directive except command flags support `PIN` and `ASYNC`.
+
+Example:
+
+```mvasm
+.cmd {
+  "group": 1,
+  "id": 7,
+  "name": "reset",
+  "group_name": "motor",
+  "flags": "PIN",
+  "auth": "ADMIN",
+  "handler": "do_reset",
+  "help": "Reset motor controller"
+}
+```
+
+**`.mailbox` directive**
+
+The assembler accepts JSON payloads to keep the grammar compact. The payload may be a single object or an array of objects. Each object maps to one mailbox descriptor in the output metadata. Example:
+
+```mvasm
+.mailbox {"target":"app:telemetry","capacity":96,"mode_mask":15}
+```
+
+Supported keys mirror the loader schema (`target`, `capacity`, `mode_mask`, `owner_pid`, `bindings`, `reserved`). The assembler normalises `target`/`name` and otherwise preserves the payload verbatim so higher-level tooling can extend the schema without changing MVASM syntax.
 
 ## Registers and Operands
 - HSX exposes 16 general-purpose registers `R0`–`R15`.
@@ -47,12 +113,90 @@ main:
 | Category | Mnemonics | Notes |
 |----------|-----------|-------|
 | Data movement | `LDI`, `LD`, `ST`, `MOV`, `LDB`, `LDH`, `STB`, `STH`, `LDI32`, `PUSH`, `POP` | `LDI32` consumes two words: the opcode followed by a 32-bit literal. Byte/halfword loads sign-extend. |
-| Integer ALU | `ADD`, `SUB`, `MUL`, `DIV`, `AND`, `OR`, `XOR`, `NOT`, `CMP` | All register-to-register; `CMP` writes condition codes in the PSW. |
+| Integer ALU | `ADD`, `SUB`, `MUL`, `DIV`, `AND`, `OR`, `XOR`, `NOT`, `CMP`, `LSL`, `LSR`, `ASR`, `ADC`, `SBC` | All register-to-register; `CMP` writes condition codes in the PSW. |
 | Control flow | `JMP`, `JZ`, `JNZ`, `CALL`, `RET`, `BRK` | `JZ/JNZ` test the provided register. `BRK` triggers a debugger stop. |
 | Floating/FP helpers | `FADD`, `FSUB`, `FMUL`, `FDIV`, `I2F`, `F2I` | Operate on f16 values stored in 32-bit registers. |
 | System services | `SVC mod, fn` | Encodes module/function IDs in the immediate field. Arguments travel in `R0`–`R3` per `docs/abi_syscalls.md`. |
 
-Opcode values follow `OPC` in `python/asm.py`; tooling should treat mnemonics as the public contract while opcode IDs remain stable for the VM decoder.
+Opcode values follow `OPCODES` in `python/opcodes.py`; tooling should treat mnemonics as the public contract while opcode IDs remain stable for the VM decoder.
+
+`LSL` and `LSR` treat the shift amount modulo 32 and always operate on the logical (zero-extended) source value. `ASR` performs an arithmetic right shift with sign extension using the same modulo-32 shift amount.
+
+## Processor Status Word (PSW)
+
+The MiniVM tracks condition codes in the low nibble of `PSW`:
+
+| Bit | Flag | Meaning | Updated by |
+|-----|------|---------|------------|
+| 0 | `Z` | Zero | All ALU/logic ops (set when result == 0) |
+| 1 | `C` | Carry / !borrow | `ADD`, `SUB`, `CMP`, shifts (when shift > 0), `MUL` (set if high 32 bits non-zero) |
+| 2 | `N` | Negative | All ALU/logic ops (mirrors bit 31 of the result) |
+| 3 | `V` | Signed overflow | `ADD`, `SUB`, `CMP`, `MUL` |
+
+- `SUB`, `SBC`, and `CMP` set `C = 1` when no borrow occurs (`Rsrc1 >= Rsrc2 + borrow_in`), making it safe to cascade for multi-precision arithmetic.
+- `ADC` consumes the incoming carry (`C`) as a +1 term; `SBC` treats `C` as "no borrow yet" (borrow-in = `1 - C`). A common pattern for cascading wide arithmetic is:
+  ```
+  ; accumulate sum
+  ADD Rd_lo, Ra_lo, Rb_lo
+  ADC Rd_hi, Ra_hi, Rb_hi
+
+  ; convert carry flag to boolean
+  LDI Rtmp, 0
+  ADC Rcarry, Rtmp, Rtmp    ; Rcarry becomes 0 or 1
+
+  ; convert borrow flag to boolean
+  SBC RborrowTmp, Rtmp, Rtmp ; writes 0 or 0xFFFFFFFF depending on borrow
+  LDI Rshift, 31
+  LSR Rborrow, RborrowTmp, Rshift
+  ```
+- Logical operations (`AND`, `OR`, `XOR`, `NOT`) clear `C` and `V`. Shift instructions clear `V` and set `C` to the last bit shifted out when the amount is non-zero.
+- Branch instructions currently test `Z` (`JZ` / `JNZ`); future opcodes may consume the other flags.
+- `DIV` performs signed 32-bit integer division with truncation toward zero; divide-by-zero halts execution and latches `HSX_ERR_DIV_ZERO` in `R0`.
+
+## Opcode Table
+
+| Opcode | Mnemonic | Description |
+| ------ | -------- | ----------- |
+| 0x01 | `LDI` | Load 12-bit immediate into `Rd` |
+| 0x02 | `LD` | Load 32-bit word from `[Rs1 + imm]` into `Rd` |
+| 0x03 | `ST` | Store 32-bit word from `Rs2` into `[Rs1 + imm]` |
+| 0x04 | `MOV` | Copy `Rs1` into `Rd` |
+| 0x06 | `LDB` | Load byte from `[Rs1 + imm]` (zero-extend) |
+| 0x07 | `LDH` | Load halfword from `[Rs1 + imm]` (zero-extend) |
+| 0x08 | `STB` | Store byte from `Rs2` into `[Rs1 + imm]` |
+| 0x09 | `STH` | Store halfword from `Rs2` into `[Rs1 + imm]` |
+| 0x10 | `ADD` | Integer addition |
+| 0x11 | `SUB` | Integer subtraction |
+| 0x12 | `MUL` | Integer multiplication |
+| 0x13 | `DIV` | Integer division (traps on divide-by-zero) |
+| 0x14 | `AND` | Bitwise AND |
+| 0x15 | `OR` | Bitwise OR |
+| 0x16 | `XOR` | Bitwise XOR |
+| 0x17 | `NOT` | Bitwise invert |
+| 0x20 | `CMP` | Compare registers (sets NZCV) |
+| 0x21 | `JMP` | Unconditional jump |
+| 0x22 | `JZ` | Jump if zero flag set |
+| 0x23 | `JNZ` | Jump if zero flag clear |
+| 0x24 | `CALL` | Subroutine call |
+| 0x25 | `RET` | Return from subroutine |
+| 0x30 | `SVC` | Supervisor call (module/function encoded in imm) |
+| 0x31 | `LSL` | Logical left shift |
+| 0x32 | `LSR` | Logical right shift |
+| 0x33 | `ASR` | Arithmetic right shift |
+| 0x34 | `ADC` | Add with carry |
+| 0x35 | `SBC` | Subtract with borrow |
+| 0x40 | `PUSH` | Push register onto stack |
+| 0x41 | `POP` | Pop register from stack |
+| 0x50 | `FADD` | Float16 addition |
+| 0x51 | `FSUB` | Float16 subtraction |
+| 0x52 | `FMUL` | Float16 multiplication |
+| 0x53 | `FDIV` | Float16 division |
+| 0x54 | `I2F` | Convert integer to float16 |
+| 0x55 | `F2I` | Convert float16 to integer |
+| 0x60 | `LDI32` | Load 32-bit immediate (two-word encoding) |
+| 0x7F | `BRK` | Breakpoint / trap to debugger |
+
+The assembler (`python/asm.py`) and disassembler (`python/disasm_util.py`) expose matching opcode dictionaries; automated tests keep the mapping in sync with the VM implementation.
 
 ## Labels and Relocations
 - Labels end with `:` and bind to the current section offset.
@@ -69,7 +213,7 @@ Refer to `docs/abi_syscalls.md` for definitive module/function tables and argume
 
 ## Example
 ```
-.include "stdlib.mvasm"
+.include "lib/hsx_std/stdlib.mvasm"
 .text
 .entry main
 main:

@@ -1,19 +1,19 @@
-usage: dbg <command>
-
-Commands:
-  attach <pid>           attach debugger to PID and report register snapshot
-  detach <pid>           detach debugger from PID and clear breakpoints
-  regs <pid>             display registers for PID
-  cont <pid> [cycles]    continue execution; optional cycle budget (default 1000)
-  step <pid> [count]     execute count instructions (default 1)
-  break <pid>            request an asynchronous break at next instruction
-  bp list <pid>          list software breakpoints for PID
-  bp add <pid> <addr>    add breakpoint at address (hex or decimal)
-  bp remove <pid> <addr> remove breakpoint at address
-
-Examples:
-  dbg attach 1
-  dbg bp add 1 0x120
-  dbg cont 1
-  dbg step 1 5
-  dbg regs 1
+usage: dbg <command>
+
+Commands:
+  attach <pid>           attach debugger to PID and report register snapshot
+  detach <pid>           detach debugger from PID and clear breakpoints
+  regs <pid>             display registers for PID
+  cont <pid> [cycles]    continue execution; optional cycle budget (default 1000)
+  step <pid> [count]     execute count instructions (default 1)
+  break <pid>            request an asynchronous break at next instruction
+  bp list <pid>          list software breakpoints for PID
+  bp add <pid> <addr>    add breakpoint at address (hex or decimal)
+  bp remove <pid> <addr> remove breakpoint at address
+
+Examples:
+  dbg attach 1
+  dbg bp add 1 0x120
+  dbg cont 1
+  dbg step 1 5
+  dbg regs 1

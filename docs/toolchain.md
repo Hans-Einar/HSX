@@ -13,6 +13,7 @@ v0.2.0 (2025-10-30)
 - Mailbox (SVC 0x05) and stdio bindings with shell listen/send, fan-out policies, and sample producer/consumer programs in both Python and C.
 - Continuous integration targets via `make`: virtualenv/bootstrap helpers, packaging/release scripts, and auto-discovered examples/tests pipelines.
 - Pytest coverage for IR->ASM translation, VM execution (exit codes, mailboxes, stdio), and mailbox manager behaviors.
+- Portable debug workflow for reproducible builds (prefix-map, `.sym`, `sources.json`); see `docs/portable_debug_workflow.md`.
 
 ## Known Limitations
 - Register allocation remains linear-scan-less; complex SSA fragments can exhaust the temporary pool and require manual structuring.

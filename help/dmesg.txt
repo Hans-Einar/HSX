@@ -1,6 +1,11 @@
-dmesg [limit]
-Show recent VM/executive log entries. Provide an optional integer to limit the number of records returned.
+dmesg [limit] [session <id|number>]
+Show recent VM/executive log entries. Provide an optional integer to limit
+the number of records returned. Use the optional ``session`` filter to show
+only events associated with a specific session (see the ``session`` command
+for listing session numbers/ids).
 
 Examples
-  dmesg        # show all buffered messages
-  dmesg 20     # show only the latest 20 entries
+  dmesg                # show all buffered messages
+  dmesg 20             # show only the latest 20 entries
+  dmesg session 3      # show logs for session number 3
+  dmesg 50 session id:5c3b...  # show last 50 entries for a specific session

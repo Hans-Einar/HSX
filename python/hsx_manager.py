@@ -19,6 +19,7 @@ Commands (type `help` after launching for the list):
 
 
 import argparse
+import atexit
 import json
 import os
 import shlex
@@ -28,29 +29,51 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+import threading
 from typing import Callable, Dict, List, Optional
+
+from executive_session import ExecutiveSession, ExecutiveSessionError
 
 DEFAULT_VM_PORT = 9999
 DEFAULT_EXEC_PORT = 9998
 
+_EXEC_SESSION: Optional[ExecutiveSession] = None
+_EXEC_SESSION_LOCK = threading.Lock()
+
+
+def _ensure_exec_session(host: str, port: int) -> ExecutiveSession:
+    global _EXEC_SESSION
+    with _EXEC_SESSION_LOCK:
+        if _EXEC_SESSION and (_EXEC_SESSION.host != host or _EXEC_SESSION.port != port):
+            _EXEC_SESSION.close()
+            _EXEC_SESSION = None
+        if _EXEC_SESSION is None:
+            _EXEC_SESSION = ExecutiveSession(
+                host,
+                port,
+                client_name="hsx-manager",
+                features=["events", "stack", "symbols", "disasm"],
+                max_events=128,
+            )
+        return _EXEC_SESSION
+
+
+def _close_exec_session() -> None:
+    global _EXEC_SESSION
+    with _EXEC_SESSION_LOCK:
+        if _EXEC_SESSION is not None:
+            _EXEC_SESSION.close()
+            _EXEC_SESSION = None
+
+
+atexit.register(_close_exec_session)
+
 
 def send_exec_request(host: str, port: int, payload: Dict[str, object]) -> Dict[str, object]:
-    payload = dict(payload)
-    payload.setdefault("version", 1)
-    with socket.create_connection((host, port), timeout=5.0) as sock:
-        with sock.makefile("w", encoding="utf-8", newline="\n") as wfile, sock.makefile(
-            "r", encoding="utf-8", newline="\n"
-        ) as rfile:
-            wfile.write(json_dumps(payload) + "\n")
-            wfile.flush()
-            line = rfile.readline()
-            if not line:
-                raise RuntimeError("executive closed connection")
-            return json.loads(line)
-
-
-def json_dumps(obj: object) -> str:
-    return json.dumps(obj, separators=(",", ":"))
+    session = _ensure_exec_session(host, port)
+    cmd = str(payload.get("cmd", "")).lower()
+    use_session = not cmd.startswith("session.")
+    return session.request(payload, use_session=use_session)
 
 
 class ManagedProcess:
@@ -222,6 +245,53 @@ class Manager:
         resp = send_exec_request(self.host, self.exec_port, payload)
         print(json.dumps(resp, indent=2, sort_keys=True))
 
+    def stack(self, pid: int, frames: int = 6) -> None:
+        session = _ensure_exec_session(self.host, self.exec_port)
+        try:
+            info = session.stack_info(pid, max_frames=frames)
+        except ExecutiveSessionError as exc:
+            print(f"[stack] error: {exc}")
+            return
+        if not info:
+            if session.supports_stack():
+                print(f"[stack] pid {pid}: no stack data")
+            else:
+                print("[stack] feature disabled by executive")
+            return
+        frames_block = info.get("frames") or []
+        truncated = "yes" if info.get("truncated") else "no"
+        print(f"[stack] pid {pid} (frames={len(frames_block)} truncated={truncated})")
+        for idx, frame in enumerate(frames_block):
+            pc = frame.get("pc", 0)
+            func = frame.get("func_name")
+            if not func:
+                symbol = frame.get("symbol")
+                if isinstance(symbol, dict):
+                    func = symbol.get("name")
+            offset = frame.get("func_offset")
+            if func:
+                if isinstance(offset, int) and offset:
+                    func_label = f"{func}+0x{offset:X}"
+                else:
+                    func_label = func
+            else:
+                func_label = f"0x{pc & 0xFFFF:04X}"
+            line_info = frame.get("line")
+            file_line = ""
+            if isinstance(line_info, dict):
+                file = line_info.get("file")
+                line_no = line_info.get("line")
+                if file and line_no is not None:
+                    file_line = f" {file}:{line_no}"
+                elif file:
+                    file_line = f" {file}"
+            ret_pc = frame.get("return_pc")
+            ret_text = f" -> 0x{ret_pc & 0xFFFF:04X}" if isinstance(ret_pc, int) and ret_pc else ""
+            print(f"  [{idx:02}] {func_label} @ 0x{pc & 0xFFFF:04X}{file_line}{ret_text}")
+        errors = info.get("errors")
+        if isinstance(errors, list) and errors:
+            print(f"  errors: {', '.join(str(err) for err in errors)}")
+
     def shutdown_all(self) -> None:
         for name in ["shell", "exec", "vm"]:
             self.stop([name])
@@ -248,6 +318,7 @@ class Manager:
                     print("  restart [vm|exec|shell|console|all]")
                     print("  status")
                     print("  load <path>  (send load command to exec)")
+                    print("  stack <pid> [frames]")
                     print("  shell        (spawn shell client)")
                     print("  quit/exit")
                     continue
@@ -267,6 +338,23 @@ class Manager:
                         self.load(args[0])
                 elif cmd == "shell":
                     self.shell()
+                elif cmd == "stack":
+                    if not args:
+                        print("usage: stack <pid> [frames]")
+                    else:
+                        try:
+                            pid = int(args[0], 0)
+                        except ValueError:
+                            print("pid must be an integer")
+                            continue
+                        frames = 6
+                        if len(args) > 1:
+                            try:
+                                frames = int(args[1], 0)
+                            except ValueError:
+                                print("frames must be an integer")
+                                continue
+                        self.stack(pid, frames)
                 else:
                     print(f"unknown command '{cmd}'")
         finally:
@@ -360,3 +448,5 @@ if __name__ == "__main__":
     import json
 
     main()
+
+

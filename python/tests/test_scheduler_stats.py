@@ -17,9 +17,13 @@ def test_info_exposes_scheduler_counters_and_trace():
     info = controller.info()
     scheduler = info.get("scheduler", {})
     counters = scheduler.get("counters", {})
+    mailbox_counters = scheduler.get("mailbox_counters", {})
     trace = scheduler.get("trace", [])
 
     assert consumer["pid"] in counters
     assert producer["pid"] in counters
     assert counters[consumer["pid"]]["step"] > 0
+    assert consumer["pid"] in mailbox_counters
+    assert producer["pid"] in mailbox_counters
+    assert "MAILBOX_STEP" in mailbox_counters[consumer["pid"]]
     assert any(entry.get("event") == "rotate" for entry in trace)

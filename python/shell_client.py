@@ -4,11 +4,15 @@ import atexit
 import json
 import math
 import os
-import socket
 import sys
 from datetime import datetime
 from pathlib import Path
 import shlex
+import threading
+import time
+from typing import Any, Dict, Iterable, List, Optional, Sequence
+
+from executive_session import ExecutiveSession
 
 try:
     import readline  # type: ignore
@@ -33,12 +37,16 @@ HELP_ALIASES = {
 COMMAND_NAMES = sorted(
     [
         "attach",
+        "bp",
         "cd",
         "clock",
+        "cmd.call",
+        "cmd.list",
         "detach",
         "dbg",
         "dumpregs",
         "dmesg",
+        "events",
         "exec",
         "exit",
         "help",
@@ -60,13 +68,404 @@ COMMAND_NAMES = sorted(
         "resume",
         "save",
         "sched",
+        "session",
         "send",
         "shutdown",
         "stdio",
+        "disasm",
+        "stack",
+        "memory",
+        "watch",
+        "symbols",
+        "sym",
         "trace",
         "step",
+        "val.get",
+        "val.list",
+        "val.set",
     ]
 )
+
+_DEFAULT_EVENT_FILTER = {
+    "categories": [
+        "debug_break",
+        "scheduler",
+        "mailbox_wait",
+        "mailbox_wake",
+        "mailbox_timeout",
+        "mailbox_error",
+        "warning",
+        "stdout",
+        "stderr",
+    ]
+}
+
+_SESSION_MANAGER: Optional[ExecutiveSession] = None
+_SESSION_LOCK = threading.Lock()
+_EVENT_STREAM_STARTED = False
+_EVENT_STREAM_LOCK = threading.Lock()
+
+_CURRENT_HOST = "127.0.0.1"
+_CURRENT_PORT = 9998
+_COMPLETION_ENABLED = False
+
+_VALUE_CACHE: Dict[str, Any] = {"timestamp": 0.0, "entries": []}
+_COMMAND_CACHE: Dict[str, Any] = {"timestamp": 0.0, "entries": []}
+_CACHE_LOCK = threading.Lock()
+_CACHE_TTL_SECONDS = 1.0
+_LAST_VALUE_CONTEXT: Dict[str, Any] = {}
+_LAST_COMMAND_CONTEXT: Dict[str, Any] = {}
+_SESSION_INDEX_LOCK = threading.Lock()
+_SESSION_INDEX_CACHE: Dict[int, str] = {}
+_SESSION_CMD_CONTEXT: Dict[str, Any] = {}
+def _set_session_context(op: str, **extra: Any) -> None:
+    _SESSION_CMD_CONTEXT.clear()
+    _SESSION_CMD_CONTEXT["op"] = op
+    _SESSION_CMD_CONTEXT.update(extra)
+
+
+def _ensure_session(host: str, port: int, *, auto_events: bool = False) -> ExecutiveSession:
+    global _SESSION_MANAGER
+    with _SESSION_LOCK:
+        if _SESSION_MANAGER and (_SESSION_MANAGER.host != host or _SESSION_MANAGER.port != port):
+            _SESSION_MANAGER.close()
+            _SESSION_MANAGER = None
+        if _SESSION_MANAGER is None:
+            _SESSION_MANAGER = ExecutiveSession(
+                host,
+                port,
+                client_name="hsx-shell",
+                features=["events", "stack", "symbols", "memory", "watch", "disasm"],
+                max_events=256,
+            )
+        session = _SESSION_MANAGER
+    if auto_events:
+        session.start_event_stream(filters=_DEFAULT_EVENT_FILTER, callback=None, ack_interval=5)
+    return session
+
+
+def _ensure_event_stream(session: ExecutiveSession) -> None:
+    global _EVENT_STREAM_STARTED
+    with _EVENT_STREAM_LOCK:
+        if _EVENT_STREAM_STARTED:
+            return
+        _EVENT_STREAM_STARTED = True
+
+    def _runner() -> None:
+        global _EVENT_STREAM_STARTED
+        try:
+            ok = session.start_event_stream(filters=_DEFAULT_EVENT_FILTER, callback=None, ack_interval=5)
+        except Exception as exc:  # pragma: no cover - diagnostic helper
+            print(f"[events] failed to subscribe: {exc}")
+            with _EVENT_STREAM_LOCK:
+                _EVENT_STREAM_STARTED = False
+        else:
+            if not ok:
+                print("[events] streaming unavailable (executive declined feature)")
+                with _EVENT_STREAM_LOCK:
+                    _EVENT_STREAM_STARTED = False
+
+    threading.Thread(target=_runner, name="hsx-shell-events-init", daemon=True).start()
+
+
+def _close_session() -> None:
+    global _SESSION_MANAGER
+    global _EVENT_STREAM_STARTED
+    with _SESSION_LOCK:
+        if _SESSION_MANAGER is not None:
+            _SESSION_MANAGER.close()
+            _SESSION_MANAGER = None
+    with _EVENT_STREAM_LOCK:
+        _EVENT_STREAM_STARTED = False
+
+
+atexit.register(_close_session)
+
+
+def _update_completion_target(host: str, port: int) -> None:
+    global _CURRENT_HOST, _CURRENT_PORT
+    _CURRENT_HOST = host
+    _CURRENT_PORT = port
+
+
+def _try_parse_int(token: Any) -> Optional[int]:
+    if isinstance(token, int):
+        return int(token)
+    if isinstance(token, str):
+        try:
+            return int(token, 0)
+        except ValueError:
+            return None
+    return None
+
+
+def _require_int(token: Any, label: str) -> int:
+    value = _try_parse_int(token)
+    if value is None:
+        raise ValueError(f"{label} must be an integer value")
+    return value
+
+
+def _format_entry_label(entry: Dict[str, Any], *, kind: str) -> str:
+    name = entry.get("name")
+    group = entry.get("group_name")
+    group_id = entry.get("group_id")
+    entry_id = entry.get("value_id" if kind == "value" else "cmd_id")
+    oid = entry.get("oid")
+    label_parts: list[str] = []
+    if isinstance(group, str) and group:
+        label_parts.append(group)
+    elif isinstance(group_id, int):
+        label_parts.append(str(group_id))
+    if isinstance(name, str) and name:
+        label_parts.append(name)
+    elif isinstance(entry_id, int):
+        label_parts.append(str(entry_id))
+    label = ":".join(label_parts) if label_parts else str(oid)
+    if isinstance(oid, int):
+        label += f" (oid=0x{oid & 0xFFFF:04X})"
+    return label
+
+
+def _load_registry_entries(kind: str, host: str, port: int, *, force: bool = False) -> List[Dict[str, Any]]:
+    cache = _VALUE_CACHE if kind == "value" else _COMMAND_CACHE
+    now = time.monotonic()
+    with _CACHE_LOCK:
+        if not force and cache.get("entries") and now - cache.get("timestamp", 0.0) < _CACHE_TTL_SECONDS:
+            return list(cache["entries"])
+    cmd = "val.list" if kind == "value" else "cmd.list"
+    key = "values" if kind == "value" else "commands"
+    try:
+        response = send_request(host, port, {"cmd": cmd})
+    except Exception:
+        with _CACHE_LOCK:
+            return list(cache.get("entries", []))
+    entries = response.get(key) if isinstance(response, dict) else None
+    if response.get("status") != "ok" or not isinstance(entries, list):
+        entries = []
+    with _CACHE_LOCK:
+        cache["entries"] = entries
+        cache["timestamp"] = now
+    return list(entries)
+
+
+def _invalidate_value_cache() -> None:
+    with _CACHE_LOCK:
+        _VALUE_CACHE["entries"] = []
+        _VALUE_CACHE["timestamp"] = 0.0
+
+
+def _invalidate_command_cache() -> None:
+    with _CACHE_LOCK:
+        _COMMAND_CACHE["entries"] = []
+        _COMMAND_CACHE["timestamp"] = 0.0
+
+
+def _match_registry_entries(
+    entries: Iterable[Dict[str, Any]],
+    identifier: str,
+    *,
+    kind: str,
+) -> List[Dict[str, Any]]:
+    normalized = identifier.strip()
+    if not normalized:
+        return []
+
+    matches: List[Dict[str, Any]] = []
+    oid_value = _try_parse_int(normalized)
+    if oid_value is not None:
+        for entry in entries:
+            entry_oid = _try_parse_int(entry.get("oid"))
+            if entry_oid == oid_value:
+                matches.append(entry)
+        if matches:
+            return matches
+
+    group_token: Optional[str] = None
+    value_token = normalized
+    if ":" in normalized:
+        parts = normalized.split(":", 1)
+        group_token = parts[0].strip()
+        value_token = parts[1].strip()
+
+    group_int = _try_parse_int(group_token) if group_token else None
+    group_str = group_token.lower() if isinstance(group_token, str) else None
+    value_int = _try_parse_int(value_token)
+    value_str = value_token.lower()
+
+    id_key = "value_id" if kind == "value" else "cmd_id"
+
+    for entry in entries:
+        group_id = _try_parse_int(entry.get("group_id"))
+        entry_group_name = entry.get("group_name")
+        entry_id = _try_parse_int(entry.get(id_key))
+        entry_name = entry.get("name")
+
+        if group_token is not None:
+            if group_int is not None:
+                if group_id != group_int:
+                    continue
+            else:
+                if not isinstance(entry_group_name, str) or entry_group_name.lower() != group_str:
+                    continue
+
+        if value_int is not None:
+            if entry_id != value_int:
+                continue
+        else:
+            if not isinstance(entry_name, str) or entry_name.lower() != value_str:
+                continue
+        matches.append(entry)
+
+    return matches
+
+
+def _resolve_registry_identifier(
+    identifier: str,
+    *,
+    host: str,
+    port: int,
+    kind: str,
+) -> Dict[str, Any]:
+    entries = _load_registry_entries(kind, host, port, force=False)
+    matches = _match_registry_entries(entries, identifier, kind=kind)
+    if not matches:
+        entries = _load_registry_entries(kind, host, port, force=True)
+        matches = _match_registry_entries(entries, identifier, kind=kind)
+    if not matches:
+        raise ValueError(f"unknown {kind} '{identifier}'")
+    if len(matches) > 1:
+        labels = ", ".join(_format_entry_label(entry, kind=kind) for entry in matches)
+        raise ValueError(f"{kind} identifier '{identifier}' is ambiguous ({labels})")
+    return matches[0]
+
+
+def _resolve_value_identifier(identifier: str, *, host: str, port: int) -> Dict[str, Any]:
+    return _resolve_registry_identifier(identifier, host=host, port=port, kind="value")
+
+
+def _resolve_command_identifier(identifier: str, *, host: str, port: int) -> Dict[str, Any]:
+    return _resolve_registry_identifier(identifier, host=host, port=port, kind="command")
+
+
+def _value_completion_candidates(host: str, port: int) -> List[str]:
+    entries = _load_registry_entries("value", host, port, force=False)
+    suggestions: list[str] = []
+    seen: set[str] = set()
+    for entry in entries:
+        oid = _try_parse_int(entry.get("oid"))
+        group_id = _try_parse_int(entry.get("group_id"))
+        value_id = _try_parse_int(entry.get("value_id"))
+        name = entry.get("name")
+        group_name = entry.get("group_name")
+        candidates: list[str] = []
+        if isinstance(name, str) and name:
+            candidates.append(name)
+        if isinstance(group_name, str) and group_name and isinstance(name, str) and name:
+            candidates.append(f"{group_name}:{name}")
+        if group_id is not None and value_id is not None:
+            candidates.append(f"{group_id}:{value_id}")
+        if oid is not None:
+            candidates.append(str(oid))
+            candidates.append(f"0x{oid & 0xFFFF:04X}")
+        for candidate in candidates:
+            if candidate and candidate not in seen:
+                seen.add(candidate)
+                suggestions.append(candidate)
+    return sorted(suggestions)
+
+
+def _command_completion_candidates(host: str, port: int) -> List[str]:
+    entries = _load_registry_entries("command", host, port, force=False)
+    suggestions: list[str] = []
+    seen: set[str] = set()
+    for entry in entries:
+        oid = _try_parse_int(entry.get("oid"))
+        group_id = _try_parse_int(entry.get("group_id"))
+        cmd_id = _try_parse_int(entry.get("cmd_id"))
+        name = entry.get("name")
+        group_name = entry.get("group_name")
+        candidates: list[str] = []
+        if isinstance(name, str) and name:
+            candidates.append(name)
+        if isinstance(group_name, str) and group_name and isinstance(name, str) and name:
+            candidates.append(f"{group_name}:{name}")
+        if group_id is not None and cmd_id is not None:
+            candidates.append(f"{group_id}:{cmd_id}")
+        if oid is not None:
+            candidates.append(str(oid))
+            candidates.append(f"0x{oid & 0xFFFF:04X}")
+        for candidate in candidates:
+            if candidate and candidate not in seen:
+                seen.add(candidate)
+                suggestions.append(candidate)
+    return sorted(suggestions)
+
+
+def _configure_completion(host: str, port: int) -> None:
+    if readline is None:
+        return
+    _update_completion_target(host, port)
+    global _COMPLETION_ENABLED
+    if not _COMPLETION_ENABLED:
+        try:
+            readline.set_completer(_readline_complete)  # type: ignore[attr-defined]
+        except Exception:
+            return
+        try:
+            readline.parse_and_bind("tab: complete")  # type: ignore[attr-defined]
+        except Exception:
+            pass
+        _COMPLETION_ENABLED = True
+
+
+def _readline_complete(text: str, state: int) -> Optional[str]:
+    if readline is None:
+        return None
+    try:
+        buffer = readline.get_line_buffer()  # type: ignore[attr-defined]
+        endidx = readline.get_endidx()  # type: ignore[attr-defined]
+    except Exception:
+        buffer = ""
+        endidx = 0
+    prefix = buffer[:endidx]
+    trailing_space = prefix.endswith(" ")
+    tokens = prefix.split()
+    if trailing_space:
+        tokens.append("")
+
+    candidates: List[str] = []
+    try:
+        if not tokens:
+            base = COMMAND_NAMES
+            candidates = [cmd for cmd in base if cmd.startswith(text)]
+        elif len(tokens) == 1 and not trailing_space:
+            base = COMMAND_NAMES
+            candidates = [cmd for cmd in base if cmd.startswith(text)]
+        else:
+            command = tokens[0]
+            arg_index = len(tokens) - 1
+            base: List[str] = []
+            if command in {"val.get", "val.set", "val.list"} and arg_index == 1:
+                base = _value_completion_candidates(_CURRENT_HOST, _CURRENT_PORT)
+            elif command in {"cmd.call", "cmd.list"} and arg_index == 1:
+                base = _command_completion_candidates(_CURRENT_HOST, _CURRENT_PORT)
+            elif command == "cmd.call" and arg_index >= 2:
+                base = ["--async", "--pid"]
+            elif command in {"val.get", "val.set", "val.list"} and arg_index >= 2:
+                base = ["--pid"]
+            else:
+                base = []
+            candidates = [option for option in base if option.startswith(text)]
+    except Exception:
+        candidates = []
+
+    candidates.sort()
+    if state < len(candidates):
+        return candidates[state]
+    return None
+
+
 def _command_usage(name: str) -> str:
     filename = HELP_ALIASES.get(name, name)
     path = HELP_DIR / f"{filename}.txt"
@@ -287,12 +686,15 @@ def _perform_load_sequence(
     *,
     verbose: bool = False,
     rpc_cmd: str = "load",
+    symbols: Optional[str] = None,
 ) -> list[tuple[Path, dict]]:
     outputs: list[tuple[Path, dict]] = []
     for path in paths:
         payload: dict[str, object] = {"cmd": rpc_cmd, "path": str(path)}
         if verbose:
             payload["verbose"] = True
+        if symbols and len(paths) == 1:
+            payload["symbols"] = symbols
         resp = send_request(host, port, payload)
         outputs.append((path, resp))
     return outputs
@@ -359,27 +761,417 @@ def _pretty_info(payload: dict) -> None:
         print(f"    throttle    : {clock.get('throttled')} ({clock.get('throttle_reason')})  last_wait_s: {clock.get('last_wait_s')}")
         print(f"    auto        : steps={clock.get('auto_steps')}  total={clock.get('auto_total_steps')}")
         print(f"    manual      : steps={clock.get('manual_steps')}  total={clock.get('manual_total_steps')}")
-    selected = info.get('selected_registers')
-    if isinstance(selected, dict):
-        print(f"  selected_pid: {info.get('selected_pid')}")
-        _render_register_block(selected, indent="  ")
-    scheduler = info.get('scheduler')
-    if isinstance(scheduler, dict):
-        counters = scheduler.get('counters')
-        trace = scheduler.get('trace')
-        if counters:
-            print("  scheduler counters:")
-            for pid, counts in counters.items():
-                print(f"    pid {pid}:")
-                for event, value in sorted(counts.items()):
-                    print(f"      {event:<8} : {value}")
-        if trace:
-            print("  scheduler trace (most recent first):")
-            for entry in reversed(trace):
-                pid_text = f" pid={entry['pid']}" if 'pid' in entry else ""
-                extra = {k: v for k, v in entry.items() if k not in {'event', 'ts', 'pid'}}
-                extra_text = f" {extra}" if extra else ""
-                print(f"    [{entry['event']}] ts={entry['ts']:.6f}{pid_text}{extra_text}")
+
+
+def _pretty_bp(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    pid = payload.get("pid")
+    breakpoints = payload.get("breakpoints", [])
+    print(f"breakpoints for pid {pid}:")
+    if not breakpoints:
+        print("  (none)")
+        return
+    for addr in breakpoints:
+        try:
+            addr_int = int(addr)
+        except (TypeError, ValueError):
+            print(f"  {addr}")
+        else:
+            print(f"  0x{addr_int:04X} ({addr_int})")
+
+
+def _pretty_events(events: list[dict]) -> None:
+    for event in events:
+        seq = event.get("seq", "-")
+        etype = event.get("type", "?")
+        pid = event.get("pid")
+        ts_value = event.get("ts")
+        if isinstance(ts_value, (int, float)):
+            timestamp = datetime.fromtimestamp(ts_value).strftime("%H:%M:%S")
+        else:
+            timestamp = "?"
+        data = event.get("data", {})
+        if etype == "task_state" and isinstance(data, dict):
+            prev_state = data.get("prev_state")
+            new_state = data.get("new_state")
+            reason = data.get("reason")
+            details = data.get("details")
+            detail_text = ""
+            if isinstance(details, dict) and details:
+                detail_text = ", ".join(f"{k}={details[k]}" for k in sorted(details))
+                detail_text = f" ({detail_text})"
+            reason_text = f" reason={reason}" if reason else ""
+            pid_text = "None" if pid is None else str(pid)
+            print(f"[{seq:>6}] {timestamp}  {etype:<16} pid={pid_text:<5}  {prev_state} -> {new_state}{reason_text}{detail_text}")
+            continue
+        if isinstance(data, dict):
+            data_items = ", ".join(f"{k}={data[k]}" for k in sorted(data))
+        else:
+            data_items = str(data)
+        pid_text = "None" if pid is None else str(pid)
+        print(f"[{seq:>6}] {timestamp}  {etype:<16} pid={pid_text:<5}  {data_items}")
+
+
+def _pretty_sym(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    if "symbols" in payload:
+        info = payload["symbols"]
+        if not info or not info.get("loaded"):
+            print(f"symbols for pid {info.get('pid', '?')}: (not loaded)")
+            return
+        print(f"symbols for pid {info.get('pid', '?')}:")
+        print(f"  path : {info.get('path')}")
+        print(f"  count: {info.get('count')}")
+        return
+    if "symbol" in payload:
+        symbol = payload.get("symbol")
+        if not symbol:
+            print("symbol: <not found>")
+            return
+        print("symbol:")
+        for key in ("name", "address", "offset", "size", "type", "file", "line"):
+            if key in symbol and symbol[key] is not None:
+                value = symbol[key]
+                if key in {"address", "offset", "size"}:
+                    try:
+                        value_int = int(value)
+                        value = f"0x{value_int:X} ({value_int})"
+                    except (TypeError, ValueError):
+                        pass
+                print(f"  {key:<7}: {value}")
+        return
+    if "line" in payload:
+        line = payload.get("line")
+        if not line:
+            print("line: <not found>")
+            return
+        print("line mapping:")
+        print(f"  file : {line.get('file')}")
+        print(f"  line : {line.get('line')}")
+        addr = line.get('address')
+        if isinstance(addr, int):
+            print(f"  addr : 0x{addr:X} ({addr})")
+        return
+    print(json.dumps(payload, indent=2, sort_keys=True))
+
+
+def _pretty_symbols(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    block = payload.get("symbols")
+    if not isinstance(block, dict):
+        print("symbols: <no data>")
+        return
+    pid = block.get("pid", "?")
+    sym_type = block.get("type") or "all"
+    total = block.get("count", 0)
+    try:
+        offset_value = int(block.get("offset", 0))
+    except (TypeError, ValueError):
+        offset_value = block.get("offset", 0)
+    limit = block.get("limit")
+    limit_text = "inf" if limit is None else str(limit)
+    print(f"symbols pid={pid} type={sym_type} count={total} offset={offset_value} limit={limit_text}")
+    entries = block.get("symbols") or []
+    if not entries:
+        print("  <no entries>")
+        return
+    for item in entries:
+        name = item.get("name", "<unnamed>")
+        address = item.get("address")
+        addr_text = "<unknown>"
+        if isinstance(address, int):
+            addr_text = f"0x{address:08X}"
+        elif isinstance(address, str):
+            try:
+                addr_text = f"0x{int(address, 0):08X}"
+            except ValueError:
+                addr_text = address
+        size = item.get("size")
+        try:
+            size_value = int(size) if size is not None else None
+        except (TypeError, ValueError):
+            size_value = None
+        size_text = "-" if size_value is None else str(size_value)
+        kind = item.get("type", "-")
+        file = item.get("file")
+        line = item.get("line")
+        details = []
+        if file:
+            details.append(str(file))
+        if line is not None:
+            details.append(f"line {line}")
+        suffix = f" ({', '.join(details)})" if details else ""
+        print(f"  {addr_text}  {size_text:>4}  {kind:<9}  {name}{suffix}")
+
+
+def _pretty_memory(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    block = payload.get("memory")
+    if not isinstance(block, dict):
+        print("memory: <no data>")
+        return
+    pid = block.get("pid", "?")
+    program = block.get("program")
+    header = f"memory pid={pid}"
+    if program:
+        header += f" program={program}"
+    print(header)
+    regions = block.get("regions") or []
+    if not regions:
+        print("  <no regions>")
+        return
+
+    def _fmt_addr(value: Any) -> str:
+        if isinstance(value, int):
+            return f"0x{value & 0xFFFF:04X}"
+        if value is None:
+            return "-"
+        return str(value)
+
+    for region in regions:
+        start_val = region.get("start")
+        end_val = region.get("end")
+        length_val = region.get("length")
+        perms = region.get("permissions", "-")
+        r_type = region.get("type", "-")
+        name = region.get("name", "")
+        start_text = _fmt_addr(start_val)
+        end_text = _fmt_addr(end_val)
+        if end_text == "-" and isinstance(start_val, int) and isinstance(length_val, int):
+            end_text = _fmt_addr((start_val + length_val) & 0xFFFF)
+        length_text = str(length_val) if isinstance(length_val, int) else str(length_val or "-")
+        details_parts: List[str] = []
+        source = region.get("source")
+        if isinstance(source, str):
+            details_parts.append(source)
+        detail_map = region.get("details")
+        if isinstance(detail_map, dict):
+            for key in sorted(detail_map):
+                value = detail_map[key]
+                if value is None:
+                    continue
+                if isinstance(value, int):
+                    details_parts.append(f"{key}=0x{value & 0xFFFF:04X}")
+                else:
+                    details_parts.append(f"{key}={value}")
+        suffix = f" ({', '.join(details_parts)})" if details_parts else ""
+        label = f" {name}" if name else ""
+        print(f"  {start_text}-{end_text} len={length_text:>5} {perms:<3} {r_type:<9}{label}{suffix}")
+
+
+def _pretty_watch(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    block = payload.get("watch")
+    if not isinstance(block, dict):
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    watches = block.get("watches")
+    if isinstance(watches, list):
+        pid = block.get("pid", "?")
+        count = block.get("count", len(watches))
+        print(f"watch pid={pid} count={count}")
+        if not watches:
+            print("  <no watches>")
+            return
+        for entry in watches:
+            _print_watch_entry(entry)
+        return
+    _print_watch_entry(block)
+
+
+def _print_watch_entry(entry: dict) -> None:
+    watch_id = entry.get("id", "?")
+    pid = entry.get("pid", "?")
+    expr = entry.get("expr", "")
+    wtype = entry.get("type", "-")
+    addr = entry.get("address")
+    length = entry.get("length", 0)
+    value = entry.get("value")
+    addr_text = f"0x{int(addr) & 0xFFFF:04X}" if isinstance(addr, int) else ("-" if addr is None else str(addr))
+    value_text = value if isinstance(value, str) else "-"
+    symbol = entry.get("symbol")
+    description = entry.get("description")
+    location = entry.get("location")
+    mode = entry.get("mode")
+    details: List[str] = []
+    if symbol:
+        details.append(f"symbol={symbol}")
+    if description and description != symbol:
+        details.append(description)
+    if location:
+        details.append(f"loc={location}")
+    if mode and mode not in {None, "memory"}:
+        details.append(f"mode={mode}")
+    suffix = f" ({', '.join(details)})" if details else ""
+    print(f"  id={watch_id} pid={pid} type={wtype:<7} addr={addr_text} len={length} value={value_text} expr={expr}{suffix}")
+
+
+def _pretty_stack(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    stack = payload.get("stack", {})
+    frames = []
+    truncated = False
+    errors = []
+    stack_base = None
+    stack_limit = None
+    stack_low = None
+    stack_high = None
+    initial_sp = None
+    initial_fp = None
+    if isinstance(stack, dict):
+        frames = stack.get("frames") or []
+        truncated = bool(stack.get("truncated"))
+        errors = stack.get("errors") or []
+        stack_base = stack.get("stack_base")
+        stack_limit = stack.get("stack_limit")
+        stack_low = stack.get("stack_low")
+        stack_high = stack.get("stack_high")
+        initial_sp = stack.get("initial_sp")
+        initial_fp = stack.get("initial_fp")
+    print("stack:")
+    if stack_base is not None or stack_limit is not None:
+        base_text = f"0x{int(stack_base) & 0xFFFFFFFF:08X}" if stack_base is not None else "-"
+        limit_text = f"0x{int(stack_limit) & 0xFFFFFFFF:08X}" if stack_limit is not None else "-"
+        low_text = f"0x{int(stack_low) & 0xFFFFFFFF:08X}" if stack_low is not None else "-"
+        high_text = f"0x{int(stack_high) & 0xFFFFFFFF:08X}" if stack_high is not None else "-"
+        print(f"  stack_base : {base_text}  stack_limit: {limit_text}")
+        print(f"  stack_low  : {low_text}  stack_high : {high_text}")
+    if initial_sp is not None or initial_fp is not None:
+        sp_text = f"0x{int(initial_sp) & 0xFFFFFFFF:08X}" if initial_sp is not None else "-"
+        fp_text = f"0x{int(initial_fp) & 0xFFFFFFFF:08X}" if initial_fp is not None else "-"
+        print(f"  initial_sp : {sp_text}  initial_fp : {fp_text}")
+    if not frames:
+        print("  (no frames)")
+    for idx, frame in enumerate(frames):
+        frame_idx = frame.get("index", idx)
+        pc = frame.get("pc", 0) or 0
+        sp = frame.get("sp")
+        fp = frame.get("fp")
+        line = f"[{frame_idx:02}] pc=0x{pc:08X}"
+        if sp is not None:
+            line += f" sp=0x{int(sp) & 0xFFFFFFFF:08X}"
+        if fp is not None:
+            line += f" fp=0x{int(fp) & 0xFFFFFFFF:08X}"
+        symbol = frame.get("symbol")
+        if isinstance(symbol, dict):
+            name = symbol.get("name")
+            offset = symbol.get("offset")
+            if name:
+                if offset:
+                    try:
+                        off_int = int(offset)
+                        line += f" {name}+0x{off_int:X}"
+                    except (TypeError, ValueError):
+                        line += f" {name}"
+                else:
+                    line += f" {name}"
+        print(line)
+        line_info = frame.get("line")
+        if isinstance(line_info, dict):
+            src = line_info.get("file")
+            lineno = line_info.get("line")
+            if src or lineno is not None:
+                print(f"       {src or '<unknown>'}:{lineno}")
+        ret_pc = frame.get("return_pc")
+        if isinstance(ret_pc, int):
+            print(f"       return -> 0x{ret_pc & 0xFFFFFFFF:08X}")
+    if truncated:
+        print("  ... truncated ...")
+    if errors:
+        print("  errors:")
+        for item in errors:
+            print(f"    - {item}")
+
+
+def _pretty_disasm(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    block = payload.get("disasm", {})
+    if not isinstance(block, dict):
+        print("disasm: <no data>")
+        return
+    print("disasm:")
+    pid = block.get("pid")
+    base = block.get("address")
+    count = block.get("count")
+    requested = block.get("requested")
+    mode = block.get("mode")
+    cached = block.get("cached")
+    truncated = block.get("truncated")
+    summary = []
+    if pid is not None:
+        summary.append(f"pid={pid}")
+    if base is not None:
+        summary.append(f"base=0x{int(base) & 0xFFFFFFFF:08X}")
+    if count is not None:
+        summary.append(f"count={count}")
+    if requested is not None and requested != count:
+        summary.append(f"requested={requested}")
+    if mode:
+        summary.append(f"mode={mode}")
+    if cached:
+        summary.append("cached")
+    if truncated:
+        summary.append("truncated")
+    if summary:
+        print(f"  {'; '.join(summary)}")
+    instructions = block.get("instructions") or []
+    if not instructions:
+        print("  (no instructions)")
+        return
+    for inst in instructions:
+        idx = inst.get("index")
+        idx_text = f"{idx:02}" if isinstance(idx, int) else "??"
+        pc = inst.get("pc")
+        if isinstance(pc, int):
+            heading = f"  [{idx_text}] 0x{pc & 0xFFFFFFFF:08X}:"
+        else:
+            heading = f"  [{idx_text}] ?:"
+        mnemonic = inst.get("mnemonic", "")
+        if mnemonic:
+            heading += f" {mnemonic}"
+        operands = inst.get("operands")
+        if operands:
+            heading += f" {operands}"
+        label = inst.get("label")
+        if not label:
+            symbol_block = inst.get("symbol")
+            if isinstance(symbol_block, dict):
+                label = symbol_block.get("name")
+        if label:
+            heading += f"    ; {label}"
+        print(heading)
+        details = []
+        target = inst.get("target")
+        if isinstance(target, int):
+            detail = f"target=0x{target & 0xFFFFFFFF:08X}"
+            target_symbol = inst.get("target_symbol")
+            if isinstance(target_symbol, dict) and target_symbol.get("name"):
+                detail += f" ({target_symbol['name']})"
+            details.append(detail)
+        line_info = inst.get("line")
+        if isinstance(line_info, dict):
+            src = line_info.get("file") or "<unknown>"
+            lineno = line_info.get("line")
+            if lineno is not None:
+                details.append(f"src={src}:{lineno}")
+            else:
+                details.append(f"src={src}")
+        if details:
+            print(f"       {'; '.join(details)}")
 
 
 def _pretty_ps(payload: dict) -> None:
@@ -462,9 +1254,73 @@ def _pretty_trace(payload: dict) -> None:
         print(json.dumps(payload, indent=2, sort_keys=True))
         return
     info = payload.get("trace", {})
+    if not isinstance(info, dict):
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    records = info.get("records")
+    if isinstance(records, list):
+        pid = info.get("pid")
+        count = info.get("count", len(records))
+        returned = info.get("returned", len(records))
+        capacity = info.get("capacity")
+        enabled = info.get("enabled")
+        print(f"trace records: pid={pid} returned={returned}/{count} capacity={capacity} enabled={enabled}")
+        if not records:
+            print("  (no trace records)")
+            return
+
+        def _fmt_hex(value: object, width: int = 4) -> str:
+            try:
+                intval = int(value) & ((1 << (width * 4)) - 1)
+                return f"0x{intval:0{width}X}"
+            except (TypeError, ValueError):
+                return str(value)
+
+        def _fmt_ts(value: object) -> str:
+            try:
+                return f"{float(value):.6f}"
+            except (TypeError, ValueError):
+                return str(value)
+
+        for rec in records:
+            if not isinstance(rec, dict):
+                print(f"  {rec}")
+                continue
+            seq = rec.get("seq")
+            ts = rec.get("ts")
+            pc = rec.get("pc")
+            opcode = rec.get("opcode")
+            next_pc = rec.get("next_pc")
+            flags = rec.get("flags")
+            steps = rec.get("steps")
+            changed = rec.get("changed_regs") or []
+            line = f"  seq={seq}"
+            if ts is not None:
+                line += f" ts={_fmt_ts(ts)}"
+            if pc is not None:
+                line += f" pc={_fmt_hex(pc, 4)}"
+            if opcode is not None:
+                line += f" opcode={_fmt_hex(opcode, 8)}"
+            if next_pc is not None:
+                line += f" next={_fmt_hex(next_pc, 4)}"
+            if flags is not None:
+                line += f" flags={_fmt_hex(flags, 2)}"
+            if steps is not None:
+                line += f" steps={steps}"
+            if changed:
+                line += f" changed={','.join(str(item) for item in changed)}"
+            print(line)
+        return
+
     print("trace:")
-    print(f"  pid     : {info.get('pid')}")
-    print(f"  enabled : {info.get('enabled')}")
+    if "pid" in info:
+        print(f"  pid     : {info.get('pid')}")
+    if "enabled" in info:
+        print(f"  enabled : {info.get('enabled')}")
+    if "buffer_size" in info:
+        print(f"  buffer  : {info.get('buffer_size')}")
+    if "changed_regs" in info and isinstance(info.get("changed_regs"), bool):
+        print(f"  changed_regs : {info.get('changed_regs')}")
 
 
 def _pretty_listen(payload: dict) -> None:
@@ -712,6 +1568,7 @@ def _pretty_sched(payload: dict) -> None:
         return
     sched = payload.get("scheduler", {})
     counters = sched.get("counters", {})
+    mailbox_counters = sched.get("mailbox_counters", {})
     trace = sched.get("trace", [])
     print("sched stats:")
     if counters:
@@ -722,6 +1579,14 @@ def _pretty_sched(payload: dict) -> None:
                 print(f"      {event:<8} : {value}")
     else:
         print("  counters: (none)")
+    if mailbox_counters:
+        print("  mailbox counters:")
+        for pid, entries in sorted(mailbox_counters.items()):
+            print(f"    pid {pid}:")
+            for event, value in sorted(entries.items()):
+                print(f"      {event:<14}: {value}")
+    else:
+        print("  mailbox counters: (none)")
     if trace:
         print("  trace (most recent first):")
         for entry in reversed(trace):
@@ -763,10 +1628,43 @@ def _pretty_dmesg(payload: dict) -> None:
         event_type = message
         if isinstance(event, dict):
             event_type = event.get("type", event_type)
-        print(f"  [{seq}] {pid_text} ({clock_text}) {timestamp} \"{level}\" \"{event_type}\"")
-        extra = {k: v for k, v in entry.items() if k not in {"ts", "level", "message", "seq", "clock_steps", "clock_cycles"}}
+        session_id = entry.get("session_id") or "-"
+        parts = [
+            f"[{seq}]",
+            timestamp,
+            level or "-",
+            f"pid={pid_text}",
+            f"session={session_id}",
+            f"clock={clock_text}",
+            f"event={event_type}",
+            f"msg={message}",
+        ]
+        extra = {
+            k: v
+            for k, v in entry.items()
+            if k
+            not in {
+                "ts",
+                "level",
+                "message",
+                "seq",
+                "clock_steps",
+                "clock_cycles",
+                "event",
+                "pid",
+            }
+        }
         if extra:
-            print(f"        {json.dumps(extra, sort_keys=True)}")
+            formatted = []
+            for key in sorted(extra.keys()):
+                value = extra[key]
+                if isinstance(value, (dict, list)):
+                    formatted.append(f"{key}={json.dumps(value, separators=(',', ':'), sort_keys=True)}")
+                else:
+                    formatted.append(f"{key}={value}")
+            if formatted:
+                parts.append(" ".join(formatted))
+        print("  " + " ".join(parts))
 
 
 _MAILBOX_NAMESPACE_NAMES = {
@@ -804,6 +1702,7 @@ def _pretty_mbox(payload: dict) -> None:
         print(json.dumps(payload, indent=2, sort_keys=True))
         return
     descriptors = payload.get("descriptors") or []
+    stats = payload.get("stats") or {}
     filter_pid = payload.get("_filter_pid")
     filter_namespace = payload.get("_filter_namespace")
     filtered: list[dict] = []
@@ -818,6 +1717,45 @@ def _pretty_mbox(payload: dict) -> None:
             continue
         filtered.append(desc)
     print("mbox:")
+    if stats:
+        max_desc = stats.get("max_descriptors")
+        active_desc = stats.get("active_descriptors")
+        free_desc = stats.get("free_descriptors")
+        bytes_used = stats.get("bytes_used")
+        bytes_available = stats.get("bytes_available")
+        queue_depth = stats.get("queue_depth")
+        total_handles = stats.get("handles_total")
+        handle_limit = stats.get("handle_limit_per_pid")
+        print("  summary:")
+        if max_desc is not None and active_desc is not None:
+            free_repr = f", free {free_desc}" if free_desc is not None else ""
+            print(f"    descriptors : {active_desc}/{max_desc}{free_repr}")
+        if bytes_used is not None:
+            detail = f"{bytes_used} B"
+            if bytes_available is not None:
+                detail += f" used, {bytes_available} B free"
+            print(f"    capacity    : {detail}")
+        if queue_depth is not None:
+            print(f"    queue depth : {queue_depth}")
+        if total_handles is not None:
+            print(f"    handles     : {total_handles}")
+        if handle_limit:
+            print(f"    handle limit: {handle_limit} / pid")
+        tap_rate = stats.get("tap_rate_limit")
+        if tap_rate:
+            print(f"    tap limit   : {tap_rate} msgs/s")
+        if stats.get("descriptor_pool_exhausted"):
+            print("    descriptor pool: exhausted")
+        tap_count = stats.get("tap_count")
+        if tap_count is not None:
+            print(f"    taps        : {tap_count}")
+        tap_backlog = stats.get("tap_queue_depth")
+        if tap_backlog:
+            print(f"    tap backlog : {tap_backlog}")
+        handles_per_pid = stats.get("handles_per_pid") or {}
+        if handles_per_pid:
+            formatted = ", ".join(f"{pid}:{count}" for pid, count in sorted(handles_per_pid.items()))
+            print(f"    handles/pid : {formatted}")
     if filter_namespace is not None:
         print(f"  namespace : {filter_namespace}")
     if filter_pid is not None:
@@ -846,10 +1784,254 @@ def _pretty_mbox(payload: dict) -> None:
         name = desc.get("name", "")
         print(f"  {descriptor_id:5}  {namespace:<9}  {owner_str:>5}  {depth:5}  {bytes_used:5}  0x{mode:04X}  {name}")
 
+
+def _format_numeric(value: Any) -> str:
+    if isinstance(value, float):
+        return f"{value:.6g}"
+    if isinstance(value, int):
+        return str(value)
+    return str(value)
+
+
+def _render_value_response(resp: Dict[str, Any], *, action: str) -> None:
+    if resp.get("status") != "ok":
+        print(json.dumps(resp, indent=2, sort_keys=True))
+        return
+    value_block = resp.get("value")
+    if not isinstance(value_block, dict):
+        print(json.dumps(resp, indent=2, sort_keys=True))
+        return
+    context = dict(_LAST_VALUE_CONTEXT)
+    entry = context.get("entry") if isinstance(context.get("entry"), dict) else {}
+    oid = context.get("oid")
+    if oid is None:
+        oid = _try_parse_int(value_block.get("oid"))
+    print(f"{action}:")
+    if oid is not None:
+        print(f"  oid       : 0x{oid & 0xFFFF:04X}")
+    name = entry.get("name")
+    group_name = entry.get("group_name")
+    if isinstance(name, str) and name:
+        if isinstance(group_name, str) and group_name:
+            print(f"  path      : {group_name}:{name}")
+        else:
+            print(f"  name      : {name}")
+    elif entry:
+        group_id = entry.get("group_id")
+        value_id = entry.get("value_id")
+        if group_id is not None and value_id is not None:
+            print(f"  path      : {group_id}:{value_id}")
+    unit = entry.get("unit")
+    if unit:
+        print(f"  unit      : {unit}")
+    flags = entry.get("flags")
+    if isinstance(flags, int):
+        print(f"  flags     : 0x{flags & 0xFFFF:04X}")
+    last_value = value_block.get("value")
+    if last_value is not None:
+        print(f"  value     : {_format_numeric(last_value)}")
+    raw = value_block.get("f16")
+    if raw is not None:
+        raw_int = _try_parse_int(raw)
+        if raw_int is not None:
+            print(f"  raw_f16   : 0x{raw_int & 0xFFFF:04X}")
+    status = value_block.get("status")
+    if status is not None:
+        print(f"  status    : {status}")
+    pid = value_block.get("pid")
+    if pid is not None:
+        print(f"  owner_pid : {pid}")
+    epsilon = entry.get("epsilon")
+    if epsilon is not None:
+        print(f"  epsilon   : {_format_numeric(epsilon)}")
+    min_val = entry.get("min")
+    max_val = entry.get("max")
+    if min_val is not None or max_val is not None:
+        print(
+            f"  range     : "
+            f"{'-' if min_val is None else _format_numeric(min_val)} .. "
+            f"{'-' if max_val is None else _format_numeric(max_val)}"
+        )
+    persist_key = entry.get("persist_key")
+    debounce = entry.get("debounce_ms")
+    if persist_key is not None or debounce is not None:
+        detail = f"key={persist_key}" if persist_key is not None else ""
+        if debounce is not None:
+            if detail:
+                detail += " "
+            detail += f"debounce={debounce}ms"
+        print(f"  persist   : {detail or '-'}")
+
+
+def _pretty_val_get(resp: Dict[str, Any]) -> None:
+    _render_value_response(resp, action="Value")
+
+
+def _pretty_val_set(resp: Dict[str, Any]) -> None:
+    _render_value_response(resp, action="Updated value")
+
+
+def _pretty_val_list(resp: Dict[str, Any]) -> None:
+    if resp.get("status") != "ok":
+        print(json.dumps(resp, indent=2, sort_keys=True))
+        return
+    values = resp.get("values")
+    if not isinstance(values, list) or not values:
+        print("Values: <none>")
+        return
+    header = "  OID    Group            Name                 Value       Unit"
+    print("Values:")
+    print(header)
+    print("  " + "-" * (len(header) - 2))
+    for entry in values:
+        oid = _try_parse_int(entry.get("oid"))
+        group = entry.get("group_name") or entry.get("group_id") or "-"
+        name = entry.get("name") or entry.get("value_id") or "-"
+        value = entry.get("last_value")
+        unit = entry.get("unit") or "-"
+        row = (
+            f"  {('0x%04X' % (oid & 0xFFFF) if oid is not None else '----'):>6}  "
+            f"{str(group):<15}  {str(name):<20}  {_format_numeric(value) if value is not None else '-':<10}  {unit}"
+        )
+        print(row)
+        min_val = entry.get("min")
+        max_val = entry.get("max")
+        if min_val is not None or max_val is not None:
+            print(
+                f"       range: "
+                f"{'-' if min_val is None else _format_numeric(min_val)} .. "
+                f"{'-' if max_val is None else _format_numeric(max_val)}"
+            )
+        help_text = entry.get("help")
+        if isinstance(help_text, str) and help_text:
+            print(f"       help : {help_text}")
+
+
+def _pretty_cmd_list(resp: Dict[str, Any]) -> None:
+    if resp.get("status") != "ok":
+        print(json.dumps(resp, indent=2, sort_keys=True))
+        return
+    commands = resp.get("commands")
+    if not isinstance(commands, list) or not commands:
+        print("Commands: <none>")
+        return
+    header = "  OID    Group            Name                 Flags"
+    print("Commands:")
+    print(header)
+    print("  " + "-" * (len(header) - 2))
+    for entry in commands:
+        oid = _try_parse_int(entry.get("oid"))
+        group = entry.get("group_name") or entry.get("group_id") or "-"
+        name = entry.get("name") or entry.get("cmd_id") or "-"
+        flags = entry.get("flags")
+        row = (
+            f"  {('0x%04X' % (oid & 0xFFFF) if oid is not None else '----'):>6}  "
+            f"{str(group):<15}  {str(name):<20}  "
+            f"{('0x%04X' % (flags & 0xFFFF) if isinstance(flags, int) else '-')}"
+        )
+        print(row)
+        help_text = entry.get("help")
+        if isinstance(help_text, str) and help_text:
+            print(f"       help : {help_text}")
+
+
+def _pretty_cmd_call(resp: Dict[str, Any]) -> None:
+    if resp.get("status") != "ok":
+        print(json.dumps(resp, indent=2, sort_keys=True))
+        return
+    info = resp.get("command")
+    if not isinstance(info, dict):
+        print(json.dumps(resp, indent=2, sort_keys=True))
+        return
+    context = dict(_LAST_COMMAND_CONTEXT)
+    entry = context.get("entry") if isinstance(context.get("entry"), dict) else {}
+    oid = context.get("oid")
+    if oid is None:
+        oid = _try_parse_int(info.get("oid"))
+    print("Command result:")
+    if oid is not None:
+        print(f"  oid       : 0x{oid & 0xFFFF:04X}")
+    name = entry.get("name")
+    group_name = entry.get("group_name")
+    if isinstance(name, str) and name:
+        if isinstance(group_name, str) and group_name:
+            print(f"  path      : {group_name}:{name}")
+        else:
+            print(f"  name      : {name}")
+    status = info.get("status")
+    if status is not None:
+        print(f"  status    : {status}")
+    result = info.get("result")
+    if isinstance(result, (dict, list)):
+        print("  result    :")
+        print(json.dumps(result, indent=4, sort_keys=True))
+    elif result is not None:
+        print(f"  result    : {result}")
+    if context.get("async"):
+        print("  async     : request dispatched (watch mailbox for completion)")
+
+
+def _pretty_session(resp: Dict[str, Any]) -> None:
+    op = _SESSION_CMD_CONTEXT.get("op")
+    if resp.get("status") != "ok":
+        print(json.dumps(resp, indent=2, sort_keys=True))
+        _SESSION_CMD_CONTEXT.clear()
+        return
+    if op == "list":
+        sessions = resp.get("sessions") or []
+        entries = [entry for entry in sessions if isinstance(entry, dict)]
+        if not entries:
+            print("sessions: <none>")
+        else:
+            _remember_session_list(entries)
+            print("sessions:")
+            now = time.time()
+            for idx, entry in enumerate(entries, 1):
+                session_id = entry.get("id", "-")
+                client = entry.get("client") or "-"
+                locks = entry.get("pid_locks")
+                if not isinstance(locks, list):
+                    pid_lock = entry.get("pid_lock")
+                    locks = [pid_lock] if pid_lock is not None else []
+                lock_text = ",".join(str(lock) for lock in locks) if locks else "-"
+                last_seen = entry.get("last_seen") or now
+                since = _format_duration(max(0.0, now - float(last_seen)))
+                age = entry.get("age_s")
+                age_text = _format_duration(float(age)) if isinstance(age, (int, float)) else "n/a"
+                features = ",".join(entry.get("features", [])) or "-"
+                print(f"  {idx:>2}: {session_id} client={client} locks={lock_text} idle={since} age={age_text} feats={features}")
+    elif op == "current":
+        info = resp.get("session") or {}
+        session_id = info.get("id") or "-"
+        client = info.get("client") or "-"
+        pid_lock = info.get("pid_lock")
+        locks = info.get("pid_locks")
+        if locks is None:
+            locks = [pid_lock] if pid_lock is not None else []
+        lock_text = ",".join(str(lock) for lock in locks) if locks else "-"
+        print(f"current session: {session_id}")
+        print(f"  client   : {client}")
+        print(f"  pid locks: {lock_text}")
+    elif op == "close":
+        closed = resp.get("closed") or {}
+        target = closed.get("id") or _SESSION_CMD_CONTEXT.get("target") or _SESSION_CMD_CONTEXT.get("requested")
+        reason = closed.get("reason") or "admin_close"
+        print(f"session closed: {target} ({reason})")
+    else:
+        print(json.dumps(resp, indent=2, sort_keys=True))
+    _SESSION_CMD_CONTEXT.clear()
+
 PRETTY_HANDLERS = {
     'dumpregs': _pretty_dumpregs,
     'info': _pretty_info,
     'attach': _pretty_info,
+    'bp': _pretty_bp,
+    'sym': _pretty_sym,
+    'symbols': _pretty_symbols,
+    'memory': _pretty_memory,
+    'watch': _pretty_watch,
+    'disasm': _pretty_disasm,
+    'stack': _pretty_stack,
     'ps': _pretty_ps,
     'list': _pretty_list,
     'reload': _pretty_reload,
@@ -863,6 +2045,12 @@ PRETTY_HANDLERS = {
     'send': _pretty_send,
     'dbg': _pretty_dbg,
     'sched': _pretty_sched,
+    'val.get': _pretty_val_get,
+    'val.set': _pretty_val_set,
+    'val.list': _pretty_val_list,
+    'cmd.list': _pretty_cmd_list,
+    'cmd.call': _pretty_cmd_call,
+    'session': _pretty_session,
 }
 
 
@@ -904,30 +2092,105 @@ def _render_register_block(registers: dict, indent: str = "  ") -> None:
             print(f"{indent}  R{idx:02}: 0x{value & 0xFFFFFFFF:08X}")
 
 
-def send_request(host: str, port: int, payload: dict) -> dict:
-    with socket.create_connection((host, port), timeout=5.0) as sock:
-        with sock.makefile("w", encoding="utf-8", newline="\n") as wfile, sock.makefile("r", encoding="utf-8", newline="\n") as rfile:
-            payload = dict(payload)
-            payload.setdefault("version", 1)
-            wfile.write(json.dumps(payload, separators=(",", ":")) + "\n")
-            wfile.flush()
-            line = rfile.readline()
-            if not line:
-                raise RuntimeError("executive closed connection")
-            return json.loads(line)
+def send_request(host: str, port: int, payload: dict, *, auto_events: bool = False) -> dict:
+    session = _ensure_session(host, port, auto_events=auto_events)
+    payload = dict(payload)
+    cmd = str(payload.get("cmd", "")).lower()
+    use_session = cmd != "session.open"
+    return session.request(payload, use_session=use_session)
 
 
 
-def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -> dict:
+def _build_payload(
+    cmd: str,
+    args: list[str],
+    current_dir: Path | None = None,
+    *,
+    host: str | None = None,
+    port: int | None = None,
+) -> dict:
     payload_cmd = cmd
     payload: dict[str, object] = {"cmd": payload_cmd}
 
-    if cmd in {"attach", "detach", "ps", "clock", "shutdown", "pause", "resume", "kill", "load", "exec", "reload", "list", "step", "listen", "send", "sched", "info", "peek", "poke", "dumpregs", "stdio", "mbox", "mailboxes", "mailbox_snapshot", "mailbox_open", "mailbox_close", "mailbox_bind", "mailbox_send", "mailbox_recv", "mailbox_peek", "mailbox_tap", "dbg"}:
+    if cmd == "session":
+        return _build_session_payload(args, host, port)
+
+    if cmd in {"val.get", "val.set", "val.list"}:
+        if host is None or port is None:
+            raise ValueError("val.* commands require host/port context")
+        return _build_val_command_payload(cmd, args, host, port)
+
+    if cmd in {"cmd.call", "cmd.list"}:
+        if host is None or port is None:
+            raise ValueError("cmd.* commands require host/port context")
+        return _build_cmd_command_payload(cmd, args, host, port)
+
+    if cmd in {"attach", "detach", "ps", "clock", "shutdown", "pause", "resume", "kill", "load", "exec", "reload", "list", "step", "listen", "send", "sched", "info", "peek", "poke", "dumpregs", "stdio", "mbox", "mailboxes", "mailbox_snapshot", "mailbox_open", "mailbox_close", "mailbox_bind", "mailbox_send", "mailbox_recv", "mailbox_peek", "mailbox_tap", "dbg", "disasm", "stack"}:
         pass
 
     if cmd == "info":
         if args:
             payload["pid"] = args[0]
+        return payload
+
+    if cmd == "bp":
+        return _build_bp_payload(args)
+    if cmd == "symbols":
+        return _build_symbols_payload(args)
+    if cmd == "watch":
+        return _build_watch_payload(args)
+    if cmd == "sym":
+        return _build_sym_payload(args)
+    if cmd == "disasm":
+        if not args:
+            raise ValueError("disasm requires <pid> [options]")
+        payload["pid"] = int(args[0], 0)
+        addr_set = False
+        count_set = False
+        mode_set = False
+        i = 1
+        while i < len(args):
+            token = args[i]
+            if token in {"--addr", "-a"}:
+                i += 1
+                if i >= len(args):
+                    raise ValueError("disasm --addr requires a value")
+                payload["addr"] = int(args[i], 0)
+                addr_set = True
+            elif token in {"--count", "-c"}:
+                i += 1
+                if i >= len(args):
+                    raise ValueError("disasm --count requires a value")
+                payload["count"] = int(args[i], 0)
+                count_set = True
+            elif token in {"--mode", "-m"}:
+                i += 1
+                if i >= len(args):
+                    raise ValueError("disasm --mode requires a value")
+                payload["mode"] = args[i]
+                mode_set = True
+            elif token in {"--cached", "-C"}:
+                payload["mode"] = "cached"
+                mode_set = True
+            else:
+                if not addr_set:
+                    payload["addr"] = int(token, 0)
+                    addr_set = True
+                elif not count_set:
+                    payload["count"] = int(token, 0)
+                    count_set = True
+                else:
+                    raise ValueError("disasm usage: disasm <pid> [addr] [count] [--mode on-demand|cached]")
+            i += 1
+        if not mode_set:
+            payload.setdefault("mode", "on-demand")
+        return payload
+    if cmd == "stack":
+        if not args:
+            raise ValueError("stack requires <pid> [frames]")
+        payload["pid"] = int(args[0], 0)
+        if len(args) > 1:
+            payload["max"] = int(args[1], 0)
         return payload
 
     if cmd == "dbg":
@@ -1005,8 +2268,72 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
 
     if cmd == "trace":
         if not args:
-            raise ValueError("trace requires <pid> [on|off]")
-        payload["pid"] = args[0]
+            raise ValueError("trace requires <pid> [on|off|records <limit>] or 'config <option>'")
+        first = args[0].lower()
+        if first == "config":
+            if len(args) < 3:
+                raise ValueError("trace config usage: trace config changed-regs <on|off> | buffer <size>")
+            payload["op"] = "config"
+            setting = args[1].lower()
+            if setting == "changed-regs":
+                payload["changed_regs"] = args[2]
+            elif setting == "buffer":
+                try:
+                    payload["buffer_size"] = int(args[2], 0)
+                except ValueError as exc:
+                    raise ValueError("trace config buffer requires integer size") from exc
+            else:
+                raise ValueError("trace config usage: trace config changed-regs <on|off> | buffer <size>")
+            return payload
+        try:
+            payload["pid"] = int(args[0], 0)
+        except ValueError as exc:
+            raise ValueError("trace requires integer pid") from exc
+        if len(args) == 1:
+            return payload
+        subcmd = args[1].lower()
+        if subcmd in {"records", "history", "export"}:
+            payload["op"] = "export" if subcmd == "export" else "records"
+            if len(args) > 2:
+                try:
+                    payload["limit"] = int(args[2], 0)
+                except ValueError as exc:
+                    raise ValueError("trace records/export limit must be integer") from exc
+            return payload
+        if subcmd == "import":
+            if len(args) < 3:
+                raise ValueError("trace import requires <file>")
+            replace = True
+            file_token = args[2]
+            option_tokens = args[3:]
+            if option_tokens and option_tokens[0] == "--append":
+                replace = False
+                option_tokens = option_tokens[1:]
+            if option_tokens:
+                raise ValueError("trace import usage: trace <pid> import <file> [--append]")
+            file_path = Path(file_token)
+            if current_dir is not None and not file_path.is_absolute():
+                file_path = (current_dir / file_path).resolve(strict=False)
+            else:
+                file_path = file_path.resolve(strict=False)
+            try:
+                data = json.loads(file_path.read_text(encoding="utf-8"))
+            except FileNotFoundError as exc:
+                raise ValueError(f"trace import file not found: {file_path}") from exc
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"trace import file is not valid JSON ({exc})") from exc
+            if isinstance(data, dict) and "records" in data:
+                records = data["records"]
+                if "format" in data:
+                    payload["format"] = data["format"]
+            else:
+                records = data
+            if not isinstance(records, list):
+                raise ValueError("trace import expects JSON list or object with 'records'")
+            payload["op"] = "import"
+            payload["records"] = records
+            payload["replace"] = replace
+            return payload
         if len(args) > 1:
             payload["mode"] = args[1]
         return payload
@@ -1084,6 +2411,7 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
         tokens = list(args)
         steps_value: Optional[int] = None
         target_pid: Optional[int] = None
+        source_only_flag = False
         i = 0
         while i < len(tokens):
             token = tokens[i]
@@ -1095,18 +2423,22 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
                     target_pid = int(tokens[i], 0)
                 except ValueError as exc:
                     raise ValueError("step pid must be integer") from exc
+            elif token in {"--source", "--source-only"}:
+                source_only_flag = True
             elif steps_value is None:
                 try:
                     steps_value = int(token, 0)
                 except ValueError as exc:
                     raise ValueError("step count must be integer") from exc
             else:
-                raise ValueError("step usage: step [steps] [-p <pid>]")
+                raise ValueError("step usage: step [steps] [-p <pid>] [--source]")
             i += 1
         if steps_value is not None:
             payload["steps"] = steps_value
         if target_pid is not None:
             payload["pid"] = target_pid
+        if source_only_flag:
+            payload["source_only"] = True
         return payload
 
     if cmd == "reload":
@@ -1206,12 +2538,7 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
         return payload
 
     if cmd == "dmesg":
-        if args:
-            try:
-                payload["limit"] = int(args[0])
-            except ValueError as exc:
-                raise ValueError("dmesg limit must be an integer") from exc
-        return payload
+        return _build_dmesg_payload(args, host, port)
 
     if cmd == "stdio":
         payload["cmd"] = "stdio_fanout"
@@ -1294,10 +2621,229 @@ def _build_payload(cmd: str, args: list[str], current_dir: Path | None = None) -
         return payload
 
     return payload
+
+
+def _build_bp_payload(args: list[str]) -> dict:
+    if not args:
+        raise ValueError("bp usage: bp <list|set|clear|clearall> ...")
+    action = args[0].lower()
+    tokens = args[1:]
+    payload: dict[str, object] = {"cmd": "bp"}
+    if action in {"list", "ls"}:
+        if not tokens:
+            raise ValueError("bp list requires <pid>")
+        payload["op"] = "list"
+        payload["pid"] = int(tokens[0], 0)
+        return payload
+    if action in {"set", "add"}:
+        if len(tokens) < 2:
+            raise ValueError("bp set requires <pid> <addr>")
+        payload["op"] = "set"
+        payload["pid"] = int(tokens[0], 0)
+        payload["addr"] = int(tokens[1], 0)
+        return payload
+    if action in {"clear", "remove", "rm", "del", "delete"}:
+        if len(tokens) < 2:
+            raise ValueError("bp clear requires <pid> <addr>")
+        payload["op"] = "clear"
+        payload["pid"] = int(tokens[0], 0)
+        payload["addr"] = int(tokens[1], 0)
+        return payload
+    if action in {"clear_all", "clearall", "reset"}:
+        if not tokens:
+            raise ValueError("bp clear_all requires <pid>")
+        payload["op"] = "clear_all"
+        payload["pid"] = int(tokens[0], 0)
+        return payload
+    raise ValueError(f"bp unknown action '{action}'")
+
+
+def _build_memory_payload(args: list[str]) -> dict:
+    if not args:
+        raise ValueError("memory usage: memory regions <pid>")
+    subcmd = args[0].lower()
+    tokens = args[1:]
+    if subcmd not in {"regions", "region", "list"}:
+        raise ValueError("memory usage: memory regions <pid>")
+    if not tokens:
+        raise ValueError("memory regions requires <pid>")
+    if len(tokens) > 1:
+        raise ValueError("memory usage: memory regions <pid>")
+    return {"cmd": "memory", "op": "regions", "pid": int(tokens[0], 0)}
+
+
+def _build_symbols_payload(args: list[str]) -> dict:
+    if not args:
+        raise ValueError("symbols usage: symbols <pid> [--type functions|variables|all] [--offset N] [--limit N]")
+    payload: dict[str, object] = {"cmd": "symbols", "pid": int(args[0], 0)}
+    i = 1
+    while i < len(args):
+        token = args[i]
+        if token in {"--type", "--kind", "-t"}:
+            i += 1
+            if i >= len(args):
+                raise ValueError("symbols --type requires a value")
+            payload["type"] = args[i]
+        elif token in {"--offset", "-o"}:
+            i += 1
+            if i >= len(args):
+                raise ValueError("symbols --offset requires a value")
+            payload["offset"] = int(args[i], 0)
+        elif token in {"--limit", "-l"}:
+            i += 1
+            if i >= len(args):
+                raise ValueError("symbols --limit requires a value")
+            payload["limit"] = int(args[i], 0)
+        else:
+            raise ValueError("symbols usage: symbols <pid> [--type functions|variables|all] [--offset N] [--limit N]")
+        i += 1
+    return payload
+
+
+def _build_watch_payload(args: list[str]) -> dict:
+    if not args:
+        raise ValueError("watch usage: watch <list|add|remove> ...")
+    action = args[0].lower()
+    tokens = args[1:]
+    if action in {"add", "create"}:
+        if len(tokens) < 2:
+            raise ValueError("watch add requires <pid> <expr>")
+        payload: dict[str, object] = {"cmd": "watch", "op": "add", "pid": int(tokens[0], 0), "expr": tokens[1]}
+        i = 2
+        while i < len(tokens):
+            token = tokens[i]
+            if token in {"--type", "--kind", "-t"}:
+                i += 1
+                if i >= len(tokens):
+                    raise ValueError("watch add --type requires a value")
+                payload["type"] = tokens[i]
+            elif token in {"--length", "--len", "-n"}:
+                i += 1
+                if i >= len(tokens):
+                    raise ValueError("watch add --length requires a value")
+                payload["length"] = int(tokens[i], 0)
+            else:
+                raise ValueError("watch add usage: watch add <pid> <expr> [--type address|symbol|local] [--length N]")
+            i += 1
+        return payload
+    if action in {"remove", "del", "delete", "rm"}:
+        if len(tokens) < 2:
+            raise ValueError("watch remove requires <pid> <id>")
+        return {"cmd": "watch", "op": "remove", "pid": int(tokens[0], 0), "id": int(tokens[1], 0)}
+    if action in {"list", "ls"}:
+        if not tokens:
+            raise ValueError("watch list requires <pid>")
+        return {"cmd": "watch", "op": "list", "pid": int(tokens[0], 0)}
+    # default: treat first argument as pid for list
+    return {"cmd": "watch", "op": "list", "pid": int(args[0], 0)}
+
+
+def _build_sym_payload(args: list[str]) -> dict:
+    if not args:
+        raise ValueError("sym usage: sym <info|addr|name|line|load> ...")
+    subcmd = args[0].lower()
+    tokens = args[1:]
+    payload: dict[str, object] = {"cmd": "sym"}
+    if subcmd in {"info", "i"}:
+        if not tokens:
+            raise ValueError("sym info requires <pid>")
+        payload["op"] = "info"
+        payload["pid"] = int(tokens[0], 0)
+        return payload
+    if subcmd in {"addr", "lookup", "lookup_addr"}:
+        if len(tokens) < 2:
+            raise ValueError("sym addr requires <pid> <address>")
+        payload["op"] = "lookup_addr"
+        payload["pid"] = int(tokens[0], 0)
+        payload["address"] = tokens[1]
+        return payload
+    if subcmd in {"name", "lookup_name"}:
+        if len(tokens) < 2:
+            raise ValueError("sym name requires <pid> <symbol>")
+        payload["op"] = "lookup_name"
+        payload["pid"] = int(tokens[0], 0)
+        payload["name"] = tokens[1]
+        return payload
+    if subcmd in {"line", "lookup_line"}:
+        if len(tokens) < 2:
+            raise ValueError("sym line requires <pid> <address>")
+        payload["op"] = "lookup_line"
+        payload["pid"] = int(tokens[0], 0)
+        payload["address"] = tokens[1]
+        return payload
+    if subcmd in {"load", "set"}:
+        if len(tokens) < 2:
+            raise ValueError("sym load requires <pid> <path>")
+        payload["op"] = "load"
+        payload["pid"] = int(tokens[0], 0)
+        payload["path"] = tokens[1]
+        return payload
+    raise ValueError(f"sym unknown subcommand '{subcmd}'")
+
+
+def _build_session_payload(args: list[str], host: str | None, port: int | None) -> dict:
+    if host is None or port is None:
+        raise ValueError("session command requires host/port context")
+    if not args:
+        _set_session_context("current")
+        return {"cmd": "session.current"}
+    subcmd = args[0].lower()
+    tokens = args[1:]
+    if subcmd in {"list", "ls"}:
+        _set_session_context("list")
+        return {"cmd": "session.list"}
+    if subcmd in {"close", "kill", "terminate"}:
+        if not tokens:
+            raise ValueError("session close requires <id|number>")
+        session_id = _resolve_session_identifier(tokens[0], host, port)
+        if not session_id:
+            raise ValueError(f"unknown session reference '{tokens[0]}'")
+        _set_session_context("close", target=session_id, requested=tokens[0])
+        return {"cmd": "session.terminate", "target": session_id}
+    raise ValueError("session usage: session [list|close <id|number>]")
+
+
+def _build_dmesg_payload(args: list[str], host: str | None, port: int | None) -> dict:
+    payload: dict[str, object] = {"cmd": "dmesg"}
+    tokens = list(args)
+    limit_set = False
+    session_token: Optional[str] = None
+    idx = 0
+    while idx < len(tokens):
+        token = tokens[idx]
+        lowered = token.lower()
+        if lowered in {"session", "sess", "sid"}:
+            idx += 1
+            if idx >= len(tokens):
+                raise ValueError("dmesg session requires <id|number>")
+            session_token = tokens[idx]
+        elif not limit_set:
+            try:
+                payload["limit"] = int(token, 0)
+                limit_set = True
+            except ValueError as exc:
+                raise ValueError("dmesg usage: dmesg [limit] [session <id|number>]") from exc
+        else:
+            raise ValueError("dmesg usage: dmesg [limit] [session <id|number>]")
+        idx += 1
+    if session_token:
+        if host is None or port is None:
+            raise ValueError("dmesg session filter requires host/port context")
+        session_id = _resolve_session_identifier(session_token, host, port)
+        if not session_id:
+            raise ValueError(f"unknown session reference '{session_token}'")
+        payload["filter_session"] = session_id
+    return payload
+
+
 def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: bool = False) -> None:
     _init_history()
+    _configure_completion(host, port)
     current_dir = (cwd or Path.cwd()).resolve()
-    print(f"Connected to executive at {host}:{port}. Type 'help' for commands or 'help <command>' for details.")
+    print(f"Connecting to executive at {host}:{port} ...", end="", flush=True)
+    session = _ensure_session(host, port, auto_events=False)
+    print(" connected.")
+    print("Type 'help' for commands or 'help <command>' for details.")
     while True:
         try:
             line = input('hsx> ')
@@ -1330,15 +2876,118 @@ def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: boo
             else:
                 args.append(token)
 
+        session = _ensure_session(host, port, auto_events=False)
+
         if cmd == 'help':
             if args:
                 _print_topic_help(args[0])
             else:
                 _print_general_help()
             continue
+        if cmd == 'events':
+            _ensure_event_stream(session)
+            limit = 10
+            if args:
+                try:
+                    limit = int(args[0], 0)
+                except ValueError:
+                    print("usage: events [count]")
+                    continue
+            events = session.get_recent_events(limit)
+            if not events:
+                print("events: <no buffered events>")
+                continue
+            if force_json:
+                for event in events:
+                    print(json.dumps(event, indent=2, sort_keys=True))
+            else:
+                _pretty_events(events)
+            continue
+        if cmd == 'memory':
+            try:
+                payload = _build_memory_payload(args)
+            except ValueError as exc:
+                print(exc)
+                continue
+            try:
+                resp = send_request(host, port, payload)
+            except Exception as exc:
+                print(f"error: {exc}")
+                continue
+            handler = PRETTY_HANDLERS.get('memory')
+            if handler and not force_json:
+                handler(resp)
+            else:
+                print(json.dumps(resp, indent=2, sort_keys=True))
+            continue
+        if cmd == 'watch':
+            try:
+                payload = _build_watch_payload(args)
+            except ValueError as exc:
+                print(exc)
+                continue
+            try:
+                resp = send_request(host, port, payload)
+            except Exception as exc:
+                print(f"error: {exc}")
+                continue
+            handler = PRETTY_HANDLERS.get('watch')
+            if handler and not force_json:
+                handler(resp)
+            else:
+                print(json.dumps(resp, indent=2, sort_keys=True))
+            continue
+        if cmd == 'symbols':
+            try:
+                payload = _build_symbols_payload(args)
+            except ValueError as exc:
+                print(exc)
+                continue
+            try:
+                resp = send_request(host, port, payload)
+            except Exception as exc:
+                print(f"error: {exc}")
+                continue
+            handler = PRETTY_HANDLERS.get('symbols')
+            if handler and not force_json:
+                handler(resp)
+            else:
+                print(json.dumps(resp, indent=2, sort_keys=True))
+            continue
+        if cmd == 'sym':
+            try:
+                payload = _build_sym_payload(args)
+            except ValueError as exc:
+                print(exc)
+                continue
+            try:
+                resp = send_request(host, port, payload)
+            except Exception as exc:
+                print(f"error: {exc}")
+                continue
+            handler = PRETTY_HANDLERS.get('sym')
+            if handler and not force_json:
+                handler(resp)
+            else:
+                print(json.dumps(resp, indent=2, sort_keys=True))
+            continue
         if cmd in {'load', 'exec'}:
             tokens = list(args)
             verbose_flag = False
+            symbols_override: Optional[str] = None
+            i = 0
+            while i < len(tokens):
+                token = tokens[i]
+                if token in {'--symbols', '--sym'}:
+                    if i + 1 >= len(tokens):
+                        print(f"usage: {cmd} <path|bundle> [--symbols <path>] [verbose]")
+                        symbols_override = None
+                        tokens = []
+                        break
+                    symbols_override = tokens[i + 1]
+                    del tokens[i:i + 2]
+                    continue
+                i += 1
             if tokens and tokens[-1].lower() in {"verbose", "--verbose"}:
                 verbose_flag = True
                 tokens = tokens[:-1]
@@ -1351,8 +3000,16 @@ def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: boo
                 print(exc)
                 continue
             rpc_cmd = 'exec' if cmd == 'exec' else 'load'
+            sym_override_resolved = None
+            if symbols_override:
+                sym_path = Path(symbols_override)
+                if not sym_path.is_absolute():
+                    sym_path = (current_dir / sym_path).resolve(strict=False)
+                else:
+                    sym_path = sym_path.resolve(strict=False)
+                sym_override_resolved = str(sym_path)
             try:
-                results = _perform_load_sequence(host, port, targets, verbose=verbose_flag, rpc_cmd=rpc_cmd)
+                results = _perform_load_sequence(host, port, targets, verbose=verbose_flag, rpc_cmd=rpc_cmd, symbols=sym_override_resolved)
             except Exception as exc:
                 print(f"error: {exc}")
                 continue
@@ -1422,7 +3079,7 @@ def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: boo
             continue
 
         try:
-            payload = _build_payload(cmd, args, current_dir)
+            payload = _build_payload(cmd, args, current_dir, host=host, port=port)
         except ValueError as exc:
             print(exc)
             continue
@@ -1458,6 +3115,7 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=9998, help="executive port")
     parser.add_argument("--steps", type=int, help="steps for step command")
     parser.add_argument("--path", help="path for load/exec commands")
+    parser.add_argument("--symbols", help="override symbol file for load/exec commands")
     parser.add_argument("--verbose", action="store_true", help="verbose load")
     parser.add_argument("--json", action="store_true", help="print raw JSON responses")
     args_ns = parser.parse_args()
@@ -1477,6 +3135,146 @@ def main() -> None:
         else:
             _print_general_help()
         return
+    if cmd == 'events':
+        session = _ensure_session(args_ns.host, args_ns.port, auto_events=True)
+        limit = 10
+        if args:
+            try:
+                limit = int(args[0], 0)
+            except ValueError:
+                parser.error("events expects an optional integer count")
+        events = session.get_recent_events(limit)
+        if not events:
+            print("events: <no buffered events>")
+            return
+        if force_json:
+            for event in events:
+                print(json.dumps(event, indent=2, sort_keys=True))
+        else:
+            _pretty_events(events)
+        return
+    if cmd == 'memory':
+        try:
+            payload = _build_memory_payload(args)
+        except ValueError as exc:
+            parser.error(str(exc))
+        resp = send_request(args_ns.host, args_ns.port, payload)
+        handler = PRETTY_HANDLERS.get('memory')
+        if handler and not force_json:
+            handler(resp)
+        else:
+            print(json.dumps(resp, indent=2, sort_keys=True))
+        return
+    if cmd == 'watch':
+        try:
+            payload = _build_watch_payload(args)
+        except ValueError as exc:
+            parser.error(str(exc))
+        resp = send_request(args_ns.host, args_ns.port, payload)
+        handler = PRETTY_HANDLERS.get('watch')
+        if handler and not force_json:
+            handler(resp)
+        else:
+            print(json.dumps(resp, indent=2, sort_keys=True))
+        return
+    if cmd == 'bp':
+        try:
+            payload = _build_bp_payload(args)
+        except ValueError as exc:
+            parser.error(str(exc))
+        resp = send_request(args_ns.host, args_ns.port, payload)
+        handler = PRETTY_HANDLERS.get('bp')
+        if handler and not force_json:
+            handler(resp)
+        else:
+            print(json.dumps(resp, indent=2, sort_keys=True))
+        return
+    if cmd == 'symbols':
+        try:
+            payload = _build_symbols_payload(args)
+        except ValueError as exc:
+            parser.error(str(exc))
+        resp = send_request(args_ns.host, args_ns.port, payload)
+        handler = PRETTY_HANDLERS.get('symbols')
+        if handler and not force_json:
+            handler(resp)
+        else:
+            print(json.dumps(resp, indent=2, sort_keys=True))
+        return
+    if cmd == 'sym':
+        try:
+            payload = _build_sym_payload(args)
+        except ValueError as exc:
+            parser.error(str(exc))
+        resp = send_request(args_ns.host, args_ns.port, payload)
+        handler = PRETTY_HANDLERS.get('sym')
+        if handler and not force_json:
+            handler(resp)
+        else:
+            print(json.dumps(resp, indent=2, sort_keys=True))
+        return
+
+def _remember_session_list(entries: Sequence[Dict[str, Any]]) -> None:
+    with _SESSION_INDEX_LOCK:
+        _SESSION_INDEX_CACHE.clear()
+        for idx, entry in enumerate(entries, 1):
+            session_id = entry.get("id")
+            if isinstance(session_id, str) and session_id:
+                _SESSION_INDEX_CACHE[idx] = session_id
+
+
+def _lookup_session_by_index(index: int) -> Optional[str]:
+    with _SESSION_INDEX_LOCK:
+        return _SESSION_INDEX_CACHE.get(index)
+
+
+def _fetch_sessions(host: str, port: int) -> List[Dict[str, Any]]:
+    response = send_request(host, port, {"cmd": "session.list"})
+    if response.get("status") != "ok":
+        raise RuntimeError(f"session.list failed: {response.get('error')}")
+    sessions = response.get("sessions") or []
+    if isinstance(sessions, list):
+        entries = [entry for entry in sessions if isinstance(entry, dict)]
+    else:
+        entries = []
+    _remember_session_list(entries)
+    return entries
+
+
+def _resolve_session_identifier(token: str, host: str, port: int) -> Optional[str]:
+    raw = token.strip()
+    if not raw:
+        return None
+    lowered = raw.lower()
+    if lowered.startswith("id:"):
+        value = raw.split(":", 1)[1].strip()
+        return value or None
+    try:
+        index = int(raw, 0)
+    except ValueError:
+        return raw
+    cached = _lookup_session_by_index(index)
+    if cached:
+        return cached
+    entries = _fetch_sessions(host, port)
+    cached = _lookup_session_by_index(index)
+    if cached:
+        return cached
+    if 1 <= index <= len(entries):
+        session_id = entries[index - 1].get("id")
+        if isinstance(session_id, str) and session_id:
+            return session_id
+    return None
+
+
+def _format_duration(seconds: float) -> str:
+    if seconds < 1:
+        return f"{seconds * 1000:.0f}ms"
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    minutes = int(seconds // 60)
+    secs = seconds % 60
+    return f"{minutes}m{secs:04.1f}s"
 
     if cmd in {'load', 'exec'}:
         tokens = list(args)
@@ -1492,6 +3290,14 @@ def main() -> None:
             targets = _resolve_load_targets(tokens[0], Path.cwd())
         except ValueError as exc:
             parser.error(str(exc))
+        sym_override = args_ns.symbols
+        if sym_override:
+            sym_path = Path(sym_override)
+            if not sym_path.is_absolute():
+                sym_path = (Path.cwd() / sym_path).resolve(strict=False)
+            else:
+                sym_path = sym_path.resolve(strict=False)
+            sym_override = str(sym_path)
         try:
             results = _perform_load_sequence(
                 args_ns.host,
@@ -1499,6 +3305,7 @@ def main() -> None:
                 targets,
                 verbose=verbose_flag,
                 rpc_cmd='exec' if cmd == 'exec' else 'load',
+                symbols=sym_override,
             )
         except Exception as exc:
             parser.error(str(exc))
@@ -1538,7 +3345,7 @@ def main() -> None:
         args = [str(args_ns.steps)]
 
     try:
-        payload = _build_payload(cmd, args, Path.cwd())
+        payload = _build_payload(cmd, args, Path.cwd(), host=args_ns.host, port=args_ns.port)
     except ValueError as exc:
         parser.error(str(exc))
 
@@ -1572,3 +3379,187 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+def _extract_pid_option(tokens: Sequence[str]) -> tuple[Optional[int], List[str]]:
+    pid: Optional[int] = None
+    remaining: List[str] = []
+    idx = 0
+    while idx < len(tokens):
+        token = tokens[idx]
+        if token in {"--pid", "-p"}:
+            idx += 1
+            if idx >= len(tokens):
+                raise ValueError("pid option requires a value")
+            pid = _require_int(tokens[idx], "pid")
+        elif token.startswith("pid="):
+            pid = _require_int(token.split("=", 1)[1], "pid")
+        else:
+            remaining.append(token)
+        idx += 1
+    return pid, remaining
+
+
+def _parse_float_value(token: str) -> float:
+    lowered = token.strip().lower()
+    if lowered in {"true", "on"}:
+        return 1.0
+    if lowered in {"false", "off"}:
+        return 0.0
+    try:
+        return float(token)
+    except ValueError as exc:
+        int_value = _try_parse_int(token)
+        if int_value is not None:
+            return float(int_value)
+        raise ValueError(f"value '{token}' is not a valid number") from exc
+
+
+def _build_val_command_payload(cmd: str, args: list[str], host: str, port: int) -> dict:
+    global _LAST_VALUE_CONTEXT
+    if cmd == "val.get":
+        if not args:
+            raise ValueError("val.get requires <identifier>")
+        identifier = args[0]
+        pid, remaining = _extract_pid_option(args[1:])
+        if remaining:
+            raise ValueError(f"val.get: unknown option '{remaining[0]}'")
+        entry = _resolve_value_identifier(identifier, host=host, port=port)
+        oid = _try_parse_int(entry.get("oid"))
+        if oid is None:
+            raise ValueError(f"val.get: unable to resolve OID for '{identifier}'")
+        _LAST_VALUE_CONTEXT = {"command": cmd, "oid": oid, "entry": entry, "identifier": identifier}
+        payload: Dict[str, Any] = {"cmd": "val.get", "oid": oid}
+        if pid is not None:
+            payload["pid"] = pid
+        return payload
+
+    if cmd == "val.set":
+        if len(args) < 2:
+            raise ValueError("val.set requires <identifier> <value>")
+        identifier = args[0]
+        value_token = args[1]
+        pid, remaining = _extract_pid_option(args[2:])
+        if remaining:
+            raise ValueError(f"val.set: unknown option '{remaining[0]}'")
+        entry = _resolve_value_identifier(identifier, host=host, port=port)
+        oid = _try_parse_int(entry.get("oid"))
+        if oid is None:
+            raise ValueError(f"val.set: unable to resolve OID for '{identifier}'")
+        value = _parse_float_value(value_token)
+        payload = {"cmd": "val.set", "oid": oid, "value": value}
+        if pid is not None:
+            payload["pid"] = pid
+        _LAST_VALUE_CONTEXT = {"command": cmd, "oid": oid, "entry": entry, "identifier": identifier, "value": value}
+        _invalidate_value_cache()
+        return payload
+
+    if cmd == "val.list":
+        pid, remaining = _extract_pid_option(args)
+        payload: Dict[str, Any] = {"cmd": "val.list"}
+        if pid is not None:
+            payload["pid"] = pid
+        idx = 0
+        while idx < len(remaining):
+            token = remaining[idx]
+            if token in {"--group", "-g"}:
+                idx += 1
+                if idx >= len(remaining):
+                    raise ValueError("val.list --group requires a value")
+                payload["group"] = _require_int(remaining[idx], "group")
+            elif token.startswith("group="):
+                payload["group"] = _require_int(token.split("=", 1)[1], "group")
+            elif token == "--oid":
+                idx += 1
+                if idx >= len(remaining):
+                    raise ValueError("val.list --oid requires a value")
+                payload["oid"] = _require_int(remaining[idx], "oid")
+            elif token.startswith("oid="):
+                payload["oid"] = _require_int(token.split("=", 1)[1], "oid")
+            elif token == "--name":
+                idx += 1
+                if idx >= len(remaining):
+                    raise ValueError("val.list --name requires a value")
+                payload["name"] = remaining[idx]
+            elif token.startswith("name="):
+                payload["name"] = token.split("=", 1)[1]
+            else:
+                raise ValueError(f"val.list: unknown option '{token}'")
+            idx += 1
+        _LAST_VALUE_CONTEXT = {}
+        return payload
+
+    raise ValueError(f"unsupported val.* command '{cmd}'")
+
+
+def _build_cmd_command_payload(cmd: str, args: list[str], host: str, port: int) -> dict:
+    global _LAST_COMMAND_CONTEXT
+    if cmd == "cmd.call":
+        if not args:
+            raise ValueError("cmd.call requires <identifier>")
+        identifier = args[0]
+        pid, remaining = _extract_pid_option(args[1:])
+        async_call = False
+        idx = 0
+        while idx < len(remaining):
+            token = remaining[idx]
+            if token == "--async":
+                async_call = True
+            elif token.startswith("async="):
+                value = token.split("=", 1)[1].strip().lower()
+                async_call = value in {"1", "true", "yes", "on"}
+            else:
+                raise ValueError(f"cmd.call: unknown option '{token}'")
+            idx += 1
+        entry = _resolve_command_identifier(identifier, host=host, port=port)
+        oid = _try_parse_int(entry.get("oid"))
+        if oid is None:
+            raise ValueError(f"cmd.call: unable to resolve OID for '{identifier}'")
+        payload: Dict[str, Any] = {"cmd": "cmd.call", "oid": oid}
+        if pid is not None:
+            payload["pid"] = pid
+        if async_call:
+            payload["async"] = True
+        _LAST_COMMAND_CONTEXT = {
+            "command": cmd,
+            "oid": oid,
+            "entry": entry,
+            "identifier": identifier,
+            "async": async_call,
+        }
+        return payload
+
+    if cmd == "cmd.list":
+        pid, remaining = _extract_pid_option(args)
+        payload: Dict[str, Any] = {"cmd": "cmd.list"}
+        if pid is not None:
+            payload["pid"] = pid
+        idx = 0
+        while idx < len(remaining):
+            token = remaining[idx]
+            if token in {"--group", "-g"}:
+                idx += 1
+                if idx >= len(remaining):
+                    raise ValueError("cmd.list --group requires a value")
+                payload["group"] = _require_int(remaining[idx], "group")
+            elif token.startswith("group="):
+                payload["group"] = _require_int(token.split("=", 1)[1], "group")
+            elif token == "--oid":
+                idx += 1
+                if idx >= len(remaining):
+                    raise ValueError("cmd.list --oid requires a value")
+                payload["oid"] = _require_int(remaining[idx], "oid")
+            elif token.startswith("oid="):
+                payload["oid"] = _require_int(token.split("=", 1)[1], "oid")
+            elif token == "--name":
+                idx += 1
+                if idx >= len(remaining):
+                    raise ValueError("cmd.list --name requires a value")
+                payload["name"] = remaining[idx]
+            elif token.startswith("name="):
+                payload["name"] = token.split("=", 1)[1]
+            else:
+                raise ValueError(f"cmd.list: unknown option '{token}'")
+            idx += 1
+        _LAST_COMMAND_CONTEXT = {}
+        return payload
+
+    raise ValueError(f"unsupported cmd.* command '{cmd}'")

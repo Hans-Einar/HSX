@@ -16,6 +16,7 @@ Options:
     --app-name NAME     Application name for HXE header
     --no-make           Skip make invocation, build files directly
     -j JOBS             Parallel jobs for make (default: auto)
+    --clean             Remove build directory before building
     -v, --verbose       Verbose output
     -h, --help          Show this help message
     
@@ -76,7 +77,11 @@ class HSXBuilder:
     def __init__(self, args):
         self.args = args
         self.verbose = args.verbose
-        
+        self.debug_prefix_map: Optional[str] = None
+        self.debug_prefix_map_flag: Optional[str] = None
+        self.debug_env: Dict[str, str] = {}
+        self.build_timestamp = self._compute_build_timestamp()
+
         # Determine working directory
         if args.directory:
             os.chdir(args.directory)
@@ -92,13 +97,45 @@ class HSXBuilder:
             self.build_dir = Path('build/debug')
         else:
             self.build_dir = Path('build')
-        
+
+        if args.clean and self.build_dir.exists():
+            if self.verbose:
+                print(f"[hsx-cc-build] Cleaning build directory: {self.build_dir}")
+            shutil.rmtree(self.build_dir)
+
         self.build_dir.mkdir(parents=True, exist_ok=True)
-        
+
         if self.verbose:
             print(f"Project root: {self.project_root}")
             print(f"Build directory: {self.build_dir}")
-    
+
+        if args.debug:
+            resolved_root = str(self.project_root.resolve())
+            self.debug_prefix_map = f"{resolved_root}=."
+            self.debug_prefix_map_flag = f"-fdebug-prefix-map={self.debug_prefix_map}"
+            self.debug_env = {
+                "HSX_DEBUG_PREFIX_MAP": self.debug_prefix_map,
+                "DEBUG_PREFIX_MAP": self.debug_prefix_map,
+            }
+
+        self.stdlib_mvasm = (self.project_root / "lib" / "hsx_std" / "stdlib.mvasm").resolve()
+        self.use_stdlib = bool(args.with_stdlib or args.debug)
+        self._stdlib_obj: Optional[Path] = None
+
+    def _compute_build_timestamp(self) -> str:
+        epoch = os.environ.get("SOURCE_DATE_EPOCH")
+        if epoch is None or epoch == "":
+            seconds = 0
+        else:
+            try:
+                seconds = int(epoch, 10)
+            except ValueError as exc:
+                raise HSXBuildError("SOURCE_DATE_EPOCH must be an integer value") from exc
+            if seconds < 0:
+                raise HSXBuildError("SOURCE_DATE_EPOCH must be non-negative")
+        dt = datetime.fromtimestamp(seconds, tz=timezone.utc)
+        return dt.isoformat().replace("+00:00", "Z")
+
     def log(self, msg: str):
         """Log message if verbose"""
         if self.verbose:
@@ -115,7 +152,8 @@ class HSXBuilder:
                 cwd=cwd,
                 check=True,
                 capture_output=True,
-                text=True
+                text=True,
+                env=self._command_env(),
             )
             if result.stdout and self.verbose:
                 print(result.stdout)
@@ -127,7 +165,30 @@ class HSXBuilder:
             if e.stderr:
                 print("STDERR:", e.stderr, file=sys.stderr)
             raise HSXBuildError(f"Command failed: {cmd_str}")
-    
+
+    def _command_env(self) -> Dict[str, str]:
+        env = os.environ.copy()
+        if self.debug_env:
+            for key, value in self.debug_env.items():
+                env.setdefault(key, value)
+        return env
+
+    def _normalize_sources(self, source_files: List[Path]) -> List[Path]:
+        """Return sorted, de-duplicated list of existing source files."""
+        seen: Dict[Path, Path] = {}
+        for src in source_files:
+            path = Path(src)
+            try:
+                resolved = path.resolve()
+            except FileNotFoundError:
+                continue
+            if resolved in seen:
+                continue
+            if resolved.is_dir():
+                continue
+            seen[resolved] = resolved
+        return sorted(seen.values(), key=lambda p: p.as_posix())
+
     def find_tool(self, tool: str) -> Path:
         """Find tool in python/ directory or PATH"""
         # Try python/ directory first
@@ -181,7 +242,7 @@ class HSXBuilder:
             clang_cmd.extend([
                 '-g',
                 '-O0',
-                f'-fdebug-prefix-map={self.project_root}=.'
+                self.debug_prefix_map_flag or f'-fdebug-prefix-map={self.project_root.resolve()}=.'
             ])
         else:
             clang_cmd.extend(['-O2'])
@@ -229,18 +290,44 @@ class HSXBuilder:
         
         self.run_command(asm_cmd)
         return hxo_file
+
+    def _ensure_stdlib_object(self) -> Optional[Path]:
+        """Assemble the standard library bundle when requested."""
+        if not self.use_stdlib:
+            return None
+        if not self.stdlib_mvasm.exists():
+            raise HSXBuildError(f"Standard library not found: {self.stdlib_mvasm}")
+        if self._stdlib_obj is None:
+            obj_path = self.build_dir / "hsx_stdlib.hxo"
+            asm_tool = self.find_tool('asm.py')
+            asm_cmd = [
+                sys.executable,
+                str(asm_tool),
+                str(self.stdlib_mvasm),
+                '-o',
+                str(obj_path),
+            ]
+            self.log(f"Assembling stdlib {self.stdlib_mvasm} -> {obj_path}")
+            self.run_command(asm_cmd)
+            self._stdlib_obj = obj_path
+        return self._stdlib_obj
     
     def link_to_hxe(self, hxo_files: List[Path], dbg_files: List[Path]) -> Path:
         """Link HXO files to HXE"""
         output_name = self.args.output or 'app.hxe'
         hxe_file = self.build_dir / output_name
         
-        self.log(f"Linking {len(hxo_files)} object files to HXE...")
+        stdlib_obj = self._ensure_stdlib_object()
+        all_hxo = list(hxo_files)
+        if stdlib_obj is not None:
+            all_hxo.append(stdlib_obj)
+
+        self.log(f"Linking {len(all_hxo)} object files to HXE...")
         
         linker = self.find_tool('hld.py')
         
         link_cmd = [sys.executable, str(linker)]
-        link_cmd.extend(str(f) for f in hxo_files)
+        link_cmd.extend(str(f) for f in all_hxo)
         link_cmd.extend(['-o', str(hxe_file)])
         
         # Add app name
@@ -261,28 +348,35 @@ class HSXBuilder:
     def generate_sources_json(self, source_files: List[Path]):
         """Generate sources.json for debugger path resolution"""
         self.log("Generating sources.json...")
+
+        normalized_sources = self._normalize_sources(source_files)
         
         sources_data = {
             'version': 1,
             'project_root': str(self.project_root.resolve()),
-            'build_time': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+            'build_time': self.build_timestamp,
             'sources': [],
             'include_paths': []
         }
+        if self.debug_prefix_map:
+            sources_data['prefix_map'] = self.debug_prefix_map
         
-        for src in source_files:
-            src_path = Path(src)
+        root = self.project_root.resolve()
+        for resolved in normalized_sources:
             try:
-                # Try to make relative to project root
-                rel_path = src_path.resolve().relative_to(self.project_root)
+                rel_path = resolved.relative_to(root)
+                rel_str = rel_path.as_posix()
+                rel_entry = f"./{rel_str}"
+                file_field = rel_str
             except ValueError:
-                # Outside project root, use as-is
-                rel_path = src_path
+                rel_str = resolved.as_posix()
+                rel_entry = rel_str
+                file_field = rel_str
             
             sources_data['sources'].append({
-                'file': str(rel_path),
-                'path': str(src_path.resolve()),
-                'relative': f"./{rel_path}"
+                'file': file_field,
+                'path': resolved.as_posix(),
+                'relative': rel_entry,
             })
         
         # Add common include paths
@@ -306,16 +400,24 @@ class HSXBuilder:
         """Discover C source files in project"""
         self.log("Discovering source files...")
         
-        source_files = []
-        
-        # Look for common source directories
+        candidates: List[Path] = []
         search_dirs = [self.project_root, self.project_root / 'src']
-        
         for search_dir in search_dirs:
-            if search_dir.exists():
-                for ext in ['*.c', '*.cpp']:
-                    source_files.extend(search_dir.glob(ext))
-        
+            if not search_dir.exists():
+                continue
+            for ext in ('*.c', '*.cpp'):
+                for candidate in search_dir.rglob(ext):
+                    if candidate.is_dir():
+                        continue
+                    try:
+                        candidate.relative_to(self.build_dir.resolve())
+                        continue
+                    except ValueError:
+                        pass
+                    candidates.append(candidate)
+
+        source_files = self._normalize_sources(candidates)
+
         if not source_files:
             raise HSXBuildError("No source files found")
         
@@ -325,11 +427,12 @@ class HSXBuilder:
     def build_direct(self, source_files: List[Path]):
         """Build source files directly without make"""
         self.log(f"Building {len(source_files)} source files...")
-        
+
+        normalized_sources = self._normalize_sources(source_files)
         hxo_files = []
         dbg_files = []
         
-        for c_file in source_files:
+        for c_file in normalized_sources:
             # C -> LLVM IR
             ll_file = self.compile_c_to_ll(c_file)
             
@@ -347,7 +450,7 @@ class HSXBuilder:
         
         # Generate sources.json for debug builds
         if self.args.debug:
-            self.generate_sources_json(source_files)
+            self.generate_sources_json(normalized_sources)
         
         self.log(f"Build complete: {hxe_file}")
         return hxe_file
@@ -443,6 +546,12 @@ def main():
         metavar='NAME',
         help='Application name for HXE header'
     )
+
+    parser.add_argument(
+        '--with-stdlib',
+        action='store_true',
+        help='Link lib/hsx_std/stdlib.mvasm into the final image'
+    )
     
     parser.add_argument(
         '--no-make',
@@ -458,6 +567,12 @@ def main():
     )
     
     parser.add_argument(
+        '--clean',
+        action='store_true',
+        help='Remove build directory before building'
+    )
+    
+    parser.add_argument(
         '-v', '--verbose',
         action='store_true',
         help='Verbose output'
@@ -465,6 +580,28 @@ def main():
     
     args = parser.parse_args()
     
+    dir_sources = []
+    file_sources = []
+    normalized_sources = []
+    for src in args.sources:
+        path = Path(src)
+        if path.is_dir():
+            dir_sources.append(path)
+        else:
+            file_sources.append(path)
+    if dir_sources:
+        if file_sources:
+            parser.error("Cannot mix directory paths with individual source files.")
+        if len(dir_sources) > 1:
+            parser.error("Only one directory path is supported at a time.")
+        directory_path = dir_sources[0].resolve()
+        if not directory_path.exists():
+            parser.error(f"Directory does not exist: {directory_path}")
+        args.directory = str(directory_path)
+        args.sources = []
+    else:
+        args.sources = [str(Path(src)) for src in file_sources]
+
     builder = HSXBuilder(args)
     return builder.build()
 

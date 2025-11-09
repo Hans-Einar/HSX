@@ -3,8 +3,10 @@ from __future__ import annotations
 
 
 import collections
+import errno
 from dataclasses import dataclass, field
-from typing import Deque, Dict, Iterable, Iterator, List, Optional, Tuple
+from typing import Any, Callable, Deque, Dict, Iterable, Iterator, List, Optional, Tuple
+import time
 
 from python import hsx_mailbox_constants as mbx_const  # namespace package import
 
@@ -39,6 +41,10 @@ HSX_MBX_TIMEOUT_POLL = mbx_const.HSX_MBX_TIMEOUT_POLL
 class MailboxError(Exception):
     """Raised for mailbox failures."""
 
+    def __init__(self, message: str, *, code: Optional[int] = None) -> None:
+        super().__init__(message)
+        self.code = code
+
 
 @dataclass
 class MailboxMessage:
@@ -56,6 +62,8 @@ class HandleState:
     last_seq: int = -1
     pending_overrun: bool = False
     is_sender: bool = False
+    is_tap: bool = False
+    pending_tap_overrun: bool = False
 
 
 @dataclass
@@ -69,7 +77,8 @@ class MailboxDescriptor:
     queue: Deque[MailboxMessage] = field(default_factory=collections.deque)
     bytes_used: int = 0
     waiters: List[int] = field(default_factory=list)
-    taps: List[int] = field(default_factory=list)
+    taps: List[Tuple[int, int]] = field(default_factory=list)
+    tap_buffers: Dict[Tuple[int, int], "TapBuffer"] = field(default_factory=dict)
     head_seq: int = 0
     next_seq: int = 0
 
@@ -77,10 +86,35 @@ class MailboxDescriptor:
         return max(self.capacity - self.bytes_used, 0)
 
 
+@dataclass
+class TapBuffer:
+    queue: Deque[MailboxMessage] = field(default_factory=collections.deque)
+    bytes_used: int = 0
+
+
 class MailboxManager:
     """Tracks HSX mailboxes and per-task handle tables."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        max_descriptors: int = 256,
+        per_pid_handle_limit: Optional[int] = None,
+        default_capacity: Optional[int] = None,
+        event_hook: Optional[Callable[[Dict[str, Any]], None]] = None,
+        tap_rate_limit: Optional[int] = None,
+    ) -> None:
+        self._max_descriptors = max(1, int(max_descriptors))
+        self._handle_limit = int(per_pid_handle_limit) if per_pid_handle_limit is not None else None
+        if self._handle_limit is not None and self._handle_limit <= 0:
+            raise ValueError("per_pid_handle_limit must be positive when provided")
+        if default_capacity is not None:
+            normalized_capacity = int(default_capacity)
+            if normalized_capacity <= 0:
+                raise ValueError("default_capacity must be positive when provided")
+            self._default_capacity = normalized_capacity
+        else:
+            self._default_capacity = HSX_MBX_DEFAULT_RING_CAPACITY
         self._next_descriptor_id = 1
         self._descriptors: Dict[int, MailboxDescriptor] = {}
         self._lookup: Dict[Tuple[int, str, Optional[int]], int] = {}
@@ -92,9 +126,57 @@ class MailboxManager:
             HSX_MBX_STDIO_ERR: HSX_MBX_MODE_RDWR,
         }
         self._stdio_handles: Dict[int, Dict[str, int]] = {}
+        self._message_overhead = 8  # header size used in _message_cost
+        self._event_hook: Optional[Callable[[Dict[str, Any]], None]] = event_hook
+        self._tap_rate_limit = max(0, int(tap_rate_limit)) if tap_rate_limit is not None else 0
+        self._tap_rate_windows: Dict[Tuple[int, int], Dict[str, float]] = {}
+        self._descriptor_exhausted = False
 
     # ------------------------------------------------------------------
     # Lifecycle helpers
+
+    @property
+    def max_descriptors(self) -> int:
+        return self._max_descriptors
+
+    @property
+    def descriptor_count(self) -> int:
+        return len(self._descriptors)
+
+    def set_event_hook(self, hook: Optional[Callable[[Dict[str, Any]], None]]) -> None:
+        """Assign or clear the event hook used for instrumentation callbacks."""
+        self._event_hook = hook
+
+    def _emit_event(self, event_type: str, **fields: Any) -> None:
+        if self._event_hook is None:
+            return
+        event = {"type": event_type, **fields}
+        try:
+            self._event_hook(event)
+        except Exception:
+            # Instrumentation must never disrupt mailbox operation.
+            pass
+
+    def set_tap_rate_limit(self, limit: Optional[int]) -> None:
+        value = 0 if limit is None else max(0, int(limit))
+        if value != self._tap_rate_limit:
+            self._tap_rate_limit = value
+            self._tap_rate_windows.clear()
+
+    def _tap_rate_allow(self, key: Tuple[int, int]) -> bool:
+        limit = self._tap_rate_limit
+        if limit <= 0:
+            return True
+        now = time.monotonic()
+        window = self._tap_rate_windows.get(key)
+        if window is None or now - window.get("start", 0.0) >= 1.0:
+            window = {"start": now, "count": 0, "dropped": 0}
+            self._tap_rate_windows[key] = window
+        if window["count"] >= limit:
+            window["dropped"] += 1
+            return False
+        window["count"] += 1
+        return True
 
     def register_task(self, pid: int) -> None:
         """Ensure the per-task mailboxes exist (stdio + control)."""
@@ -139,6 +221,20 @@ class MailboxManager:
         key = (namespace, name, owner_pid)
         descriptor_id = self._lookup.get(key)
         if descriptor_id is None:
+            if len(self._descriptors) >= self._max_descriptors:
+                self._descriptor_exhausted = True
+                self._emit_event(
+                    "mailbox_exhausted",
+                    reason="descriptor_pool_full",
+                    namespace=namespace,
+                    name=name,
+                    owner=owner_pid,
+                    max_descriptors=self._max_descriptors,
+                )
+                raise MailboxError(
+                    "descriptor pool exhausted",
+                    code=mbx_const.HSX_MBX_STATUS_NO_DESCRIPTOR,
+                )
             descriptor_id = self._next_descriptor_id
             self._next_descriptor_id += 1
             desc = MailboxDescriptor(
@@ -146,7 +242,7 @@ class MailboxManager:
                 namespace=namespace,
                 name=name,
                 owner_pid=owner_pid,
-                capacity=capacity or HSX_MBX_DEFAULT_RING_CAPACITY,
+                capacity=capacity or self._default_capacity,
                 mode_mask=mode_mask,
             )
             self._descriptors[descriptor_id] = desc
@@ -154,6 +250,7 @@ class MailboxManager:
             self._update_head_seq(desc)
             if mode_mask:
                 self._apply_descriptor_mode(desc, mode_mask)
+            self._descriptor_exhausted = len(self._descriptors) >= self._max_descriptors
             return desc
 
         desc = self._descriptors[descriptor_id]
@@ -197,19 +294,40 @@ class MailboxManager:
     def open(self, *, pid: int, target: str, flags: int = 0) -> int:
         namespace, name, owner_pid = self._parse_target(pid, target)
         desc = self.bind(namespace=namespace, name=name, owner_pid=owner_pid)
+        handle_table = self._handles.setdefault(pid, {})
+        if self._handle_limit is not None and len(handle_table) >= self._handle_limit:
+            self._emit_event(
+                "mailbox_exhausted",
+                reason="handle_limit",
+                pid=pid,
+                handle_limit=self._handle_limit,
+                handles=len(handle_table),
+            )
+            raise MailboxError(
+                "handle quota exceeded",
+                code=errno.ENOSPC,
+            )
         handle = self._allocate_handle(pid)
         state = HandleState(descriptor_id=desc.descriptor_id)
         self._initialize_handle_state(desc, state)
-        self._handles.setdefault(pid, {})[handle] = state
+        handle_table[handle] = state
         return handle
 
     def close(self, *, pid: int, handle: int) -> None:
         table = self._handles.get(pid)
         if not table or handle not in table:
-            raise MailboxError(f"invalid handle {handle} for pid {pid}")
+            raise MailboxError(
+                f"invalid handle {handle} for pid {pid}",
+                code=mbx_const.HSX_MBX_STATUS_INVALID_HANDLE,
+            )
         state = table.pop(handle)
         desc = self._descriptors.get(state.descriptor_id)
         if desc is not None:
+            if state.is_tap:
+                key = (pid, handle)
+                desc.tap_buffers.pop(key, None)
+                desc.taps = [entry for entry in desc.taps if entry != key]
+                self._tap_rate_windows.pop(key, None)
             self._reclaim_acked(desc)
 
     def descriptor_for_handle(self, pid: int, handle: int) -> MailboxDescriptor:
@@ -269,6 +387,8 @@ class MailboxManager:
                 trace_fp.write(f"[MailboxManager] recv pid={pid} handle={handle} descriptor={desc.descriptor_id} depth={len(desc.queue)}\n")
         except OSError:
             pass
+        if state.is_tap:
+            return self._tap_recv(desc, state, pid, handle)
         if fanout_enabled:
             self._reclaim_acked(desc)
             next_msg = self._next_message_for_handle(desc, state)
@@ -329,13 +449,21 @@ class MailboxManager:
 
     def tap(self, *, pid: int, handle: int, enable: bool) -> None:
         desc = self.descriptor_for_handle(pid, handle)
-        taps = desc.taps
+        state = self._handle_state(pid, handle)
+        key = (pid, handle)
         if enable:
-            if pid not in taps:
-                taps.append(pid)
+            if key not in desc.taps:
+                desc.taps.append(key)
+            desc.tap_buffers.setdefault(key, TapBuffer())
+            state.is_tap = True
+            self._tap_rate_windows.pop(key, None)
         else:
-            if pid in taps:
-                taps.remove(pid)
+            if key in desc.taps:
+                desc.taps = [entry for entry in desc.taps if entry != key]
+            desc.tap_buffers.pop(key, None)
+            state.is_tap = False
+            state.pending_tap_overrun = False
+            self._tap_rate_windows.pop(key, None)
 
     def iter_waiters(self, descriptor_id: int) -> Iterable[int]:
         desc = self._descriptors.get(descriptor_id)
@@ -401,6 +529,11 @@ class MailboxManager:
     def descriptor_snapshot(self) -> List[Dict[str, object]]:
         out: List[Dict[str, object]] = []
         for desc in self._descriptors.values():
+            tap_infos: List[Dict[str, int]] = []
+            for pid, handle in desc.taps:
+                buffer = desc.tap_buffers.get((pid, handle))
+                depth = len(buffer.queue) if buffer is not None else 0
+                tap_infos.append({"pid": pid, "handle": handle, "depth": depth})
             out.append(
                 {
                     "descriptor_id": desc.descriptor_id,
@@ -413,12 +546,42 @@ class MailboxManager:
                     "head_seq": desc.head_seq,
                     "next_seq": desc.next_seq,
                     "mode_mask": desc.mode_mask,
-                    "subscriber_count": sum(1 for _ in self._iter_handle_states(desc.descriptor_id)),
                     "waiters": list(desc.waiters),
-                    "taps": list(desc.taps),
+                    "taps": tap_infos,
                 }
             )
         return sorted(out, key=lambda item: item["descriptor_id"])
+
+    def resource_stats(self) -> Dict[str, object]:
+        descriptors = list(self._descriptors.values())
+        active_descriptors = len(descriptors)
+        total_capacity = sum(desc.capacity for desc in descriptors)
+        bytes_used = sum(desc.bytes_used for desc in descriptors)
+        queue_depth = sum(len(desc.queue) for desc in descriptors)
+        handles_per_pid = {pid: len(handles) for pid, handles in self._handles.items()}
+        total_handles = sum(handles_per_pid.values())
+        tap_total = sum(len(desc.taps) for desc in descriptors)
+        tap_queue_depth = sum(len(buffer.queue) for desc in descriptors for buffer in desc.tap_buffers.values())
+        wait_total = sum(len(desc.waiters) for desc in descriptors)
+        fanout_descriptors = sum(1 for desc in descriptors if desc.mode_mask & HSX_MBX_MODE_FANOUT)
+        return {
+            "max_descriptors": self._max_descriptors,
+            "active_descriptors": active_descriptors,
+            "free_descriptors": max(self._max_descriptors - active_descriptors, 0),
+            "total_capacity": total_capacity,
+            "bytes_used": bytes_used,
+            "bytes_available": max(total_capacity - bytes_used, 0),
+            "queue_depth": queue_depth,
+            "handles_total": total_handles,
+            "handles_per_pid": handles_per_pid,
+            "handle_limit_per_pid": self._handle_limit,
+            "tap_rate_limit": self._tap_rate_limit,
+            "descriptor_pool_exhausted": self._descriptor_exhausted,
+            "tap_count": tap_total,
+            "tap_queue_depth": tap_queue_depth,
+            "waiter_count": wait_total,
+            "fanout_descriptors": fanout_descriptors,
+        }
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -464,7 +627,10 @@ class MailboxManager:
     def _handle_state(self, pid: int, handle: int) -> HandleState:
         table = self._handles.get(pid)
         if not table or handle not in table:
-            raise MailboxError(f"invalid handle {handle} for pid {pid}")
+            raise MailboxError(
+                f"invalid handle {handle} for pid {pid}",
+                code=mbx_const.HSX_MBX_STATUS_INVALID_HANDLE,
+            )
         return table[handle]
 
     def _iter_handle_states(self, descriptor_id: int) -> Iterator[HandleState]:
@@ -490,27 +656,67 @@ class MailboxManager:
     def _enqueue_message(self, desc: MailboxDescriptor, message: MailboxMessage) -> bool:
         cost = _message_cost(message)
         if cost > desc.capacity:
-            raise MailboxError("message too large for mailbox capacity")
+            raise MailboxError(
+                "message too large for mailbox capacity",
+                code=mbx_const.HSX_MBX_STATUS_MSG_TOO_LARGE,
+            )
 
         fanout_enabled = bool(desc.mode_mask & HSX_MBX_MODE_FANOUT)
         if not fanout_enabled:
             if cost > desc.space_remaining():
+                self._emit_event(
+                    "mailbox_backpressure",
+                    descriptor=desc.descriptor_id,
+                    policy="single",
+                    capacity=desc.capacity,
+                    bytes_used=desc.bytes_used,
+                    requested=cost,
+                )
                 return False
             self._append_message(desc, message, cost)
+            self._deliver_to_taps(desc, message)
             return True
 
         self._reclaim_acked(desc)
         if desc.mode_mask & HSX_MBX_MODE_FANOUT_BLOCK:
             if cost > desc.space_remaining():
+                self._emit_event(
+                    "mailbox_backpressure",
+                    descriptor=desc.descriptor_id,
+                    policy="fanout_block",
+                    capacity=desc.capacity,
+                    bytes_used=desc.bytes_used,
+                    requested=cost,
+                )
                 return False
         else:
             while cost > desc.space_remaining() and desc.queue:
                 dropped = self._pop_head(desc)
                 if dropped is not None:
+                    self._emit_event(
+                        "mailbox_overrun",
+                        pid=dropped.src_pid,
+                        descriptor=desc.descriptor_id,
+                        dropped_seq=dropped.seq_no,
+                        dropped_length=dropped.length,
+                        dropped_flags=dropped.flags,
+                        channel=dropped.channel,
+                        reason="fanout_drop",
+                        queue_depth=len(desc.queue),
+                    )
                     self._mark_overrun(desc.descriptor_id, dropped.seq_no)
         if cost > desc.space_remaining():
+            self._emit_event(
+                "mailbox_backpressure",
+                descriptor=desc.descriptor_id,
+                policy="fanout_block" if (desc.mode_mask & HSX_MBX_MODE_FANOUT_BLOCK) else "fanout_drop",
+                capacity=desc.capacity,
+                bytes_used=desc.bytes_used,
+                requested=cost,
+            )
             return False
         self._append_message(desc, message, cost)
+        self._deliver_to_taps(desc, message)
         return True
 
     def _append_message(self, desc: MailboxDescriptor, message: MailboxMessage, cost: int) -> None:
@@ -520,6 +726,59 @@ class MailboxManager:
         desc.next_seq = message.seq_no + 1
         if was_empty:
             desc.head_seq = message.seq_no
+
+    def _deliver_to_taps(self, desc: MailboxDescriptor, message: MailboxMessage) -> None:
+        if not desc.taps:
+            return
+        cost = _message_cost(message)
+        for tap_pid, tap_handle in list(desc.taps):
+            buffer = desc.tap_buffers.setdefault((tap_pid, tap_handle), TapBuffer())
+            state = self._handles.get(tap_pid, {}).get(tap_handle)
+            if state is None or not state.is_tap:
+                continue
+            key = (tap_pid, tap_handle)
+            if not self._tap_rate_allow(key):
+                state.pending_tap_overrun = True
+                self._emit_event(
+                    "mailbox_backpressure",
+                    descriptor=desc.descriptor_id,
+                    policy="tap_rate_limit",
+                    tap_pid=tap_pid,
+                    tap_handle=tap_handle,
+                    limit=self._tap_rate_limit,
+                )
+                continue
+            if cost > desc.capacity:
+                state.pending_tap_overrun = True
+                continue
+            while buffer.bytes_used + cost > desc.capacity and buffer.queue:
+                old = buffer.queue.popleft()
+                buffer.bytes_used = max(buffer.bytes_used - _message_cost(old), 0)
+                state.pending_tap_overrun = True
+            if buffer.bytes_used + cost > desc.capacity:
+                state.pending_tap_overrun = True
+                continue
+            buffer.queue.append(message)
+            buffer.bytes_used += cost
+
+    def _tap_recv(self, desc: MailboxDescriptor, state: HandleState, pid: int, handle: int) -> Optional[MailboxMessage]:
+        buffer = desc.tap_buffers.get((pid, handle))
+        if buffer is None or not buffer.queue:
+            return None
+        message = buffer.queue.popleft()
+        buffer.bytes_used = max(buffer.bytes_used - _message_cost(message), 0)
+        flags = message.flags
+        if state.pending_tap_overrun:
+            flags |= mbx_const.HSX_MBX_FLAG_OVERRUN
+            state.pending_tap_overrun = False
+        return MailboxMessage(
+            length=message.length,
+            flags=flags,
+            src_pid=message.src_pid,
+            channel=message.channel,
+            payload=message.payload,
+            seq_no=message.seq_no,
+        )
 
     def _pop_head(self, desc: MailboxDescriptor) -> Optional[MailboxMessage]:
         if not desc.queue:

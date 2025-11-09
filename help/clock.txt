@@ -1,8 +1,8 @@
-clock [status|start|stop|step [steps] [-p <pid>]|rate <hz>]
-Inspect and control the executive clock. No arguments show current counters, including the current mode (active/throttled/sleep/idle) and throttle state. `clock start`/`clock stop` toggle the background stepping loop. `clock step [steps]` retires that many guest instructions across runnable tasks in round-robin order; add `-p <pid>` to focus on a single task. `clock rate <hz>` throttles the auto loop; use `0` for unlimited.
-
-Examples
-  clock status             # show current counters and rate
-  clock step 12            # retire 12 instructions across all runnable tasks
-  clock step 50 -p 3       # step PID 3 forward by 50 instructions
-  clock rate 200           # run the auto loop at ~200 steps/sec
+clock [status|start|stop|step [steps] [-p <pid>]|rate <hz>]
+Inspect and control the executive clock. No arguments show current counters, including the current mode (active/throttled/sleep/idle) and throttle state. `clock start`/`clock stop` toggle the background stepping loop. `clock step [steps]` retires that many guest instructions across runnable tasks in round-robin order; add `-p <pid>` to focus on a single task. `clock rate <hz>` throttles the auto loop; use `0` for unlimited.
+
+Examples
+  clock status             # show current counters and rate
+  clock step 12            # retire 12 instructions across all runnable tasks
+  clock step 50 -p 3       # step PID 3 forward by 50 instructions
+  clock rate 200           # run the auto loop at ~200 steps/sec

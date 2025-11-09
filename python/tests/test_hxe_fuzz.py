@@ -9,6 +9,7 @@ from platforms.python.host_vm import (
     HEADER,
     HSX_MAGIC,
     HSX_VERSION,
+    SUPPORTED_HSX_VERSIONS,
     load_hxe,
     MAX_BSS_SIZE,
     MAX_CODE_LEN,
@@ -44,7 +45,7 @@ def test_load_hxe_detects_header_corruption(tmp_path):
 
     # Unsupported version
     mutated = bytearray(original)
-    struct.pack_into(">H", mutated, 4, HSX_VERSION + 1)
+    struct.pack_into(">H", mutated, 4, max(SUPPORTED_HSX_VERSIONS) + 1)
     _update_crc(mutated)
     bad_version = tmp_path / "bad_version.hxe"
     bad_version.write_bytes(mutated)

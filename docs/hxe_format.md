@@ -34,6 +34,11 @@ All multi-byte fields use big-endian unless stated otherwise.
 
 **Total header size: 96 bytes (0x60)**
 
+**Version 0x0002 additions**
+- `app_name` carries the canonical program name reported via `ps`/`info`. Whitespace is stripped and the executive truncates longer names to 31 bytes.
+- `flags` bit 1 (`FLAG_ALLOW_MULTIPLE`) controls instance policy. When the bit is cleared, the executive rejects additional loads with the same `app_name`. When set, the executive auto-suffixes `_#N` to create unique instance names.
+- `meta_offset` / `meta_count` enable the metadata section table described below. Loaders must reject tables that overlap the code or rodata segments.
+
 Immediately following the header:
 1. `code` section (`code_len` bytes) – executable VM code.
 2. `rodata` section (`ro_len` bytes) – read-only data.
@@ -88,9 +93,14 @@ Defines values to be registered by executive before VM execution. Each entry:
 | 0x0C   | 2    | `min_val` | Range minimum (f16). |
 | 0x0E   | 2    | `max_val` | Range maximum (f16). |
 | 0x10   | 2    | `persist_key` | FRAM key (0=no persistence). |
-| 0x12   | 2    | `reserved` | Reserved for future use. |
+| 0x12   | 2    | `group_name_offset` | Offset to group name string (0 = none). |
 
 **Entry size: 20 bytes**
+
+- **Executive handling:** Each `(group_id,value_id)` pair must be unique. The loader rejects values outside `0..255`. Absent strings resolve to `None`. The executive stores the raw f16 values (`init_raw`, `epsilon_raw`, `min_raw`, `max_raw`) while also exposing the decoded float fields. When `persist_key` is non-zero the runtime flags the value for FRAM persistence via `val.persist`.
+- **Pre-registration:** During image load the executive automatically registers each value with the runtime registry, applies the `init_value`, and synthesises name/unit/range/persist descriptors from the metadata. Duplicate registrations or invalid string offsets abort the load.
+- **Validation:** Duplicate IDs or malformed string offsets cause the load to fail. The executive ignores entries when the section is omitted.
+- **Change filtering:** When `epsilon` is non-zero, updates within the epsilon band are ignored (no notifications or persistence). When `rate_ms` is non-zero, repeated updates within the window return `EBUSY` and must be retried once the suppression interval elapses.
 
 ### `.cmd` Section (type=2)
 Defines commands to be registered. Each entry:
@@ -104,21 +114,107 @@ Defines commands to be registered. Each entry:
 | 0x04   | 4    | `handler_offset` | Code offset to handler function. |
 | 0x08   | 2    | `name_offset` | Offset to name string (0=none). |
 | 0x0A   | 2    | `help_offset` | Offset to help text (0=none). |
-| 0x0C   | 4    | `reserved` | Reserved for future use. |
+| 0x0C   | 4    | `reserved_hi:group_name_offset` | Lower 16 bits: group name string offset (0 = none). Upper 16 bits reserved. |
 
 **Entry size: 16 bytes**
 
+- **Executive handling:** Commands share the same `(group_id,value_id)` namespace as values. The `handler_offset` points to the VM entry point (relative to the code section). The executive enforces uniqueness and records the supplied names/help strings for debugger shells. Flags/auth levels map directly to the command SVC policy (`HSX_CMD_FL_PIN`, etc.).
+- **Pre-registration:** Every `.cmd` entry is registered before the VM begins executing. The runtime preserves `handler_offset` for future dispatch, applies PIN/auth flags, and exposes descriptor metadata to RPC/HXE tooling. Errors (duplicate IDs, bad strings) cause the load to fail.
+
 ### `.mailbox` Section (type=3)
-Defines mailboxes to be created. Each entry:
+Defines mailboxes to be created before the VM starts running. HXE v2 uses a UTF-8 JSON payload:
+
+```jsonc
+{
+  "version": 1,
+  "mailboxes": [
+    {
+      "target": "app:telemetry",
+      "capacity": 96,
+      "mode": "RDWR",           // simple single-reader mailbox bound to app PID 2
+      "owner_pid": 2
+    },
+    {
+      "target": "shared:metrics",
+      "capacity": 192,
+      "mode": "RDWR|FANOUT_DROP", // fan-out telemetry stream (drop oldest on overflow)
+      "bindings": [
+        {"pid": 0, "flags": 0x0001},   // executive tap for dashboards
+        {"pid": 3, "flags": 0x0001}    // background logger subscribes
+      ]
+    },
+    {
+      "target": "svc:stdio.out@5",
+      "mode": "RDWR|TAP",          // declare tap for task 5 stdout mirroring
+      "bindings": [
+        {"pid": 0, "flags": 0x0004}
+      ]
+    },
+    {
+      "target": "pid:5",
+      "capacity": 64,
+      "mode": "RDWR",
+      "bindings": [
+        {"pid": 0, "flags": 0x0001}    // executive control channel (stdin)
+      ]
+    }
+  ]
+}
+```
+
+Each entry object supports the following fields (all optional unless noted):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `target` | string (**required**) | Mailbox name with namespace prefix (`svc:`, `pid:`, `app:`, `shared:`). |
+| `capacity` | integer | Requested ring capacity in bytes. Omit or set to `0` for the default (`HSX_MBX_DEFAULT_RING_CAPACITY`). |
+| `mode_mask` | integer | `HSX_MBX_MODE_*` bit-mask. Defaults to `HSX_MBX_MODE_RDWR` when not provided. |
+| `owner_pid` | integer | Declares the owning PID (used by provisioning tooling; optional). |
+| `bindings` | array<object> | Declarative binding hints. Each object must include `pid` (int) and may specify `flags` or other module-defined attributes. |
+| `reserved` | any | Reserved for future use. Preserved verbatim in metadata snapshots. |
+
+The loader validates the JSON structure, normalises numeric fields, and rejects duplicate mailbox names. Declarative bindings are stored for higher-level tooling but are not acted upon during image load yet.
+
+- **Precreation:** The Python loader binds each declared mailbox before the task runs. Creation results are surfaced both in the load response (`mailbox_creation`) and in `metadata._mailbox_creation`, and each metadata entry is updated with the resolved `descriptor`, `queue_depth`, and `mode_mask`.
+
+### Declarative Mailbox Pragmas
+
+HSX source files declare mailbox metadata with a C-style pragma:
+
+```c
+#pragma hsx_mailbox(target="app:telemetry", capacity=96, mode="RDWR|FANOUT")
+```
+
+- `target` (required) follows the same namespace rules as the JSON schema (`svc:`, `pid:`, `app:`, `shared:`).
+- Optional fields (`capacity`, `mode_mask`, `mode`, `owner_pid`, `bindings`) mirror the JSON object. The `mode` string supports `RDONLY`, `WRONLY`, `RDWR`, `FANOUT`, `FANOUT_DROP`, `FANOUT_BLOCK`, and `TAP`, combined with `|`.
+- The Clang → LLVM pipeline lowers the pragma to a comment in the IR: `; #pragma hsx_mailbox(...)`. `hsx-llc.py` detects these directives and emits matching `.mailbox { ... }` MVASM entries, which the assembler/linker convert into the HXE `.mailbox` section described above.
+
+#### Example scenarios
+
+- **Simple IPC (`app:telemetry`)** - single-reader mailbox provisioned for the owning PID. Use when a task exposes a control channel to tooling or other tasks.
+- **Fan-out broadcast (`shared:metrics`)** - shared namespace with `FANOUT_DROP` ensures producers never block; older entries are discarded when subscribers lag.
+- **Tap monitoring (`svc:stdio.out@5`)** - enable the `TAP` mode to duplicate stdout to the executive without starving the owner. Combine with tap rate limits configured in the mailbox profile.
+- **Stdio redirection (`pid:5`)** - declare the per-task control mailbox so provisioning can pre-bind stdin/stdout handles on load.
+
+**Tuning tips:**
+- Keep capacities power-of-two multiples of the default (64B) for predictable SRAM usage. Fan-out mailboxes must account for the largest payload multiplied by the number of subscribers.
+- Reserve `shared:` namespace for telemetry and logging. Use `app:` for intra-application channels and `svc:` for executive-owned plumbing (stdio, control).
+- When taps are involved, prefer `FANOUT_DROP` or tap-specific rate limits to protect the owner’s throughput.
+
+Legacy (pre-v2) images may still encode `.mailbox` entries as fixed-size binary structures:
 
 | Offset | Size | Field | Description |
 |--------|------|-------|-------------|
 | 0x00   | 4    | `name_offset` | Offset to mailbox name string. |
-| 0x04   | 2    | `queue_depth` | Maximum messages (0=default). |
-| 0x06   | 2    | `flags` | Mailbox flags (shared, persistent). |
+| 0x04   | 2    | `queue_depth` | Requested capacity (`0` = default). |
+| 0x06   | 2    | `flags` | Mode mask (`HSX_MBX_MODE_*`). |
 | 0x08   | 8    | `reserved` | Reserved for future use. |
 
 **Entry size: 16 bytes**
+
+Images authored with the legacy format continue to load; the parser automatically falls back to the struct layout when the payload does not contain JSON.
+
+- **Executive handling:** the executive validates each mailbox record and calls `mailbox_bind` with the normalised `target`, `capacity` (if non-zero), and `mode_mask`. Declarative bindings and owner metadata are stored in the executive registry for later phases. Duplicate mailbox names within the same image abort the load.
 
 ### String Table
 Each section may reference a string table located at the end of that section. String offsets are relative to the section start. Strings are null-terminated UTF-8.
@@ -173,6 +269,8 @@ The toolchain processes preprocessor directives in HXE source code to generate m
 #pragma hsx_mailbox(motor_status, depth=8, flags=SHARED)
 ```
 
+Flags supplied to pragmas may be written symbolically (`flags=PERSIST|PIN`), and auth levels accept the tokens `PUBLIC`, `USER`, `ADMIN`, and `FACTORY`. The command `handler=` parameter accepts either a literal offset or the name of a text-section symbol; the linker resolves symbol names to final code offsets.
+
 **Preprocessing flow:**
 1. Compiler frontend (clang) parses pragma directives and emits special metadata annotations.
 2. `hsx-llc` or assembler collects annotations and generates `.value`/`.cmd`/`.mailbox` section data.
@@ -193,6 +291,7 @@ The toolchain processes preprocessor directives in HXE source code to generate m
 ## Executive/Provisioning Responsibilities
 - Validate magic/version/CRC before loading.
 - **Preprocess metadata sections**: Parse `.value`, `.cmd`, `.mailbox` sections and register entries with app's PID.
+- The Python executive rejects duplicate values/commands/mailboxes, ensures all IDs are byte-sized, and binds mailboxes before exposing the app to the VM. Mailbox binds reuse the existing mailbox manager so metadata-driven resources appear identical to runtime-created bindings.
 - **Strip metadata sections** before loading code/rodata/bss to VM (or VM ignores them).
 - Allocate code/rodata/bss based on header fields for VM execution.
 - Apply capability checks (`req_caps`) against hardware/executive features.

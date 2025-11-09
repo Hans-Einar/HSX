@@ -9,6 +9,28 @@ try:
 except ImportError:
     import hsx_mailbox_constants as mbx_const
 
+try:
+    from . import disasm_util
+except ImportError:
+    import disasm_util
+
+try:
+    from . import trace_format
+except ImportError:
+    import trace_format
+try:
+    from .valcmd import f16_to_float, float_to_f16
+except ImportError:
+    from valcmd import f16_to_float, float_to_f16
+try:
+    from . import hsx_value_constants as val_const
+except ImportError:
+    import hsx_value_constants as val_const
+try:
+    from . import hsx_command_constants as cmd_const
+except ImportError:
+    import hsx_command_constants as cmd_const
+
 """HSX executive daemon.
 
 Connects to the HSX VM RPC server, takes over scheduling (attach/pause/resume),
@@ -16,16 +38,189 @@ and exposes a TCP JSON interface for shell clients. This is an initial scaffold;
 future work will add task tables, stdout routing, and richer scheduling.
 """
 import argparse
+import bisect
+import heapq
 import json
 import os
 import socketserver
 import threading
 import time
 import sys
+import uuid
 from collections import deque
+from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Iterable, Deque, Set, Tuple, Mapping
 
+
+class SessionError(RuntimeError):
+    """Raised when session validation or locking fails."""
+
+
+class TaskState(Enum):
+    READY = "ready"
+    RUNNING = "running"
+    WAIT_MBX = "waiting_mbx"
+    SLEEPING = "sleeping"
+    PAUSED = "paused"
+    RETURNED = "returned"
+    TERMINATED = "terminated"
+    KILLED = "killed"
+
+    @classmethod
+    def from_any(cls, value: Any) -> "TaskState":
+        if isinstance(value, TaskState):
+            return value
+        if value is None:
+            raise ValueError("task_state_none")
+        if isinstance(value, str):
+            key = value.lower()
+            alias = _TASK_STATE_ALIASES.get(key)
+            if alias is not None:
+                return alias
+        raise ValueError(f"unknown_task_state:{value}")
+
+
+_TASK_STATE_ALIASES = {
+    state.value: state for state in TaskState
+}
+_TASK_STATE_ALIASES.update(
+    {
+        "wait_mbx": TaskState.WAIT_MBX,
+        "waiting": TaskState.WAIT_MBX,
+        "sleep": TaskState.SLEEPING,
+        "sleeping": TaskState.SLEEPING,
+        "returning": TaskState.RETURNED,
+        "returned": TaskState.RETURNED,
+        "exited": TaskState.RETURNED,
+        "exit": TaskState.RETURNED,
+        "stopped": TaskState.PAUSED,
+        "dead": TaskState.TERMINATED,
+    }
+)
+
+_ALLOWED_STATE_TRANSITIONS: Dict[Optional[TaskState], Set[TaskState]] = {
+    None: {
+        TaskState.READY,
+        TaskState.RUNNING,
+        TaskState.RETURNED,
+        TaskState.TERMINATED,
+        TaskState.PAUSED,
+        TaskState.SLEEPING,
+        TaskState.WAIT_MBX,
+    },
+    TaskState.READY: {
+        TaskState.READY,
+        TaskState.RUNNING,
+        TaskState.WAIT_MBX,
+        TaskState.SLEEPING,
+        TaskState.PAUSED,
+        TaskState.TERMINATED,
+        TaskState.KILLED,
+    },
+    TaskState.RUNNING: {
+        TaskState.RUNNING,
+        TaskState.READY,
+        TaskState.WAIT_MBX,
+        TaskState.SLEEPING,
+        TaskState.PAUSED,
+        TaskState.RETURNED,
+        TaskState.TERMINATED,
+        TaskState.KILLED,
+    },
+    TaskState.WAIT_MBX: {
+        TaskState.WAIT_MBX,
+        TaskState.READY,
+        TaskState.RUNNING,
+        TaskState.PAUSED,
+        TaskState.TERMINATED,
+        TaskState.KILLED,
+    },
+    TaskState.SLEEPING: {
+        TaskState.SLEEPING,
+        TaskState.READY,
+        TaskState.RUNNING,
+        TaskState.PAUSED,
+        TaskState.TERMINATED,
+        TaskState.KILLED,
+    },
+    TaskState.PAUSED: {
+        TaskState.PAUSED,
+        TaskState.READY,
+        TaskState.RUNNING,
+        TaskState.TERMINATED,
+        TaskState.KILLED,
+    },
+    TaskState.RETURNED: {
+        TaskState.RETURNED,
+        TaskState.TERMINATED,
+        TaskState.KILLED,
+    },
+    TaskState.TERMINATED: {
+        TaskState.TERMINATED,
+    },
+    TaskState.KILLED: {
+        TaskState.KILLED,
+    },
+}
+
+
+@dataclass
+class SessionRecord:
+    session_id: str
+    client: str
+    features: List[str]
+    max_events: int
+    pid_locks: List[int]
+    heartbeat_s: int
+    warnings: List[str] = field(default_factory=list)
+    created_at: float = field(default_factory=time.time)
+    last_seen: float = field(default_factory=time.time)
+
+
+@dataclass
+class EventSubscription:
+    token: str
+    session_id: str
+    pids: Optional[Set[int]]
+    categories: Optional[Set[str]]
+    queue: Deque[Dict[str, Any]]
+    condition: threading.Condition
+    max_events: int
+    last_ack: int = 0
+    delivered_seq: int = 0
+    drop_count: int = 0
+    slow_count: int = 0
+    high_water: int = 0
+    slow_warning_active: bool = False
+    slow_since: float = 0.0
+    last_warning_ts: float = 0.0
+    last_delivery_ts: float = field(default_factory=time.time)
+    created_at: float = field(default_factory=time.time)
+    active: bool = True
+    since_seq: Optional[int] = None
+
+    def matches(self, event: Dict[str, Any]) -> bool:
+        if self.pids is not None:
+            pid = event.get("pid")
+            if pid not in self.pids:
+                return False
+        if self.categories is not None:
+            etype = event.get("type")
+            if etype not in self.categories:
+                return False
+        return True
+
+    def pending(self) -> int:
+        return max(0, self.delivered_seq - self.last_ack)
+
+
+
+RODATA_BASE = 0x4000
+REGISTER_REGION_START = 0x1000
+REGISTER_BANK_BYTES = 16 * 4
+VM_ADDRESS_SPACE_SIZE = 0x10000
 
 
 class ExecutiveState:
@@ -53,36 +248,3031 @@ class ExecutiveState:
         self.clock_mode: str = "stopped"
         self._clock_last_wait: float = 0.0
         self._clock_throttle_reason: Optional[str] = None
+        self.sessions: Dict[str, SessionRecord] = {}
+        self.pid_locks: Dict[int, str] = {}
+        self.session_lock = threading.RLock()
+        self.session_heartbeat_default = 30
+        self.session_heartbeat_min = 5
+        self.session_heartbeat_max = 300
+        self.session_events_default = 256
+        self.session_events_max = 2048
+        self._last_session_prune = 0.0
+        self._session_prune_interval = 5.0
+        self.session_supported_features = {"events", "stack", "disasm", "symbols", "memory", "watch"}
+        self.debug_attached: Set[int] = set()
+        self.breakpoints: Dict[int, Set[int]] = {}
+        self.event_lock = threading.RLock()
+        self.event_seq = 1
+        self.event_history: Deque[Dict[str, Any]] = deque(maxlen=4096)
+        self.event_subscriptions: Dict[str, EventSubscription] = {}
+        self.session_event_map: Dict[str, str] = {}
+        self.event_retention_ms = 5000
+        self.event_ack_warn_factor = 2
+        self.event_ack_drop_factor = 4
+        self.event_ack_warn_floor = 64
+        self.event_ack_drop_floor = 256
+        self.event_backpressure_grace = 1.0
+        self.event_slow_warning_interval = 0.5
+        self.symbol_tables: Dict[int, Dict[str, Any]] = {}
+        self.disasm_cache: Dict[int, Dict[Tuple[int, int], Dict[str, Any]]] = {}
+        self.memory_layouts: Dict[int, Dict[str, int]] = {}
+        self.image_metadata: Dict[int, Dict[str, Any]] = {}
+        self.value_registry: Dict[int, Dict[Tuple[int, int], Dict[str, Any]]] = {}
+        self.command_registry: Dict[int, Dict[Tuple[int, int], Dict[str, Any]]] = {}
+        self.mailbox_registry: Dict[int, Dict[str, Dict[str, Any]]] = {}
+        self.watchers: Dict[int, Dict[int, Dict[str, Any]]] = {}
+        self._next_watch_id = 1
+        self.task_state_pending: Dict[int, Dict[str, Any]] = {}
+        self.trace_last_regs: Dict[int, Dict[str, Any]] = {}
+        self.trace_track_changed_regs = True
+        self.trace_lock = threading.RLock()
+        self.trace_buffer_capacity = 256
+        self.trace_buffer_max = 4096
+        self.trace_buffers: Dict[int, Deque[Dict[str, Any]]] = {}
+        self._trace_seq = 1
+        self.symbol_cache_lock = threading.RLock()
+        self.default_stack_frames = 16
+        self.last_state_transition: Dict[int, Dict[str, Any]] = {}
+        self.sleeping_heap: List[Tuple[float, int]] = []
+        self.sleeping_deadlines: Dict[int, float] = {}
+        self.wait_mbx_heap: List[Tuple[float, int]] = []
+        self.wait_mbx_deadlines: Dict[int, float] = {}
+        self._pending_scheduler_context: Optional[Dict[str, Any]] = None
+        self.enforce_context_isolation: bool = True
+
+    def _register_metadata(self, pid: int, metadata: Dict[str, Any]) -> None:
+        if not metadata:
+            self.value_registry.pop(pid, None)
+            self.command_registry.pop(pid, None)
+            self.mailbox_registry.pop(pid, None)
+            return
+        if not isinstance(metadata, dict):
+            raise ValueError("metadata_invalid")
+
+        values_block = metadata.get("values") or []
+        commands_block = metadata.get("commands") or []
+        mailboxes_block = metadata.get("mailboxes") or []
+
+        if not isinstance(values_block, list) or not isinstance(commands_block, list) or not isinstance(mailboxes_block, list):
+            raise ValueError("metadata_structure_invalid")
+
+        new_values: Dict[Tuple[int, int], Dict[str, Any]] = {}
+        new_commands: Dict[Tuple[int, int], Dict[str, Any]] = {}
+        new_mailboxes: Dict[str, Dict[str, Any]] = {}
+        mailbox_bind_requests: List[Tuple[str, Optional[int], int, Dict[str, Any]]] = []
+
+        for entry in values_block:
+            if not isinstance(entry, dict):
+                raise ValueError("metadata_value_invalid")
+            try:
+                group_id = int(entry.get("group_id"))
+                value_id = int(entry.get("value_id"))
+            except (TypeError, ValueError):
+                raise ValueError("metadata_value_invalid")
+            if not (0 <= group_id <= 0xFF) or not (0 <= value_id <= 0xFF):
+                raise ValueError("metadata_value_range")
+            key = (group_id, value_id)
+            if key in new_values:
+                raise ValueError(f"metadata_value_duplicate:{group_id}:{value_id}")
+            record = {
+                "group_id": group_id,
+                "value_id": value_id,
+                "flags": int(entry.get("flags", 0)) & 0xFF,
+                "auth_level": int(entry.get("auth_level", 0)) & 0xFF,
+                "init_raw": int(entry.get("init_raw", 0)) & 0xFFFF,
+                "init_value": entry.get("init_value"),
+                "name": entry.get("name"),
+                "unit": entry.get("unit"),
+                "epsilon_raw": int(entry.get("epsilon_raw", 0)) & 0xFFFF,
+                "epsilon": entry.get("epsilon"),
+                "min_raw": int(entry.get("min_raw", 0)) & 0xFFFF,
+                "min": entry.get("min"),
+                "max_raw": int(entry.get("max_raw", 0)) & 0xFFFF,
+                "max": entry.get("max"),
+                "persist_key": int(entry.get("persist_key", 0)) & 0xFFFF,
+                "reserved": int(entry.get("reserved", 0)) & 0xFFFF,
+            }
+            new_values[key] = record
+
+        for entry in commands_block:
+            if not isinstance(entry, dict):
+                raise ValueError("metadata_command_invalid")
+            try:
+                group_id = int(entry.get("group_id"))
+                cmd_id = int(entry.get("cmd_id"))
+            except (TypeError, ValueError):
+                raise ValueError("metadata_command_invalid")
+            if not (0 <= group_id <= 0xFF) or not (0 <= cmd_id <= 0xFF):
+                raise ValueError("metadata_command_range")
+            key = (group_id, cmd_id)
+            if key in new_commands:
+                raise ValueError(f"metadata_command_duplicate:{group_id}:{cmd_id}")
+            record = {
+                "group_id": group_id,
+                "cmd_id": cmd_id,
+                "flags": int(entry.get("flags", 0)) & 0xFF,
+                "auth_level": int(entry.get("auth_level", 0)) & 0xFF,
+                "handler_offset": int(entry.get("handler_offset", 0)) & 0xFFFFFFFF,
+                "name": entry.get("name"),
+                "help": entry.get("help"),
+                "reserved": int(entry.get("reserved", 0)) & 0xFFFFFFFF,
+            }
+            new_commands[key] = record
+
+        for entry in mailboxes_block:
+            if not isinstance(entry, dict):
+                raise ValueError("metadata_mailbox_invalid")
+            target_value = entry.get("target") or entry.get("name")
+            if not isinstance(target_value, str) or not target_value.strip():
+                raise ValueError("metadata_mailbox_name")
+            target = target_value.strip()
+            if target in new_mailboxes:
+                raise ValueError(f"metadata_mailbox_duplicate:{target}")
+            capacity_value = entry.get("capacity", entry.get("queue_depth"))
+            capacity: Optional[int]
+            if capacity_value in (None, "", 0):
+                capacity = None
+            else:
+                try:
+                    capacity = int(capacity_value)
+                except (TypeError, ValueError):
+                    raise ValueError(f"metadata_mailbox_capacity:{target}")
+                if capacity <= 0:
+                    capacity = None
+            mode_value = entry.get("mode_mask", entry.get("mode", entry.get("flags", 0)))
+            try:
+                mode_mask = int(mode_value)
+            except (TypeError, ValueError):
+                raise ValueError(f"metadata_mailbox_mode:{target}")
+            if mode_mask <= 0:
+                mode_mask = mbx_const.HSX_MBX_MODE_RDWR
+            else:
+                mode_mask &= 0xFFFF
+            owner_pid_val = entry.get("owner_pid")
+            owner_pid: Optional[int]
+            if owner_pid_val in (None, ""):
+                owner_pid = None
+            else:
+                try:
+                    owner_pid = int(owner_pid_val)
+                except (TypeError, ValueError):
+                    raise ValueError(f"metadata_mailbox_owner:{target}")
+            bindings_raw = entry.get("bindings") or []
+            if not isinstance(bindings_raw, list):
+                raise ValueError(f"metadata_mailbox_bindings:{target}")
+            bindings: List[Dict[str, Any]] = []
+            for index, binding in enumerate(bindings_raw):
+                if not isinstance(binding, dict):
+                    raise ValueError(f"metadata_mailbox_binding_object:{target}:{index}")
+                pid_val = binding.get("pid")
+                if pid_val in (None, ""):
+                    raise ValueError(f"metadata_mailbox_binding_pid:{target}:{index}")
+                try:
+                    pid_int = int(pid_val)
+                except (TypeError, ValueError):
+                    raise ValueError(f"metadata_mailbox_binding_pid:{target}:{index}")
+                flags_val = binding.get("flags", 0)
+                try:
+                    flags_int = int(flags_val) & 0xFFFF
+                except (TypeError, ValueError):
+                    raise ValueError(f"metadata_mailbox_binding_flags:{target}:{index}")
+                binding_record = dict(binding)
+                binding_record["pid"] = pid_int
+                binding_record["flags"] = flags_int
+                bindings.append(binding_record)
+            record = {
+                "name": target,
+                "target": target,
+                "queue_depth": entry.get("queue_depth"),
+                "capacity": capacity,
+                "flags": entry.get("flags", mode_mask),
+                "mode": mode_mask,
+                "reserved": entry.get("reserved"),
+                "owner_pid": owner_pid,
+                "bindings": bindings,
+                "source": entry.get("_source"),
+            }
+            if "raw" in entry and isinstance(entry["raw"], dict):
+                record["raw"] = entry["raw"]
+            mailbox_bind_requests.append((target, capacity, mode_mask, record))
+
+        bound_mailboxes: List[Tuple[str, Dict[str, Any]]] = []
+        for target, capacity, mode_mask, record in mailbox_bind_requests:
+            response = self.vm.mailbox_bind(pid, target, capacity=capacity, mode=mode_mask)
+            if response.get("status") != "ok":
+                error_text = response.get("error", "mailbox_bind_failed")
+                raise RuntimeError(f"metadata_mailbox_bind_failed:{target}:{error_text}")
+            bound_record = dict(record)
+            bound_record["descriptor"] = response.get("descriptor")
+            bound_record["capacity"] = response.get("capacity", capacity)
+            bound_record["mode"] = response.get("mode", mode_mask)
+            bound_mailboxes.append((target, bound_record))
+
+        if new_values:
+            self.value_registry[pid] = new_values
+        else:
+            self.value_registry.pop(pid, None)
+        if new_commands:
+            self.command_registry[pid] = new_commands
+        else:
+            self.command_registry.pop(pid, None)
+        if bound_mailboxes:
+            self.mailbox_registry[pid] = {name: info for name, info in bound_mailboxes}
+        else:
+            self.mailbox_registry.pop(pid, None)
+
+        self.log(
+            "info",
+            "metadata_registered",
+            pid=pid,
+            values=len(new_values),
+            commands=len(new_commands),
+            mailboxes=len(bound_mailboxes),
+        )
+
+    def _normalise_pid_list(self, pid_lock: Any) -> List[int]:
+        if pid_lock is None:
+            return []
+        values: Iterable[Any]
+        if isinstance(pid_lock, (list, tuple, set)):
+            values = pid_lock
+        else:
+            values = (pid_lock,)
+        pids: List[int] = []
+        for value in values:
+            if value is None:
+                continue
+            try:
+                pid_int = int(value)
+            except (TypeError, ValueError):
+                raise ValueError("pid_lock must be an integer or sequence of integers")
+            if pid_int < 0:
+                raise ValueError("pid_lock values must be non-negative")
+            pids.append(pid_int)
+        # ensure deterministic order and uniqueness
+        return sorted(set(pids))
+
+    def _coerce_task_state(self, value: Any, *, allow_none: bool = False) -> Optional[TaskState]:
+        if value is None and allow_none:
+            return None
+        return TaskState.from_any(value)
+
+    def _validate_state_transition(self, pid: int, previous: Optional[TaskState], new: TaskState) -> None:
+        allowed = _ALLOWED_STATE_TRANSITIONS.get(previous, set())
+        if new not in allowed:
+            raise ValueError(f"invalid_state_transition:{previous}->{new}:pid={pid}")
+
+    def _record_state_transition(self, pid: int, previous: Optional[TaskState], new: TaskState) -> None:
+        self.last_state_transition[pid] = {
+            "from": previous.value if isinstance(previous, TaskState) else None,
+            "to": new.value,
+            "ts": time.time(),
+        }
+
+    def _track_sleep(self, pid: int, deadline: Optional[Any]) -> None:
+        if deadline is None:
+            self._untrack_sleep(pid)
+            return
+        try:
+            deadline_f = float(deadline)
+        except (TypeError, ValueError):
+            self._untrack_sleep(pid)
+            return
+        self.sleeping_deadlines[pid] = deadline_f
+        heapq.heappush(self.sleeping_heap, (deadline_f, pid))
+
+    def _untrack_sleep(self, pid: int) -> None:
+        self.sleeping_deadlines.pop(pid, None)
+
+    def _track_wait_mailbox(self, pid: int, deadline: Optional[Any]) -> None:
+        if deadline is None:
+            self._untrack_wait_mailbox(pid)
+            return
+        try:
+            deadline_f = float(deadline)
+        except (TypeError, ValueError):
+            self._untrack_wait_mailbox(pid)
+            return
+        previous = self.wait_mbx_deadlines.get(pid)
+        self.wait_mbx_deadlines[pid] = deadline_f
+        heapq.heappush(self.wait_mbx_heap, (deadline_f, pid))
+        if previous != deadline_f:
+            self.auto_event.set()
+
+    def _untrack_wait_mailbox(self, pid: int) -> None:
+        if pid in self.wait_mbx_deadlines:
+            self.wait_mbx_deadlines.pop(pid, None)
+            self.auto_event.set()
+
+    def _advance_sleeping_tasks(self) -> None:
+        now = time.monotonic()
+        changed = False
+        while self.sleeping_heap:
+            deadline, pid = self.sleeping_heap[0]
+            if deadline > now:
+                break
+            heapq.heappop(self.sleeping_heap)
+            current = self.sleeping_deadlines.get(pid)
+            if current is None or current != deadline:
+                continue
+            self.sleeping_deadlines.pop(pid, None)
+            task = self.tasks.get(pid)
+            if task is not None:
+                task["state"] = "ready"
+                task["sleep_pending"] = False
+                task.pop("sleep_pending_ms", None)
+                task.pop("sleep_deadline", None)
+            state_entry = self.task_states.get(pid)
+            if isinstance(state_entry, dict):
+                ctx = state_entry.get("context", {})
+                if isinstance(ctx, dict):
+                    ctx["state"] = "ready"
+                    ctx.pop("sleep_pending_ms", None)
+                    ctx.pop("sleep_deadline", None)
+                    state_entry["context"] = ctx
+            self._set_task_state_pending(pid, "sleep_wake", target_state="ready", ts=time.time(), force=True)
+            changed = True
+        if changed:
+            self.auto_event.set()
+
+    def _next_sleep_deadline(self) -> Optional[float]:
+        while self.sleeping_heap:
+            deadline, pid = self.sleeping_heap[0]
+            current = self.sleeping_deadlines.get(pid)
+            if current is None or current != deadline:
+                heapq.heappop(self.sleeping_heap)
+                continue
+            return deadline
+        return None
+
+    def _next_wait_mailbox_deadline(self) -> Optional[float]:
+        while self.wait_mbx_heap:
+            deadline, pid = self.wait_mbx_heap[0]
+            current = self.wait_mbx_deadlines.get(pid)
+            if current is None or current != deadline:
+                heapq.heappop(self.wait_mbx_heap)
+                continue
+            return deadline
+        return None
+
+    def _update_scheduler_context(self, **fields: Any) -> None:
+        if not fields:
+            return
+        context = self._pending_scheduler_context or {}
+        for key, value in fields.items():
+            if value is None:
+                continue
+            context[key] = value
+        self._pending_scheduler_context = context or None
+
+    def _assert_context_isolation(self, pid: int, context: Dict[str, Any], state: TaskState) -> None:
+        if state not in {TaskState.READY, TaskState.RUNNING, TaskState.WAIT_MBX, TaskState.SLEEPING}:
+            return
+        if "regs" in context:
+            self.log("error", "context_isolation_violation", pid=pid, field="regs_present")
+            raise AssertionError(f"context_isolation:pid={pid}:context_regs_present")
+        reg_base = self._optional_int(context.get("reg_base"))
+        stack_base = self._optional_int(context.get("stack_base"))
+        stack_limit = self._optional_int(context.get("stack_limit"))
+        stack_size = self._optional_int(context.get("stack_size"))
+        if not reg_base:
+            self.log("error", "context_isolation_violation", pid=pid, field="reg_base", state=state.value)
+            raise AssertionError(f"context_isolation:pid={pid}:reg_base_missing")
+        if not stack_base:
+            self.log("error", "context_isolation_violation", pid=pid, field="stack_base", state=state.value)
+            raise AssertionError(f"context_isolation:pid={pid}:stack_base_missing")
+        if stack_limit is None and stack_size is None:
+            self.log(
+                "error",
+                "context_isolation_violation",
+                pid=pid,
+                field="stack_limit",
+                stack_base=stack_base,
+                stack_limit=stack_limit,
+                stack_size=stack_size,
+                state=state.value,
+            )
+            raise AssertionError(f"context_isolation:pid={pid}:stack_limit_invalid")
+
+    def _session_payload(self, session: SessionRecord) -> Dict[str, Any]:
+        if not session.pid_locks:
+            pid_lock_repr: Optional[Any] = None
+        elif len(session.pid_locks) == 1:
+            pid_lock_repr = session.pid_locks[0]
+        else:
+            pid_lock_repr = list(session.pid_locks)
+        payload = {
+            "id": session.session_id,
+            "client": session.client,
+            "heartbeat_s": session.heartbeat_s,
+            "features": list(session.features),
+            "max_events": session.max_events,
+            "pid_lock": pid_lock_repr,
+            "created_at": session.created_at,
+            "last_seen": session.last_seen,
+        }
+        if session.warnings:
+            payload["warnings"] = list(session.warnings)
+        return payload
+
+    def _session_details(self, session: SessionRecord) -> Dict[str, Any]:
+        payload = self._session_payload(session)
+        payload["pid_locks"] = list(session.pid_locks)
+        payload["features"] = list(session.features)
+        payload["warnings"] = list(session.warnings)
+        return payload
+
+    def describe_session(self, session_id: str) -> Dict[str, Any]:
+        record = self._get_session(session_id)
+        return self._session_details(record)
+
+    def list_sessions(self) -> List[Dict[str, Any]]:
+        with self.session_lock:
+            records = list(self.sessions.values())
+        entries = [self._session_details(record) for record in records]
+        entries.sort(key=lambda item: item.get("created_at", 0.0))
+        now = time.time()
+        for entry in entries:
+            created = entry.get("created_at") or now
+            entry["age_s"] = max(0.0, now - created)
+        return entries
+
+    def session_open(
+        self,
+        *,
+        client: Optional[str] = None,
+        capabilities: Optional[Dict[str, Any]] = None,
+        pid_lock: Any = None,
+        heartbeat_s: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        now = time.time()
+        lock_targets = self._normalise_pid_list(pid_lock)
+        caps = capabilities or {}
+        requested_features = caps.get("features") or []
+        if not isinstance(requested_features, (list, tuple)):
+            raise ValueError("capabilities.features must be a list when provided")
+        features: List[str] = []
+        warnings: List[str] = []
+        for feature in requested_features:
+            feature_name = str(feature)
+            if feature_name in self.session_supported_features:
+                features.append(feature_name)
+            else:
+                warnings.append(f"unsupported_feature:{feature_name}")
+        max_events_raw = caps.get("max_events")
+        if max_events_raw is None:
+            max_events = self.session_events_default
+        else:
+            try:
+                max_events = int(max_events_raw)
+            except (TypeError, ValueError):
+                raise ValueError("capabilities.max_events must be an integer when provided")
+            if max_events <= 0:
+                raise ValueError("capabilities.max_events must be positive")
+            if max_events < 2:
+                warnings.append("max_events_clamped:2")
+                max_events = 2
+            if max_events > self.session_events_max:
+                warnings.append(f"max_events_clamped:{self.session_events_max}")
+                max_events = self.session_events_max
+        if heartbeat_s is None:
+            heartbeat = self.session_heartbeat_default
+        else:
+            try:
+                heartbeat = int(heartbeat_s)
+            except (TypeError, ValueError):
+                raise ValueError("heartbeat_s must be an integer when provided")
+            if heartbeat < self.session_heartbeat_min:
+                warnings.append(f"heartbeat_clamped:{self.session_heartbeat_min}")
+                heartbeat = self.session_heartbeat_min
+            elif heartbeat > self.session_heartbeat_max:
+                warnings.append(f"heartbeat_clamped:{self.session_heartbeat_max}")
+                heartbeat = self.session_heartbeat_max
+        session_id = str(uuid.uuid4())
+        with self.session_lock:
+            for pid in lock_targets:
+                owner = self.pid_locks.get(pid)
+                if owner is not None:
+                    raise SessionError(f"pid_locked:{pid}")
+            record = SessionRecord(
+                session_id=session_id,
+                client=str(client or ""),
+                features=features,
+                max_events=max_events,
+                pid_locks=list(lock_targets),
+                heartbeat_s=heartbeat,
+                warnings=list(warnings),
+                created_at=now,
+                last_seen=now,
+            )
+            self.sessions[session_id] = record
+            for pid in lock_targets:
+                self.pid_locks[pid] = session_id
+        self.log("info", "session opened", session_id=session_id, client=client or "", pid_locks=lock_targets)
+        return self._session_payload(record)
+
+    def _get_session(self, session_id: str) -> SessionRecord:
+        with self.session_lock:
+            record = self.sessions.get(session_id)
+            if record is None:
+                raise SessionError("session_required")
+            return record
+
+    def touch_session(self, session_id: str) -> SessionRecord:
+        with self.session_lock:
+            record = self.sessions.get(session_id)
+            if record is None:
+                raise SessionError("session_required")
+            record.last_seen = time.time()
+            return record
+
+    def session_keepalive(self, session_id: str) -> None:
+        record = self.touch_session(session_id)
+        self.log("debug", "session keepalive", session_id=record.session_id)
+
+    def _release_session_locks(self, session: SessionRecord) -> None:
+        with self.session_lock:
+            for pid in list(session.pid_locks):
+                owner = self.pid_locks.get(pid)
+                if owner == session.session_id:
+                    self.pid_locks.pop(pid, None)
+
+    def _close_session(self, session_id: str, reason: str, *, actor: Optional[str] = None) -> bool:
+        with self.session_lock:
+            record = self.sessions.pop(session_id, None)
+            if record is None:
+                return False
+        self._release_session_locks(record)
+        self.log(
+            "info",
+            "session closed",
+            session_id=session_id,
+            reason=reason,
+            pid_locks=list(record.pid_locks),
+            closed_by=actor or session_id,
+        )
+        self.events_session_disconnected(session_id)
+        return True
+
+    def session_close(self, session_id: str) -> None:
+        if not self._close_session(session_id, reason="client_close", actor=session_id):
+            raise SessionError("session_required")
+
+    def force_close_session(self, target_session_id: str, *, actor: Optional[str] = None, reason: str = "admin_close") -> Dict[str, Any]:
+        if not self._close_session(target_session_id, reason=reason, actor=actor):
+            raise SessionError("session_not_found")
+        return {"id": target_session_id, "reason": reason}
+
+    def prune_sessions(self) -> None:
+        now = time.time()
+        if (now - self._last_session_prune) < self._session_prune_interval:
+            return
+        self._last_session_prune = now
+        expired: List[str] = []
+        with self.session_lock:
+            for session_id, record in list(self.sessions.items()):
+                if (now - record.last_seen) > record.heartbeat_s:
+                    expired.append(session_id)
+        for session_id in expired:
+            self._close_session(session_id, reason="timeout")
+
+    def ensure_pid_access(self, pid: int, session_id: Optional[str]) -> None:
+        with self.session_lock:
+            owner = self.pid_locks.get(pid)
+        if owner is None:
+            return
+        if session_id is None or owner != session_id:
+            raise SessionError(f"pid_locked:{pid}")
+
+    @staticmethod
+    def _coerce_int(value: Any) -> int:
+        if isinstance(value, int):
+            return value
+        if isinstance(value, str):
+            return int(value, 0)
+        raise ValueError(f"expected integer-compatible value, got {value!r}")
+
+    @staticmethod
+    def _optional_int(value: Any) -> Optional[int]:
+        if value is None:
+            return None
+        try:
+            return ExecutiveState._coerce_int(value)
+        except (ValueError, TypeError):
+            return None
+
+    @staticmethod
+    def _coerce_float(value: Any) -> Optional[float]:
+        if value is None:
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _vm_debug(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        response = self.vm.request(payload)
+        if response.get("status") != "ok":
+            raise RuntimeError(response.get("error", "debug error"))
+        block = response.get("debug")
+        return block if isinstance(block, dict) else {}
+
+    def _ensure_debug_session(self, pid: int) -> None:
+        if pid in self.debug_attached:
+            return
+        attach_payload = {"cmd": "dbg", "op": "attach", "pid": pid}
+        with self.lock:
+            debug = self._vm_debug(attach_payload)
+        breakpoints = debug.get("breakpoints", []) if isinstance(debug, dict) else []
+        if isinstance(breakpoints, list):
+            self.breakpoints[pid] = {self._coerce_int(addr) & 0xFFFF for addr in breakpoints}
+        else:
+            self.breakpoints[pid] = set()
+        self.debug_attached.add(pid)
+
+    def _detach_debug_session(self, pid: int) -> None:
+        if pid not in self.debug_attached:
+            self.breakpoints.pop(pid, None)
+            return
+        detach_payload = {"cmd": "dbg", "op": "detach", "pid": pid}
+        try:
+            with self.lock:
+                self._vm_debug(detach_payload)
+        except Exception:
+            pass
+        self.debug_attached.discard(pid)
+        self.breakpoints.pop(pid, None)
+
+    def _extract_breakpoints(self, pid: int, debug_block: Dict[str, Any]) -> List[int]:
+        raw = debug_block.get("breakpoints") if isinstance(debug_block, dict) else []
+        result: List[int] = []
+        if isinstance(raw, list):
+            for item in raw:
+                try:
+                    result.append(self._coerce_int(item) & 0xFFFF)
+                except (TypeError, ValueError):
+                    continue
+        self.breakpoints[pid] = set(result)
+        return sorted(result)
+
+    def breakpoint_list(self, pid: int) -> Dict[str, Any]:
+        self.get_task(pid)
+        self._ensure_debug_session(pid)
+        payload = {"cmd": "dbg", "op": "bp", "pid": pid, "action": "list"}
+        with self.lock:
+            debug = self._vm_debug(payload)
+        breakpoints = self._extract_breakpoints(pid, debug)
+        return {"pid": pid, "breakpoints": breakpoints}
+
+    def breakpoint_add(self, pid: int, addr: int) -> Dict[str, Any]:
+        self.get_task(pid)
+        self._ensure_debug_session(pid)
+        addr_int = self._coerce_int(addr) & 0xFFFF
+        payload = {"cmd": "dbg", "op": "bp", "pid": pid, "action": "add", "addr": addr_int}
+        with self.lock:
+            debug = self._vm_debug(payload)
+        breakpoints = self._extract_breakpoints(pid, debug)
+        self.log("info", "breakpoint added", pid=pid, addr=addr_int)
+        return {"pid": pid, "breakpoints": breakpoints}
+
+    def breakpoint_clear(self, pid: int, addr: int) -> Dict[str, Any]:
+        self.get_task(pid)
+        self._ensure_debug_session(pid)
+        addr_int = self._coerce_int(addr) & 0xFFFF
+        payload = {"cmd": "dbg", "op": "bp", "pid": pid, "action": "remove", "addr": addr_int}
+        with self.lock:
+            debug = self._vm_debug(payload)
+        breakpoints = self._extract_breakpoints(pid, debug)
+        self.log("info", "breakpoint removed", pid=pid, addr=addr_int)
+        return {"pid": pid, "breakpoints": breakpoints}
+
+    def breakpoint_clear_all(self, pid: int) -> Dict[str, Any]:
+        # ensure session and current snapshot
+        info = self.breakpoint_list(pid)
+        existing = list(info.get("breakpoints", []))
+        for addr in existing:
+            payload = {"cmd": "dbg", "op": "bp", "pid": pid, "action": "remove", "addr": addr}
+            with self.lock:
+                self._vm_debug(payload)
+        payload = {"cmd": "dbg", "op": "bp", "pid": pid, "action": "list"}
+        with self.lock:
+            debug = self._vm_debug(payload)
+        breakpoints = self._extract_breakpoints(pid, debug)
+        self.log("info", "breakpoints cleared", pid=pid)
+        return {"pid": pid, "breakpoints": breakpoints}
+
+    def _handle_breakpoint_hit(self, pid: int, pc: int, *, phase: str) -> Dict[str, Any]:
+        self.log("info", "breakpoint hit", pid=pid, pc=pc, phase=phase)
+        self.stop_auto()
+        self._set_task_state_pending(
+            pid,
+            "debug_break",
+            target_state="paused",
+            details={"pc": pc, "phase": phase},
+            ts=time.time(),
+        )
+        try:
+            self.pause_task(pid)
+        except Exception as exc:
+            self.log("error", "pause failed after breakpoint", pid=pid, error=str(exc))
+        event = self.emit_event(
+            "debug_break",
+            pid=pid,
+            data={"pc": pc, "phase": phase, "reason": "breakpoint"},
+        )
+        return event
+
+    def _check_breakpoint_before_step(self, pid: Optional[int]) -> Optional[Dict[str, Any]]:
+        if pid is None:
+            return None
+        bp_set = self.breakpoints.get(pid)
+        if not bp_set:
+            return None
+        with self.lock:
+            regs = self.vm.read_regs(pid=pid)
+        pc = regs.get("pc")
+        if not isinstance(pc, int):
+            return None
+        if (pc & 0xFFFF) in bp_set:
+            return self._handle_breakpoint_hit(pid, pc, phase="pre")
+        return None
+
+    def _check_breakpoint_after_step(self, requested_pid: Optional[int], result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        if requested_pid is not None:
+            target_pid = requested_pid
+        else:
+            current = result.get("current_pid")
+            target_pid = current if isinstance(current, int) else None
+        if target_pid is None:
+            return None
+        bp_set = self.breakpoints.get(target_pid)
+        if not bp_set:
+            return None
+        with self.lock:
+            regs = self.vm.read_regs(pid=target_pid)
+        pc = regs.get("pc")
+        if not isinstance(pc, int):
+            return None
+        if (pc & 0xFFFF) in bp_set:
+            return self._handle_breakpoint_hit(target_pid, pc, phase="post")
+        return None
+
+    def _read_stack_words(self, pid: int, address: int, count: int) -> Optional[List[int]]:
+        length = max(0, count) * 4
+        if length == 0:
+            return []
+        try:
+            with self.lock:
+                raw = self.vm.read_mem(address, length, pid=pid)
+        except Exception as exc:
+            self.log("error", "stack_read_failed", pid=pid, address=address, error=str(exc))
+            return None
+        if isinstance(raw, str):
+            try:
+                raw = bytes.fromhex(raw)
+            except ValueError:
+                raw = raw.encode("utf-8", errors="ignore")
+        if not isinstance(raw, (bytes, bytearray)):
+            return None
+        if len(raw) < length:
+            raw = raw.ljust(length, b"\x00")
+        return [int.from_bytes(raw[i * 4:(i + 1) * 4], "little") for i in range(count)]
+
+    def _resolve_symbol_path(self, pid: int, *, program: Optional[str], override: Optional[str]) -> Optional[Path]:
+        if override:
+            candidate = Path(override)
+            if not candidate.is_absolute():
+                base = Path(program).parent if program else Path.cwd()
+                candidate = (base / candidate).resolve()
+            return candidate if candidate.exists() else candidate
+        if not program:
+            return None
+        program_path = Path(program)
+        sym_path = program_path.with_suffix(".sym")
+        return sym_path
+
+    @staticmethod
+    def _extract_symbol_entries(data: Any) -> List[Dict[str, Any]]:
+        entries: List[Dict[str, Any]] = []
+
+        def normalise(name: str, info: Dict[str, Any]) -> Dict[str, Any]:
+            address = (
+                info.get("address")
+                or info.get("addr")
+                or info.get("abs_addr")
+                or info.get("absolute")
+                or info.get("offset")
+                or 0
+            )
+            try:
+                address_int = int(address)
+            except (TypeError, ValueError):
+                address_int = 0
+            entry = {
+                "name": name,
+                "address": address_int & 0xFFFFFFFF,
+                "size": info.get("size"),
+                "type": info.get("type") or info.get("kind") or info.get("section"),
+                "file": info.get("file") or info.get("source"),
+                "line": info.get("line"),
+            }
+            return entry
+
+        if isinstance(data, dict):
+            def _append_list(items: Iterable[Dict[str, Any]], default_type: Optional[str] = None) -> None:
+                for info in items:
+                    if not isinstance(info, dict):
+                        continue
+                    entry = dict(info)
+                    if default_type and not entry.get("type"):
+                        entry["type"] = default_type
+                    name = entry.get("name") or entry.get("symbol")
+                    if not name:
+                        continue
+                    entries.append(normalise(str(name), entry))
+
+            sym_block = data.get("symbols")
+            if isinstance(sym_block, dict):
+                for name, info in sym_block.items():
+                    if isinstance(info, dict):
+                        entries.append(normalise(str(name), info))
+                functions_block = sym_block.get("functions")
+                if isinstance(functions_block, list):
+                    _append_list(functions_block, default_type="function")
+                variables_block = sym_block.get("variables")
+                if isinstance(variables_block, list):
+                    _append_list(variables_block, default_type="variable")
+                generic_block = sym_block.get("symbols")
+                if isinstance(generic_block, list):
+                    _append_list(generic_block)
+            elif isinstance(sym_block, list):
+                _append_list(sym_block)
+
+            functions = data.get("functions")
+            if isinstance(functions, list):
+                _append_list(functions, default_type="function")
+            variables = data.get("variables")
+            if isinstance(variables, list):
+                _append_list(variables, default_type="variable")
+        return entries
+
+    @staticmethod
+    def _extract_line_entries(data: Any) -> List[Dict[str, Any]]:
+        line_block = None
+        if isinstance(data, dict):
+            for key in ("lines", "line_table", "line_map"):
+                if key in data:
+                    line_block = data[key]
+                    break
+            if line_block is None:
+                inst_block = data.get("instructions")
+                inst_lines: List[Dict[str, Any]] = []
+                if isinstance(inst_block, list):
+                    for item in inst_block:
+                        if not isinstance(item, dict):
+                            continue
+                        address = item.get("pc")
+                        line_value = item.get("line")
+                        if line_value is None:
+                            continue
+                        inst_lines.append(
+                            {
+                                "address": address,
+                                "file": item.get("file"),
+                                "line": line_value,
+                            }
+                        )
+                if inst_lines:
+                    line_block = inst_lines
+        lines: List[Dict[str, Any]] = []
+        if isinstance(line_block, list):
+            for item in line_block:
+                if isinstance(item, dict):
+                    address = item.get("address")
+                    try:
+                        address_int = int(address)
+                    except (TypeError, ValueError):
+                        continue
+                    lines.append(
+                        {
+                            "address": address_int & 0xFFFFFFFF,
+                            "file": item.get("file") or item.get("source"),
+                            "line": item.get("line"),
+                        }
+                    )
+        elif isinstance(line_block, dict):
+            for key, value in line_block.items():
+                try:
+                    address_int = int(key)
+                except (TypeError, ValueError):
+                    continue
+                if isinstance(value, dict):
+                    lines.append(
+                        {
+                            "address": address_int & 0xFFFFFFFF,
+                            "file": value.get("file") or value.get("source"),
+                            "line": value.get("line"),
+                        }
+                    )
+        return lines
+
+    @staticmethod
+    def _extract_instruction_entries(data: Any) -> Tuple[List[Dict[str, Any]], Dict[int, Dict[str, Any]]]:
+        instructions: List[Dict[str, Any]] = []
+        lookup: Dict[int, Dict[str, Any]] = {}
+        if isinstance(data, dict):
+            block = data.get("instructions")
+            if isinstance(block, list):
+                for item in block:
+                    if not isinstance(item, dict):
+                        continue
+                    pc_value = item.get("pc")
+                    try:
+                        pc_int = int(pc_value, 0) if isinstance(pc_value, str) else int(pc_value)
+                    except (TypeError, ValueError):
+                        continue
+                    entry: Dict[str, Any] = {
+                        "pc": pc_int & 0xFFFFFFFF,
+                        "source_kind": (item.get("source_kind") or "").lower() or None,
+                        "line": item.get("line"),
+                        "column": item.get("column"),
+                        "function": item.get("function"),
+                        "file": item.get("file"),
+                        "directory": item.get("directory"),
+                    }
+                    instructions.append(entry)
+                    lookup[entry["pc"]] = entry
+        instructions.sort(key=lambda item: item["pc"])
+        return instructions, lookup
+
+    @classmethod
+    def _extract_local_entries(
+        cls,
+        data: Any,
+    ) -> Tuple[List[Dict[str, Any]], Dict[str, List[Dict[str, Any]]]]:
+        locals_list: List[Dict[str, Any]] = []
+        by_function: Dict[str, List[Dict[str, Any]]] = {}
+        local_block: Optional[List[Any]] = None
+        if isinstance(data, dict):
+            sym_block = data.get("symbols")
+            if isinstance(sym_block, dict):
+                block = sym_block.get("locals")
+                if isinstance(block, list):
+                    local_block = block
+            if local_block is None:
+                block = data.get("locals")
+                if isinstance(block, list):
+                    local_block = block
+        if not isinstance(local_block, list):
+            return locals_list, by_function
+
+        def _append_entry(entry: Dict[str, Any]) -> None:
+            name = entry.get("name")
+            function = entry.get("function")
+            if not name or not function:
+                return
+            norm_entry: Dict[str, Any] = {
+                "name": str(name),
+                "function": str(function),
+                "scope": entry.get("scope"),
+                "file": entry.get("file"),
+                "directory": entry.get("directory"),
+                "line": entry.get("line"),
+                "type": entry.get("type"),
+                "locations": [],
+            }
+            if "size" in entry:
+                size_val = cls._optional_int(entry.get("size"))
+                if size_val is not None:
+                    norm_entry["size"] = size_val
+            locations = entry.get("locations")
+            if isinstance(locations, list):
+                for loc in locations:
+                    if not isinstance(loc, dict):
+                        continue
+                    start = cls._optional_int(loc.get("start"))
+                    end = cls._optional_int(loc.get("end"))
+                    loc_desc = loc.get("location") or {}
+                    if not isinstance(loc_desc, dict):
+                        continue
+                    kind = str(loc_desc.get("kind") or "stack").lower()
+                    details: Dict[str, Any] = {"kind": kind}
+                    if "offset" in loc_desc:
+                        offset_val = cls._optional_int(loc_desc.get("offset"))
+                        if offset_val is not None:
+                            details["offset"] = offset_val
+                    if "size" in loc_desc:
+                        loc_size = cls._optional_int(loc_desc.get("size"))
+                        if loc_size is not None:
+                            details["size"] = loc_size
+                    if kind == "register":
+                        reg_name = str(loc_desc.get("name") or loc_desc.get("register") or "").upper()
+                        details["name"] = reg_name
+                        if reg_name.startswith("R") and reg_name[1:].isdigit():
+                            details["index"] = int(reg_name[1:])
+                    elif kind == "global":
+                        if loc_desc.get("symbol"):
+                            details["symbol"] = str(loc_desc.get("symbol"))
+                        addr_val = cls._optional_int(loc_desc.get("address"))
+                        if addr_val is not None:
+                            details["address"] = addr_val & 0xFFFFFFFF
+                    elif kind == "const":
+                        const_val = loc_desc.get("value")
+                        if isinstance(const_val, str):
+                            try:
+                                const_val = int(const_val, 0)
+                            except ValueError:
+                                const_val = None
+                        if isinstance(const_val, int):
+                            details["value"] = const_val & 0xFFFFFFFF
+                    norm_entry["locations"].append(
+                        {
+                            "start": start,
+                            "end": end,
+                            "location": details,
+                        }
+                    )
+            locals_list.append(norm_entry)
+            by_function.setdefault(norm_entry["function"], []).append(norm_entry)
+
+        for raw_entry in local_block:
+            if isinstance(raw_entry, dict):
+                _append_entry(raw_entry)
+        return locals_list, by_function
+
+    def _parse_symbol_file(self, path: Path) -> Dict[str, Any]:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        entries = self._extract_symbol_entries(data)
+        lines = self._extract_line_entries(data)
+        instructions, instruction_lookup = self._extract_instruction_entries(data)
+        locals_entries, locals_by_function = self._extract_local_entries(data)
+        by_name = {entry["name"]: entry for entry in entries if entry.get("name")}
+        addresses = sorted(entries, key=lambda item: item.get("address", 0))
+        line_index = sorted(lines, key=lambda item: item.get("address", 0))
+        return {
+            "path": str(path),
+            "symbols": entries,
+            "by_name": by_name,
+            "addresses": addresses,
+            "lines": line_index,
+            "locals": locals_entries,
+            "locals_by_function": locals_by_function,
+            "instructions": instructions,
+            "instructions_by_pc": instruction_lookup,
+        }
+
+    def load_symbols_for_pid(
+        self,
+        pid: int,
+        *,
+        program: Optional[str] = None,
+        override: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        self.get_task(pid)
+        sym_path = self._resolve_symbol_path(pid, program=program, override=override)
+        if sym_path is None:
+            self.symbol_tables.pop(pid, None)
+            return {"pid": pid, "loaded": False, "path": None}
+        try:
+            table = self._parse_symbol_file(sym_path)
+            with self.symbol_cache_lock:
+                self.symbol_tables[pid] = table
+            self.log("info", "symbols loaded", pid=pid, path=str(sym_path))
+            return {"pid": pid, "loaded": True, "path": str(sym_path), "count": len(table["symbols"])}
+        except FileNotFoundError:
+            self.log("warning", "symbol file missing", pid=pid, path=str(sym_path))
+            with self.symbol_cache_lock:
+                self.symbol_tables.pop(pid, None)
+            return {"pid": pid, "loaded": False, "path": str(sym_path)}
+        except Exception as exc:
+            self.log("error", "symbol load failed", pid=pid, path=str(sym_path), error=str(exc))
+            with self.symbol_cache_lock:
+                self.symbol_tables.pop(pid, None)
+            return {"pid": pid, "loaded": False, "path": str(sym_path), "error": str(exc)}
+
+    def symbol_info(self, pid: int) -> Dict[str, Any]:
+        self.get_task(pid)
+        with self.symbol_cache_lock:
+            table = self.symbol_tables.get(pid)
+            if not table:
+                return {"pid": pid, "loaded": False}
+            return {
+                "pid": pid,
+                "loaded": True,
+                "path": table.get("path"),
+                "count": len(table.get("symbols", [])),
+            }
+
+    def symbol_lookup_name(self, pid: int, name: str) -> Optional[Dict[str, Any]]:
+        with self.symbol_cache_lock:
+            table = self.symbol_tables.get(pid)
+            if not table:
+                return None
+            entry = table["by_name"].get(name)
+            if not entry:
+                return None
+            return dict(entry)
+
+    def symbol_lookup_addr(self, pid: int, address: int) -> Optional[Dict[str, Any]]:
+        with self.symbol_cache_lock:
+            table = self.symbol_tables.get(pid)
+            if not table:
+                return None
+            addr_list = table["addresses"]
+            if not addr_list:
+                return None
+            addresses = [entry["address"] for entry in addr_list]
+            idx = bisect.bisect_right(addresses, address) - 1
+            if idx < 0:
+                return None
+            entry = dict(addr_list[idx])
+            entry["offset"] = address - entry.get("address", 0)
+            return entry
+
+    def symbol_lookup_line(self, pid: int, address: int) -> Optional[Dict[str, Any]]:
+        with self.symbol_cache_lock:
+            table = self.symbol_tables.get(pid)
+            if not table:
+                return None
+            lines = table.get("lines", [])
+            if not lines:
+                return None
+            addresses = [item["address"] for item in lines]
+            idx = bisect.bisect_right(addresses, address) - 1
+            if idx < 0:
+                return None
+            return dict(lines[idx])
+
+    def symbols_list(
+        self,
+        pid: int,
+        *,
+        kind: Optional[str] = None,
+        offset: int = 0,
+        limit: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        self.get_task(pid)
+        try:
+            offset = max(0, int(offset))
+        except (TypeError, ValueError):
+            offset = 0
+        try:
+            limit_value = int(limit) if limit is not None else None
+        except (TypeError, ValueError):
+            limit_value = None
+        if limit_value is not None:
+            limit_value = max(1, min(limit_value, 256))
+        kind_normalised = (kind or "all").lower()
+        allowed_kinds = {"functions", "variables", "all"}
+        if kind_normalised not in allowed_kinds:
+            raise ValueError("symbols.list type must be 'functions', 'variables', or 'all'")
+        with self.symbol_cache_lock:
+            table = self.symbol_tables.get(pid)
+            if not table:
+                return {
+                    "pid": pid,
+                    "count": 0,
+                    "offset": 0,
+                    "limit": limit_value,
+                    "type": kind_normalised,
+                    "symbols": [],
+                }
+            entries = list(table.get("symbols", []))
+        if kind_normalised != "all":
+            if kind_normalised == "functions":
+                entries = [item for item in entries if str(item.get("type") or "").lower() == "function"]
+            else:
+                entries = [item for item in entries if str(item.get("type") or "").lower() != "function"]
+        entries.sort(key=lambda item: item.get("address", 0))
+        total = len(entries)
+        start = min(offset, total)
+        end = total if limit_value is None else min(total, start + limit_value)
+        view = [dict(entry) for entry in entries[start:end]]
+        return {
+            "pid": pid,
+            "count": total,
+            "offset": start,
+            "limit": limit_value,
+            "type": kind_normalised,
+            "symbols": view,
+        }
+
+    def memory_regions(self, pid: int) -> Dict[str, Any]:
+        task = self.get_task(pid)
+        layout = dict(self.memory_layouts.get(pid, {}))
+        state_entry = self.task_states.get(pid, {})
+        context = state_entry.get("context", {}) if isinstance(state_entry, dict) else {}
+
+        regions: List[Dict[str, Any]] = []
+
+        def _to_int(value: Any) -> Optional[int]:
+            if value is None:
+                return None
+            try:
+                return int(value) & 0xFFFFFFFF
+            except (TypeError, ValueError):
+                return None
+
+        def _add_region(
+            name: str,
+            start: Optional[int],
+            length: Optional[int],
+            *,
+            kind: str,
+            permissions: str,
+            source: Optional[str] = None,
+            details: Optional[Dict[str, Any]] = None,
+        ) -> None:
+            if start is None or length is None:
+                return
+            if length <= 0:
+                return
+            start &= 0xFFFFFFFF
+            end = start + length
+            if VM_ADDRESS_SPACE_SIZE:
+                max_len = VM_ADDRESS_SPACE_SIZE - (start & 0xFFFF)
+                if max_len <= 0:
+                    return
+                length = min(length, max_len)
+                end = start + length
+            region: Dict[str, Any] = {
+                "name": name,
+                "type": kind,
+                "start": start & 0xFFFF,
+                "end": end & 0xFFFF,
+                "length": int(length),
+                "permissions": permissions,
+            }
+            if source:
+                region["source"] = source
+            if details:
+                region["details"] = details
+            regions.append(region)
+
+        code_len = _to_int(layout.get("code_len"))
+        if code_len:
+            _add_region(
+                "code",
+                0,
+                code_len,
+                kind="code",
+                permissions="rx",
+                source="hxe",
+                details={"entry": layout.get("entry")},
+            )
+
+        ro_len = _to_int(layout.get("ro_len"))
+        if ro_len:
+            _add_region(
+                "rodata",
+                RODATA_BASE,
+                ro_len,
+                kind="rodata",
+                permissions="r",
+                source="hxe",
+            )
+
+        bss_size = _to_int(layout.get("bss"))
+        if bss_size:
+            bss_base = RODATA_BASE + (ro_len or 0)
+            _add_region(
+                "bss",
+                bss_base,
+                bss_size,
+                kind="bss",
+                permissions="rw",
+                source="hxe",
+            )
+
+        reg_base = _to_int(context.get("reg_base"))
+        if reg_base:
+            _add_region(
+                "registers",
+                reg_base,
+                REGISTER_BANK_BYTES,
+                kind="registers",
+                permissions="rw",
+                source="vm",
+            )
+
+        stack_base = _to_int(context.get("stack_base"))
+        stack_size = _to_int(context.get("stack_size"))
+        if stack_base and stack_size:
+            sp_value = _to_int(context.get("sp"))
+            details = {"sp": sp_value} if sp_value is not None else None
+            _add_region(
+                "stack",
+                stack_base,
+                stack_size,
+                kind="stack",
+                permissions="rw",
+                source="vm",
+                details=details,
+            )
+
+        regions.sort(key=lambda item: (item.get("start", 0), item.get("name", "")))
+        return {
+            "pid": pid,
+            "program": task.get("program"),
+            "regions": regions,
+            "layout": layout,
+        }
+
+    def _frame_pointer_from_regs(self, regs: Dict[str, Any]) -> Optional[int]:
+        candidates = [
+            regs.get("frame_pointer"),
+            regs.get("fp"),
+            regs.get("r7"),
+            regs.get("R7"),
+        ]
+        regs_block = regs.get("regs")
+        if isinstance(regs_block, list) and len(regs_block) > 7:
+            candidates.append(regs_block[7])
+        for value in candidates:
+            fp = self._optional_int(value)
+            if fp is not None:
+                return fp & 0xFFFFFFFF
+        return None
+
+    def _register_value_from_snapshot(self, regs: Dict[str, Any], index: Optional[int]) -> Optional[int]:
+        if index is None or index < 0 or index > 15:
+            return None
+        regs_block = regs.get("regs")
+        if isinstance(regs_block, list) and len(regs_block) > index:
+            candidate = self._optional_int(regs_block[index])
+            if candidate is not None:
+                return candidate & 0xFFFFFFFF
+        for key in (f"r{index}", f"R{index}"):
+            if key in regs:
+                candidate = self._optional_int(regs.get(key))
+                if candidate is not None:
+                    return candidate & 0xFFFFFFFF
+        return None
+
+    def _read_register_bytes(self, regs: Dict[str, Any], index: int, length: int) -> bytes:
+        value = self._register_value_from_snapshot(regs, index)
+        if value is None:
+            raise ValueError(f"register R{index} unavailable")
+        raw = int(value & 0xFFFFFFFF).to_bytes(4, "little")
+        if length <= len(raw):
+            return raw[:length]
+        return raw + b"\x00" * max(0, length - len(raw))
+
+    @staticmethod
+    def _select_local_location(locations: List[Dict[str, Any]], pc: int) -> Optional[Dict[str, Any]]:
+        for loc in locations:
+            start = loc.get("start")
+            end = loc.get("end")
+            if start is not None and pc < start:
+                continue
+            if end is not None and pc >= end:
+                continue
+            return loc
+        return None
+
+    @staticmethod
+    def _format_stack_location(offset: Optional[int]) -> str:
+        if offset is None or offset == 0:
+            return "fp"
+        sign = "+" if offset >= 0 else "-"
+        return f"fp{sign}0x{abs(offset):X}"
+
+    def _read_local_bytes(
+        self,
+        pid: int,
+        local_info: Dict[str, Any],
+        length: int,
+        *,
+        regs: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        if regs is None:
+            regs = self.request_dump_regs(pid)
+        entry = local_info.get("entry") or {}
+        locations = entry.get("locations") or []
+        pc = self._optional_int(regs.get("pc")) or 0
+        location = self._select_local_location(locations, pc)
+        if location is None:
+            raise ValueError(f"local '{local_info.get('name')}' not live at current PC")
+        loc_desc = location.get("location") or {}
+        kind = str(loc_desc.get("kind") or "stack").lower()
+        if kind == "stack":
+            fp = self._frame_pointer_from_regs(regs)
+            if fp is None:
+                raise ValueError("frame pointer not available")
+            offset = loc_desc.get("offset") or 0
+            address = (fp + int(offset)) & 0xFFFFFFFF
+            data = self.vm.read_mem(address, length, pid=pid)
+            payload = bytes(data)
+            return {
+                "value": payload,
+                "address": address,
+                "location": self._format_stack_location(offset),
+            }
+        if kind == "register":
+            index = loc_desc.get("index")
+            if index is None:
+                name_token = str(loc_desc.get("name") or "").upper()
+                if name_token.startswith("R") and name_token[1:].isdigit():
+                    index = int(name_token[1:])
+            if index is None:
+                raise ValueError("register location missing index")
+            payload = self._read_register_bytes(regs, index, length)
+            reg_name = loc_desc.get("name") or f"R{index}"
+            return {"value": payload, "address": None, "location": reg_name}
+        if kind == "global":
+            base = loc_desc.get("address")
+            if base is None and loc_desc.get("symbol"):
+                sym_entry = self.symbol_lookup_name(pid, loc_desc["symbol"])
+                if sym_entry:
+                    base = sym_entry.get("address")
+            if base is None:
+                raise ValueError("global location missing base address")
+            offset = loc_desc.get("offset") or 0
+            address = (int(base) + int(offset)) & 0xFFFFFFFF
+            data = self.vm.read_mem(address, length, pid=pid)
+            payload = bytes(data)
+            symbol = loc_desc.get("symbol")
+            if symbol:
+                hint = f"{symbol}+0x{offset:X}" if offset else symbol
+            else:
+                hint = f"0x{address:04X}"
+            return {"value": payload, "address": address, "location": hint}
+        if kind == "const":
+            value = loc_desc.get("value")
+            if value is None:
+                raise ValueError("const location missing value")
+            try:
+                const_val = int(value) & 0xFFFFFFFF
+            except (TypeError, ValueError) as exc:
+                raise ValueError("invalid const value") from exc
+            raw = const_val.to_bytes(4, "little")
+            payload = raw[:length] if length <= len(raw) else raw + b"\x00" * (length - len(raw))
+            return {"value": payload, "address": None, "location": "const"}
+        raise ValueError(f"unsupported local storage kind '{kind}'")
+
+    def _resolve_local_watch(self, pid: int, expr: str) -> Dict[str, Any]:
+        expr_clean = expr.strip()
+        if expr_clean.lower().startswith("local:"):
+            expr_clean = expr_clean.split(":", 1)[1].strip()
+        if not expr_clean:
+            raise ValueError("local expression must name a variable")
+        if "::" in expr_clean:
+            func_hint, var_name = [part.strip() for part in expr_clean.split("::", 1)]
+        elif "@" in expr_clean:
+            var_name, func_hint = [part.strip() for part in expr_clean.split("@", 1)]
+        else:
+            func_hint = None
+            var_name = expr_clean.strip()
+        if not var_name:
+            raise ValueError("local expression missing variable name")
+        with self.symbol_cache_lock:
+            table = self.symbol_tables.get(pid)
+        if not table:
+            raise ValueError("symbols not loaded; use symbols.load before watching locals")
+        locals_by_function = table.get("locals_by_function") or {}
+        regs = self.request_dump_regs(pid)
+        pc = self._optional_int(regs.get("pc")) or 0
+        if not func_hint:
+            func_entry = self.symbol_lookup_addr(pid, pc)
+            func_hint = func_entry.get("name") if func_entry else None
+        if not func_hint:
+            raise ValueError("unable to determine current function for local lookup")
+        candidates = locals_by_function.get(func_hint)
+        if not candidates:
+            raise ValueError(f"function '{func_hint}' has no local metadata")
+        match_entry = None
+        for entry in candidates:
+            if entry.get("name") != var_name:
+                continue
+            if self._select_local_location(entry.get("locations") or [], pc):
+                match_entry = entry
+                break
+        if match_entry is None:
+            raise ValueError(f"local '{var_name}' is not live in function '{func_hint}' at current PC")
+        length_hint = match_entry.get("size")
+        if not length_hint:
+            for loc in match_entry.get("locations", []):
+                loc_size = loc.get("location", {}).get("size")
+                if isinstance(loc_size, int) and loc_size > 0:
+                    length_hint = loc_size
+                    break
+        description = f"{func_hint}::{var_name}"
+        return {
+            "type": "local",
+            "mode": "local",
+            "local": {
+                "name": var_name,
+                "function": func_hint,
+                "entry": match_entry,
+            },
+            "length": length_hint,
+            "description": description,
+            "regs": regs,
+        }
+
+    def _instruction_entry(self, pid: Optional[int], pc: Optional[int]) -> Optional[Dict[str, Any]]:
+        if pid is None or pc is None:
+            return None
+        with self.symbol_cache_lock:
+            table = self.symbol_tables.get(pid)
+            if not table:
+                return None
+            lookup = table.get("instructions_by_pc")
+            if not isinstance(lookup, dict):
+                return None
+            return lookup.get(int(pc) & 0xFFFFFFFF)
+
+    def _is_compiler_instruction(self, pid: Optional[int], pc: Optional[int]) -> bool:
+        entry = self._instruction_entry(pid, pc)
+        if not entry:
+            return False
+        kind = entry.get("source_kind")
+        return isinstance(kind, str) and kind.lower() == "compiler"
+
+    def watch_add(
+        self,
+        pid: int,
+        expr: str,
+        *,
+        watch_type: Optional[str] = None,
+        length: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        self.get_task(pid)
+        expr_text = str(expr).strip()
+        if not expr_text:
+            raise ValueError("watch expression must be non-empty")
+        resolved = self._resolve_watch_expression(pid, expr_text, watch_type)
+        length_value = resolved.get("length")
+        if length_value is None:
+            length_value = 4 if length is None else max(1, int(length))
+        else:
+            length_value = max(1, length_value if isinstance(length_value, int) else int(length_value))
+        if length is not None:
+            length_value = max(1, int(length))
+        mode = resolved.get("mode", "memory")
+        location_hint: Optional[str] = None
+        address: Optional[int] = resolved.get("address")
+        regs_snapshot = resolved.pop("regs", None) if mode == "local" else None
+        try:
+            if mode == "local":
+                local_info = resolved.get("local")
+                if not isinstance(local_info, dict):
+                    raise ValueError("local metadata missing")
+                read_info = self._read_local_bytes(pid, local_info, length_value, regs=regs_snapshot)
+                raw_bytes = read_info["value"]
+                address = read_info.get("address")
+                location_hint = read_info.get("location")
+            else:
+                if address is None:
+                    raise ValueError("address required for memory watch")
+                address &= 0xFFFF
+                raw_bytes = self.vm.read_mem(address, length_value, pid=pid)
+        except Exception as exc:
+            raise ValueError(f"watch read failed: {exc}") from exc
+        watch_id = self._next_watch_id
+        self._next_watch_id += 1
+        payload = bytes(raw_bytes)
+        watch_record = {
+            "id": watch_id,
+            "pid": pid,
+            "expr": expr_text,
+            "type": resolved["type"],
+            "address": address,
+            "length": length_value,
+            "symbol": resolved.get("symbol"),
+            "description": resolved.get("description"),
+            "mode": mode,
+            "last_value": payload,
+        }
+        if mode == "local":
+            watch_record["local"] = resolved.get("local")
+        if location_hint:
+            watch_record["last_location"] = location_hint
+        self.watchers.setdefault(pid, {})[watch_id] = watch_record
+        return self._export_watch_record(watch_record)
+
+    def watch_remove(self, pid: int, watch_id: int) -> Dict[str, Any]:
+        watch_map = self.watchers.get(pid)
+        if not watch_map or watch_id not in watch_map:
+            raise ValueError(f"unknown watch {watch_id} for pid {pid}")
+        record = watch_map.pop(watch_id)
+        if not watch_map:
+            self.watchers.pop(pid, None)
+        return self._export_watch_record(record)
+
+    def watch_list(self, pid: int) -> Dict[str, Any]:
+        watch_map = self.watchers.get(pid, {})
+        items = [self._export_watch_record(record) for record in sorted(watch_map.values(), key=lambda item: item["id"])]
+        return {"pid": pid, "count": len(items), "watches": items}
+
+    def _resolve_watch_expression(
+        self,
+        pid: int,
+        expr: str,
+        watch_type: Optional[str],
+    ) -> Dict[str, Any]:
+        expr_type = (watch_type or "").strip().lower()
+        expr_clean = expr.strip()
+        if not expr_clean:
+            raise ValueError("watch expression must be non-empty")
+        local_expr = expr_clean
+        if expr_clean.lower().startswith("local:"):
+            local_expr = expr_clean.split(":", 1)[1].strip()
+            expr_type = "local"
+        if expr_type in {"local", "locals"}:
+            return self._resolve_local_watch(pid, local_expr or expr_clean)
+        address: Optional[int] = None
+        symbol_name: Optional[str] = None
+        description: Optional[str] = None
+        if expr_type in {"addr", "address"}:
+            try:
+                address = int(expr_clean, 0)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"invalid address '{expr_clean}'") from exc
+            expr_type = "address"
+        elif expr_type in {"symbol", "name"}:
+            entry = self.symbol_lookup_name(pid, expr_clean)
+            if not entry:
+                raise ValueError(f"symbol '{expr_clean}' not found for pid {pid}")
+            address = int(entry.get("address", 0))
+            symbol_name = entry.get("name")
+            description = entry.get("name")
+            expr_type = "symbol"
+        else:
+            try:
+                address = int(expr_clean, 0)
+                expr_type = "address"
+            except (TypeError, ValueError):
+                entry = self.symbol_lookup_name(pid, expr_clean)
+                if not entry:
+                    raise ValueError(f"symbol '{expr_clean}' not found for pid {pid}")
+                address = int(entry.get("address", 0))
+                symbol_name = entry.get("name")
+                description = entry.get("name")
+                expr_type = "symbol"
+        if address is None:
+            raise ValueError("unable to resolve watch expression")
+        return {
+            "type": expr_type,
+            "address": address & 0xFFFF,
+            "symbol": symbol_name,
+            "description": description,
+        }
+
+    def _export_watch_record(self, record: Dict[str, Any]) -> Dict[str, Any]:
+        data: Dict[str, Any] = {
+            "id": record["id"],
+            "pid": record["pid"],
+            "expr": record["expr"],
+            "type": record["type"],
+            "length": record["length"],
+            "value": record["last_value"].hex(),
+        }
+        if "address" in record and record["address"] is not None:
+            data["address"] = int(record["address"]) & 0xFFFF
+        if record.get("symbol"):
+            data["symbol"] = record["symbol"]
+        if record.get("description"):
+            data["description"] = record["description"]
+        if record.get("mode"):
+            data["mode"] = record["mode"]
+        if record.get("last_location"):
+            data["location"] = record["last_location"]
+        return data
+
+    def _check_watches(self, pid: Optional[int] = None) -> List[Dict[str, Any]]:
+        events: List[Dict[str, Any]] = []
+        if not self.watchers:
+            return events
+        if pid is not None:
+            pids = [pid]
+        else:
+            pids = list(self.watchers.keys())
+        for watch_pid in pids:
+            watch_map = self.watchers.get(watch_pid)
+            if not watch_map:
+                continue
+            regs_cache: Optional[Dict[str, Any]] = None
+            for watch_id, record in list(watch_map.items()):
+                mode = record.get("mode", "memory")
+                try:
+                    if mode == "local":
+                        if regs_cache is None:
+                            regs_cache = self.request_dump_regs(watch_pid)
+                        local_info = record.get("local")
+                        if not isinstance(local_info, dict):
+                            raise ValueError("local metadata missing")
+                        read_info = self._read_local_bytes(
+                            watch_pid,
+                            local_info,
+                            record["length"],
+                            regs=regs_cache,
+                        )
+                        current = read_info["value"]
+                        address = read_info.get("address")
+                        if address is not None:
+                            record["address"] = address
+                        record["last_location"] = read_info.get("location")
+                    else:
+                        addr_val = record.get("address")
+                        if addr_val is None:
+                            raise ValueError("watch address unavailable")
+                        addr = int(addr_val) & 0xFFFF
+                        data = self.vm.read_mem(addr, record["length"], pid=watch_pid)
+                        current = bytes(data)
+                        record["last_location"] = None
+                except Exception as exc:
+                    self.log("warning", "watch read failed", pid=watch_pid, watch_id=watch_id, error=str(exc))
+                    continue
+                if current == record["last_value"]:
+                    continue
+                payload = {
+                    "watch_id": watch_id,
+                    "address": record.get("address"),
+                    "expr": record["expr"],
+                    "type": record["type"],
+                    "length": record["length"],
+                    "old": record["last_value"].hex(),
+                    "new": current.hex(),
+                }
+                if record.get("symbol"):
+                    payload["symbol"] = record["symbol"]
+                if record.get("last_location"):
+                    payload["location"] = record["last_location"]
+                record["last_value"] = current
+                event = self.emit_event("watch_update", pid=watch_pid, data=payload)
+                events.append(event)
+        return events
+
+    @staticmethod
+    def _decode_instruction_word(word: int) -> Dict[str, int]:
+        op = (word >> 24) & 0xFF
+        rd = (word >> 20) & 0x0F
+        rs1 = (word >> 16) & 0x0F
+        rs2 = (word >> 12) & 0x0F
+        imm_raw = word & 0x0FFF
+        imm = imm_raw
+        if imm & 0x800:
+            imm -= 0x1000
+        return {
+            "op": op,
+            "rd": rd,
+            "rs1": rs1,
+            "rs2": rs2,
+            "imm": imm,
+            "imm_raw": imm_raw,
+        }
+
+    def _disassemble_bytes(
+        self,
+        pid: int,
+        data: bytes,
+        base_addr: int,
+        count: int,
+        *,
+        reg_values: Optional[List[int]] = None,
+    ) -> Tuple[List[Dict[str, Any]], bool, int]:
+        listing: List[Dict[str, Any]] = []
+        offset = 0
+        truncated = False
+        consumed = 0
+        unsigned_ops = {0x21, 0x22, 0x23, 0x30, 0x7F}
+        data_len = len(data)
+        for index in range(count):
+            if offset + 4 > data_len:
+                truncated = True
+                break
+            word = int.from_bytes(data[offset:offset + 4], "big")
+            decoded = self._decode_instruction_word(word)
+            opcode = decoded["op"]
+            mnemonic = disasm_util.OPCODE_NAMES.get(opcode, f"0x{opcode:02X}")
+            size = disasm_util.instruction_size(mnemonic)
+            next_word = None
+            if size == 8:
+                if offset + 8 > data_len:
+                    truncated = True
+                    break
+                next_word = int.from_bytes(data[offset + 4:offset + 8], "big")
+            imm_effective = decoded["imm_raw"] if opcode in unsigned_ops else decoded["imm"]
+            operands = disasm_util.format_operands(
+                mnemonic,
+                decoded["rd"],
+                decoded["rs1"],
+                decoded["rs2"],
+                imm=imm_effective,
+                imm_raw=decoded["imm_raw"],
+                reg_values=reg_values,
+                next_word=next_word,
+                pc=base_addr + offset,
+            )
+            inst_addr = (base_addr + offset) & 0xFFFFFFFF
+            entry: Dict[str, Any] = {
+                "index": index,
+                "pc": inst_addr,
+                "size": size,
+                "word": word,
+                "mnemonic": mnemonic,
+                "rd": decoded["rd"],
+                "rs1": decoded["rs1"],
+                "rs2": decoded["rs2"],
+                "imm": decoded["imm"],
+                "imm_raw": decoded["imm_raw"],
+                "operands": operands,
+                "bytes": data[offset:offset + size].hex(),
+            }
+            if next_word is not None:
+                entry["extended_word"] = next_word
+            if mnemonic in {"JMP", "JZ", "JNZ", "CALL"}:
+                target = imm_effective & 0xFFFFFFFF
+                entry["target"] = target
+                target_symbol = self.symbol_lookup_addr(pid, target)
+                if target_symbol:
+                    entry["target_symbol"] = dict(target_symbol)
+            listing.append(entry)
+            offset += size
+            consumed = offset
+        if offset < data_len and len(listing) >= count:
+            consumed = offset
+        return listing, truncated, consumed
+
+    def disasm_read(
+        self,
+        pid: int,
+        *,
+        address: Optional[int] = None,
+        count: Optional[int] = None,
+        mode: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        self.get_task(pid)
+        try:
+            count_value = 8 if count is None else int(count)
+        except (TypeError, ValueError):
+            raise ValueError("count must be an integer") from None
+        count_value = max(1, min(count_value, 64))
+
+        mode_value = (mode or "on-demand").strip().lower()
+        if mode_value not in {"on-demand", "cached"}:
+            raise ValueError("mode must be 'on-demand' or 'cached'")
+        cache_enabled = mode_value == "cached"
+
+        regs = self.request_dump_regs(pid)
+        pc = regs.get("pc")
+        if address is None:
+            start_addr = int(pc) & 0xFFFFFFFF if isinstance(pc, int) else 0
+        else:
+            try:
+                start_addr = int(address) & 0xFFFFFFFF
+            except (TypeError, ValueError) as exc:
+                raise ValueError("address must be integer") from exc
+
+        cache_key = (start_addr, count_value)
+        if cache_enabled:
+            cache_for_pid = self.disasm_cache.get(pid, {})
+            cached_entry = cache_for_pid.get(cache_key)
+            if cached_entry:
+                result = dict(cached_entry["result"])
+                result["cached"] = True
+                return result
+
+        max_bytes = min(count_value * 8, 4096)
+        try:
+            with self.lock:
+                raw = self.vm.read_mem(start_addr, max_bytes, pid=pid)
+        except Exception as exc:
+            raise ValueError(f"disassembly memory read failed: {exc}") from exc
+
+        if isinstance(raw, str):
+            try:
+                raw_bytes = bytes.fromhex(raw)
+            except ValueError:
+                raw_bytes = raw.encode("utf-8", errors="ignore")
+        elif isinstance(raw, (bytes, bytearray)):
+            raw_bytes = bytes(raw)
+        else:
+            raise ValueError("unexpected memory payload from VM")
+
+        reg_values = None
+        regs_block = regs.get("regs")
+        if isinstance(regs_block, list):
+            reg_values = [int(val) & 0xFFFFFFFF for val in regs_block if isinstance(val, int)]
+
+        instructions, truncated, consumed = self._disassemble_bytes(
+            pid,
+            raw_bytes,
+            start_addr,
+            count_value,
+            reg_values=reg_values,
+        )
+
+        for entry in instructions:
+            symbol = self.symbol_lookup_addr(pid, entry["pc"])
+            if symbol:
+                entry["symbol"] = dict(symbol)
+            line = self.symbol_lookup_line(pid, entry["pc"])
+            if line:
+                entry["line"] = dict(line)
+            offset = symbol.get("offset") if symbol else None
+            if symbol and (offset is None or offset == 0):
+                entry["label"] = symbol.get("name")
+
+        result = {
+            "pid": pid,
+            "address": start_addr,
+            "count": len(instructions),
+            "requested": count_value,
+            "mode": mode_value,
+            "cached": False,
+            "truncated": truncated,
+            "bytes_read": consumed,
+            "data": raw_bytes[:consumed].hex(),
+            "instructions": instructions,
+        }
+
+        if cache_enabled:
+            cache_for_pid = self.disasm_cache.setdefault(pid, {})
+            cache_for_pid[cache_key] = {
+                "result": dict(result),
+                "timestamp": time.time(),
+            }
+
+        return result
+
+    def stack_info(self, pid: int, *, max_frames: Optional[int] = None) -> Dict[str, Any]:
+        self.get_task(pid)
+        regs = self.request_dump_regs(pid)
+        frames: List[Dict[str, Any]] = []
+        max_frames = max_frames or self.default_stack_frames
+        try:
+            max_frames = max(1, min(int(max_frames), 64))
+        except (TypeError, ValueError):
+            max_frames = self.default_stack_frames
+
+        errors: List[str] = []
+
+        def _coerce_ptr(name: str, value: Any) -> Optional[int]:
+            if value is None:
+                return None
+            try:
+                return int(value) & 0xFFFFFFFF
+            except (TypeError, ValueError):
+                errors.append(f"invalid_{name}")
+                return None
+
+        stack_base = _coerce_ptr("stack_base", regs.get("stack_base")) or 0
+        stack_size_raw = regs.get("stack_size", 0) or 0
+        try:
+            stack_size = int(stack_size_raw)
+        except (TypeError, ValueError):
+            errors.append("invalid_stack_size")
+            stack_size = 0
+        stack_limit = _coerce_ptr("stack_limit", regs.get("stack_limit")) or stack_base
+        stack_low = min(stack_base, stack_limit)
+        if stack_size > 0:
+            stack_high = stack_base + stack_size
+        else:
+            stack_high = stack_low + 0x10000
+
+        def _in_stack_range(ptr: Optional[int], *, allow_high: bool = False) -> bool:
+            if ptr is None:
+                return False
+            if stack_low <= ptr < stack_high:
+                return True
+            if allow_high and ptr == stack_high:
+                return True
+            return False
+
+        current_pc = _coerce_ptr("pc", regs.get("pc")) or 0
+        sp_effective = _coerce_ptr("sp_effective", regs.get("sp_effective"))
+        if sp_effective is None:
+            sp_raw = _coerce_ptr("sp", regs.get("sp")) or 0
+            if stack_base:
+                sp_effective = (stack_base + (sp_raw & 0xFFFF)) & 0xFFFFFFFF
+            else:
+                sp_effective = sp_raw
+        current_sp = sp_effective or 0
+        start_sp = current_sp
+        if not _in_stack_range(current_sp, allow_high=True):
+            errors.append(f"sp_out_of_range:0x{current_sp:08X}")
+
+        fp_candidates = [
+            ("fp", regs.get("fp")),
+            ("frame_pointer", regs.get("frame_pointer")),
+            ("r7", regs.get("r7")),
+            ("R7", regs.get("R7")),
+        ]
+        regs_block = regs.get("regs")
+        if isinstance(regs_block, list) and len(regs_block) > 7:
+            fp_candidates.append(("regs7", regs_block[7]))
+        fp: Optional[int] = None
+        for name, value in fp_candidates:
+            fp = _coerce_ptr(name, value)
+            if fp is not None:
+                break
+
+        initial_fp = fp
+        if fp is not None and not _in_stack_range(fp):
+            errors.append(f"fp_out_of_range:0x{fp:08X}")
+
+        truncated = False
+        seen_fps: set[int] = set()
+
+        for depth in range(max_frames):
+            frame_entry: Dict[str, Any] = {
+                "index": depth,
+                "pc": current_pc,
+                "sp": current_sp,
+                "fp": fp,
+                "return_pc": None,
+            }
+            symbol = self.symbol_lookup_addr(pid, current_pc)
+            if symbol:
+                frame_entry["symbol"] = symbol
+                frame_entry["func_name"] = symbol.get("name")
+                frame_entry["func_addr"] = symbol.get("address")
+                if symbol.get("offset") is not None:
+                    frame_entry["func_offset"] = symbol.get("offset")
+            line = self.symbol_lookup_line(pid, current_pc)
+            if line:
+                frame_entry["line"] = line
+                if line.get("line") is not None:
+                    frame_entry["line_num"] = line.get("line")
+            frames.append(frame_entry)
+
+            if fp is None or fp == 0:
+                break
+            if fp in seen_fps:
+                errors.append(f"fp_cycle:0x{fp:08X}")
+                truncated = True
+                break
+            seen_fps.add(fp)
+            if fp % 4 != 0:
+                errors.append(f"fp_unaligned:0x{fp:08X}")
+                truncated = True
+                break
+            if not _in_stack_range(fp, allow_high=False):
+                errors.append(f"fp_out_of_range:0x{fp:08X}")
+                truncated = True
+                break
+            if fp + 8 > stack_high:
+                errors.append(f"fp_frame_overflow:0x{fp:08X}")
+                truncated = True
+                break
+
+            words = self._read_stack_words(pid, fp, 2)
+            if not words or len(words) < 2:
+                errors.append(f"stack_read_failed:0x{fp:08X}")
+                truncated = True
+                break
+            prev_fp, return_pc = words
+            prev_fp &= 0xFFFFFFFF
+            return_pc &= 0xFFFFFFFF
+            frame_entry["return_pc"] = return_pc
+            if prev_fp == 0 and return_pc == 0:
+                break
+            current_sp = (fp + 8) & 0xFFFFFFFF
+            current_pc = return_pc
+            fp = prev_fp if prev_fp != 0 else None
+            if fp is not None and not _in_stack_range(fp, allow_high=False):
+                errors.append(f"fp_out_of_range:0x{fp:08X}")
+                fp = None
+                truncated = True
+                break
+        else:
+            truncated = True
+            errors.append("frame_limit_reached")
+
+        return {
+            "pid": pid,
+            "frames": frames,
+            "truncated": truncated,
+            "errors": errors,
+            "stack_base": stack_base,
+            "stack_limit": stack_limit,
+            "stack_low": stack_low,
+            "stack_high": stack_high,
+            "initial_sp": start_sp,
+            "initial_fp": initial_fp,
+        }
+
+    def _next_event_seq(self) -> int:
+        with self.event_lock:
+            seq = self.event_seq
+            self.event_seq += 1
+            return seq
+
+    def _build_event(
+        self,
+        event_type: str,
+        *,
+        pid: Optional[int] = None,
+        data: Optional[Dict[str, Any]] = None,
+        ts: Optional[float] = None,
+        seq: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        event = {
+            "seq": seq if seq is not None else self._next_event_seq(),
+            "ts": ts if ts is not None else time.time(),
+            "type": event_type,
+            "pid": pid,
+            "data": data or {},
+        }
+        return event
+
+    def _store_history(self, event: Dict[str, Any]) -> None:
+        with self.event_lock:
+            self.event_history.append(event)
+
+    def emit_event(
+        self,
+        event_type: str,
+        *,
+        pid: Optional[int] = None,
+        data: Optional[Dict[str, Any]] = None,
+        ts: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        event = self._build_event(event_type, pid=pid, data=data, ts=ts)
+        self._store_history(event)
+        self._broadcast_event(event)
+        return event
+
+    def _deliver_warning(self, subscription: EventSubscription, reason: str, **fields: Any) -> None:
+        warning_event = self._build_event(
+            "warning",
+            pid=None,
+            data={"reason": reason, **fields, "subscription": subscription.token},
+        )
+        # do not store warning-only events globally; they are session specific
+        with subscription.condition:
+            if not subscription.active:
+                return
+            subscription.queue.append(warning_event)
+            pending = self._post_enqueue_locked(subscription, warning_event["seq"])
+            subscription.condition.notify_all()
+        # warnings are considered part of the backlog but should not recursively trigger new warnings
+        # immediately, so skip back-pressure evaluation here.
+
+    def _post_enqueue_locked(self, subscription: EventSubscription, seq: int) -> int:
+        """Update delivery metrics after enqueuing an event while the subscription lock is held."""
+        subscription.delivered_seq = max(subscription.delivered_seq, seq)
+        pending = subscription.pending()
+        if pending > subscription.high_water:
+            subscription.high_water = pending
+        subscription.last_delivery_ts = time.time()
+        return pending
+
+    def _apply_backpressure(self, subscription: EventSubscription, pending: Optional[int] = None) -> None:
+        if not subscription.active:
+            return
+        pending_count = subscription.pending() if pending is None else pending
+        now = time.time()
+        if (now - subscription.created_at) < self.event_backpressure_grace:
+            return
+        warn_threshold = max(subscription.max_events * self.event_ack_warn_factor, self.event_ack_warn_floor)
+        drop_threshold = max(subscription.max_events * self.event_ack_drop_factor, self.event_ack_drop_floor)
+        if pending_count >= warn_threshold:
+            if (now - subscription.last_warning_ts) >= self.event_slow_warning_interval:
+                self._deliver_warning(
+                    subscription,
+                    "slow_consumer",
+                    pending=pending_count,
+                    high_water=subscription.high_water,
+                    drops=subscription.drop_count,
+                )
+                subscription.last_warning_ts = now
+                subscription.slow_warning_active = True
+                if not subscription.slow_since:
+                    subscription.slow_since = now
+                subscription.slow_count += 1
+        else:
+            subscription.slow_warning_active = False
+            subscription.slow_since = 0.0
+        if pending_count >= drop_threshold:
+            self.log(
+                "warn",
+                "events subscription dropped due to backpressure",
+                session_id=subscription.session_id,
+                token=subscription.token,
+                pending=pending_count,
+                last_ack=subscription.last_ack,
+                delivered=subscription.delivered_seq,
+                max_events=subscription.max_events,
+                drops=subscription.drop_count,
+            )
+            self._deliver_warning(
+                subscription,
+                "slow_consumer_drop",
+                pending=pending_count,
+                high_water=subscription.high_water,
+                drops=subscription.drop_count,
+            )
+            self.events_unsubscribe(token=subscription.token)
+
+    def _broadcast_event(self, event: Dict[str, Any]) -> None:
+        with self.event_lock:
+            subscribers = list(self.event_subscriptions.values())
+        for sub in subscribers:
+            pending: Optional[int] = None
+            with sub.condition:
+                if not sub.active:
+                    continue
+                if not sub.matches(event):
+                    continue
+                if sub.max_events > 0 and len(sub.queue) >= sub.max_events:
+                    dropped = sub.queue.popleft()
+                    dropped_seq = dropped.get("seq", sub.last_ack)
+                    sub.last_ack = max(sub.last_ack, dropped_seq)
+                    sub.drop_count += 1
+                    self.log(
+                        "warn",
+                        "events queue drop",
+                        session_id=sub.session_id,
+                        token=sub.token,
+                        dropped_seq=dropped_seq,
+                        drop_count=sub.drop_count,
+                        max_events=sub.max_events,
+                    )
+                    self._deliver_warning(
+                        sub,
+                        "event_dropped",
+                        dropped_seq=dropped_seq,
+                        drops=sub.drop_count,
+                    )
+                    # ensure room after warning
+                    if sub.max_events > 0 and len(sub.queue) >= sub.max_events:
+                        sub.queue.popleft()
+                sub.queue.append(event)
+                pending = self._post_enqueue_locked(sub, event.get("seq", sub.delivered_seq))
+                sub.condition.notify_all()
+            if pending is not None:
+                self._apply_backpressure(sub, pending)
+
+    def _set_task_state_pending(
+        self,
+        pid: int,
+        reason: str,
+        *,
+        target_state: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None,
+        ts: Optional[float] = None,
+        force: bool = False,
+    ) -> None:
+        if not reason:
+            return
+        payload: Dict[str, Any] = {
+            "reason": reason,
+            "target_state": target_state,
+            "details": dict(details) if isinstance(details, dict) else (details if details is None else {"value": details}),
+            "ts": ts,
+            "force": force,
+        }
+        self.task_state_pending[pid] = payload
+
+    def _emit_task_state_event(
+        self,
+        pid: int,
+        prev_state: Optional[str],
+        new_state: Optional[str],
+        *,
+        reason: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None,
+        ts: Optional[float] = None,
+        state_entry: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        if state_entry is None:
+            state_entry = self.task_states.setdefault(pid, {})
+        data: Dict[str, Any] = {
+            "prev_state": prev_state,
+            "new_state": new_state,
+        }
+        if reason is not None:
+            data["reason"] = reason
+        if details:
+            data["details"] = details
+        event = self.emit_event("task_state", pid=pid, data=data, ts=ts)
+        state_entry["state"] = new_state
+        if reason is not None:
+            state_entry["last_reason"] = reason
+        state_entry["last_state_ts"] = time.time()
+        return event
+
+    def _maybe_emit_scheduler_event(
+        self,
+        prev_snapshot: Dict[str, Any],
+        *,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        context = context or {}
+        prev_tasks_raw = prev_snapshot.get("tasks")
+        prev_tasks: Dict[Any, Dict[str, Any]]
+        if isinstance(prev_tasks_raw, dict):
+            prev_tasks = prev_tasks_raw
+        else:
+            prev_tasks = {}
+
+        def _fetch_task(tasks: Dict[Any, Dict[str, Any]], pid: Optional[int]) -> Optional[Dict[str, Any]]:
+            if pid is None:
+                return None
+            entry = tasks.get(pid)
+            if entry is None:
+                entry = tasks.get(str(pid))
+            if isinstance(entry, dict):
+                return entry
+            return None
+
+        prev_pid = self._optional_int(context.get("prev_pid"))
+        if prev_pid is None:
+            prev_pid = self._optional_int(prev_snapshot.get("current_pid"))
+        if prev_pid is None:
+            for key, task in prev_tasks.items():
+                pid_candidate = self._optional_int(key)
+                if pid_candidate is None:
+                    continue
+                state_val = str(task.get("state") or "").lower()
+                if state_val == "running":
+                    prev_pid = pid_candidate
+                    break
+
+        next_pid = self._optional_int(context.get("next_pid"))
+        if next_pid is None:
+            next_pid = self._optional_int(self.current_pid)
+
+        if prev_pid is None or prev_pid == next_pid:
+            return None
+
+        prev_task = _fetch_task(prev_tasks, prev_pid)
+        prev_state = None
+        if prev_task is not None:
+            prev_state = prev_task.get("state")
+
+        next_task = _fetch_task(self.tasks, next_pid)
+        next_state = None
+        if next_task is not None:
+            next_state = next_task.get("state")
+
+        post_task = _fetch_task(self.tasks, prev_pid)
+        post_state = (post_task.get("state") if isinstance(post_task, dict) else None) if post_task else None
+        post_state_norm = str(post_state or "").lower() if post_state is not None else None
+
+        reason = context.get("reason") or context.get("reason_hint")
+        if reason is None:
+            if post_task is None:
+                reason = "killed"
+            elif post_state_norm in {"sleeping"}:
+                reason = "sleep"
+            elif post_state_norm in {"waiting_mbx", "waiting"}:
+                reason = "wait_mbx"
+            elif post_state_norm == "paused":
+                reason = "paused"
+            elif post_state_norm in {"terminated", "killed", "returned"}:
+                reason = "killed"
+            else:
+                reason = "quantum_expired"
+
+        quantum_remaining: Optional[int] = None
+        if isinstance(prev_task, dict):
+            quantum = self._optional_int(prev_task.get("quantum"))
+            accounted = self._optional_int(prev_task.get("accounted_steps"))
+            if quantum and quantum > 0 and accounted is not None:
+                remainder = quantum - (accounted % quantum)
+                if remainder == quantum:
+                    remainder = 0
+                quantum_remaining = remainder
+
+        data: Dict[str, Any] = {
+            "state": "switch",
+            "prev_pid": prev_pid,
+            "next_pid": next_pid,
+            "reason": reason,
+        }
+        if quantum_remaining is not None:
+            data["quantum_remaining"] = quantum_remaining
+        if prev_state is not None:
+            data["prev_state"] = str(prev_state)
+        if next_state is not None:
+            data["next_state"] = str(next_state)
+        if post_state is not None:
+            data["post_state"] = str(post_state)
+        executed = self._optional_int(context.get("executed"))
+        if executed is not None:
+            data["executed"] = executed
+        source = context.get("source")
+        if isinstance(source, str):
+            data["source"] = source
+        details = context.get("details")
+        if isinstance(details, dict) and details:
+            data["details"] = dict(details)
+
+        return self.emit_event("scheduler", pid=next_pid, data=data)
+
+    def _infer_task_state_reason(
+        self,
+        prev_state: Optional[str],
+        new_state: Optional[str],
+        task: Dict[str, Any],
+        state_entry: Dict[str, Any],
+    ) -> Optional[str]:
+        prev = str(prev_state or "").lower()
+        new = str(new_state or "").lower()
+        if new == "waiting_mbx":
+            return "mailbox_wait"
+        if prev == "waiting_mbx" and new in {"ready", "running"}:
+            return "mailbox_wake"
+        if new == "returned":
+            return "returned"
+        if new == "terminated":
+            last_reason = state_entry.get("last_reason")
+            if last_reason in {"killed", "timeout"}:
+                return last_reason
+            return "killed"
+        if new == "paused" and state_entry.get("last_reason") == "debug_break":
+            return "debug_break"
+        exit_status = task.get("exit_status")
+        if exit_status is not None and new in {"stopped", "returned"}:
+            return "returned"
+        return None
+
+    def _handle_trace_step_event(self, pid: int, payload: Dict[str, Any]) -> None:
+        regs_value = payload.get("regs")
+        if not isinstance(regs_value, (list, tuple)):
+            self.trace_last_regs.pop(pid, None)
+            return
+        regs_list = list(regs_value[:16])
+        clean_regs: List[int] = []
+        for value in regs_list:
+            try:
+                clean_regs.append(int(value) & 0xFFFFFFFF)
+            except (TypeError, ValueError):
+                clean_regs.append(0)
+        while len(clean_regs) < 16:
+            clean_regs.append(0)
+        pc_value_raw = payload.get("pc")
+        pc_value: Optional[int]
+        try:
+            pc_value = int(pc_value_raw) & 0xFFFFFFFF if pc_value_raw is not None else None
+        except (TypeError, ValueError):
+            pc_value = None
+        flags_raw = payload.get("flags")
+        try:
+            flags_value = int(flags_raw) & 0xFFFFFFFF if flags_raw is not None else None
+        except (TypeError, ValueError):
+            flags_value = None
+        last_entry = self.trace_last_regs.get(pid)
+        changed: List[str] = []
+        if last_entry is None or not isinstance(last_entry.get("regs"), list):
+            changed = [f"R{i}" for i in range(len(clean_regs))]
+        else:
+            last_regs = last_entry.get("regs", [])
+            for idx, value in enumerate(clean_regs):
+                prev_value = last_regs[idx] if idx < len(last_regs) else None
+                if prev_value is None or prev_value != value:
+                    changed.append(f"R{idx}")
+        last_pc = last_entry.get("pc") if last_entry else None
+        if pc_value is not None and (last_pc is None or pc_value != last_pc):
+            changed.append("PC")
+        last_flags = last_entry.get("flags") if last_entry else None
+        if flags_value is not None and (last_flags is None or flags_value != last_flags):
+            changed.append("PSW")
+        if "PC" in changed:
+            changed.remove("PC")
+        if self.trace_track_changed_regs and changed:
+            payload["changed_regs"] = changed
+        self.trace_last_regs[pid] = {"regs": clean_regs, "pc": pc_value, "flags": flags_value}
+        self._append_trace_record(pid, payload, clean_regs, pc_value, flags_value)
+
+    def _next_trace_seq_locked(self) -> int:
+        seq = self._trace_seq
+        self._trace_seq += 1
+        if self._trace_seq > 1_000_000_000:
+            self._trace_seq = 1
+        return seq
+
+    def _append_trace_record(
+        self,
+        pid: int,
+        payload: Dict[str, Any],
+        regs: List[int],
+        pc: Optional[int],
+        flags: Optional[int],
+    ) -> None:
+        if self.trace_buffer_capacity <= 0:
+            return
+        timestamp = time.time()
+        with self.trace_lock:
+            if self.trace_buffer_capacity <= 0:
+                return
+            buffer = self.trace_buffers.get(pid)
+            if buffer is None or buffer.maxlen != self.trace_buffer_capacity:
+                buffer = deque(maxlen=self.trace_buffer_capacity)
+                self.trace_buffers[pid] = buffer
+            record_dict: Dict[str, Any] = {
+                "seq": self._next_trace_seq_locked(),
+                "ts": timestamp,
+                "pid": pid,
+                "pc": pc if pc is not None else self._optional_int(payload.get("pc")),
+                "opcode": self._optional_int(payload.get("opcode")),
+            }
+            if flags is not None:
+                record_dict["flags"] = flags
+            if regs:
+                record_dict["regs"] = list(regs)
+            next_pc = self._optional_int(payload.get("next_pc"))
+            if next_pc is not None:
+                record_dict["next_pc"] = next_pc
+            steps = self._optional_int(payload.get("steps"))
+            if steps is not None:
+                record_dict["steps"] = steps
+            changed = payload.get("changed_regs")
+            if isinstance(changed, (list, tuple)):
+                record_dict["changed_regs"] = list(changed)
+            mem_access = payload.get("mem_access")
+            if isinstance(mem_access, dict):
+                record_dict["mem_access"] = dict(mem_access)
+            source = payload.get("source")
+            if source is not None:
+                record_dict["source"] = source
+            normalized = trace_format.decode_trace_records(
+                [record_dict], default_pid=pid
+            )[0]
+            buffer.append(normalized)
+
+    def _emit_trace_snapshot(self, pid: int, snapshot: Mapping[str, Any]) -> None:
+        pid_value = self._optional_int(snapshot.get("pid")) or pid
+        payload: Dict[str, Any] = {k: v for k, v in snapshot.items() if k != "pid"}
+        regs_value = payload.get("regs")
+        if isinstance(regs_value, list):
+            payload["regs"] = [int(val) & 0xFFFFFFFF for val in regs_value]
+        elif isinstance(regs_value, tuple):
+            payload["regs"] = [int(val) & 0xFFFFFFFF for val in regs_value]
+        else:
+            payload["regs"] = []
+        if "flags" in payload:
+            try:
+                payload["flags"] = int(payload["flags"]) & 0xFF
+            except (TypeError, ValueError):
+                payload["flags"] = 0
+        else:
+            payload["flags"] = 0
+        mem_access = payload.get("mem_access")
+        if isinstance(mem_access, dict):
+            payload["mem_access"] = dict(mem_access)
+        self._handle_trace_step_event(pid_value, payload)
+        self.emit_event("trace_step", pid=pid_value, data=payload)
+
+    def _parse_event_filters(self, filters: Optional[Dict[str, Any]]) -> Tuple[Optional[Set[int]], Optional[Set[str]], Optional[int]]:
+        if not isinstance(filters, dict):
+            return None, None, None
+        pid_values = filters.get("pid")
+        pids: Optional[Set[int]]
+        if pid_values is None:
+            pids = None
+        else:
+            if not isinstance(pid_values, (list, tuple, set)):
+                pid_values = [pid_values]
+            pids = set()
+            for value in pid_values:
+                try:
+                    pid = int(value)
+                except (TypeError, ValueError):
+                    raise ValueError("filters.pid must contain integer PIDs")
+                pids.add(pid)
+        categories_values = filters.get("categories")
+        categories: Optional[Set[str]]
+        if categories_values is None:
+            categories = None
+        else:
+            if not isinstance(categories_values, (list, tuple, set)):
+                categories_values = [categories_values]
+            categories = {str(cat) for cat in categories_values}
+        since_seq_value = filters.get("since_seq")
+        since_seq: Optional[int]
+        if since_seq_value is None:
+            since_seq = None
+        else:
+            try:
+                since_seq = int(since_seq_value)
+            except (TypeError, ValueError):
+                raise ValueError("filters.since_seq must be an integer when provided")
+            if since_seq < 0:
+                raise ValueError("filters.since_seq must be non-negative")
+        return pids, categories, since_seq
+
+    def events_subscribe(
+        self,
+        session_id: str,
+        *,
+        filters: Optional[Dict[str, Any]] = None,
+    ) -> EventSubscription:
+        record = self._get_session(session_id)
+        pids, categories, since_seq = self._parse_event_filters(filters)
+        with self.event_lock:
+            existing_token = self.session_event_map.pop(session_id, None)
+            if existing_token:
+                old = self.event_subscriptions.pop(existing_token, None)
+                if old:
+                    with old.condition:
+                        old.active = False
+                        old.condition.notify_all()
+            token = f"{session_id}:{uuid.uuid4()}"
+            condition = threading.Condition(self.event_lock)
+            current_seq = self.event_seq - 1
+            initial_ack = since_seq if since_seq is not None else current_seq
+            subscription = EventSubscription(
+                token=token,
+                session_id=session_id,
+                pids=pids,
+                categories=categories,
+                queue=deque(),
+                condition=condition,
+                max_events=record.max_events,
+                last_ack=initial_ack,
+                delivered_seq=initial_ack,
+                since_seq=since_seq,
+            )
+            # preload history if requested
+            if since_seq is not None:
+                with subscription.condition:
+                    for event in self.event_history:
+                        if event.get("seq", 0) > since_seq and subscription.matches(event):
+                            subscription.queue.append(event)
+                            self._post_enqueue_locked(subscription, event.get("seq", initial_ack))
+            self.event_subscriptions[token] = subscription
+            self.session_event_map[session_id] = token
+            subscription.condition.notify_all()
+        self.log(
+            "info",
+            "events subscribed",
+            session_id=session_id,
+            token=token,
+            filters={"pid": sorted(subscription.pids) if subscription.pids else None, "categories": sorted(subscription.categories) if subscription.categories else None},
+        )
+        return subscription
+
+    def events_unsubscribe(self, session_id: Optional[str] = None, token: Optional[str] = None) -> bool:
+        if token is None and session_id is not None:
+            with self.event_lock:
+                token = self.session_event_map.pop(session_id, None)
+        removed = False
+        if token is None:
+            return False
+        with self.event_lock:
+            sub = self.event_subscriptions.pop(token, None)
+            if sub:
+                if sub.session_id in self.session_event_map and self.session_event_map[sub.session_id] == token:
+                    self.session_event_map.pop(sub.session_id, None)
+                removed = True
+                with sub.condition:
+                    sub.active = False
+                    sub.condition.notify_all()
+        if removed:
+            self.log("info", "events unsubscribed", token=token, session_id=session_id)
+        return removed
+
+    def events_ack(self, session_id: str, seq: int) -> None:
+        if seq < 0:
+            raise ValueError("ack seq must be non-negative")
+        with self.event_lock:
+            token = self.session_event_map.get(session_id)
+            if not token:
+                raise SessionError("session_required")
+            subscription = self.event_subscriptions.get(token)
+        if subscription is None:
+            raise SessionError("session_required")
+        with subscription.condition:
+            subscription.last_ack = max(subscription.last_ack, seq)
+            while subscription.queue and subscription.queue[0].get("seq", 0) <= seq:
+                subscription.queue.popleft()
+            pending_after = subscription.pending()
+            if pending_after <= subscription.max_events:
+                subscription.slow_warning_active = False
+                subscription.slow_since = 0.0
+            subscription.condition.notify_all()
+
+    def events_next(self, subscription: EventSubscription, timeout: float = 1.0) -> Optional[Dict[str, Any]]:
+        end_time = time.time() + timeout
+        with subscription.condition:
+            while True:
+                if subscription.queue:
+                    return subscription.queue.popleft()
+                if not subscription.active:
+                    return None
+                remaining = end_time - time.time()
+                if remaining <= 0:
+                    return None
+                subscription.condition.wait(timeout=remaining)
+        return None
+
+    def events_metrics(self, session_id: str) -> Dict[str, Any]:
+        with self.event_lock:
+            token = self.session_event_map.get(session_id)
+            if not token:
+                raise SessionError("session_required")
+            subscription = self.event_subscriptions.get(token)
+        if subscription is None:
+            raise SessionError("session_required")
+        with subscription.condition:
+            pending = subscription.pending()
+            return {
+                "token": subscription.token,
+                "pending": pending,
+                "high_water": subscription.high_water,
+                "drop_count": subscription.drop_count,
+                "slow_count": subscription.slow_count,
+                "last_ack": subscription.last_ack,
+                "delivered_seq": subscription.delivered_seq,
+                "max_events": subscription.max_events,
+                "active": subscription.active,
+                "slow_warning_active": subscription.slow_warning_active,
+            }
+
+    def events_session_disconnected(self, session_id: str) -> None:
+        self.events_unsubscribe(session_id=session_id)
 
     def _refresh_tasks(self) -> None:
         try:
             snapshot = self.vm.ps()
         except RuntimeError:
             return
+        prev_current_pid = self.current_pid
         tasks_block = snapshot.get("tasks", [])
         if isinstance(tasks_block, dict):
             tasks = tasks_block.get("tasks", [])
-            self.current_pid = tasks_block.get("current_pid")
+            new_current_pid = tasks_block.get("current_pid")
         else:
             tasks = tasks_block
-            self.current_pid = snapshot.get("current_pid")
+            new_current_pid = snapshot.get("current_pid")
+        prev_snapshot = {
+            "current_pid": prev_current_pid,
+            "tasks": {pid: dict(task) for pid, task in self.tasks.items()},
+        }
+        self.current_pid = self._optional_int(new_current_pid)
+        prev_states = self.task_states
         self.tasks = {}
         new_states: Dict[int, Dict[str, Any]] = {}
+        current_pids: Set[int] = set()
+        now = time.time()
         for task in tasks:
             if not isinstance(task, dict):
                 continue
-            pid = int(task.get("pid", 0))
+            pid_raw = task.get("pid", 0)
+            try:
+                pid = int(pid_raw)
+            except (TypeError, ValueError):
+                continue
             self.tasks[pid] = task
-            state_entry = self.task_states.get(pid, {})
-            context = state_entry.get("context", {})
+            prev_entry = prev_states.get(pid)
+            state_entry: Dict[str, Any]
+            if isinstance(prev_entry, dict):
+                state_entry = prev_entry
+            else:
+                state_entry = {}
+            context = state_entry.get("context")
+            if not isinstance(context, dict):
+                context = {}
+            prev_wait_mailbox_value = context.get("wait_mailbox")
+            prev_wait_handle_value = context.get("wait_handle")
+            prev_wait_timeout_value = context.get("wait_timeout")
+            prev_wait_deadline_value = context.get("wait_deadline")
+            context.pop("regs", None)
             context["state"] = task.get("state")
             if "exit_status" in task:
                 context["exit_status"] = task.get("exit_status")
+            elif "exit_status" in context and "exit_status" not in task:
+                context.pop("exit_status", None)
             if "trace" in task:
                 context["trace"] = task.get("trace")
+            def _propagate_field(name: str) -> None:
+                val = self._optional_int(task.get(name))
+                if val is not None:
+                    context[name] = val
+                    task[name] = val
+                elif name in context:
+                    context.pop(name, None)
+            _propagate_field("reg_base")
+            _propagate_field("stack_base")
+            _propagate_field("stack_limit")
+            _propagate_field("stack_size")
+            wait_mailbox_value = task.get("wait_mailbox")
+            wait_handle_value = task.get("wait_handle")
+            wait_timeout_value = task.get("wait_timeout")
+            wait_deadline_value = task.get("wait_deadline")
+            if wait_mailbox_value is None:
+                wait_mailbox_value = prev_wait_mailbox_value
+            if wait_handle_value is None:
+                wait_handle_value = prev_wait_handle_value
+            if wait_timeout_value is None:
+                wait_timeout_value = prev_wait_timeout_value
+            if wait_deadline_value is None:
+                wait_deadline_value = prev_wait_deadline_value
+            if wait_mailbox_value is not None:
+                context["wait_mailbox"] = wait_mailbox_value
+            elif "wait_mailbox" in context:
+                context.pop("wait_mailbox", None)
+            if wait_handle_value is not None:
+                context["wait_handle"] = wait_handle_value
+            elif "wait_handle" in context:
+                context.pop("wait_handle", None)
+            if wait_timeout_value is not None:
+                context["wait_timeout"] = wait_timeout_value
+            elif "wait_timeout" in context:
+                context.pop("wait_timeout", None)
+            if wait_deadline_value is not None:
+                context["wait_deadline"] = wait_deadline_value
+            elif "wait_deadline" in context:
+                context.pop("wait_deadline", None)
+            prev_state = state_entry.get("state")
+            prev_state_enum = state_entry.get("state_enum")
+            if not isinstance(prev_state_enum, TaskState):
+                try:
+                    prev_state_enum = self._coerce_task_state(prev_state, allow_none=True)
+                except ValueError:
+                    prev_state_enum = None
+            prev_sleep = bool(state_entry.get("sleep_pending"))
+            new_state_value = task.get("state")
+            if new_state_value is None:
+                new_state_str = context.get("state") or prev_state
+            else:
+                new_state_str = str(new_state_value)
+            try:
+                new_state_enum = self._coerce_task_state(new_state_str)
+            except ValueError as exc:
+                raise ValueError(f"task_state_invalid:{new_state_str}:pid={pid}") from exc
+            self._validate_state_transition(pid, prev_state_enum, new_state_enum)
+            if new_state_enum != prev_state_enum:
+                self._record_state_transition(pid, prev_state_enum, new_state_enum)
+            new_state = new_state_enum.value
+            if new_state_enum == TaskState.SLEEPING:
+                self._track_sleep(pid, task.get("sleep_deadline"))
+            else:
+                self._untrack_sleep(pid)
+            state_entry["state"] = new_state
+            state_entry["state_enum"] = new_state_enum
+            sleep_flag = bool(task.get("sleep_pending"))
+            state_entry["sleep_pending"] = sleep_flag
             state_entry["context"] = context
+            context["state"] = new_state
+            if self.enforce_context_isolation:
+                self._assert_context_isolation(pid, context, new_state_enum)
+            task["state"] = new_state
+            if new_state_enum == TaskState.WAIT_MBX:
+                if "wait_mailbox" in context:
+                    task["wait_mailbox"] = context.get("wait_mailbox")
+                if "wait_handle" in context:
+                    task["wait_handle"] = context.get("wait_handle")
+                if "wait_timeout" in context:
+                    task["wait_timeout"] = context.get("wait_timeout")
+                if "wait_deadline" in context:
+                    task["wait_deadline"] = context.get("wait_deadline")
+                self._track_wait_mailbox(pid, context.get("wait_deadline"))
+            else:
+                task.pop("wait_mailbox", None)
+                task.pop("wait_handle", None)
+                task.pop("wait_timeout", None)
+                task.pop("wait_deadline", None)
+                self._untrack_wait_mailbox(pid)
             new_states[pid] = state_entry
+            current_pids.add(pid)
+            bp_set = self.breakpoints.get(pid)
+            if bp_set:
+                task["breakpoints"] = sorted(bp_set)
+            elif "breakpoints" in task:
+                task.pop("breakpoints", None)
+            symbol_table = self.symbol_tables.get(pid)
+            if symbol_table:
+                task["symbols"] = {
+                    "path": symbol_table.get("path"),
+                    "count": len(symbol_table.get("symbols", [])),
+                }
+            elif "symbols" in task:
+                task.pop("symbols", None)
+
+            reason: Optional[str] = None
+            details: Optional[Dict[str, Any]] = None
+            ts: Optional[float] = None
+            emit_same_state = False
+            pending = self.task_state_pending.pop(pid, None)
+            if pending:
+                reason = pending.get("reason")
+                details_payload = pending.get("details")
+                if isinstance(details_payload, dict):
+                    details = dict(details_payload)
+                elif details_payload is not None:
+                    details = {"value": details_payload}
+                ts = pending.get("ts")
+                emit_same_state = bool(pending.get("force"))
+                expected_state = pending.get("target_state")
+                if expected_state and expected_state != new_state:
+                    merged = dict(details or {})
+                    merged.setdefault("expected_state", expected_state)
+                    details = merged
+            if reason is None and prev_entry is None:
+                reason = "loaded"
+                ts = ts or now
+            if prev_entry is not None and prev_state != new_state and reason is None:
+                inferred = self._infer_task_state_reason(prev_state, new_state, task, state_entry)
+                if inferred:
+                    reason = inferred
+            if not prev_sleep and sleep_flag:
+                sleep_details = dict(details or {}) if details else {}
+                sleep_details.setdefault("sleep_pending", True)
+                sleep_ms = task.get("sleep_pending_ms")
+                if sleep_ms is not None:
+                    sleep_details.setdefault("sleep_ms", sleep_ms)
+                if reason is None:
+                    reason = "sleep"
+                    details = sleep_details
+                else:
+                    updated = dict(details or {})
+                    updated.update(sleep_details)
+                    details = updated
+                ts = ts or now
+                emit_same_state = True
+            if reason == "returned" and task.get("exit_status") is not None:
+                exit_details = dict(details or {})
+                exit_details.setdefault("exit_status", task.get("exit_status"))
+                details = exit_details
+            if reason is not None or (prev_state != new_state) or emit_same_state:
+                self._emit_task_state_event(
+                    pid,
+                    prev_state,
+                    new_state,
+                    reason=reason,
+                    details=details,
+                    ts=ts,
+                    state_entry=state_entry,
+                )
+
+        removed_pids = set(prev_states.keys()) - current_pids
+        for pid in removed_pids:
+            pending = self.task_state_pending.pop(pid, None)
+            prev_entry = prev_states.get(pid)
+            if not isinstance(prev_entry, dict):
+                prev_entry = {}
+            prev_state = prev_entry.get("state")
+            reason = pending.get("reason") if pending else None
+            details_payload = pending.get("details") if pending else None
+            ts = pending.get("ts") if pending else None
+            if details_payload is not None and not isinstance(details_payload, dict):
+                details = {"value": details_payload}
+            else:
+                details = dict(details_payload) if isinstance(details_payload, dict) else None
+            if reason is None:
+                if prev_state == "returned":
+                    reason = "returned"
+                elif prev_state == "terminated" and prev_entry.get("last_reason"):
+                    reason = prev_entry.get("last_reason")
+                else:
+                    reason = "killed"
+            self._emit_task_state_event(
+                pid,
+                prev_state,
+                "terminated",
+                reason=reason,
+                details=details,
+                ts=ts,
+                state_entry=prev_entry,
+            )
+            self.trace_last_regs.pop(pid, None)
+            self._untrack_sleep(pid)
+
         self.task_states = new_states
+        context = self._pending_scheduler_context or {}
+        self._pending_scheduler_context = None
+        self._maybe_emit_scheduler_event(prev_snapshot, context=context)
+        stale = set(self.breakpoints.keys()) - current_pids
+        for pid in stale:
+            self.breakpoints.pop(pid, None)
+            self.debug_attached.discard(pid)
+        stale_symbols = set(self.symbol_tables.keys()) - current_pids
+        for pid in stale_symbols:
+            self.symbol_tables.pop(pid, None)
+        stale_disasm = set(self.disasm_cache.keys()) - current_pids
+        for pid in stale_disasm:
+            self.disasm_cache.pop(pid, None)
+        stale_watchers = set(self.watchers.keys()) - current_pids
+        for pid in stale_watchers:
+            self.watchers.pop(pid, None)
+        stale_values = set(self.value_registry.keys()) - current_pids
+        for pid in stale_values:
+            self.value_registry.pop(pid, None)
+        stale_commands = set(self.command_registry.keys()) - current_pids
+        for pid in stale_commands:
+            self.command_registry.pop(pid, None)
+        stale_mailboxes = set(self.mailbox_registry.keys()) - current_pids
+        for pid in stale_mailboxes:
+            self.mailbox_registry.pop(pid, None)
+        stale_layouts = set(self.memory_layouts.keys()) - current_pids
+        for pid in stale_layouts:
+            self.memory_layouts.pop(pid, None)
+        stale_meta = set(self.image_metadata.keys()) - current_pids
+        for pid in stale_meta:
+            self.image_metadata.pop(pid, None)
+        stale_trace = set(self.trace_last_regs.keys()) - current_pids
+        for pid in stale_trace:
+            self.trace_last_regs.pop(pid, None)
+            with self.trace_lock:
+                self.trace_buffers.pop(pid, None)
 
     def log(self, level: str, message: str, **fields: Any) -> None:
         entry = {
@@ -97,10 +3287,14 @@ class ExecutiveState:
         self.log_buffer.append(entry)
         self._next_log_seq += 1
 
-    def get_logs(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_logs(self, limit: Optional[int] = None, *, filter_session: Optional[str] = None) -> List[Dict[str, Any]]:
         if limit is None or limit <= 0 or limit >= len(self.log_buffer):
-            return list(self.log_buffer)
-        return list(self.log_buffer)[-limit:]
+            logs = list(self.log_buffer)
+        else:
+            logs = list(self.log_buffer)[-limit:]
+        if filter_session:
+            logs = [entry for entry in logs if entry.get("session_id") == filter_session]
+        return logs
 
     def attach(self) -> Dict[str, Any]:
         info = self.vm.attach()
@@ -119,22 +3313,139 @@ class ExecutiveState:
         payload["clock"] = clock
         return payload
 
-    def load(self, path: str, verbose: bool = False) -> Dict[str, Any]:
-        info = self.vm.load(str(Path(path)), verbose=verbose)
+    def load(self, path: str, verbose: bool = False, *, symbols: Optional[str] = None) -> Dict[str, Any]:
+        program_path = Path(path)
+        info = self.vm.load(str(program_path), verbose=verbose)
         self._refresh_tasks()
+        pid = info.get("pid")
+        symbol_status: Optional[Dict[str, Any]] = None
+        pid_int: Optional[int]
+        try:
+            pid_int = int(pid) if pid is not None else None
+        except (TypeError, ValueError):
+            pid_int = None
+        if pid_int is not None:
+            self.disasm_cache.pop(pid_int, None)
+            task = self.tasks.get(pid_int, {})
+            program = task.get("program") or info.get("program") or str(program_path)
+            symbol_status = self.load_symbols_for_pid(pid_int, program=program, override=symbols)
+            metadata_summary = info.get("metadata") or {}
+            try:
+                self._register_metadata(pid_int, metadata_summary)
+            except Exception:
+                self.value_registry.pop(pid_int, None)
+                self.command_registry.pop(pid_int, None)
+                self.mailbox_registry.pop(pid_int, None)
+                self.image_metadata.pop(pid_int, None)
+                raise
+            self.image_metadata[pid_int] = metadata_summary
+            layout = {
+                "entry": self._coerce_int(info.get("entry")) if info.get("entry") is not None else None,
+                "code_len": self._coerce_int(info.get("code_len")) if info.get("code_len") is not None else None,
+                "ro_len": self._coerce_int(info.get("ro_len")) if info.get("ro_len") is not None else None,
+                "bss": self._coerce_int(info.get("bss")) if info.get("bss") is not None else None,
+                "app_name": task.get("app_name") or info.get("app_name"),
+                "app_name_base": task.get("app_name_base") or info.get("app_name_base"),
+                "meta_count": self._coerce_int(info.get("meta_count")) if info.get("meta_count") is not None else None,
+                "allow_multiple": info.get("allow_multiple_instances"),
+                "version": self._coerce_int(info.get("version")) if info.get("version") is not None else None,
+            }
+            self.memory_layouts[pid_int] = {k: v for k, v in layout.items() if v is not None}
+        if symbol_status is not None:
+            info["symbols"] = symbol_status
+            if not symbol_status.get("loaded"):
+                warnings = info.setdefault("warnings", [])
+                error_text = symbol_status.get("error")
+                path_text = symbol_status.get("path")
+                if error_text:
+                    warnings.append(f"symbols_failed:{error_text}")
+                elif path_text:
+                    warnings.append(f"symbols_missing:{path_text}")
+                else:
+                    warnings.append("symbols_unavailable")
         return info
 
-    def step(self, steps: Optional[int] = None, *, pid: Optional[int] = None, source: str = "manual") -> Dict[str, Any]:
+    def step(
+        self,
+        steps: Optional[int] = None,
+        *,
+        pid: Optional[int] = None,
+        source: str = "manual",
+        source_only: bool = False,
+    ) -> Dict[str, Any]:
         budget = steps if steps is not None else self.step_batch
+        if not source_only:
+            result, _ = self._step_once(budget, pid=pid, source=source)
+            return result
+        source_steps = steps if steps is not None else 1
+        iterations = max(1, source_steps)
+        aggregated_events: List[Dict[str, Any]] = []
+        total_executed = 0
+        final_result: Optional[Dict[str, Any]] = None
+        for _ in range(iterations):
+            while True:
+                result, trace_snapshot = self._step_once(1, pid=pid, source=source)
+                final_result = result
+                events = result.get("events") or []
+                if events:
+                    aggregated_events.extend(events)
+                exec_val = result.get("executed")
+                if isinstance(exec_val, int):
+                    total_executed += exec_val
+                pid_eval = self._optional_int(trace_snapshot.get("pid")) if isinstance(trace_snapshot, dict) else None
+                if pid_eval is None:
+                    pid_eval = self._optional_int(result.get("current_pid")) or pid
+                skip = False
+                if pid_eval is not None and isinstance(trace_snapshot, dict):
+                    pc_val = self._optional_int(trace_snapshot.get("pc"))
+                    if pc_val is not None and self._is_compiler_instruction(pid_eval, pc_val):
+                        skip = True
+                if not skip or not result.get("running"):
+                    break
+            if final_result is None or not final_result.get("running"):
+                break
+        if final_result is None:
+            return {"executed": 0, "running": False, "events": []}
+        final_events = aggregated_events or final_result.get("events") or []
+        final_result["events"] = final_events
+        if total_executed:
+            final_result["executed"] = total_executed
+        return final_result
+
+    def _step_once(self, steps: Optional[int], *, pid: Optional[int], source: str) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
+        self._advance_sleeping_tasks()
+        budget = steps if steps is not None else self.step_batch
+        pre_event = self._check_breakpoint_before_step(pid)
+        if pre_event is not None:
+            if source == "auto":
+                self.auto_step_count += 1
+            else:
+                self.manual_step_count += 1
+            result = {
+                "executed": 0,
+                "running": False,
+                "paused": True,
+                "current_pid": pid,
+                "events": [pre_event],
+            }
+            self._refresh_tasks()
+            return result, None
         with self.lock:
             result = self.vm.step(budget, pid=pid)
-        events = result.get('events') or []
-        self._process_vm_events(events)
         executed_raw = result.get("executed", 0)
         try:
             executed = int(executed_raw)
         except (TypeError, ValueError):
             executed = 0
+        self._update_scheduler_context(
+            prev_pid=self._optional_int(result.get("current_pid")),
+            next_pid=self._optional_int(result.get("next_pid")),
+            executed=executed,
+            source=source,
+        )
+        events = result.get("events") or []
+        has_trace_event = any(evt.get("type") == "trace_step" for evt in events)
+        self._process_vm_events(events)
         if executed > 0:
             self.total_steps += executed
         if source == "auto":
@@ -144,6 +3455,12 @@ class ExecutiveState:
             self.manual_step_count += 1
             self.manual_step_total += executed
         running_flag = bool(result.get("running", True))
+        post_event = self._check_breakpoint_after_step(pid, result)
+        if post_event is not None:
+            result.setdefault("events", []).append(post_event)
+            result["paused"] = True
+            result["running"] = False
+            running_flag = False
         if (not running_flag) and (executed > 0 or self._last_vm_running):
             self.log(
                 "info",
@@ -153,8 +3470,21 @@ class ExecutiveState:
                 paused=result.get("paused"),
             )
         self._last_vm_running = running_flag
+        trace_last = result.pop("trace_last", None)
+        if not has_trace_event and trace_last:
+            pid_from_trace = self._optional_int(trace_last.get("pid"))
+            if pid_from_trace is None:
+                pid_from_trace = self._optional_int(result.get("current_pid")) or self.current_pid
+            if pid_from_trace is not None:
+                try:
+                    self._emit_trace_snapshot(pid_from_trace, trace_last)
+                except Exception:
+                    pass
         self._refresh_tasks()
-        return result
+        watch_events = self._check_watches(pid if pid is not None else None)
+        if watch_events:
+            result.setdefault("events", []).extend(watch_events)
+        return result, trace_last
 
     def start_auto(self) -> None:
         if self.auto_thread and self.auto_thread.is_alive():
@@ -199,7 +3529,9 @@ class ExecutiveState:
         return any(task.get("state") in {"running", "ready"} for task in self.tasks.values())
 
     def _has_waiting_tasks(self) -> bool:
-        return any(task.get("state") in {"waiting", "waiting_mbx", "waiting_io"} for task in self.tasks.values())
+        if self.sleeping_deadlines:
+            return True
+        return any(task.get("state") in {"waiting", "waiting_mbx", "waiting_io", "sleeping"} for task in self.tasks.values())
 
     def set_clock_rate(self, hz: float) -> Dict[str, Any]:
         if hz < 0:
@@ -235,8 +3567,14 @@ class ExecutiveState:
             task['pc'] = regs.get('pc')
         return regs
 
+    def set_trace_changed_regs(self, enabled: bool) -> Dict[str, Any]:
+        self.trace_track_changed_regs = bool(enabled)
+        if not self.trace_track_changed_regs:
+            self.trace_last_regs.clear()
+        return {"changed_regs": self.trace_track_changed_regs}
+
     def trace_task(self, pid: int, enable: Optional[bool]) -> Dict[str, Any]:
-        result = self.vm.trace(pid, enable)
+        result = dict(self.vm.trace(pid, enable) or {})
         pid_val = int(result.get("pid", pid))
         state_entry = self.task_states.get(pid_val, {})
         context = state_entry.get("context", {})
@@ -245,7 +3583,99 @@ class ExecutiveState:
         self.task_states[pid_val] = state_entry
         if pid_val in self.tasks:
             self.tasks[pid_val]["trace"] = result.get("enabled")
+        result["buffer_size"] = self.trace_buffer_capacity
         return result
+
+    def set_trace_buffer_size(self, size: int) -> Dict[str, Any]:
+        try:
+            new_size = int(size)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("trace buffer size must be integer") from exc
+        if new_size < 0:
+            raise ValueError("trace buffer size must be non-negative")
+        if new_size > self.trace_buffer_max:
+            new_size = self.trace_buffer_max
+        with self.trace_lock:
+            self.trace_buffer_capacity = new_size
+            if new_size == 0:
+                self.trace_buffers.clear()
+            else:
+                for pid, buffer in list(self.trace_buffers.items()):
+                    if buffer.maxlen != new_size:
+                        recent = list(buffer)[-new_size:]
+                        self.trace_buffers[pid] = deque(recent, maxlen=new_size)
+        return {"buffer_size": self.trace_buffer_capacity}
+
+    def trace_records(self, pid: int, limit: Optional[int] = None) -> Dict[str, Any]:
+        capacity = self.trace_buffer_capacity
+        with self.trace_lock:
+            buffer = self.trace_buffers.get(pid)
+            count = len(buffer) if buffer is not None else 0
+            if limit is not None:
+                try:
+                    limit_int = int(limit)
+                except (TypeError, ValueError) as exc:
+                    raise ValueError("trace records limit must be integer-compatible") from exc
+                if limit_int <= 0:
+                    raw_records: List[Dict[str, Any]] = []
+                else:
+                    raw_records = list(buffer)[-limit_int:] if buffer is not None else []
+            else:
+                raw_records = list(buffer) if buffer is not None else []
+            encoded = trace_format.encode_trace_records(raw_records)
+        enabled = None
+        task = self.tasks.get(pid)
+        if isinstance(task, dict):
+            enabled = bool(task.get("trace"))
+        return {
+            "pid": pid,
+            "capacity": capacity,
+            "count": count,
+            "returned": len(encoded),
+            "enabled": enabled,
+            "format": trace_format.TRACE_FORMAT_VERSION,
+            "records": encoded,
+        }
+
+    def trace_export(self, pid: int, limit: Optional[int] = None) -> Dict[str, Any]:
+        info = self.trace_records(pid, limit=limit)
+        return {
+            "pid": info.get("pid"),
+            "capacity": info.get("capacity"),
+            "count": info.get("count"),
+            "returned": info.get("returned"),
+            "format": trace_format.TRACE_FORMAT_VERSION,
+            "records": list(info.get("records", [])),
+        }
+
+    def trace_import(
+        self,
+        pid: int,
+        records: Iterable[Mapping[str, Any]],
+        *,
+        replace: bool = False,
+    ) -> Dict[str, Any]:
+        if self.trace_buffer_capacity <= 0:
+            raise ValueError("trace buffer disabled")
+        decoded = trace_format.decode_trace_records(records, default_pid=pid)
+        with self.trace_lock:
+            buffer = self.trace_buffers.get(pid)
+            if replace or buffer is None or buffer.maxlen != self.trace_buffer_capacity:
+                buffer = deque(maxlen=self.trace_buffer_capacity)
+            else:
+                buffer = deque(buffer, maxlen=self.trace_buffer_capacity)
+            if decoded:
+                if len(decoded) > self.trace_buffer_capacity:
+                    decoded = decoded[-self.trace_buffer_capacity :]
+                for rec in decoded:
+                    buffer.append(rec)
+                max_seq = max(rec.get("seq", 0) for rec in decoded)
+                if isinstance(max_seq, int):
+                    self._trace_seq = max(self._trace_seq, max_seq + 1)
+            elif replace:
+                buffer.clear()
+            self.trace_buffers[pid] = buffer
+        return self.trace_records(pid)
 
     def task_list(self) -> Dict[str, Any]:
         self._refresh_tasks()
@@ -253,6 +3683,8 @@ class ExecutiveState:
 
     def pause_task(self, pid: int) -> Dict[str, Any]:
         self.get_task(pid)
+        if pid not in self.task_state_pending:
+            self._set_task_state_pending(pid, "user_pause", target_state="paused", ts=time.time())
         with self.lock:
             self.vm.pause(pid=pid)
         self._refresh_tasks()
@@ -260,16 +3692,28 @@ class ExecutiveState:
 
     def resume_task(self, pid: int) -> Dict[str, Any]:
         self.get_task(pid)
+        self._set_task_state_pending(pid, "resume", target_state="running", ts=time.time())
         with self.lock:
             self.vm.resume(pid=pid)
         self._refresh_tasks()
         return dict(self.get_task(pid))
 
     def kill_task(self, pid: int) -> Dict[str, Any]:
+        self._set_task_state_pending(pid, "killed", target_state="terminated", ts=time.time())
         self.stop_auto()
         with self.lock:
             self.vm.kill(pid)
         self._refresh_tasks()
+        self._detach_debug_session(pid)
+        with self.symbol_cache_lock:
+            self.symbol_tables.pop(pid, None)
+        self.disasm_cache.pop(pid, None)
+        self.memory_layouts.pop(pid, None)
+        self.watchers.pop(pid, None)
+        self.value_registry.pop(pid, None)
+        self.command_registry.pop(pid, None)
+        self.mailbox_registry.pop(pid, None)
+        self.image_metadata.pop(pid, None)
         return {"pid": pid, "state": "terminated"}
 
     def set_task_attrs(self, pid: int, *, priority: Optional[int] = None, quantum: Optional[int] = None) -> Dict[str, Any]:
@@ -277,8 +3721,11 @@ class ExecutiveState:
         self._refresh_tasks()
         return attrs
 
-    def mailbox_snapshot(self) -> List[Dict[str, Any]]:
-        return self.vm.mailbox_snapshot()
+    def mailbox_snapshot(self) -> Dict[str, Any]:
+        snapshot = self.vm.mailbox_snapshot()
+        if isinstance(snapshot, dict):
+            return snapshot
+        return {"descriptors": snapshot, "stats": {}}
 
     def mailbox_open(self, pid: int, target: str, flags: int = 0) -> dict:
         return self.vm.mailbox_open(pid, target, flags)
@@ -302,7 +3749,8 @@ class ExecutiveState:
         return self.vm.mailbox_tap(pid, handle, enable=enable)
 
     def list_channels(self, pid: int) -> Dict[str, Any]:
-        descriptors = self.mailbox_snapshot()
+        snapshot = self.mailbox_snapshot()
+        descriptors = snapshot.get("descriptors", []) if isinstance(snapshot, dict) else snapshot
         channels: List[Dict[str, Any]] = []
         for desc in descriptors:
             owner = desc.get("owner_pid")
@@ -471,6 +3919,262 @@ class ExecutiveState:
             return "fanout"
         return "off"
 
+    def _update_value_registry_from_event(
+        self, pid: Optional[int], event: Dict[str, Any], payload: Dict[str, Any]
+    ) -> None:
+        if pid is None:
+            return
+        group_raw = payload.get("group_id")
+        value_raw = payload.get("value_id")
+        if group_raw is None or value_raw is None:
+            return
+        try:
+            group_id = int(group_raw) & 0xFF
+            value_id = int(value_raw) & 0xFF
+        except (TypeError, ValueError):
+            return
+        table = self.value_registry.setdefault(pid, {})
+        key = (group_id, value_id)
+        entry = dict(table.get(key) or {})
+        entry.setdefault("group_id", group_id)
+        entry.setdefault("value_id", value_id)
+        oid_raw = payload.get("oid")
+        try:
+            oid = int(oid_raw) & 0xFFFF if oid_raw is not None else ((group_id << 8) | value_id)
+        except (TypeError, ValueError):
+            oid = (group_id << 8) | value_id
+        entry["oid"] = oid
+        flags_raw = payload.get("flags")
+        if flags_raw is not None:
+            try:
+                entry["flags"] = int(flags_raw) & 0xFF
+            except (TypeError, ValueError):
+                pass
+        auth_raw = payload.get("auth_level")
+        if auth_raw is not None:
+            try:
+                entry["auth_level"] = int(auth_raw) & 0xFF
+            except (TypeError, ValueError):
+                pass
+        owner_raw = payload.get("owner_pid")
+        if owner_raw is not None:
+            try:
+                entry["owner_pid"] = int(owner_raw)
+            except (TypeError, ValueError):
+                pass
+        caller_raw = payload.get("caller_pid")
+        if caller_raw is not None:
+            try:
+                entry["last_caller_pid"] = int(caller_raw)
+            except (TypeError, ValueError):
+                pass
+        ts = event.get("ts") or time.time()
+        etype = event.get("type")
+        if etype == "value_registered":
+            entry["registered_ts"] = ts
+            if payload.get("desc_head") is not None:
+                try:
+                    entry["desc_head"] = int(payload["desc_head"])
+                except (TypeError, ValueError):
+                    pass
+        elif etype == "value_changed":
+            entry["last_update_ts"] = ts
+            new_value = payload.get("new_value")
+            new_f16 = payload.get("new_f16")
+            if new_value is None and new_f16 is not None:
+                try:
+                    new_value = f16_to_float(int(new_f16))
+                except (TypeError, ValueError):
+                    new_value = None
+            if new_f16 is not None:
+                try:
+                    entry["last_f16"] = int(new_f16) & 0xFFFF
+                except (TypeError, ValueError):
+                    pass
+            coerced_new = self._coerce_float(new_value)
+            if coerced_new is not None:
+                entry["last_value"] = coerced_new
+            old_value = payload.get("old_value")
+            old_f16 = payload.get("old_f16")
+            if old_value is None and old_f16 is not None:
+                try:
+                    old_value = f16_to_float(int(old_f16))
+                except (TypeError, ValueError):
+                    old_value = None
+            if old_f16 is not None:
+                try:
+                    entry["prev_f16"] = int(old_f16) & 0xFFFF
+                except (TypeError, ValueError):
+                    pass
+            coerced_old = self._coerce_float(old_value)
+            if coerced_old is not None:
+                entry["prev_value"] = coerced_old
+            entry["change_count"] = int(entry.get("change_count", 0)) + 1
+        table[key] = entry
+
+    def _update_command_registry_from_event(
+        self, pid: Optional[int], event: Dict[str, Any], payload: Dict[str, Any]
+    ) -> None:
+        if pid is None:
+            return
+        group_raw = payload.get("group_id")
+        cmd_raw = payload.get("cmd_id")
+        if group_raw is None or cmd_raw is None:
+            return
+        try:
+            group_id = int(group_raw) & 0xFF
+            cmd_id = int(cmd_raw) & 0xFF
+        except (TypeError, ValueError):
+            return
+        table = self.command_registry.setdefault(pid, {})
+        key = (group_id, cmd_id)
+        entry = dict(table.get(key) or {})
+        entry.setdefault("group_id", group_id)
+        entry.setdefault("cmd_id", cmd_id)
+        oid_raw = payload.get("oid")
+        try:
+            oid = int(oid_raw) & 0xFFFF if oid_raw is not None else ((group_id << 8) | cmd_id)
+        except (TypeError, ValueError):
+            oid = (group_id << 8) | cmd_id
+        entry["oid"] = oid
+        flags_raw = payload.get("flags")
+        if flags_raw is not None:
+            try:
+                entry["flags"] = int(flags_raw) & 0xFF
+            except (TypeError, ValueError):
+                pass
+        auth_raw = payload.get("auth_level")
+        if auth_raw is not None:
+            try:
+                entry["auth_level"] = int(auth_raw) & 0xFF
+            except (TypeError, ValueError):
+                pass
+        owner_raw = payload.get("owner_pid")
+        if owner_raw is not None:
+            try:
+                entry["owner_pid"] = int(owner_raw)
+            except (TypeError, ValueError):
+                pass
+        caller_raw = payload.get("caller_pid")
+        if caller_raw is not None:
+            try:
+                entry["last_caller_pid"] = int(caller_raw)
+            except (TypeError, ValueError):
+                pass
+        ts = event.get("ts") or time.time()
+        etype = event.get("type")
+        if etype == "cmd_invoked":
+            entry["last_invoked_ts"] = ts
+        elif etype == "cmd_completed":
+            entry["last_completed_ts"] = ts
+            entry["last_status"] = payload.get("status")
+            if "result" in payload:
+                entry["last_result"] = payload.get("result")
+        table[key] = entry
+
+    def _merge_value_snapshot(self, snapshot: Dict[str, Any]) -> None:
+        pid_raw = snapshot.get("owner_pid", snapshot.get("pid"))
+        if pid_raw is None:
+            return
+        try:
+            pid = int(pid_raw)
+        except (TypeError, ValueError):
+            return
+        group_raw = snapshot.get("group_id")
+        value_raw = snapshot.get("value_id")
+        if group_raw is None or value_raw is None:
+            return
+        try:
+            group_id = int(group_raw) & 0xFF
+            value_id = int(value_raw) & 0xFF
+        except (TypeError, ValueError):
+            return
+        table = self.value_registry.setdefault(pid, {})
+        key = (group_id, value_id)
+        entry = dict(table.get(key) or {})
+        entry.update(
+            {
+                "group_id": group_id,
+                "value_id": value_id,
+                "oid": int(snapshot.get("oid", (group_id << 8) | value_id)) & 0xFFFF,
+                "flags": int(snapshot.get("flags", entry.get("flags", 0))) & 0xFF,
+                "auth_level": int(snapshot.get("auth_level", entry.get("auth_level", 0))) & 0xFF,
+                "owner_pid": pid,
+            }
+        )
+        if snapshot.get("name"):
+            entry["name"] = snapshot.get("name")
+        if snapshot.get("group_name"):
+            entry["group_name"] = snapshot.get("group_name")
+        if snapshot.get("unit"):
+            entry["unit"] = snapshot.get("unit")
+            entry["unit_code"] = snapshot.get("unit_code")
+        if snapshot.get("epsilon") is not None:
+            entry["epsilon"] = snapshot.get("epsilon")
+            entry["epsilon_f16"] = snapshot.get("epsilon_f16")
+        if snapshot.get("rate_ms") is not None:
+            entry["rate_ms"] = snapshot.get("rate_ms")
+        if snapshot.get("min") is not None:
+            entry["min"] = snapshot.get("min")
+            entry["min_f16"] = snapshot.get("min_f16")
+        if snapshot.get("max") is not None:
+            entry["max"] = snapshot.get("max")
+            entry["max_f16"] = snapshot.get("max_f16")
+        if snapshot.get("persist_key") is not None:
+            entry["persist_key"] = snapshot.get("persist_key")
+            entry["debounce_ms"] = snapshot.get("debounce_ms")
+        last_value = snapshot.get("last_value")
+        coerced_last = self._coerce_float(last_value)
+        if coerced_last is not None:
+            entry["last_value"] = coerced_last
+        if snapshot.get("last_f16") is not None:
+            try:
+                entry["last_f16"] = int(snapshot.get("last_f16")) & 0xFFFF
+            except (TypeError, ValueError):
+                pass
+        table[key] = entry
+
+    def _merge_command_snapshot(self, snapshot: Dict[str, Any]) -> None:
+        pid_raw = snapshot.get("owner_pid", snapshot.get("pid"))
+        if pid_raw is None:
+            return
+        try:
+            pid = int(pid_raw)
+        except (TypeError, ValueError):
+            return
+        group_raw = snapshot.get("group_id")
+        cmd_raw = snapshot.get("cmd_id")
+        if group_raw is None or cmd_raw is None:
+            return
+        try:
+            group_id = int(group_raw) & 0xFF
+            cmd_id = int(cmd_raw) & 0xFF
+        except (TypeError, ValueError):
+            return
+        table = self.command_registry.setdefault(pid, {})
+        key = (group_id, cmd_id)
+        entry = dict(table.get(key) or {})
+        entry.update(
+            {
+                "group_id": group_id,
+                "cmd_id": cmd_id,
+                "oid": int(snapshot.get("oid", (group_id << 8) | cmd_id)) & 0xFFFF,
+                "flags": int(snapshot.get("flags", entry.get("flags", 0))) & 0xFF,
+                "auth_level": int(snapshot.get("auth_level", entry.get("auth_level", 0))) & 0xFF,
+                "owner_pid": pid,
+            }
+        )
+        if snapshot.get("name"):
+            entry["name"] = snapshot.get("name")
+        if snapshot.get("help"):
+            entry["help"] = snapshot.get("help")
+        if snapshot.get("handler_ref") is not None:
+            try:
+                entry["handler_ref"] = int(snapshot.get("handler_ref"))
+            except (TypeError, ValueError):
+                pass
+        table[key] = entry
+
     @staticmethod
     def _parse_stdio_pid(value: Any) -> Optional[int]:
         if value is None:
@@ -507,6 +4211,15 @@ class ExecutiveState:
             etype = event.get("type")
             pid_value = event.get("pid")
             pid = int(pid_value) if pid_value is not None else None
+            payload = {k: v for k, v in event.items() if k not in {"type", "pid", "ts", "seq"}}
+            event_type = str(etype or "vm")
+            if etype in {"value_registered", "value_changed"}:
+                self._update_value_registry_from_event(pid, event, payload)
+            if etype in {"cmd_invoked", "cmd_completed"}:
+                self._update_command_registry_from_event(pid, event, payload)
+            if etype == "trace_step" and pid is not None:
+                self._handle_trace_step_event(pid, payload)
+            self.emit_event(event_type, pid=pid, data=payload, ts=event.get("ts"))
             if etype == "mailbox_wait" and pid is not None:
                 self._mark_task_wait_mailbox(pid, event)
                 self.log(
@@ -517,10 +4230,11 @@ class ExecutiveState:
                     handle=event.get("handle"),
                 )
             elif etype in {"mailbox_wake", "mailbox_timeout"} and pid is not None:
-                self._mark_task_ready(pid, event)
+                reason = "timeout" if etype == "mailbox_timeout" else "mailbox_wake"
+                self._mark_task_ready(pid, event, reason=reason, ts=event.get("ts"))
                 self.log(
                     "debug",
-                    "task mailbox wake",
+                    "task mailbox timeout" if etype == "mailbox_timeout" else "task mailbox wake",
                     pid=pid,
                     descriptor=event.get("descriptor"),
                     timeout=(etype == "mailbox_timeout"),
@@ -545,15 +4259,108 @@ class ExecutiveState:
             else:
                 self.log("debug", "vm event", event=event)
 
+    def val_list(
+        self,
+        *,
+        pid: Optional[int] = None,
+        group: Optional[int] = None,
+        oid: Optional[int] = None,
+        name: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        values = self.vm.val_list(pid=pid, group=group, oid=oid, name=name)
+        for info in values:
+            if isinstance(info, dict):
+                self._merge_value_snapshot(info)
+        return values
+
+    def val_get(self, oid: int, *, pid: Optional[int] = None) -> Dict[str, Any]:
+        result = self.vm.val_get(oid, pid=pid)
+        status = result.get("status") if isinstance(result, dict) else None
+        if status == val_const.HSX_VAL_STATUS_OK and isinstance(result, dict):
+            snapshot = {
+                "oid": oid,
+                "owner_pid": pid if pid is not None else result.get("pid"),
+                "group_id": (oid >> 8) & 0xFF,
+                "value_id": oid & 0xFF,
+                "last_value": result.get("value"),
+                "last_f16": result.get("f16"),
+            }
+            self._merge_value_snapshot(snapshot)
+        return result
+
+    def val_set(self, oid: int, value: Any, *, pid: Optional[int] = None) -> Dict[str, Any]:
+        result = self.vm.val_set(oid, value, pid=pid)
+        status = result.get("status") if isinstance(result, dict) else None
+        if status == val_const.HSX_VAL_STATUS_OK and isinstance(result, dict):
+            snapshot = {
+                "oid": oid,
+                "owner_pid": pid if pid is not None else result.get("pid"),
+                "group_id": (oid >> 8) & 0xFF,
+                "value_id": oid & 0xFF,
+                "last_value": result.get("value"),
+                "last_f16": result.get("f16"),
+            }
+            self._merge_value_snapshot(snapshot)
+        return result
+
+    def val_stats(self) -> Dict[str, Any]:
+        return self.vm.val_stats()
+
+    def cmd_list(
+        self,
+        *,
+        pid: Optional[int] = None,
+        group: Optional[int] = None,
+        oid: Optional[int] = None,
+        name: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        commands = self.vm.cmd_list(pid=pid, group=group, oid=oid, name=name)
+        for info in commands:
+            if isinstance(info, dict):
+                self._merge_command_snapshot(info)
+        return commands
+
+    def cmd_call(self, oid: int, *, pid: Optional[int] = None, async_call: bool = False) -> Dict[str, Any]:
+        result = self.vm.cmd_call(oid, pid=pid, async_call=async_call)
+        status = result.get("status") if isinstance(result, dict) else None
+        if status == cmd_const.HSX_CMD_STATUS_OK and isinstance(result, dict):
+            snapshot = {
+                "oid": oid,
+                "owner_pid": pid if pid is not None else result.get("pid"),
+                "group_id": (oid >> 8) & 0xFF,
+                "cmd_id": oid & 0xFF,
+            }
+            self._merge_command_snapshot(snapshot)
+            entry = self.command_registry.get(snapshot["owner_pid"], {}).get(((oid >> 8) & 0xFF, oid & 0xFF))
+            if entry is not None:
+                entry["last_status"] = status
+                entry["last_result"] = result.get("result")
+        return result
+
+    def cmd_stats(self) -> Dict[str, Any]:
+        return self.vm.cmd_stats()
+
     def _mark_task_wait_mailbox(self, pid: int, event: Dict[str, Any]) -> None:
-        descriptor = event.get('descriptor')
-        handle = event.get('handle')
+        descriptor = event.get("descriptor")
+        handle = event.get("handle")
+        timeout = event.get("timeout")
+        deadline = event.get("deadline")
         task = self.tasks.get(pid)
         if task is not None:
             task['state'] = 'waiting_mbx'
             task['wait_mailbox'] = descriptor
             if handle is not None:
                 task['wait_handle'] = handle
+            else:
+                task.pop('wait_handle', None)
+            if timeout is not None:
+                task['wait_timeout'] = timeout
+            else:
+                task.pop('wait_timeout', None)
+            if deadline is not None:
+                task['wait_deadline'] = deadline
+            else:
+                task.pop('wait_deadline', None)
         state = self.task_states.get(pid)
         if state is not None:
             state['running'] = False
@@ -563,13 +4370,43 @@ class ExecutiveState:
             ctx['wait_mailbox'] = descriptor
             if handle is not None:
                 ctx['wait_handle'] = handle
+            else:
+                ctx.pop('wait_handle', None)
+            if timeout is not None:
+                ctx['wait_timeout'] = timeout
+            else:
+                ctx.pop('wait_timeout', None)
+            if deadline is not None:
+                ctx['wait_deadline'] = deadline
+            else:
+                ctx.pop('wait_deadline', None)
+        self._track_wait_mailbox(pid, deadline)
+        details = {
+            k: v
+            for k, v in {
+                "descriptor": descriptor,
+                "handle": handle,
+                "timeout": event.get("timeout"),
+                "deadline": deadline,
+            }.items()
+            if v is not None
+        }
+        self._set_task_state_pending(
+            pid,
+            "mailbox_wait",
+            target_state="waiting_mbx",
+            details=details or None,
+            ts=event.get("ts"),
+        )
 
-    def _mark_task_ready(self, pid: int, event: Dict[str, Any]) -> None:
+    def _mark_task_ready(self, pid: int, event: Dict[str, Any], *, reason: Optional[str] = None, ts: Optional[float] = None) -> None:
         task = self.tasks.get(pid)
         if task is not None:
             task['state'] = 'ready'
             task.pop('wait_mailbox', None)
             task.pop('wait_handle', None)
+            task.pop('wait_timeout', None)
+            task.pop('wait_deadline', None)
         state = self.task_states.get(pid)
         if state is not None:
             ctx = state.setdefault('context', {})
@@ -578,7 +4415,29 @@ class ExecutiveState:
             ctx['wait_mailbox'] = None
             ctx['wait_deadline'] = None
             ctx['wait_handle'] = None
+            ctx['wait_timeout'] = None
             state['running'] = True
+        self._untrack_wait_mailbox(pid)
+        details = {
+            k: v
+            for k, v in {
+                "descriptor": event.get("descriptor"),
+                "status": event.get("status"),
+                "length": event.get("length"),
+                "flags": event.get("flags"),
+                "channel": event.get("channel"),
+                "src_pid": event.get("src_pid"),
+            }.items()
+            if v is not None
+        }
+        pending_reason = reason or ("timeout" if event.get("status") not in (None, 0) else "mailbox_wake")
+        self._set_task_state_pending(
+            pid,
+            pending_reason,
+            target_state="ready",
+            details=details or None,
+            ts=ts,
+        )
 
     def scheduler_stats(self) -> Dict[int, Dict[str, int]]:
         info = self.vm.info()
@@ -600,7 +4459,8 @@ class ExecutiveState:
         return trace
 
     def listen_stdout(self, pid: Optional[int], *, limit: int = 1, max_len: int = 512) -> Dict[str, Any]:
-        descriptors = self.mailbox_snapshot()
+        snapshot = self.mailbox_snapshot()
+        descriptors = snapshot.get("descriptors", []) if isinstance(snapshot, dict) else snapshot
         if pid is not None:
             targets = [f"svc:stdio.out@{pid}"]
         else:
@@ -682,6 +4542,19 @@ class ExecutiveState:
                     wait_time = 0.05
                 else:
                     wait_time = 0.001
+
+            next_deadline = self._next_sleep_deadline()
+            if next_deadline is not None:
+                remaining = max(0.0, next_deadline - time.monotonic())
+                if wait_time == 0.0 or remaining < wait_time:
+                    wait_time = remaining
+                    throttle_reason = throttle_reason or "sleep"
+            next_mailbox_deadline = self._next_wait_mailbox_deadline()
+            if next_mailbox_deadline is not None:
+                remaining_mbx = max(0.0, next_mailbox_deadline - time.monotonic())
+                if wait_time == 0.0 or remaining_mbx < wait_time:
+                    wait_time = remaining_mbx
+                    throttle_reason = throttle_reason or "wait_mbx"
 
             if not any_tasks:
                 throttle_reason = throttle_reason or "idle"
@@ -766,13 +4639,53 @@ class _ShellHandler(socketserver.StreamRequestHandler):
             except json.JSONDecodeError:
                 self._send({"version": 1, "status": "error", "error": "invalid_json"})
                 continue
+            try:
+                self.server.state.log(
+                    "debug",
+                    "shell request",
+                    command=str(request.get("cmd")),
+                    session=request.get("session"),
+                )
+            except Exception:
+                pass
             response = self.server.exec_state_handle(request)
+            stream_info = response.get("__stream__") if isinstance(response, dict) else None
+            if stream_info:
+                ack_payload = stream_info.get("ack")
+                if ack_payload is not None:
+                    self._send(ack_payload)
+                subscription: EventSubscription = stream_info.get("subscription")
+                if subscription is not None:
+                    self._stream_events(subscription)
+                break
             self._send(response)
 
     def _send(self, payload: Dict[str, Any]) -> None:
-        data = json.dumps(payload, separators=(",", ":")).encode("utf-8") + b"\n"
+        self._write_json(payload)
+
+    def _write_json(self, payload: Dict[str, Any], *, newline: bool = True) -> None:
+        data = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+        if newline:
+            data += b"\n"
         self.wfile.write(data)
         self.wfile.flush()
+
+    def _stream_events(self, subscription: EventSubscription) -> None:
+        try:
+            while True:
+                event = self.server.state.events_next(subscription, timeout=1.0)
+                if event is None:
+                    if not subscription.active:
+                        break
+                    continue
+                try:
+                    self._write_json(event)
+                except Exception:
+                    raise
+        except Exception:
+            pass
+        finally:
+            self.server.state.events_unsubscribe(token=subscription.token)
 
 class ExecutiveServer(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
@@ -788,12 +4701,184 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
         if version != 1:
             return {"version": 1, "status": "error", "error": f"unsupported_version:{version}"}
         try:
+            self.state.prune_sessions()
+            session_raw = request.get("session")
+            session_id = None
+            if isinstance(session_raw, str):
+                session_id = session_raw.strip() or None
+            if cmd == "session.open":
+                session_payload = self.state.session_open(
+                    client=request.get("client"),
+                    capabilities=request.get("capabilities"),
+                    pid_lock=request.get("pid_lock"),
+                    heartbeat_s=request.get("heartbeat_s"),
+                )
+                return {"version": 1, "status": "ok", "session": session_payload}
+            if cmd == "session.keepalive":
+                if session_id is None:
+                    raise SessionError("session_required")
+                self.state.session_keepalive(session_id)
+                return {"version": 1, "status": "ok"}
+            if cmd == "session.close":
+                if session_id is None:
+                    raise SessionError("session_required")
+                self.state.session_close(session_id)
+                return {"version": 1, "status": "ok"}
+            if cmd == "session.current":
+                if session_id is None:
+                    raise SessionError("session_required")
+                info = self.state.describe_session(session_id)
+                return {"version": 1, "status": "ok", "session": info}
+            if cmd == "session.list":
+                sessions = self.state.list_sessions()
+                return {"version": 1, "status": "ok", "sessions": sessions}
+            if cmd == "session.terminate":
+                if session_id is None:
+                    raise SessionError("session_required")
+                target_value = request.get("target")
+                if not target_value:
+                    raise ValueError("session.terminate requires 'target'")
+                target_id = str(target_value)
+                result = self.state.force_close_session(target_id, actor=session_id)
+                return {"version": 1, "status": "ok", "closed": result}
+            if session_id is not None:
+                self.state.touch_session(session_id)
+            if cmd == "events.subscribe":
+                if session_id is None:
+                    raise SessionError("session_required")
+                subscription = self.state.events_subscribe(session_id, filters=request.get("filters"))
+                metrics = self.state.events_metrics(session_id)
+                ack_payload = {
+                    "version": 1,
+                    "status": "ok",
+                    "events": {
+                        "token": subscription.token,
+                        "max": subscription.max_events,
+                        "cursor": self.state.event_seq - 1,
+                        "retention_ms": self.state.event_retention_ms,
+                        "pending": metrics.get("pending"),
+                        "high_water": metrics.get("high_water"),
+                        "drops": metrics.get("drop_count"),
+                    },
+                }
+                if subscription.since_seq is not None:
+                    ack_payload["events"]["since_seq"] = subscription.since_seq
+                return {"__stream__": {"ack": ack_payload, "subscription": subscription}}
+            if cmd == "events.ack":
+                if session_id is None:
+                    raise SessionError("session_required")
+                seq_value = request.get("seq")
+                if seq_value is None:
+                    raise ValueError("events.ack requires 'seq'")
+                try:
+                    seq = int(seq_value)
+                except (TypeError, ValueError):
+                    raise ValueError("events.ack seq must be an integer")
+                self.state.events_ack(session_id, seq)
+                metrics = self.state.events_metrics(session_id)
+                return {
+                    "version": 1,
+                    "status": "ok",
+                    "events": {
+                        "pending": metrics.get("pending"),
+                        "high_water": metrics.get("high_water"),
+                        "drops": metrics.get("drop_count"),
+                        "last_ack": metrics.get("last_ack"),
+                    },
+                }
+            if cmd == "events.unsubscribe":
+                if session_id is None:
+                    raise SessionError("session_required")
+                removed = self.state.events_unsubscribe(session_id=session_id)
+                return {"version": 1, "status": "ok", "unsubscribed": bool(removed)}
             if cmd == "ping":
                 return {"version": 1, "status": "ok", "reply": "pong"}
             if cmd == "info":
                 pid_value = request.get("pid")
                 pid = int(pid_value) if pid_value is not None else None
                 return {"version": 1, "status": "ok", "info": self.state.info(pid)}
+            if cmd == "val.list":
+                pid_value = request.get("pid")
+                pid_int = int(pid_value) if pid_value is not None else None
+                if pid_int is not None:
+                    self.state.ensure_pid_access(pid_int, session_id)
+                group_int = None
+                if request.get("group") is not None:
+                    group_int = self.state._optional_int(request.get("group"))
+                oid_int = None
+                if request.get("oid") is not None:
+                    try:
+                        oid_int = int(request.get("oid"), 0) if isinstance(request.get("oid"), str) else int(request.get("oid"))
+                    except (TypeError, ValueError):
+                        raise ValueError("val.list oid must be numeric")
+                name_token = str(request.get("name")) if request.get("name") is not None else None
+                values = self.state.val_list(pid=pid_int, group=group_int, oid=oid_int, name=name_token)
+                return {"version": 1, "status": "ok", "values": values}
+            if cmd == "val.stats":
+                stats = self.state.val_stats()
+                return {"version": 1, "status": "ok", "stats": stats}
+            if cmd == "val.get":
+                oid_value = request.get("oid")
+                if oid_value is None:
+                    raise ValueError("val.get requires 'oid'")
+                oid_int = int(oid_value, 0) if isinstance(oid_value, str) else int(oid_value)
+                pid_value = request.get("pid")
+                pid_int = int(pid_value) if pid_value is not None else None
+                if pid_int is not None:
+                    self.state.ensure_pid_access(pid_int, session_id)
+                value = self.state.val_get(oid_int, pid=pid_int)
+                return {"version": 1, "status": "ok", "value": value}
+            if cmd == "val.set":
+                oid_value = request.get("oid")
+                if oid_value is None:
+                    raise ValueError("val.set requires 'oid'")
+                if "value" not in request:
+                    raise ValueError("val.set requires 'value'")
+                oid_int = int(oid_value, 0) if isinstance(oid_value, str) else int(oid_value)
+                pid_value = request.get("pid")
+                pid_int = int(pid_value) if pid_value is not None else None
+                if pid_int is not None:
+                    self.state.ensure_pid_access(pid_int, session_id)
+                value = self.state.val_set(oid_int, request.get("value"), pid=pid_int)
+                return {"version": 1, "status": "ok", "value": value}
+            if cmd == "cmd.list":
+                pid_value = request.get("pid")
+                pid_int = int(pid_value) if pid_value is not None else None
+                if pid_int is not None:
+                    self.state.ensure_pid_access(pid_int, session_id)
+                group_int = None
+                if request.get("group") is not None:
+                    group_int = self.state._optional_int(request.get("group"))
+                oid_int = None
+                if request.get("oid") is not None:
+                    try:
+                        oid_int = int(request.get("oid"), 0) if isinstance(request.get("oid"), str) else int(request.get("oid"))
+                    except (TypeError, ValueError):
+                        raise ValueError("cmd.list oid must be numeric")
+                name_token = str(request.get("name")) if request.get("name") is not None else None
+                commands = self.state.cmd_list(pid=pid_int, group=group_int, oid=oid_int, name=name_token)
+                return {"version": 1, "status": "ok", "commands": commands}
+            if cmd == "cmd.stats":
+                stats = self.state.cmd_stats()
+                return {"version": 1, "status": "ok", "stats": stats}
+            if cmd == "cmd.call":
+                oid_value = request.get("oid")
+                if oid_value is None:
+                    raise ValueError("cmd.call requires 'oid'")
+                oid_int = int(oid_value, 0) if isinstance(oid_value, str) else int(oid_value)
+                pid_value = request.get("pid")
+                pid_int = int(pid_value) if pid_value is not None else None
+                if pid_int is not None:
+                    self.state.ensure_pid_access(pid_int, session_id)
+                async_value = request.get("async")
+                if isinstance(async_value, str):
+                    async_call = async_value.strip().lower() in {"1", "true", "yes", "on"}
+                elif isinstance(async_value, (int, bool)):
+                    async_call = bool(async_value)
+                else:
+                    async_call = False
+                result = self.state.cmd_call(oid_int, pid=pid_int, async_call=async_call)
+                return {"version": 1, "status": "ok", "command": result}
             if cmd == "attach":
                 info = self.state.attach()
                 return {"version": 1, "status": "ok", "info": info}
@@ -839,6 +4924,8 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                             raise ValueError("clock step steps must be positive")
                     pid_value = request.get("pid")
                     pid_int = int(pid_value) if pid_value is not None else None
+                    if pid_int is not None:
+                        self.state.ensure_pid_access(pid_int, session_id)
                     result = self.state.clock_step(steps, pid=pid_int)
                     status = self.state.get_clock_status()
                     return {"version": 1, "status": "ok", "result": result, "clock": status}
@@ -847,20 +4934,245 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 path_value = request.get("path")
                 if not path_value:
                     raise ValueError(f"{cmd} requires 'path'")
-                info = self.state.load(str(path_value), verbose=bool(request.get("verbose")))
+                symbols_override = request.get("symbols")
+                sym_path = str(symbols_override) if isinstance(symbols_override, str) else None
+                info = self.state.load(str(path_value), verbose=bool(request.get("verbose")), symbols=sym_path)
                 return {"version": 1, "status": "ok", "image": info}
             if cmd == "step":
                 steps_value = request.get("steps")
                 pid_value = request.get("pid")
+                source_only_flag = bool(request.get("source_only") or request.get("source"))
                 steps_int = int(steps_value) if steps_value is not None else None
                 pid_int = int(pid_value) if pid_value is not None else None
-                result = self.state.step(steps_int, pid=pid_int, source="manual")
+                if pid_int is not None:
+                    self.state.ensure_pid_access(pid_int, session_id)
+                result = self.state.step(steps_int, pid=pid_int, source="manual", source_only=source_only_flag)
                 status = self.state.get_clock_status()
                 return {"version": 1, "status": "ok", "result": result, "clock": status}
+            if cmd == "bp":
+                op_value = request.get("op", request.get("action"))
+                op = str(op_value or "").lower()
+                pid_value = request.get("pid")
+                if pid_value is None:
+                    raise ValueError("bp requires 'pid'")
+                pid_int = int(pid_value)
+                if op in {"", "list", "ls"}:
+                    info = self.state.breakpoint_list(pid_int)
+                    return {"version": 1, "status": "ok", "pid": pid_int, "breakpoints": info.get("breakpoints", [])}
+                if op in {"set", "add"}:
+                    addr_value = request.get("addr")
+                    if addr_value is None:
+                        raise ValueError("bp set requires 'addr'")
+                    try:
+                        addr_int = int(addr_value, 0) if isinstance(addr_value, str) else int(addr_value)
+                    except (TypeError, ValueError) as exc:
+                        raise ValueError(f"invalid breakpoint addr '{addr_value}'") from exc
+                    self.state.ensure_pid_access(pid_int, session_id)
+                    info = self.state.breakpoint_add(pid_int, addr_int)
+                    return {"version": 1, "status": "ok", "pid": pid_int, "breakpoints": info.get("breakpoints", [])}
+                if op in {"clear", "remove", "rm", "del", "delete"}:
+                    addr_value = request.get("addr")
+                    if addr_value is None:
+                        raise ValueError("bp clear requires 'addr'")
+                    try:
+                        addr_int = int(addr_value, 0) if isinstance(addr_value, str) else int(addr_value)
+                    except (TypeError, ValueError) as exc:
+                        raise ValueError(f"invalid breakpoint addr '{addr_value}'") from exc
+                    self.state.ensure_pid_access(pid_int, session_id)
+                    info = self.state.breakpoint_clear(pid_int, addr_int)
+                    return {"version": 1, "status": "ok", "pid": pid_int, "breakpoints": info.get("breakpoints", [])}
+                if op in {"clear_all", "clearall", "reset"}:
+                    self.state.ensure_pid_access(pid_int, session_id)
+                    info = self.state.breakpoint_clear_all(pid_int)
+                    return {"version": 1, "status": "ok", "pid": pid_int, "breakpoints": info.get("breakpoints", [])}
+                raise ValueError(f"unknown bp op '{op}'")
+            if cmd == "stack":
+                op_value = request.get("op")
+                op = str(op_value or "info").lower()
+                pid_value = request.get("pid")
+                if pid_value is None:
+                    raise ValueError("stack requires 'pid'")
+                pid_int = int(pid_value)
+                max_value = request.get("max") or request.get("limit") or request.get("frames")
+                max_frames = None
+                if max_value is not None:
+                    try:
+                        max_frames = int(max_value)
+                    except (TypeError, ValueError) as exc:
+                        raise ValueError("stack max must be integer") from exc
+                if op in {"info", "list"}:
+                    info = self.state.stack_info(pid_int, max_frames=max_frames)
+                    return {"version": 1, "status": "ok", "stack": info}
+                raise ValueError(f"unknown stack op '{op}'")
+            if cmd == "symbols":
+                op_value = request.get("op")
+                op = str(op_value or "list").lower()
+                pid_value = request.get("pid")
+                if pid_value is None:
+                    raise ValueError("symbols requires 'pid'")
+                pid_int = int(pid_value)
+                if op in {"", "list", "ls"}:
+                    type_value = request.get("type") or request.get("kind")
+                    offset_value = request.get("offset")
+                    limit_value = request.get("limit") or request.get("count")
+                    info = self.state.symbols_list(pid_int, kind=type_value, offset=offset_value or 0, limit=limit_value)
+                    return {"version": 1, "status": "ok", "symbols": info}
+                raise ValueError(f"unknown symbols op '{op}'")
+            if cmd == "memory":
+                op_value = request.get("op")
+                op = str(op_value or "regions").lower()
+                pid_value = request.get("pid")
+                if pid_value is None:
+                    raise ValueError("memory requires 'pid'")
+                pid_int = int(pid_value)
+                if op in {"regions", "region", "list"}:
+                    info = self.state.memory_regions(pid_int)
+                    return {"version": 1, "status": "ok", "memory": info}
+                raise ValueError(f"unknown memory op '{op}'")
+            if cmd == "watch":
+                op_value = request.get("op")
+                op = str(op_value or "list").lower()
+                pid_value = request.get("pid")
+                if pid_value is None:
+                    raise ValueError("watch requires 'pid'")
+                pid_int = int(pid_value)
+                if op in {"add", "create"}:
+                    expr = request.get("expr") or request.get("expression")
+                    if not isinstance(expr, str):
+                        raise ValueError("watch add requires 'expr'")
+                    watch_type = request.get("type") or request.get("kind")
+                    length_value = request.get("length") or request.get("size")
+                    length_int = int(length_value) if length_value is not None else None
+                    self.state.ensure_pid_access(pid_int, session_id)
+                    info = self.state.watch_add(pid_int, expr, watch_type=watch_type, length=length_int)
+                    return {"version": 1, "status": "ok", "watch": info}
+                if op in {"remove", "del", "delete"}:
+                    watch_id = request.get("watch") or request.get("id")
+                    if watch_id is None:
+                        raise ValueError("watch remove requires 'id'")
+                    self.state.ensure_pid_access(pid_int, session_id)
+                    info = self.state.watch_remove(pid_int, int(watch_id))
+                    return {"version": 1, "status": "ok", "watch": info}
+                if op in {"", "list", "ls"}:
+                    info = self.state.watch_list(pid_int)
+                    return {"version": 1, "status": "ok", "watch": info}
+                raise ValueError(f"unknown watch op '{op}'")
+            if cmd == "disasm":
+                pid_value = request.get("pid")
+                if pid_value is None:
+                    raise ValueError("disasm requires 'pid'")
+                pid_int = int(pid_value)
+                addr_value = request.get("addr") or request.get("address")
+                count_value = request.get("count")
+                mode_value = request.get("mode")
+                address = None
+                if addr_value is not None:
+                    if isinstance(addr_value, str):
+                        address = int(addr_value, 0)
+                    else:
+                        address = int(addr_value)
+                count = None
+                if count_value is not None:
+                    if isinstance(count_value, str):
+                        count = int(count_value, 0)
+                    else:
+                        count = int(count_value)
+                info = self.state.disasm_read(pid_int, address=address, count=count, mode=mode_value)
+                return {"version": 1, "status": "ok", "disasm": info}
+            if cmd == "sym":
+                op = str(request.get("op") or "info").lower()
+                pid_value = request.get("pid")
+                if pid_value is None:
+                    raise ValueError("sym requires 'pid'")
+                pid_int = int(pid_value)
+                if op == "info":
+                    info = self.state.symbol_info(pid_int)
+                    return {"version": 1, "status": "ok", "symbols": info}
+                if op in {"load", "set"}:
+                    path_value = request.get("path")
+                    if not path_value:
+                        raise ValueError("sym load requires 'path'")
+                    self.state.ensure_pid_access(pid_int, session_id)
+                    result = self.state.load_symbols_for_pid(pid_int, program=self.state.tasks.get(pid_int, {}).get("program"), override=str(path_value))
+                    return {"version": 1, "status": "ok", "symbols": result}
+                if op in {"lookup", "lookup_name", "name"}:
+                    name_value = request.get("name")
+                    if not isinstance(name_value, str):
+                        raise ValueError("sym lookup requires 'name'")
+                    result = self.state.symbol_lookup_name(pid_int, name_value)
+                    return {"version": 1, "status": "ok", "symbol": result, "pid": pid_int, "name": name_value}
+                if op in {"lookup_addr", "addr"}:
+                    addr_value = request.get("address")
+                    if addr_value is None:
+                        raise ValueError("sym addr requires 'address'")
+                    try:
+                        address_int = int(addr_value, 0) if isinstance(addr_value, str) else int(addr_value)
+                    except (TypeError, ValueError) as exc:
+                        raise ValueError(f"invalid address {addr_value!r}") from exc
+                    result = self.state.symbol_lookup_addr(pid_int, address_int)
+                    return {"version": 1, "status": "ok", "symbol": result, "pid": pid_int, "address": address_int}
+                if op in {"line", "lookup_line"}:
+                    addr_value = request.get("address")
+                    if addr_value is None:
+                        raise ValueError("sym line requires 'address'")
+                    try:
+                        address_int = int(addr_value, 0) if isinstance(addr_value, str) else int(addr_value)
+                    except (TypeError, ValueError) as exc:
+                        raise ValueError(f"invalid address {addr_value!r}") from exc
+                    result = self.state.symbol_lookup_line(pid_int, address_int)
+                    return {"version": 1, "status": "ok", "line": result, "pid": pid_int, "address": address_int}
+                raise ValueError(f"unknown sym op '{op}'")
             if cmd == "trace":
+                op_raw = request.get("op")
+                if op_raw is not None:
+                    op = str(op_raw).strip().lower()
+                    if op == "config":
+                        if "changed_regs" in request:
+                            changed_value = request.get("changed_regs")
+                            if isinstance(changed_value, bool):
+                                enabled = changed_value
+                            else:
+                                if changed_value is None:
+                                    raise ValueError("trace.config requires 'changed-regs <on|off>' or 'buffer <size>'")
+                                mode_str = str(changed_value).strip().lower()
+                                if mode_str in {"on", "true", "1"}:
+                                    enabled = True
+                                elif mode_str in {"off", "false", "0"}:
+                                    enabled = False
+                                else:
+                                    raise ValueError("trace.config changed_regs must be 'on' or 'off'")
+                            info = self.state.set_trace_changed_regs(enabled)
+                            return {"version": 1, "status": "ok", "trace": info}
+                        if "buffer_size" in request:
+                            info = self.state.set_trace_buffer_size(request.get("buffer_size"))
+                            return {"version": 1, "status": "ok", "trace": info}
+                        raise ValueError("trace.config requires 'changed-regs <on|off>' or 'buffer <size>'")
+                    if op in {"records", "history", "export", "import"}:
+                        pid_value = request.get("pid")
+                        if pid_value is None:
+                            raise ValueError(f"trace {op} requires 'pid'")
+                        pid_int = int(pid_value)
+                        limit_value = request.get("limit")
+                        if op == "import":
+                            if session_id is None:
+                                raise SessionError("session_required")
+                            self.state.ensure_pid_access(pid_int, session_id)
+                            records_payload = request.get("records")
+                            if not isinstance(records_payload, (list, tuple)):
+                                raise ValueError("trace import requires 'records' list")
+                            replace_flag = bool(request.get("replace", True))
+                            info = self.state.trace_import(pid_int, records_payload, replace=replace_flag)
+                        elif op == "export":
+                            info = self.state.trace_export(pid_int, limit=limit_value)
+                        else:
+                            info = self.state.trace_records(pid_int, limit=limit_value)
+                        return {"version": 1, "status": "ok", "trace": info}
+                    raise ValueError(f"unknown trace op '{op}'")
                 pid_value = request.get("pid")
                 if pid_value is None:
                     raise ValueError("trace requires 'pid'")
+                pid_int = int(pid_value)
+                self.state.ensure_pid_access(pid_int, session_id)
                 mode_value = request.get("mode")
                 if isinstance(mode_value, bool):
                     enable = mode_value
@@ -874,14 +5186,16 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                         enable = False
                     else:
                         raise ValueError("trace mode must be 'on' or 'off'")
-                trace_info = self.state.trace_task(int(pid_value), enable)
+                trace_info = self.state.trace_task(pid_int, enable)
                 return {"version": 1, "status": "ok", "trace": trace_info}
             if cmd == "reload":
                 pid_value = request.get("pid")
                 if pid_value is None:
                     raise ValueError("reload requires 'pid'")
+                pid_int = int(pid_value)
+                self.state.ensure_pid_access(pid_int, session_id)
                 verbose = bool(request.get("verbose"))
-                reload_info = self.state.reload_task(int(pid_value), verbose=verbose)
+                reload_info = self.state.reload_task(pid_int, verbose=verbose)
                 return {"version": 1, "status": "ok", "reload": reload_info}
             if cmd == "peek":
                 pid = int(request.get("pid"))
@@ -891,6 +5205,7 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 return {"version": 1, "status": "ok", "data": data}
             if cmd == "poke":
                 pid = int(request.get("pid"))
+                self.state.ensure_pid_access(pid, session_id)
                 addr = int(request.get("addr"))
                 data_hex = request.get("data")
                 if not isinstance(data_hex, str):
@@ -905,19 +5220,25 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 pid_value = request.get("pid")
                 if pid_value is None:
                     raise ValueError("pause requires 'pid'")
-                task = self.state.pause_task(int(pid_value))
+                pid_int = int(pid_value)
+                self.state.ensure_pid_access(pid_int, session_id)
+                task = self.state.pause_task(pid_int)
                 return {"version": 1, "status": "ok", "task": task}
             if cmd == "resume":
                 pid_value = request.get("pid")
                 if pid_value is None:
                     raise ValueError("resume requires 'pid'")
-                task = self.state.resume_task(int(pid_value))
+                pid_int = int(pid_value)
+                self.state.ensure_pid_access(pid_int, session_id)
+                task = self.state.resume_task(pid_int)
                 return {"version": 1, "status": "ok", "task": task}
             if cmd == "kill":
                 pid_value = request.get("pid")
                 if pid_value is None:
                     raise ValueError("kill requires 'pid'")
-                task = self.state.kill_task(int(pid_value))
+                pid_int = int(pid_value)
+                self.state.ensure_pid_access(pid_int, session_id)
+                task = self.state.kill_task(pid_int)
                 return {"version": 1, "status": "ok", "task": task}
             if cmd == "ps":
                 return {"version": 1, "status": "ok", "tasks": self.state.task_list()}
@@ -928,12 +5249,19 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 channels = self.state.list_channels(int(pid_value))
                 return {"version": 1, "status": "ok", "channels": channels}
             if cmd == "mailbox_snapshot":
-                descriptors = self.state.mailbox_snapshot()
-                return {"version": 1, "status": "ok", "descriptors": descriptors}
+                snapshot = self.state.mailbox_snapshot()
+                payload: Dict[str, Any] = {"version": 1, "status": "ok"}
+                if isinstance(snapshot, dict):
+                    payload.update(snapshot)
+                else:
+                    payload["descriptors"] = snapshot
+                return payload
             if cmd == "dmesg":
                 limit = request.get("limit")
                 limit_int = int(limit) if limit is not None else None
-                logs = self.state.get_logs(limit=limit_int)
+                filter_session = request.get("filter_session")
+                filter_str = str(filter_session) if filter_session else None
+                logs = self.state.get_logs(limit=limit_int, filter_session=filter_str)
                 return {"version": 1, "status": "ok", "logs": logs}
             if cmd == "stdio_fanout":
                 pid_raw = request.get("pid")
@@ -966,17 +5294,21 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 pid_value = request.get("pid")
                 if pid_value is None:
                     raise ValueError("send requires 'pid'")
+                pid_int = int(pid_value)
+                self.state.ensure_pid_access(pid_int, session_id)
                 data = request.get("data")
                 data_hex = request.get("data_hex")
                 channel = request.get("channel")
                 if data_hex is None and not isinstance(data, str):
                     raise ValueError("send requires 'data' or 'data_hex'")
-                result = self.state.send_stdin(int(pid_value), data=data if isinstance(data, str) else None, data_hex=data_hex if isinstance(data_hex, str) else None, channel=channel)
+                result = self.state.send_stdin(pid_int, data=data if isinstance(data, str) else None, data_hex=data_hex if isinstance(data_hex, str) else None, channel=channel)
                 return {"version": 1, "status": "ok", **result}
             if cmd == "sched":
                 pid_value = request.get("pid")
                 if pid_value is not None:
-                    task = self.state.set_task_attrs(int(pid_value), priority=request.get("priority"), quantum=request.get("quantum"))
+                    pid_int = int(pid_value)
+                    self.state.ensure_pid_access(pid_int, session_id)
+                    task = self.state.set_task_attrs(pid_int, priority=request.get("priority"), quantum=request.get("quantum"))
                     return {"version": 1, "status": "ok", "task": task}
                 stats = self.state.scheduler_stats()
                 trace_limit = request.get("limit")

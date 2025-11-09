@@ -1,0 +1,19 @@
+symbols
+=======
+
+List symbols loaded for a task.
+
+Usage::
+
+    symbols <pid> [--type functions|variables|all] [--offset N] [--limit N]
+
+Arguments:
+- ``pid``: Target task id whose symbols should be listed.
+
+Options:
+- ``--type`` / ``--kind`` / ``-t``: Filter by symbol kind (default: ``all``).
+- ``--offset`` / ``-o``: Skip the first ``N`` entries (default: ``0``).
+- ``--limit`` / ``-l``: Return at most ``N`` entries (default: no limit).
+
+The shell prints address, name, type, size, and source metadata when
+available. Symbol data comes from the executive's cached ``.sym`` table.
