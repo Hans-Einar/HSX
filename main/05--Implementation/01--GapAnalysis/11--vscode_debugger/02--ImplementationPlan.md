@@ -749,6 +749,8 @@ VS Code pauses/watches currently lose executive sessions and cannot resolve expr
 - [x] Add session heartbeat + reconnection logic to hsx-dap (CommandClient + SessionManager)
 - [x] Ensure DAP adapter re-subscribes to events on reconnect
 - [x] Translate VS Code watch expressions to `watch add`/`list` with graceful errors
-- [ ] Surface watch updates in Variables/Watch panes (invalidate scopes on updates)
-- [ ] Add regression tests covering session timeout + reconnect
-- [ ] Document required executive session settings / limits
+- [x] Surface watch updates in Variables/Watch panes (invalidate scopes on updates)
+- [x] Add regression tests covering session timeout + reconnect
+- [x] Document required executive session settings / limits
+
+**Session requirements note:** `hsx-dap` opens sessions with `features=["events","stack","watch"]`, `max_events=256`, and heartbeat derived from the executive response (minimum 5 s). Ensure the executive exposes these capabilities (`events`, `stack`, `watch`) and that `session.heartbeat_min` ≤ 5 s so the adapter’s keepalive thread can refresh before timeouts. When debugging systems with aggressive session pruning, set `HEARTBEAT_S` ≥ 10 s or mirror the adapter’s defaults in `execd`.

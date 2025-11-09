@@ -166,6 +166,7 @@ def test_apply_watch_event_updates_cache():
     watch = cache.get_watch(1, 7)
     assert watch is not None
     assert watch.value == "01020304"
+    assert watch.expr == "foo"
 
 
 def test_cache_controller_receives_events_from_bus():

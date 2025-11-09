@@ -71,12 +71,28 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 ### Work Summary
 - Hardened DAP watch evaluation: ensured symbol loaders run before adding watches, added register-expression short-circuiting, and fail fast with actionable errors (missing symbols, local/stack variables not yet supported).
 - Added `CommandClient.load_symbols` helper plus session retry logic unit tests to guard both `session_required` and transport timeouts; introduced `symbol_lookup_name` wrapper for expression validation.
-- Created regression tests (`python/tests/test_hsxdbg_commands.py`, `python/tests/test_hsx_dap_watch.py`) covering the new `_request` retry behavior, register evaluation path, and stack-variable rejection; re-ran symbol mapper tests.
+- Created regression tests (`python/tests/test_hsxdbg_cache.py`, `python/tests/test_hsxdbg_commands.py`, `python/tests/test_hsx_dap_watch.py`, `python/tests/test_hsx_dap_breakpoints.py`) covering the new `_request` retry behavior, register evaluation path, stack-variable rejection, and breakpoint reapplication; re-ran symbol mapper tests.
 - Shell UX refinements: `dmesg` now shows the cached session number (matching `session list` output), and `ExecutiveSession.request` retries once when a socket timeout occurs—preventing `stack` commands from failing with “cannot read from timed out object.”
 
 ### Testing
-- `PYTHONPATH=. pytest python/tests/test_hsxdbg_commands.py python/tests/test_hsx_dap_watch.py python/tests/test_hsx_dap_symbol_mapper.py`
+- `PYTHONPATH=. pytest python/tests/test_hsxdbg_cache.py python/tests/test_hsxdbg_commands.py python/tests/test_hsx_dap_watch.py python/tests/test_hsx_dap_breakpoints.py python/tests/test_hsx_dap_symbol_mapper.py`
 
 ### Next Steps
 - Validate VS Code watch panel again (symbol names should now work after auto-loading). 
 - Continue Phase 2.6: improve expression parsing/locals surfacing, hook watch updates to UI scopes, and document executive session requirements. Once stable, move on to breakpoint/stopped event mapping (Phase 4.1/4.2).
+
+## 2025-11-09 - Codex (Session 4)
+
+### Scope
+- Plan item / phase addressed: Phase 2.6 (remaining checklist items: reconnect regression tests & session requirements documentation)
+- Design sections reviewed: 04.11--vscode_debugger §5.1, docs/executive_protocol.md (session.open)
+
+### Work Summary
+- Added `python/tests/test_hsxdbg_session.py` to verify `SessionManager.reopen()` closes/reopens sessions and resubscribes to prior event filters (guards future regressions in reconnect logic).
+- Documented the adapter’s required executive session capabilities/heartbeat expectations directly in ImplementationPlan §2.6, so ops teams know to enable `events`, `stack`, and `watch` features with heartbeat ≥5 s.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_hsxdbg_session.py`
+
+### Next Steps
+- With Phase 2.6 complete, proceed to Phase 3 (stack/scopes/variables) to surface locals and support symbol-driven watches that rely on per-frame metadata.
