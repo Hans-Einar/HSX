@@ -453,13 +453,32 @@ class HSXDebugAdapter:
         return self._handle_threads(args)
 
     def _handle_evaluate(self, args: JsonDict) -> JsonDict:
-        context = str(args.get("context") or "")
         expression = str(args.get("expression") or "").strip()
-        if context == "watch" and expression:
-            self._ensure_client()
-            reg_value = self._evaluate_register_expression(expression)
-            if reg_value is not None:
-                return {"result": reg_value, "variablesReference": 0}
+        context = str(args.get("context") or "")
+        frame = self._resolve_frame(args.get("frameId"))
+        if not expression:
+            return {"result": "", "variablesReference": 0}
+        self._ensure_client()
+        self._ensure_symbol_mapper()
+
+        register_value = self._evaluate_register_expression(expression)
+        if register_value is not None:
+            return {"result": register_value, "type": "register", "variablesReference": 0}
+
+        pointer_value = self._evaluate_pointer_expression(expression, frame)
+        if pointer_value is not None:
+            return pointer_value
+
+        include_globals = context != "watch"
+        symbol_value = self._evaluate_symbol_expression(
+            expression,
+            frame,
+            include_globals=include_globals,
+        )
+        if symbol_value is not None:
+            return symbol_value
+
+        if context == "watch":
             try:
                 watch = self._ensure_watch_entry(expression)
             except RuntimeError as exc:
@@ -469,7 +488,8 @@ class HSXDebugAdapter:
             if not watch:
                 return {"result": "watch unavailable", "variablesReference": 0}
             return {"result": self._describe_watch_value(watch), "variablesReference": 0}
-        return {"result": "not supported", "variablesReference": 0}
+
+        return {"result": f"unsupported expression '{expression}'", "variablesReference": 0}
 
     def _handle_setExceptionBreakpoints(self, args: JsonDict) -> JsonDict:  # noqa: N802
         return {"breakpoints": []}
@@ -889,6 +909,23 @@ class HSXDebugAdapter:
             return None
         return {"name": Path(path).name, "path": path}
 
+    def _resolve_frame(self, raw_frame_id) -> Optional[_FrameRecord]:
+        if isinstance(raw_frame_id, _FrameRecord):
+            return raw_frame_id
+        frame_id: Optional[int] = None
+        try:
+            if raw_frame_id is not None:
+                frame_id = int(raw_frame_id)
+        except (TypeError, ValueError):
+            frame_id = None
+        if frame_id is not None and frame_id in self._frames:
+            return self._frames[frame_id]
+        if self._frames:
+            # fall back to the most recent frame
+            first_key = next(iter(self._frames))
+            return self._frames[first_key]
+        return None
+
     def _evaluate_register_expression(self, expression: str) -> Optional[str]:
         token = expression.strip().upper()
         normalized = REGISTER_NAMES.get(token)
@@ -909,6 +946,60 @@ class HSXDebugAdapter:
             return None
         return f"0x{int(value) & 0xFFFFFFFF:08X}"
 
+    def _evaluate_pointer_expression(self, expression: str, frame: Optional[_FrameRecord]) -> Optional[JsonDict]:
+        token = expression.strip()
+        if not token or token[0] not in {"@", "*", "&"}:
+            return None
+        deref = token[0] in {"@", "*"}
+        body = token[1:].strip()
+        length = 4
+        if ":" in body:
+            addr_expr, _, length_expr = body.partition(":")
+            body = addr_expr.strip()
+            try:
+                parsed_length = int(length_expr, 0)
+                if parsed_length > 0:
+                    length = max(1, min(parsed_length, 16))
+            except ValueError:
+                pass
+        address = self._resolve_address_token(body, frame, include_globals=True)
+        if address is None:
+            return {
+                "result": f"unresolved address '{expression}'",
+                "variablesReference": 0,
+            }
+        address = int(address) & 0xFFFFFFFF
+        if not deref:
+            return {
+                "result": f"0x{address:08X}",
+                "type": "address",
+                "variablesReference": 0,
+            }
+        formatted = self._format_memory_value(address, length=length)
+        if formatted is None:
+            return {
+                "result": f"unreadable memory @0x{address:08X}",
+                "variablesReference": 0,
+            }
+        if length != 4:
+            formatted = f"{formatted} (len={length})"
+        return {"result": formatted, "type": "memory", "variablesReference": 0}
+
+    def _evaluate_symbol_expression(
+        self,
+        expression: str,
+        frame: Optional[_FrameRecord],
+        *,
+        include_globals: bool,
+    ) -> Optional[JsonDict]:
+        symbol = self._find_symbol(expression, frame, include_globals=include_globals)
+        if not symbol:
+            return None
+        formatted = self._format_symbol_value(symbol, frame)
+        if formatted is None:
+            formatted = self._describe_local_symbol(symbol)
+        return {"result": formatted, "type": "symbol", "variablesReference": 0}
+
     def _classify_watch_expression(self, expression: str) -> str:
         token = expression.strip()
         if not token:
@@ -921,7 +1012,7 @@ class HSXDebugAdapter:
             return "address"
         except ValueError:
             pass
-        if token.startswith("&") or token.startswith("*"):
+        if token.startswith("&") or token.startswith("*") or token.startswith("@"):
             return "address"
         if all(ch.isalnum() or ch == "_" for ch in token):
             return "symbol"
@@ -936,6 +1027,74 @@ class HSXDebugAdapter:
             except Exception:
                 return None
         return None
+
+    def _lookup_local_symbol(self, name: str, frame: Optional[_FrameRecord]) -> Optional[Dict[str, Any]]:
+        if not name or not self._symbol_mapper or not frame or not getattr(frame, "name", None):
+            return None
+        function = getattr(frame, "name", None)
+        if not function:
+            return None
+        for entry in self._symbol_mapper.locals_for_function(function):
+            if entry.get("name") == name:
+                return entry
+        return None
+
+    def _lookup_global_symbol(self, name: str) -> Optional[Dict[str, Any]]:
+        if not name or not self._symbol_mapper:
+            return None
+        for entry in self._symbol_mapper.globals_list():
+            if entry.get("name") == name:
+                return entry
+        return None
+
+    def _find_symbol(
+        self,
+        name: str,
+        frame: Optional[_FrameRecord],
+        *,
+        include_globals: bool,
+    ) -> Optional[Dict[str, Any]]:
+        if not name:
+            return None
+        local_entry = self._lookup_local_symbol(name, frame)
+        if local_entry:
+            return local_entry
+        if include_globals:
+            global_entry = self._lookup_global_symbol(name)
+            if global_entry:
+                return global_entry
+            return self._lookup_symbol_metadata(name)
+        return None
+
+    def _resolve_address_token(
+        self,
+        token: str,
+        frame: Optional[_FrameRecord],
+        *,
+        include_globals: bool,
+    ) -> Optional[int]:
+        token = token.strip()
+        if not token:
+            return None
+        try:
+            return int(token, 0) & 0xFFFFFFFF
+        except ValueError:
+            pass
+        symbol = self._find_symbol(token, frame, include_globals=include_globals)
+        if not symbol:
+            return None
+        return self._resolve_symbol_address(symbol, frame)
+
+    def _format_memory_value(self, addr: int, *, length: int = 4) -> Optional[str]:
+        if not self.client:
+            return None
+        data = self.client.read_memory(addr, length, pid=self.current_pid)
+        if not data:
+            return None
+        if len(data) < length:
+            data = data.ljust(length, b"\x00")
+        value = int.from_bytes(data[:length], byteorder="big")
+        return f"0x{value:08X} ({value}) @ 0x{addr:08X}"
 
     @staticmethod
     def _symbol_requires_stack(symbol: Dict[str, Any]) -> bool:

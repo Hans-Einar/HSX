@@ -145,3 +145,20 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 
 ### Next Steps
 - Phase 3.4 Evaluate Request: leverage the new locals/globals metadata to power hover/watch expressions (addresses, symbols) and expand documentation for variable formatting.
+
+## 2025-11-10 - Codex (Session 8)
+
+### Scope
+- Plan item / phase addressed: Phase 3.4 Evaluate Request (register/address/symbol support + docs/tests)
+- Design sections reviewed: 04.11--vscode_debugger §5.3, Implementation Plan §3.4
+
+### Work Summary
+- Taught `_handle_evaluate` to resolve registers, pointer expressions (`@expr[:len]`, `&expr`), and symbol names, differentiating hover vs watch contexts so locals are evaluated via stack metadata without registering executive watches.
+- Added helpers for pointer parsing, symbol lookups, and memory formatting plus richer error messaging; updated `_classify_watch_expression` to understand `@` syntax.
+- Documented the supported syntax inside the Implementation Plan and created `python/tests/test_hsx_dap_evaluate.py` covering register hover, pointer dereference, global symbol reads, and stack-local evaluations (ensuring locals never trigger `watch add`).
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_hsxdbg_cache.py python/tests/test_hsxdbg_commands.py python/tests/test_hsxdbg_session.py python/tests/test_hsx_dap_watch.py python/tests/test_hsx_dap_breakpoints.py python/tests/test_hsx_dap_stacktrace.py python/tests/test_hsx_dap_scopes.py python/tests/test_hsx_dap_variables.py python/tests/test_hsx_dap_symbol_mapper.py python/tests/test_hsx_dap_evaluate.py`
+
+### Next Steps
+- Move into Phase 4 (event mapping + source-mapped stopped events) now that inspection flows (stack/scopes/variables/evaluate) meet the documented requirements.

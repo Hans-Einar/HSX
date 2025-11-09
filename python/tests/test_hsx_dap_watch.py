@@ -29,6 +29,7 @@ def test_watch_register_expression_returns_register_value():
         symbol_lookup_name=lambda name, pid=None: None,
         add_watch=lambda expr, pid=None: {"watch_id": 1},
         list_watches=lambda pid, refresh=False: [],
+        symbol_info=lambda pid: {"loaded": False},
     )
 
     result = adapter._handle_evaluate({"context": "watch", "expression": "R0"})
@@ -52,6 +53,7 @@ def test_watch_local_symbol_reports_not_supported():
         },
         add_watch=fake_add_watch,
         list_watches=lambda pid, refresh=False: [],
+        symbol_info=lambda pid: {"loaded": True, "path": "dummy"},
     )
 
     result = adapter._handle_evaluate({"context": "watch", "expression": "counter"})

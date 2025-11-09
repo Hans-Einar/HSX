@@ -292,12 +292,18 @@ Support watch expressions and hover queries. Interactive expression evaluation.
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.11--vscode_debugger](../../../04--Design/04.11--vscode_debugger.md)
 - [x] Implement `evaluate` request handler
-- [ ] Support register name evaluation (e.g., "r0")
-- [ ] Support address evaluation (e.g., "@0x1000")
-- [ ] Support symbol evaluation (if available)
-- [ ] Return formatted results
-- [ ] Add evaluate tests
-- [ ] Document evaluate syntax
+- [x] Support register name evaluation (e.g., "r0")
+- [x] Support address evaluation (e.g., "@0x1000")
+- [x] Support symbol evaluation (if available)
+- [x] Return formatted results
+- [x] Add evaluate tests
+- [x] Document evaluate syntax
+
+**Evaluate syntax reference:**  
+- `R0`…`R15`, `PC`, `SP`, `PSW` — register snapshots (hover/watch)  
+- `@expr[:len]` / `*expr` — dereference numeric or symbol addresses, optional byte length (default 4, max 16)  
+- `&expr` — address-of helper for numeric/symbol operands  
+- Bare symbol names — globals anytime, locals when a stack frame is supplied (hover/watch)
 
 ---
 
