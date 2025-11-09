@@ -19,16 +19,22 @@ class HSXConfigurationProvider {
 class HSXAdapterFactory {
   constructor(context) {
     this.context = context;
-    this.pyCommand = process.env.PYTHON || process.env.HSX_PYTHON || (process.platform === "win32" ? "python" : "python3");
-    if (context.globalState) {
-      const key = "hsx.pythonCommand";
-      this.pyCommand = context.globalState.get(key, this.pyCommand);
-      context.globalState.update(key, this.pyCommand);
-    }
   }
 
   createDebugAdapterDescriptor(session) {
-    const pythonCommand = this.pyCommand;
+    const config = session.configuration || {};
+    const pythonCommand =
+      config.pythonPath ||
+      process.env.PYTHON ||
+      process.env.HSX_PYTHON ||
+      (process.env.CONDA_PREFIX
+        ? path.join(
+            process.env.CONDA_PREFIX,
+            process.platform === "win32" ? "python.exe" : "bin/python",
+          )
+        : undefined) ||
+      (process.platform === "win32" ? "python" : "python3");
+
     const adapterPath = this.context.asAbsolutePath(path.join("debugAdapter", "hsx-dap.py"));
     const config = session.configuration || {};
     const pid = config.pid ?? 1;
