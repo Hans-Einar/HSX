@@ -320,13 +320,19 @@ Translate executive events to DAP events. Event-driven debugging.
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.11--vscode_debugger](../../../04--Design/04.11--vscode_debugger.md)
-- [ ] Map debug_break event → `stopped` event (reason: breakpoint)
-- [ ] Map trace_step event → `stopped` event (reason: step)
-- [ ] Map stdout/stderr events → `output` event
-- [ ] Map task_state events → `stopped` or `continued` events
-- [ ] Add event filtering (don't send every trace_step)
-- [ ] Add event tests
-- [ ] Document event mapping
+- [x] Map debug_break event → `stopped` event (reason: breakpoint)
+- [x] Map trace_step event → `stopped` event (reason: step)
+- [x] Map stdout/stderr events → `output` event
+- [x] Map task_state events → `stopped` or `continued` events
+- [x] Add event filtering (don't send every trace_step)
+- [x] Add event tests
+- [x] Document event mapping
+
+**Event mapping reference:**  
+- `debug_break` → `stopped` (reason + symbol, source-mapped)  
+- `trace_step` → `stopped` only when a user step is pending (_pending_step_reason debounce)  
+- `task_state.running` → `continued`, `task_state.paused/stopped` or reason `debug_break` → `stopped` with PC metadata  
+- `stdout`/`stderr`/`watch_update` → `output` console entries; warnings surface as console text
 
 ---
 
@@ -341,11 +347,13 @@ Convert instruction addresses in events to source locations. Source-level event 
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.11--vscode_debugger](../../../04--Design/04.11--vscode_debugger.md)
-- [ ] Map addresses to source locations for stopped events
-- [ ] Include source file and line in stopped events
-- [ ] Handle addresses without source mapping
-- [ ] Add source mapping tests
-- [ ] Document source mapping behavior
+- [x] Map addresses to source locations for stopped events
+- [x] Include source file and line in stopped events
+- [x] Handle addresses without source mapping
+- [x] Add source mapping tests
+- [x] Document source mapping behavior
+
+**Source mapping notes:** `_emit_stopped_event` now resolves every PC through `SymbolMapper.lookup_pc`, annotating `stopped` bodies with `source`, `line`, `column`, and `instructionPointerReference` when available; unmapped PCs still emit a valid stop without source fields.
 
 ---
 
@@ -360,12 +368,14 @@ Map HSX PIDs to DAP thread IDs. Multi-task debugging support.
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.11--vscode_debugger](../../../04--Design/04.11--vscode_debugger.md)
-- [ ] Implement PID → thread ID mapping
-- [ ] Send `thread` event when tasks start/stop
-- [ ] Implement `threads` request handler
-- [ ] Return thread list with names
-- [ ] Add thread management tests
-- [ ] Document thread mapping
+- [x] Implement PID → thread ID mapping
+- [x] Send `thread` event when tasks start/stop
+- [x] Implement `threads` request handler
+- [x] Return thread list with names
+- [x] Add thread management tests
+- [x] Document thread mapping
+
+**Thread mapping notes:** Task-state transitions populate `_thread_states`, emit `thread` events (`started`/`exited`), and drive `continued`/`stopped` routing. The `threads` request now reflects the tracked PID set (defaulting to the locked PID when no events have fired).
 
 ---
 

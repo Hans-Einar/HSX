@@ -22,16 +22,17 @@ if str(REPO_ROOT) not in sys.path:
 
 from python.hsxdbg import (
     CommandClient,
+    DebugBreakEvent,
     EventBus,
     EventSubscription,
     RuntimeCache,
     SessionConfig,
     SessionManager,
+    StdStreamEvent,
+    TaskStateEvent,
     TraceStepEvent,
     WarningEvent,
     WatchUpdateEvent,
-    DebugBreakEvent,
-    StdStreamEvent,
 )
 from python.hsxdbg.transport import TransportConfig
 
@@ -240,6 +241,8 @@ class HSXDebugAdapter:
         self._watch_id_to_expr: Dict[int, str] = {}
         self._pending_breakpoints: Dict[str, Dict[str, Any]] = {}
         self._sym_hint: Optional[Path] = None
+        self._pending_step_reason: Optional[str] = None
+        self._thread_states: Dict[int, Dict[str, Any]] = {}
 
     def serve(self) -> None:
         while True:
@@ -330,8 +333,14 @@ class HSXDebugAdapter:
         return {}
 
     def _handle_threads(self, args: JsonDict) -> JsonDict:
-        pid = self.current_pid or 0
-        return {"threads": [{"id": pid, "name": f"PID {pid}"}]}
+        threads: List[JsonDict] = []
+        for pid in sorted(self._thread_states.keys()):
+            meta = self._thread_states.get(pid, {})
+            threads.append({"id": pid, "name": meta.get("name") or f"PID {pid}"})
+        if not threads and self.current_pid:
+            pid = self.current_pid
+            threads.append({"id": pid, "name": f"PID {pid}"})
+        return {"threads": threads}
 
     def _handle_continue(self, args: JsonDict) -> JsonDict:
         self._ensure_client()
@@ -355,6 +364,7 @@ class HSXDebugAdapter:
     def _handle_next(self, args: JsonDict) -> JsonDict:
         self._ensure_client()
         self.client.step(self.current_pid, source_only=False)
+        self._pending_step_reason = "step"
         return {}
 
     def _handle_stepIn(self, args: JsonDict) -> JsonDict:  # noqa: N802
@@ -497,6 +507,8 @@ class HSXDebugAdapter:
     # Internal helpers -------------------------------------------------
     def _connect(self, host: str, port: int, pid: int) -> None:
         self.logger.info("Connecting to executive at %s:%d (PID %d)", host, port, pid)
+        self._thread_states.clear()
+        self._pending_step_reason = None
         self.event_bus = EventBus()
         self.event_bus.start()
         self.runtime_cache = RuntimeCache()
@@ -509,7 +521,8 @@ class HSXDebugAdapter:
             runtime_cache=self.runtime_cache,
         )
         self.session.open()
-        self.session.subscribe_events({"pid": [pid], "categories": ["debug_break", "watch_update", "stdout", "stderr", "warning"]})
+        categories = ["debug_break", "watch_update", "stdout", "stderr", "warning", "trace_step", "task_state"]
+        self.session.subscribe_events({"pid": [pid], "categories": categories})
         self.client = CommandClient(session=self.session, cache=self.runtime_cache)
         self._watch_expr_to_id.clear()
         self._watch_id_to_expr.clear()
@@ -519,15 +532,17 @@ class HSXDebugAdapter:
             self._event_token = self.event_bus.subscribe(subscription)
 
     def _handle_exec_event(self, event) -> None:
-        if isinstance(event, DebugBreakEvent):
+        if isinstance(event, TaskStateEvent):
+            self._handle_task_state_event(event)
+        elif isinstance(event, TraceStepEvent):
+            self._handle_trace_step_event(event)
+        elif isinstance(event, DebugBreakEvent):
             reason = event.reason or "breakpoint"
-            self.protocol.send_event(
-                "stopped",
-                {
-                    "reason": reason,
-                    "threadId": event.pid or self.current_pid,
-                    "description": event.symbol or reason,
-                },
+            self._emit_stopped_event(
+                pid=event.pid or self.current_pid,
+                reason=reason,
+                description=event.symbol or reason,
+                pc=event.pc,
             )
         elif isinstance(event, WarningEvent):
             text = f"warning: {event.reason or 'warning'}\n"
@@ -544,9 +559,6 @@ class HSXDebugAdapter:
             text = f"watch {label}[{event.watch_id}] -> {event.new_value}\n"
             self.protocol.send_event("output", {"category": "console", "output": text})
             self._invalidate_variables_scope()
-        elif isinstance(event, TraceStepEvent):
-            # no-op; cache controller already updated registers
-            return
 
     def _ensure_client(self) -> None:
         if not self.client:
@@ -890,6 +902,8 @@ class HSXDebugAdapter:
         self._symbol_mapper = None
         self._symbol_path = None
         self._symbol_mtime = None
+        self._pending_step_reason = None
+        self._thread_states.clear()
         if self._event_token and self.event_bus:
             self.event_bus.unsubscribe(self._event_token)
             self._event_token = None
@@ -908,6 +922,113 @@ class HSXDebugAdapter:
         if not path:
             return None
         return {"name": Path(path).name, "path": path}
+
+    def _emit_stopped_event(
+        self,
+        *,
+        pid: Optional[int],
+        reason: Optional[str],
+        description: Optional[str] = None,
+        pc: Optional[int] = None,
+    ) -> None:
+        thread_id = pid or self.current_pid
+        if thread_id is None:
+            return
+        reason_value = reason or "stopped"
+        body: JsonDict = {
+            "reason": reason_value,
+            "threadId": thread_id,
+            "description": description or reason_value,
+            "allThreadsStopped": False,
+        }
+        self._ensure_symbol_mapper()
+        if pc is not None:
+            pc_int = int(pc) & 0xFFFFFFFF
+            body["instructionPointerReference"] = f"{pc_int:#x}"
+            mapped = self._map_pc_to_source(pc_int)
+            if mapped:
+                body["source"] = self._render_source(mapped.get("path"))
+                if mapped.get("line") is not None:
+                    body["line"] = mapped.get("line")
+                if mapped.get("column") is not None:
+                    body["column"] = mapped.get("column")
+        self.protocol.send_event("stopped", body)
+
+    def _handle_trace_step_event(self, event: TraceStepEvent) -> None:
+        if not self._pending_step_reason:
+            return
+        reason = self._pending_step_reason
+        self._pending_step_reason = None
+        self._emit_stopped_event(
+            pid=event.pid or self.current_pid,
+            reason=reason,
+            description="step complete",
+            pc=event.pc or event.next_pc,
+        )
+
+    def _handle_task_state_event(self, event: TaskStateEvent) -> None:
+        pid = event.pid or self.current_pid
+        if pid is None:
+            return
+        name = None
+        if isinstance(event.data, dict):
+            name = event.data.get("name")
+        created = self._ensure_thread_entry(pid, name=name)
+        state = str(event.new_state or "").lower()
+        reason = str(event.reason or "").lower()
+        previous_state = self._thread_states.get(pid, {}).get("state")
+        meta = self._thread_states.get(pid)
+        if meta is not None:
+            if state:
+                meta["state"] = state
+            if name:
+                meta["name"] = name
+        if created:
+            self.protocol.send_event("thread", {"reason": "started", "threadId": pid})
+        if state == "terminated":
+            self.protocol.send_event("thread", {"reason": "exited", "threadId": pid})
+            self._thread_states.pop(pid, None)
+            if self.current_pid == pid:
+                self.current_pid = None
+            return
+        if state == "running":
+            if previous_state != "running":
+                self.protocol.send_event("continued", {"threadId": pid})
+            return
+        if state in {"paused", "stopped"} or reason in {"debug_break", "user_pause"}:
+            pc = self._extract_task_state_pc(event)
+            description = f"Task {state}" if state else (event.reason or "stopped")
+            self._emit_stopped_event(
+                pid=pid,
+                reason=reason or state or "stopped",
+                description=description,
+                pc=pc,
+            )
+
+    def _ensure_thread_entry(self, pid: Optional[int], *, name: Optional[str] = None) -> bool:
+        if pid is None:
+            return False
+        if pid not in self._thread_states:
+            self._thread_states[pid] = {"name": name or f"PID {pid}", "state": None}
+            return True
+        if name:
+            self._thread_states[pid]["name"] = name
+        return False
+
+    def _extract_task_state_pc(self, event: TaskStateEvent) -> Optional[int]:
+        details = None
+        if isinstance(event.data, dict):
+            details = event.data.get("details")
+        if isinstance(details, dict):
+            pc = details.get("pc")
+            if isinstance(pc, str):
+                try:
+                    return int(pc, 0)
+                except ValueError:
+                    return None
+            if isinstance(pc, (int, float)):
+                return int(pc)
+        return None
 
     def _resolve_frame(self, raw_frame_id) -> Optional[_FrameRecord]:
         if isinstance(raw_frame_id, _FrameRecord):

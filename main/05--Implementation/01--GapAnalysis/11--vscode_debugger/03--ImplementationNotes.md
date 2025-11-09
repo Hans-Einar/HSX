@@ -162,3 +162,21 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 
 ### Next Steps
 - Move into Phase 4 (event mapping + source-mapped stopped events) now that inspection flows (stack/scopes/variables/evaluate) meet the documented requirements.
+
+## 2025-11-10 - Codex (Session 9)
+
+### Scope
+- Plan item / phase addressed: Phase 4 (4.1 DAP events, 4.2 source mapping, 4.3 thread management)
+- Design sections reviewed: 04.11--vscode_debugger §5.4/5.5, docs/executive_protocol.md §5.2 (task_state events)
+
+### Work Summary
+- Expanded `hsx-dap` event handling: subscription now captures `trace_step`/`task_state`, `_pending_step_reason` gates trace spam, and `_emit_stopped_event` funnels every debug break/task pause through a shared source-aware helper (PC→source via `SymbolMapper.lookup_pc`).
+- Added PID/thread tracking so `task_state` transitions emit `thread` (`started`/`exited`) plus `continued`/`stopped` events, and taught the DAP `threads` request to reflect the tracked map (defaulting to the locked PID when no events fired yet).
+- Introduced `_handle_trace_step_event` (user steps raise a single `stopped`), `_extract_task_state_pc`, and richer stopped payloads (instruction pointer + optional source). Updated Implementation Plan §§4.1‑4.3 with references describing the mappings.
+- Added `python/tests/test_hsx_dap_events.py` covering trace-step debouncing, thread start/continue/stop sequencing, and source annotations for paused/terminated transitions.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_hsxdbg_cache.py python/tests/test_hsxdbg_commands.py python/tests/test_hsxdbg_session.py python/tests/test_hsx_dap_watch.py python/tests/test_hsx_dap_breakpoints.py python/tests/test_hsx_dap_stacktrace.py python/tests/test_hsx_dap_scopes.py python/tests/test_hsx_dap_variables.py python/tests/test_hsx_dap_symbol_mapper.py python/tests/test_hsx_dap_evaluate.py python/tests/test_hsx_dap_events.py`
+
+### Next Steps
+- Begin Phase 5 (VS Code extension work) once adapter-side flows stabilize, or circle back for DAP polish (hover/evaluate enhancements, error surfacing) depending on backlog priorities.
