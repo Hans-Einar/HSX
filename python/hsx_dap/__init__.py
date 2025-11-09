@@ -38,9 +38,9 @@ from python.hsxdbg.transport import TransportConfig
 
 
 JsonDict = Dict[str, Any]
-REGISTER_NAMES = {
-    f"R{idx}": f"R{idx}" for idx in range(16)
-}
+REGISTER_NAMES = {f"R{idx}": f"R{idx}" for idx in range(16)}
+for idx in range(16):
+    REGISTER_NAMES[f"R{idx:02d}"] = f"R{idx}"
 REGISTER_NAMES.update({"PC": "PC", "SP": "SP", "PSW": "PSW"})
 
 
@@ -570,12 +570,16 @@ class HSXDebugAdapter:
         state = self.client.get_register_state(self.current_pid)
         if not state:
             return []
-        variables = []
-        for name in sorted(state.registers.keys()):
+        variables: List[JsonDict] = []
+        for idx in range(16):
+            raw_key = f"R{idx}"
+            if raw_key not in state.registers:
+                continue
+            display_name = f"R{idx:02d}"
             variables.append(
                 {
-                    "name": name,
-                    "value": f"0x{state.registers[name]:08X}",
+                    "name": display_name,
+                    "value": f"0x{state.registers[raw_key]:08X}",
                     "type": "register",
                     "variablesReference": 0,
                 }

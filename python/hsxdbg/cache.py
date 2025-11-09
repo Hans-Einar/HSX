@@ -122,11 +122,8 @@ class RuntimeCache:
         reg_map: Dict[str, int] = {}
         if isinstance(regs, Mapping):
             for idx in range(16):
-                key_upper = f"R{idx}"
-                value = regs.get(key_upper)
-                if value is None:
-                    value = regs.get(key_upper.lower())
-                reg_map[key_upper] = _to_int(value) or 0
+                raw_value = self._lookup_reg_value(regs, idx)
+                reg_map[f"R{idx}"] = _to_int(raw_value) or 0
             pc = _to_int(pc if pc is not None else (regs.get("PC") or regs.get("pc")))
             sp = _to_int(sp if sp is not None else (regs.get("SP") or regs.get("sp")))
             psw = _to_int(psw if psw is not None else (regs.get("PSW") or regs.get("psw")))
@@ -152,7 +149,27 @@ class RuntimeCache:
         name = register.upper()
         if name in {"PC", "SP", "PSW"}:
             return getattr(state, name.lower())
+        if name.startswith("R"):
+            try:
+                idx = int(name[1:])
+                key = f"R{idx}"
+                return state.registers.get(key)
+            except ValueError:
+                return None
         return state.registers.get(name)
+
+    @staticmethod
+    def _lookup_reg_value(regs: Mapping[str, Any], idx: int) -> Any:
+        candidates = [
+            f"R{idx}",
+            f"r{idx}",
+            f"R{idx:02d}",
+            f"r{idx:02d}",
+        ]
+        for key in candidates:
+            if key in regs:
+                return regs.get(key)
+        return None
 
     # ------------------------------------------------------------------
     # Memory caching

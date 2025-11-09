@@ -33,6 +33,21 @@ def test_update_registers_from_list_with_overrides():
     assert state.sp == 0x8000
 
 
+def test_update_registers_accepts_zero_padded_keys():
+    cache = RuntimeCache()
+    state = cache.update_registers(
+        5,
+        {
+            "r00": 42,
+            "R15": 0xAA55,
+        },
+    )
+    assert state.registers["R0"] == 42
+    assert state.registers["R15"] == 0xAA55
+    assert cache.query_registers(5, "R00") == 42
+    assert cache.query_registers(5, "r15") == 0xAA55
+
+
 def test_memory_cache_read_exact_range():
     cache = RuntimeCache()
     block = cache.cache_memory(1, base=0x100, data=b"abcdef")
