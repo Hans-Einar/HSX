@@ -99,12 +99,12 @@ Read .sym files and build source line → address mappings. Essential for source
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.11--vscode_debugger](../../../04--Design/04.11--vscode_debugger.md)
-- [ ] Implement .sym file parser
-- [ ] Build source file → address map
+- [x] Implement .sym file parser
+- [x] Build source file → address map
 - [ ] Build address → source file map
 - [ ] Implement symbol name lookup
-- [ ] Handle missing .sym files gracefully
-- [ ] Add symbol loader tests
+- [x] Handle missing .sym files gracefully
+- [x] Add symbol loader tests
 - [ ] Document symbol file format expectations
 
 ---
@@ -163,11 +163,11 @@ Map source file:line to addresses, set executive breakpoints. Core debugging fea
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.11--vscode_debugger](../../../04--Design/04.11--vscode_debugger.md)
-- [ ] Implement `setBreakpoints` request handler
-- [ ] Map source locations to instruction addresses using .sym
-- [ ] Set breakpoints in executive at resolved addresses
-- [ ] Return verified breakpoint locations
-- [ ] Handle unresolved breakpoints (e.g., optimized out)
+- [x] Implement `setBreakpoints` request handler
+- [x] Map source locations to instruction addresses using .sym
+- [x] Set breakpoints in executive at resolved addresses
+- [x] Return verified breakpoint locations
+- [x] Handle unresolved breakpoints (e.g., optimized out)
 - [ ] Add breakpoint synchronization tests
 - [ ] Document breakpoint mapping
 

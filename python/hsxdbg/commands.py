@@ -27,19 +27,19 @@ class CommandClient:
 
     def pause(self, pid: Optional[int] = None) -> Dict:
         target = pid or self.session.state.pid
-        response = self._request({"cmd": "exec.pause", "pid": target})
+        response = self._request({"cmd": "pause", "pid": target})
         self._invalidate_cache(target, registers=True, stack=True)
         return response
 
     def resume(self, pid: Optional[int] = None) -> Dict:
         target = pid or self.session.state.pid
-        response = self._request({"cmd": "exec.continue", "pid": target})
+        response = self._request({"cmd": "resume", "pid": target})
         self._invalidate_cache(target, registers=True, stack=True)
         return response
 
     def step(self, pid: Optional[int] = None, *, source_only: bool = False) -> Dict:
         payload = {
-            "cmd": "exec.step",
+            "cmd": "step",
             "pid": pid or self.session.state.pid,
         }
         if source_only:
@@ -137,6 +137,39 @@ class CommandClient:
             return self._fetch_watch_list(pid)
 
         return self.cache.query_watches(pid, fallback=fallback)
+
+    def add_watch(self, expr: str, pid: Optional[int] = None, *, watch_type: Optional[str] = None, length: Optional[int] = None) -> Dict:
+        target = pid or self.session.state.pid
+        payload = {"cmd": "watch", "op": "add", "pid": target, "expr": expr}
+        if watch_type:
+            payload["type"] = watch_type
+        if length is not None:
+            payload["length"] = length
+        response = self._request(payload)
+        if response.get("status") != "ok":
+            raise RuntimeError(f"watch add failed: {response}")
+        watch = response.get("watch") or {}
+        if self.cache:
+            self.cache.update_watch(target, watch)
+        return watch
+
+    def remove_watch(self, watch_id: int, pid: Optional[int] = None) -> Dict:
+        target = pid or self.session.state.pid
+        payload = {"cmd": "watch", "op": "remove", "pid": target, "id": watch_id}
+        response = self._request(payload)
+        if response.get("status") != "ok":
+            raise RuntimeError(f"watch remove failed: {response}")
+        if self.cache:
+            self.cache.invalidate_watches(target)
+        return response.get("watch") or {}
+
+    def symbol_info(self, pid: Optional[int] = None) -> Dict:
+        target = pid or self.session.state.pid
+        payload = {"cmd": "sym", "op": "info", "pid": target}
+        response = self._request(payload)
+        if response.get("status") != "ok":
+            raise RuntimeError(f"sym info failed: {response}")
+        return response.get("symbols") or {}
 
     def read_memory(
         self,

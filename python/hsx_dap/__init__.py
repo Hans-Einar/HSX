@@ -10,6 +10,7 @@ import logging
 import os
 import sys
 import threading
+from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -78,6 +79,51 @@ class DAPProtocol:
             payload["message"] = message
         self.seq += 1
         self._send_message(payload)
+
+
+def _canonical_path(value: str) -> str:
+    return str(value).replace("\\", "/").lower()
+
+
+class SymbolMapper:
+    """Helper to map source lines to PCs using .sym metadata."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self._line_map: Dict[str, Dict[int, List[int]]] = defaultdict(lambda: defaultdict(list))
+        self._load()
+
+    def _load(self) -> None:
+        try:
+            data = json.loads(self.path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            return
+        instructions = data.get("instructions") or []
+        for inst in instructions:
+            line = inst.get("line")
+            pc = inst.get("pc")
+            file_value = inst.get("file")
+            if line is None or pc is None or not file_value:
+                continue
+            directory = inst.get("directory")
+            keys = {_canonical_path(file_value), _canonical_path(Path(file_value).name)}
+            if directory:
+                try:
+                    full = Path(directory) / file_value
+                    keys.add(_canonical_path(full))
+                    keys.add(_canonical_path(str(full.resolve())))
+                except Exception:
+                    pass
+            for key in keys:
+                lines = self._line_map[key]
+                lines.setdefault(int(line), []).append(int(pc))
+
+    def lookup(self, source_path: str, line: int) -> List[int]:
+        key = _canonical_path(source_path)
+        if key in self._line_map:
+            return self._line_map[key].get(int(line), [])
+        filename_key = _canonical_path(Path(source_path).name)
+        return self._line_map.get(filename_key, {}).get(int(line), [])
 
     def _send_message(self, message: JsonDict) -> None:
         data = json.dumps(message)
@@ -148,6 +194,11 @@ class HSXDebugAdapter:
         self._scopes: Dict[int, _ScopeRecord] = {}
         self._next_scope_id = 1
         self._breakpoints: Dict[str, List[JsonDict]] = {}
+        self._symbol_mapper: Optional[SymbolMapper] = None
+        self._symbol_path: Optional[Path] = None
+        self._symbol_mtime: Optional[float] = None
+        self._watch_expr_to_id: Dict[str, int] = {}
+        self._watch_id_to_expr: Dict[int, str] = {}
 
     def serve(self) -> None:
         while True:
@@ -282,8 +333,7 @@ class HSXDebugAdapter:
         if registers:
             scopes.append(self._make_scope("Registers", registers, expensive=False))
         watches = self._format_watches()
-        if watches:
-            scopes.append(self._make_scope("Watches", watches, expensive=False))
+        scopes.append(self._make_scope("Watches", watches, expensive=False))
         return {"scopes": scopes}
 
     def _handle_variables(self, args: JsonDict) -> JsonDict:
@@ -292,37 +342,44 @@ class HSXDebugAdapter:
         return {"variables": scope.variables[:] if scope else []}
 
     def _handle_setBreakpoints(self, args: JsonDict) -> JsonDict:  # noqa: N802
-        source = args.get("source") or {}
-        source_key = source.get("path") or source.get("name") or "<global>"
-        breakpoints = args.get("breakpoints") or []
         self._ensure_client()
-        existing = self._breakpoints.get(source_key, [])
-        for bp in existing:
-            addr = bp.get("address")
-            if addr is not None and bp.get("verified"):
-                try:
-                    self.client.clear_breakpoint(addr, pid=self.current_pid)
-                except Exception:
-                    pass
+        source = args.get("source") or {}
+        source_path = source.get("path") or source.get("name")
+        source_key = self._canonical_source_key(source)
+        breakpoints = args.get("breakpoints") or []
+        self._ensure_symbol_mapper()
+        self._clear_breakpoints(source_key)
+
         results: List[JsonDict] = []
         new_entries: List[JsonDict] = []
         for bp in breakpoints:
-            parsed = self._parse_address(bp)
-            if parsed is None:
-                results.append({"verified": False, "message": "address or instructionReference required"})
+            line = bp.get("line")
+            addresses = self._resolve_breakpoint_addresses(source_path, line, bp)
+            if not addresses:
+                reason = "unmapped source line" if line and self._symbol_mapper else "address required"
+                results.append({"verified": False, "line": line, "message": reason})
                 continue
-            try:
-                self.client.set_breakpoint(parsed, pid=self.current_pid)
-                entry = {
-                    "verified": True,
-                    "instructionReference": f"{parsed:#x}",
-                    "address": parsed,
-                    "id": parsed,
-                }
-                new_entries.append(entry)
-                results.append(entry.copy())
-            except Exception as exc:
-                results.append({"verified": False, "message": str(exc)})
+            verified_any = False
+            failed_error: Optional[str] = None
+            for addr in addresses:
+                try:
+                    self.client.set_breakpoint(addr, pid=self.current_pid)
+                    verified_any = True
+                except Exception as exc:
+                    failed_error = str(exc)
+                    self.logger.debug("breakpoint set failed for 0x%X: %s", addr, exc)
+            entry = {
+                "verified": verified_any,
+                "instructionReference": f"{addresses[0]:#x}",
+                "address": addresses[0],
+                "id": addresses[0],
+                "line": line,
+            }
+            if failed_error and not verified_any:
+                entry["message"] = failed_error
+            new_entries.append({"addresses": addresses})
+            results.append(entry)
+
         self._breakpoints[source_key] = new_entries
         return {"breakpoints": results}
 
@@ -330,6 +387,17 @@ class HSXDebugAdapter:
         return self._handle_threads(args)
 
     def _handle_evaluate(self, args: JsonDict) -> JsonDict:
+        context = str(args.get("context") or "")
+        expression = str(args.get("expression") or "").strip()
+        if context == "watch" and expression:
+            self._ensure_client()
+            try:
+                watch = self._ensure_watch_entry(expression)
+            except Exception as exc:
+                return {"result": f"watch error: {exc}", "variablesReference": 0}
+            if not watch:
+                return {"result": "unavailable", "variablesReference": 0}
+            return {"result": self._describe_watch_value(watch), "variablesReference": 0}
         return {"result": "not supported", "variablesReference": 0}
 
     def _handle_setExceptionBreakpoints(self, args: JsonDict) -> JsonDict:  # noqa: N802
@@ -352,6 +420,9 @@ class HSXDebugAdapter:
         self.session.open()
         self.session.subscribe_events({"pid": [pid], "categories": ["debug_break", "watch_update", "stdout", "stderr", "warning"]})
         self.client = CommandClient(session=self.session, cache=self.runtime_cache)
+        self._watch_expr_to_id.clear()
+        self._watch_id_to_expr.clear()
+        self._ensure_symbol_mapper(force=True)
         if self.event_bus:
             subscription = EventSubscription(handler=self._handle_exec_event)
             self._event_token = self.event_bus.subscribe(subscription)
@@ -374,8 +445,14 @@ class HSXDebugAdapter:
             category = "stdout" if event.stream == "stdout" else "stderr"
             self.protocol.send_event("output", {"category": category, "output": event.text + ("\n" if not event.text.endswith("\n") else "")})
         elif isinstance(event, WatchUpdateEvent):
-            text = f"watch {event.watch_id} updated: {event.new_value}\n"
+            if event.watch_id is not None and event.expr:
+                self._watch_expr_to_id.setdefault(event.expr, event.watch_id)
+                self._watch_id_to_expr.setdefault(event.watch_id, event.expr)
+            expr = event.expr or self._watch_id_to_expr.get(event.watch_id or -1) or ""
+            label = f"{expr} " if expr else ""
+            text = f"watch {label}[{event.watch_id}] -> {event.new_value}\n"
             self.protocol.send_event("output", {"category": "console", "output": text})
+            self._invalidate_variables_scope()
         elif isinstance(event, TraceStepEvent):
             # no-op; cache controller already updated registers
             return
@@ -404,14 +481,19 @@ class HSXDebugAdapter:
     def _format_watches(self) -> List[JsonDict]:
         if not self.client:
             return []
-        watches = self.client.list_watches(self.current_pid)
+        watches = self.client.list_watches(self.current_pid, refresh=True)
         results = []
         for watch in watches:
+            display = self._describe_watch_value(watch)
+            memory_ref = f"0x{watch.address:08X}" if getattr(watch, "address", None) is not None else None
             results.append(
                 {
                     "name": watch.expr or f"watch {watch.watch_id}",
-                    "value": watch.value,
+                    "value": display,
                     "type": "watch",
+                    "evaluateName": watch.expr or None,
+                    "variablesReference": 0,
+                    **({"memoryReference": memory_ref} if memory_ref else {}),
                 }
             )
         return results
@@ -434,7 +516,169 @@ class HSXDebugAdapter:
             return int(value)
         return None
 
+    def _canonical_source_key(self, source: JsonDict) -> str:
+        path = source.get("path")
+        if path:
+            return _canonical_path(path)
+        name = source.get("name")
+        return str(name).lower() if name else "<global>"
+
+    def _clear_breakpoints(self, source_key: str) -> None:
+        entries = self._breakpoints.get(source_key, [])
+        if not entries or not self.client:
+            self._breakpoints[source_key] = []
+            return
+        for entry in entries:
+            addresses = entry.get("addresses") or []
+            if isinstance(addresses, int):
+                addresses = [addresses]
+            for address in addresses:
+                try:
+                    self.client.clear_breakpoint(int(address), pid=self.current_pid)
+                except Exception:
+                    self.logger.debug("failed to clear breakpoint 0x%X", address)
+        self._breakpoints[source_key] = []
+
+    def _resolve_breakpoint_addresses(self, source_path: Optional[str], line: Optional[int], bp: JsonDict) -> List[int]:
+        addresses: List[int] = []
+        lookup_path = source_path or bp.get("sourcePath") or bp.get("sourceName")
+        if self._symbol_mapper and lookup_path and line:
+            try:
+                addresses.extend(self._symbol_mapper.lookup(lookup_path, int(line)))
+            except Exception as exc:
+                self.logger.debug("symbol lookup failed for %s:%s (%s)", lookup_path, line, exc)
+        parsed = self._parse_address(bp)
+        if parsed is not None:
+            addresses.append(parsed)
+        ordered: List[int] = []
+        seen: set[int] = set()
+        for addr in addresses:
+            if addr in seen:
+                continue
+            seen.add(addr)
+            ordered.append(addr)
+        return ordered
+
+    def _resolve_sym_path(self, raw_path: str) -> Optional[Path]:
+        candidates = []
+        try:
+            candidates.append(Path(raw_path))
+        except Exception:
+            return None
+        if REPO_ROOT:
+            candidates.append(REPO_ROOT / raw_path)
+        candidates.append(Path.cwd() / raw_path)
+        for candidate in candidates:
+            try:
+                if candidate.exists():
+                    return candidate.resolve()
+            except OSError:
+                continue
+        return None
+
+    def _ensure_symbol_mapper(self, force: bool = False) -> None:
+        if not self.client or self.current_pid is None:
+            return
+        if not force and self._symbol_mapper is not None:
+            return
+        try:
+            info = self.client.symbol_info(self.current_pid)
+        except Exception as exc:
+            self.logger.debug("symbol_info failed: %s", exc)
+            return
+        if not info.get("loaded"):
+            if force:
+                self.logger.info("symbols not loaded for pid %s", self.current_pid)
+            self._symbol_mapper = None
+            self._symbol_path = None
+            self._symbol_mtime = None
+            return
+        path_value = info.get("path")
+        if not path_value:
+            return
+        resolved = self._resolve_sym_path(path_value)
+        if not resolved:
+            self.logger.warning("symbol file not found: %s", path_value)
+            self._symbol_mapper = None
+            return
+        mtime: Optional[float] = None
+        try:
+            mtime = resolved.stat().st_mtime
+        except OSError:
+            pass
+        if (
+            not force
+            and self._symbol_mapper is not None
+            and self._symbol_path == resolved
+            and (mtime is None or self._symbol_mtime == mtime)
+        ):
+            return
+        try:
+            self._symbol_mapper = SymbolMapper(resolved)
+            self._symbol_path = resolved
+            self._symbol_mtime = mtime
+            self.logger.info("Loaded symbol map for pid %s from %s", self.current_pid, resolved)
+        except Exception as exc:
+            self.logger.warning("failed to parse %s: %s", resolved, exc)
+            self._symbol_mapper = None
+
+    def _ensure_watch_entry(self, expression: str):
+        expr = expression.strip()
+        if not expr or not self.client:
+            return None
+        watch_id = self._watch_expr_to_id.get(expr)
+        if watch_id is None:
+            record = self.client.add_watch(expr, pid=self.current_pid)
+            watch_id = int(record.get("watch_id") or record.get("id") or 0)
+            if watch_id:
+                self._watch_expr_to_id[expr] = watch_id
+                self._watch_id_to_expr[watch_id] = expr
+                self._invalidate_variables_scope()
+        if not watch_id:
+            return None
+        watches = self.client.list_watches(self.current_pid, refresh=True)
+        for watch in watches:
+            if getattr(watch, "watch_id", None) == watch_id:
+                return watch
+        return None
+
+    def _describe_watch_value(self, watch) -> str:
+        value = getattr(watch, "value", None) or ""
+        address = getattr(watch, "address", None)
+        location = getattr(watch, "location", None)
+        parts = [str(value)]
+        meta: List[str] = []
+        if address is not None:
+            meta.append(f"@ 0x{int(address):08X}")
+        if location:
+            meta.append(str(location))
+        if meta:
+            parts.append(f"({' '.join(meta)})")
+        return " ".join(part for part in parts if part)
+
+    def _invalidate_variables_scope(self) -> None:
+        try:
+            self.protocol.send_event("invalidated", {"areas": ["variables"]})
+        except Exception:
+            pass
+
+    def _cleanup_watches(self) -> None:
+        if not self._watch_expr_to_id:
+            return
+        if self.client:
+            for watch_id in set(self._watch_expr_to_id.values()):
+                try:
+                    self.client.remove_watch(watch_id, pid=self.current_pid)
+                except Exception:
+                    self.logger.debug("failed to remove watch %s", watch_id)
+        self._watch_expr_to_id.clear()
+        self._watch_id_to_expr.clear()
+
     def _shutdown(self) -> None:
+        self._cleanup_watches()
+        self._symbol_mapper = None
+        self._symbol_path = None
+        self._symbol_mtime = None
         if self._event_token and self.event_bus:
             self.event_bus.unsubscribe(self._event_token)
             self._event_token = None
