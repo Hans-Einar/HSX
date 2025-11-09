@@ -450,6 +450,9 @@ class HSXDebugAdapter:
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="HSX Debug Adapter", add_help=False)
+    parser.add_argument("--pid", type=int, required=True)
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=9998)
     parser.add_argument("--log-file")
     parser.add_argument("--log-level", default="INFO")
     args, _ = parser.parse_known_args(argv)
@@ -464,6 +467,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     protocol = DAPProtocol(sys.stdin.buffer, sys.stdout.buffer)
     adapter = HSXDebugAdapter(protocol)
+    adapter.current_pid = args.pid
     logger = logging.getLogger("hsx-dap")
     logger.info("HSX DAP adapter starting (pid=%s)", os.getpid())
     try:
