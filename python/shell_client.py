@@ -3211,7 +3211,7 @@ def main() -> None:
         if handler and not force_json:
             handler(resp)
         else:
-        print(json.dumps(resp, indent=2, sort_keys=True))
+            print(json.dumps(resp, indent=2, sort_keys=True))
         return
 
 def _remember_session_list(entries: Sequence[Dict[str, Any]]) -> None:
