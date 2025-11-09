@@ -330,6 +330,9 @@ class HSXDebugAdapter:
     def _handle_evaluate(self, args: JsonDict) -> JsonDict:
         return {"result": "not supported", "variablesReference": 0}
 
+    def _handle_setExceptionBreakpoints(self, args: JsonDict) -> JsonDict:  # noqa: N802
+        return {"breakpoints": []}
+
     # Internal helpers -------------------------------------------------
     def _connect(self, host: str, port: int, pid: int) -> None:
         self.logger.info("Connecting to executive at %s:%d (PID %d)", host, port, pid)
