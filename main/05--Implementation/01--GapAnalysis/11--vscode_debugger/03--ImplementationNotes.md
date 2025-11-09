@@ -180,3 +180,21 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 
 ### Next Steps
 - Begin Phase 5 (VS Code extension work) once adapter-side flows stabilize, or circle back for DAP polish (hover/evaluate enhancements, error surfacing) depending on backlog priorities.
+
+## 2025-11-10 - Codex (Session 10)
+
+### Scope
+- Plan item / phase addressed: Phase 5 (VS Code extension scaffold/package/launch handling)
+- Design sections reviewed: 04.11--vscode_debugger §6 (extension API), VS Code debugger contribution docs
+
+### Work Summary
+- Rebuilt `vscode-hsx` as a typed extension: added `tsconfig.json`, TypeScript activation code (`src/extension.ts`), npm scripts (`compile`, `watch`, `test`, `package`), and a minimal test (`src/test/configProvider.test.ts`) that covers launch default/validation logic.
+- Expanded `package.json` to fully describe the `hsx` debugger contribution (schema for pid/host/port/pythonPath/symPath/logLevel/adapterArgs/env, snippets, activation events) and documented build/install steps + configuration options in `vscode-hsx/README.md`.
+- Implemented `HSXAdapterFactory` (spawns `debugAdapter/hsx-dap.py`, resolves log files/interpreter/env overrides) and updated the extension host launch config to watch `dist/**/*.js`. Added `.vscodeignore` to ship only compiled assets.
+- Could not run `npm run test` locally because Node/npm binaries are unavailable in this environment; instructions in the README explain running `npm install && npm run test` once Node is present.
+
+### Testing
+- (Deferred) `npm run test` — requires Node toolchain on the workstation; not available in the container.
+
+### Next Steps
+- Once Node is available locally, run `npm install`, `npm run compile`, and `npm run test` inside `vscode-hsx` to regenerate `dist/` and validate the provider. Future work: add branding assets (icons) and lifecycle/E2E tests per Phase 6.

@@ -16,12 +16,18 @@ registers, and watches from within the IDE.
 
 ## Usage
 
-1. Install VS Code and ensure `python3` is available on your PATH (or set the
-   `PYTHON`/`HSX_PYTHON` environment variables).
-2. From this repository root run `code vscode-hsx`.
-3. Press <kbd>F5</kbd> (run extension) or package the extension normally. The
-   contributed debug type is `hsx`.
-4. Add a debug configuration similar to:
+1. Install VS Code and ensure `python3` (or your preferred interpreter) is
+   available on your PATH. You can point the extension at a custom interpreter
+   with the `pythonPath` launch option or via the `PYTHON`/`HSX_PYTHON`
+   environment variables.
+2. From this repository root run `code vscode-hsx` and execute `npm install`
+   (installs the TypeScript toolchain for the extension).
+3. Use `npm run compile` to build `dist/extension.js` or `npm run watch` to
+   rebuild automatically while developing the extension.
+4. Press <kbd>F5</kbd> to launch an “Extension Development Host” session or run
+   `npm run package` (requires `vsce`) to produce a `.vsix` you can install
+   elsewhere. The contributed debug type is `hsx`.
+5. Add a debug configuration similar to:
 
 ```jsonc
 {
@@ -34,17 +40,36 @@ registers, and watches from within the IDE.
 }
 ```
 
-5. Start the HSX manager/executive, then launch the configuration. The adapter
+6. Start the HSX manager/executive, then launch the configuration. The adapter
    will lock the requested PID, stream events, and surface stacks/registers in
    VS Code.
+
+### Launch options
+
+Every `hsx` configuration understands the following properties:
+
+| Property     | Description                                                                 |
+|--------------|-----------------------------------------------------------------------------|
+| `pid`        | Required. Executive PID to lock via `session.open`.                         |
+| `host`       | Executive host (defaults to `127.0.0.1`).                                   |
+| `port`       | Executive port (defaults to `9998`).                                        |
+| `symPath`    | Optional path to a `.sym` file hint (forwarded to the Python adapter).      |
+| `pythonPath` | Interpreter used to launch `hsx-dap.py`.                                    |
+| `logLevel`   | Adapter log verbosity (`CRITICAL`, `ERROR`, `WARNING`, `INFO`, `DEBUG`).    |
+| `adapterArgs`| Extra command-line switches appended after `hsx-dap.py`.                    |
+| `env`        | Additional environment variables merged into the adapter process.           |
+
+The extension registers a snippet named **“HSX: Attach PID”** that seeds a
+configuration with the most common fields.
 
 ## Repository Layout
 
 ```
 vscode-hsx/
-├── package.json       # Extension manifest (contributes `hsx` debugger)
+├── package.json       # Extension manifest + npm scripts
 ├── README.md          # This file
-├── src/extension.js   # Activation logic + debug adapter factory
+├── src/extension.ts   # Activation logic + debug adapter factory (TypeScript)
+├── dist/extension.js  # Compiled JavaScript consumed by VS Code
 └── debugAdapter/
     └── hsx-dap.py     # Wrapper that launches python.hsx_dap.main()
 ```

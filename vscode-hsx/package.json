@@ -8,8 +8,8 @@
     "vscode": "^1.85.0"
   },
   "categories": ["Debuggers"],
-  "main": "./src/extension.js",
-  "activationEvents": ["onDebugResolve:hsx"],
+  "main": "./dist/extension.js",
+  "activationEvents": ["onDebugResolve:hsx", "onDebugInitialConfigurations:hsx"],
   "contributes": {
     "debuggers": [
       {
@@ -34,6 +34,31 @@
                 "type": "number",
                 "description": "Executive port.",
                 "default": 9998
+              },
+              "pythonPath": {
+                "type": "string",
+                "description": "Python interpreter used to launch hsx-dap.py."
+              },
+              "symPath": {
+                "type": "string",
+                "description": "Path to the preferred .sym file (passed to the adapter)."
+              },
+              "logLevel": {
+                "type": "string",
+                "enum": ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
+                "default": "INFO",
+                "description": "Log verbosity for hsx-dap."
+              },
+              "adapterArgs": {
+                "type": "array",
+                "description": "Extra command-line arguments appended after hsx-dap.py.",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "env": {
+                "type": "object",
+                "description": "Environment variables merged into the adapter process."
               }
             }
           }
@@ -45,11 +70,35 @@
             "request": "launch",
             "pid": 1
           }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "HSX: Attach PID",
+            "description": "Attach to an HSX PID running inside the executive.",
+            "body": {
+              "type": "hsx",
+              "request": "launch",
+              "name": "HSX Attach",
+              "pid": 1,
+              "host": "127.0.0.1",
+              "port": 9998,
+              "symPath": "${workspaceFolder}/build/app.sym"
+            }
+          }
         ]
       }
     ]
   },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -w -p ./",
+    "test": "npm run compile && node ./dist/test/configProvider.test.js",
+    "package": "npm run compile && vsce package"
+  },
   "devDependencies": {
-    "@types/vscode": "^1.85.0"
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0",
+    "vsce": "^2.15.0"
   }
 }

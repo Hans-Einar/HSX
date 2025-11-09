@@ -392,13 +392,15 @@ Create VS Code extension project with TypeScript. Extension foundation.
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.11--vscode_debugger](../../../04--Design/04.11--vscode_debugger.md)
-- [ ] Create VS Code extension directory structure
-- [ ] Initialize TypeScript project
-- [ ] Add VS Code extension dependencies
-- [ ] Create extension entry point (extension.ts)
-- [ ] Set up build system (webpack/esbuild)
-- [ ] Add extension tests
-- [ ] Document extension structure
+- [x] Create VS Code extension directory structure
+- [x] Initialize TypeScript project
+- [x] Add VS Code extension dependencies
+- [x] Create extension entry point (extension.ts)
+- [x] Set up build system (tsc compile/watch, npm scripts)
+- [x] Add extension tests
+- [x] Document extension structure
+
+**Notes:** `vscode-hsx` now builds via `tsc` (see `tsconfig.json`, `npm run compile`). `src/extension.ts` contains the activation logic, `src/test/configProvider.test.ts` covers default resolution, and the README documents layout + build steps. `.vscodeignore` ensures only the compiled `dist` payload ships in the .vsix.
 
 ---
 
@@ -413,13 +415,15 @@ Define debugger contribution and activation events. Extension manifest.
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.11--vscode_debugger](../../../04--Design/04.11--vscode_debugger.md)
-- [ ] Create package.json with extension metadata
-- [ ] Define debugger type ("hsx")
-- [ ] Register debug configuration provider
-- [ ] Define activation events
-- [ ] Specify extension dependencies
+- [x] Create package.json with extension metadata
+- [x] Define debugger type ("hsx")
+- [x] Register debug configuration provider
+- [x] Define activation events
+- [x] Specify extension dependencies
 - [ ] Add icons and branding
-- [ ] Document package.json structure
+- [x] Document package.json structure
+
+**Notes:** `vscode-hsx/package.json` now contributes the `hsx` debugger type, schema (pid/host/port/pythonPath/symPath/logLevel/adapterArgs/env), npm scripts (`compile`, `watch`, `test`, `package`), and activation events (`onDebugResolve` + `onDebugInitialConfigurations`). Branding assets remain TODO.
 
 ---
 
@@ -434,13 +438,15 @@ Provide `launch.json` templates for HXE debugging. User configuration interface.
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.11--vscode_debugger](../../../04--Design/04.11--vscode_debugger.md)
-- [ ] Create launch configuration provider
-- [ ] Define launch configuration schema
-- [ ] Provide initial launch.json template
-- [ ] Add configuration snippets
-- [ ] Validate user configurations
-- [ ] Add configuration tests
-- [ ] Document configuration options
+- [x] Create launch configuration provider
+- [x] Define launch configuration schema
+- [x] Provide initial launch.json template
+- [x] Add configuration snippets
+- [x] Validate user configurations
+- [x] Add configuration tests
+- [x] Document configuration options
+
+**Notes:** `HSXConfigurationProvider` (src/extension.ts) supplies defaults/validation, the manifest exposes schema + snippet, README documents fields, and `src/test/configProvider.test.ts` exercises default resolution/error handling.
 
 ---
 
@@ -455,13 +461,14 @@ Spawn and manage `hsx-dap.py` process. Adapter process management.
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.11--vscode_debugger](../../../04--Design/04.11--vscode_debugger.md)
-- [ ] Implement debug adapter descriptor factory
-- [ ] Spawn hsx-dap.py process with stdio communication
-- [ ] Pass configuration to adapter
-- [ ] Handle adapter process lifecycle
-- [ ] Clean up on session end
+- [x] Implement debug adapter descriptor factory
+- [x] Spawn hsx-dap.py process with stdio communication
+- [x] Pass configuration to adapter
+- [x] Handle adapter process lifecycle
 - [ ] Add lifecycle tests
-- [ ] Document adapter spawning
+- [x] Document adapter spawning
+
+**Notes:** `HSXAdapterFactory` resolves the Python interpreter, creates per-session log files, forwards env overrides, and registers with VS Code. README documents how the adapter is spawned. Lifecycle tests are still pending (Phase 6 will cover E2E).
 
 ---
 
