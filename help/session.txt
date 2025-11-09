@@ -1,0 +1,14 @@
+session [list|close <id|number>]
+Show or manage executive sessions.
+
+Examples
+  session             # show the current session id details
+  session list        # list all sessions with numeric identifiers
+  session close 3     # close the session numbered 3
+  session close id:abcd-1234  # close a specific session by id
+
+Notes
+- The ``session list`` output assigns numbers starting at 1; use these
+  numbers with ``session close`` or the ``dmesg session`` filter.
+- Sessions may only be terminated by clients that still hold an active
+  session with the executive.

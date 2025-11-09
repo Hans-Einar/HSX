@@ -277,6 +277,14 @@ class HSXDebugAdapter:
     def _handle_pause(self, args: JsonDict) -> JsonDict:
         self._ensure_client()
         self.client.pause(self.current_pid)
+        self.protocol.send_event(
+            "stopped",
+            {
+                "reason": "pause",
+                "threadId": self.current_pid,
+                "description": "Paused by client",
+            },
+        )
         return {}
 
     def _handle_next(self, args: JsonDict) -> JsonDict:

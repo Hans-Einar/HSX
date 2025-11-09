@@ -668,10 +668,34 @@ class ExecutiveState:
             "features": list(session.features),
             "max_events": session.max_events,
             "pid_lock": pid_lock_repr,
+            "created_at": session.created_at,
+            "last_seen": session.last_seen,
         }
         if session.warnings:
             payload["warnings"] = list(session.warnings)
         return payload
+
+    def _session_details(self, session: SessionRecord) -> Dict[str, Any]:
+        payload = self._session_payload(session)
+        payload["pid_locks"] = list(session.pid_locks)
+        payload["features"] = list(session.features)
+        payload["warnings"] = list(session.warnings)
+        return payload
+
+    def describe_session(self, session_id: str) -> Dict[str, Any]:
+        record = self._get_session(session_id)
+        return self._session_details(record)
+
+    def list_sessions(self) -> List[Dict[str, Any]]:
+        with self.session_lock:
+            records = list(self.sessions.values())
+        entries = [self._session_details(record) for record in records]
+        entries.sort(key=lambda item: item.get("created_at", 0.0))
+        now = time.time()
+        for entry in entries:
+            created = entry.get("created_at") or now
+            entry["age_s"] = max(0.0, now - created)
+        return entries
 
     def session_open(
         self,
@@ -773,19 +797,31 @@ class ExecutiveState:
                 if owner == session.session_id:
                     self.pid_locks.pop(pid, None)
 
-    def _close_session(self, session_id: str, reason: str) -> bool:
+    def _close_session(self, session_id: str, reason: str, *, actor: Optional[str] = None) -> bool:
         with self.session_lock:
             record = self.sessions.pop(session_id, None)
             if record is None:
                 return False
         self._release_session_locks(record)
-        self.log("info", "session closed", session_id=session_id, reason=reason, pid_locks=list(record.pid_locks))
+        self.log(
+            "info",
+            "session closed",
+            session_id=session_id,
+            reason=reason,
+            pid_locks=list(record.pid_locks),
+            closed_by=actor or session_id,
+        )
         self.events_session_disconnected(session_id)
         return True
 
     def session_close(self, session_id: str) -> None:
-        if not self._close_session(session_id, reason="client_close"):
+        if not self._close_session(session_id, reason="client_close", actor=session_id):
             raise SessionError("session_required")
+
+    def force_close_session(self, target_session_id: str, *, actor: Optional[str] = None, reason: str = "admin_close") -> Dict[str, Any]:
+        if not self._close_session(target_session_id, reason=reason, actor=actor):
+            raise SessionError("session_not_found")
+        return {"id": target_session_id, "reason": reason}
 
     def prune_sessions(self) -> None:
         now = time.time()
@@ -3251,10 +3287,14 @@ class ExecutiveState:
         self.log_buffer.append(entry)
         self._next_log_seq += 1
 
-    def get_logs(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_logs(self, limit: Optional[int] = None, *, session_id: Optional[str] = None) -> List[Dict[str, Any]]:
         if limit is None or limit <= 0 or limit >= len(self.log_buffer):
-            return list(self.log_buffer)
-        return list(self.log_buffer)[-limit:]
+            logs = list(self.log_buffer)
+        else:
+            logs = list(self.log_buffer)[-limit:]
+        if session_id:
+            logs = [entry for entry in logs if entry.get("session_id") == session_id]
+        return logs
 
     def attach(self) -> Dict[str, Any]:
         info = self.vm.attach()
@@ -4684,6 +4724,23 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                     raise SessionError("session_required")
                 self.state.session_close(session_id)
                 return {"version": 1, "status": "ok"}
+            if cmd == "session.current":
+                if session_id is None:
+                    raise SessionError("session_required")
+                info = self.state.describe_session(session_id)
+                return {"version": 1, "status": "ok", "session": info}
+            if cmd == "session.list":
+                sessions = self.state.list_sessions()
+                return {"version": 1, "status": "ok", "sessions": sessions}
+            if cmd == "session.terminate":
+                if session_id is None:
+                    raise SessionError("session_required")
+                target_value = request.get("target")
+                if not target_value:
+                    raise ValueError("session.terminate requires 'target'")
+                target_id = str(target_value)
+                result = self.state.force_close_session(target_id, actor=session_id)
+                return {"version": 1, "status": "ok", "closed": result}
             if session_id is not None:
                 self.state.touch_session(session_id)
             if cmd == "events.subscribe":
@@ -5202,7 +5259,9 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
             if cmd == "dmesg":
                 limit = request.get("limit")
                 limit_int = int(limit) if limit is not None else None
-                logs = self.state.get_logs(limit=limit_int)
+                session_filter = request.get("session")
+                session_str = str(session_filter) if session_filter else None
+                logs = self.state.get_logs(limit=limit_int, session_id=session_str)
                 return {"version": 1, "status": "ok", "logs": logs}
             if cmd == "stdio_fanout":
                 pid_raw = request.get("pid")

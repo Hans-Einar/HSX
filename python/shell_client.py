@@ -68,6 +68,7 @@ COMMAND_NAMES = sorted(
         "resume",
         "save",
         "sched",
+        "session",
         "send",
         "shutdown",
         "stdio",
@@ -114,6 +115,13 @@ _CACHE_LOCK = threading.Lock()
 _CACHE_TTL_SECONDS = 1.0
 _LAST_VALUE_CONTEXT: Dict[str, Any] = {}
 _LAST_COMMAND_CONTEXT: Dict[str, Any] = {}
+_SESSION_INDEX_LOCK = threading.Lock()
+_SESSION_INDEX_CACHE: Dict[int, str] = {}
+_SESSION_CMD_CONTEXT: Dict[str, Any] = {}
+def _set_session_context(op: str, **extra: Any) -> None:
+    _SESSION_CMD_CONTEXT.clear()
+    _SESSION_CMD_CONTEXT["op"] = op
+    _SESSION_CMD_CONTEXT.update(extra)
 
 
 def _ensure_session(host: str, port: int, *, auto_events: bool = False) -> ExecutiveSession:
@@ -1620,10 +1628,43 @@ def _pretty_dmesg(payload: dict) -> None:
         event_type = message
         if isinstance(event, dict):
             event_type = event.get("type", event_type)
-        print(f"  [{seq}] {pid_text} ({clock_text}) {timestamp} \"{level}\" \"{event_type}\"")
-        extra = {k: v for k, v in entry.items() if k not in {"ts", "level", "message", "seq", "clock_steps", "clock_cycles"}}
+        session_id = entry.get("session_id") or "-"
+        parts = [
+            f"[{seq}]",
+            timestamp,
+            level or "-",
+            f"pid={pid_text}",
+            f"session={session_id}",
+            f"clock={clock_text}",
+            f"event={event_type}",
+            f"msg={message}",
+        ]
+        extra = {
+            k: v
+            for k, v in entry.items()
+            if k
+            not in {
+                "ts",
+                "level",
+                "message",
+                "seq",
+                "clock_steps",
+                "clock_cycles",
+                "event",
+                "pid",
+            }
+        }
         if extra:
-            print(f"        {json.dumps(extra, sort_keys=True)}")
+            formatted = []
+            for key in sorted(extra.keys()):
+                value = extra[key]
+                if isinstance(value, (dict, list)):
+                    formatted.append(f"{key}={json.dumps(value, separators=(',', ':'), sort_keys=True)}")
+                else:
+                    formatted.append(f"{key}={value}")
+            if formatted:
+                parts.append(" ".join(formatted))
+        print("  " + " ".join(parts))
 
 
 _MAILBOX_NAMESPACE_NAMES = {
@@ -1929,6 +1970,57 @@ def _pretty_cmd_call(resp: Dict[str, Any]) -> None:
     if context.get("async"):
         print("  async     : request dispatched (watch mailbox for completion)")
 
+
+def _pretty_session(resp: Dict[str, Any]) -> None:
+    op = _SESSION_CMD_CONTEXT.get("op")
+    if resp.get("status") != "ok":
+        print(json.dumps(resp, indent=2, sort_keys=True))
+        _SESSION_CMD_CONTEXT.clear()
+        return
+    if op == "list":
+        sessions = resp.get("sessions") or []
+        entries = [entry for entry in sessions if isinstance(entry, dict)]
+        if not entries:
+            print("sessions: <none>")
+        else:
+            _remember_session_list(entries)
+            print("sessions:")
+            now = time.time()
+            for idx, entry in enumerate(entries, 1):
+                session_id = entry.get("id", "-")
+                client = entry.get("client") or "-"
+                locks = entry.get("pid_locks")
+                if not isinstance(locks, list):
+                    pid_lock = entry.get("pid_lock")
+                    locks = [pid_lock] if pid_lock is not None else []
+                lock_text = ",".join(str(lock) for lock in locks) if locks else "-"
+                last_seen = entry.get("last_seen") or now
+                since = _format_duration(max(0.0, now - float(last_seen)))
+                age = entry.get("age_s")
+                age_text = _format_duration(float(age)) if isinstance(age, (int, float)) else "n/a"
+                features = ",".join(entry.get("features", [])) or "-"
+                print(f"  {idx:>2}: {session_id} client={client} locks={lock_text} idle={since} age={age_text} feats={features}")
+    elif op == "current":
+        info = resp.get("session") or {}
+        session_id = info.get("id") or "-"
+        client = info.get("client") or "-"
+        pid_lock = info.get("pid_lock")
+        locks = info.get("pid_locks")
+        if locks is None:
+            locks = [pid_lock] if pid_lock is not None else []
+        lock_text = ",".join(str(lock) for lock in locks) if locks else "-"
+        print(f"current session: {session_id}")
+        print(f"  client   : {client}")
+        print(f"  pid locks: {lock_text}")
+    elif op == "close":
+        closed = resp.get("closed") or {}
+        target = closed.get("id") or _SESSION_CMD_CONTEXT.get("target") or _SESSION_CMD_CONTEXT.get("requested")
+        reason = closed.get("reason") or "admin_close"
+        print(f"session closed: {target} ({reason})")
+    else:
+        print(json.dumps(resp, indent=2, sort_keys=True))
+    _SESSION_CMD_CONTEXT.clear()
+
 PRETTY_HANDLERS = {
     'dumpregs': _pretty_dumpregs,
     'info': _pretty_info,
@@ -1958,6 +2050,7 @@ PRETTY_HANDLERS = {
     'val.list': _pretty_val_list,
     'cmd.list': _pretty_cmd_list,
     'cmd.call': _pretty_cmd_call,
+    'session': _pretty_session,
 }
 
 
@@ -2003,7 +2096,7 @@ def send_request(host: str, port: int, payload: dict, *, auto_events: bool = Fal
     session = _ensure_session(host, port, auto_events=auto_events)
     payload = dict(payload)
     cmd = str(payload.get("cmd", "")).lower()
-    use_session = not cmd.startswith("session.")
+    use_session = cmd != "session.open"
     return session.request(payload, use_session=use_session)
 
 
@@ -2018,6 +2111,9 @@ def _build_payload(
 ) -> dict:
     payload_cmd = cmd
     payload: dict[str, object] = {"cmd": payload_cmd}
+
+    if cmd == "session":
+        return _build_session_payload(args, host, port)
 
     if cmd in {"val.get", "val.set", "val.list"}:
         if host is None or port is None:
@@ -2442,12 +2538,7 @@ def _build_payload(
         return payload
 
     if cmd == "dmesg":
-        if args:
-            try:
-                payload["limit"] = int(args[0])
-            except ValueError as exc:
-                raise ValueError("dmesg limit must be an integer") from exc
-        return payload
+        return _build_dmesg_payload(args, host, port)
 
     if cmd == "stdio":
         payload["cmd"] = "stdio_fanout"
@@ -2688,6 +2779,61 @@ def _build_sym_payload(args: list[str]) -> dict:
         payload["path"] = tokens[1]
         return payload
     raise ValueError(f"sym unknown subcommand '{subcmd}'")
+
+
+def _build_session_payload(args: list[str], host: str | None, port: int | None) -> dict:
+    if host is None or port is None:
+        raise ValueError("session command requires host/port context")
+    if not args:
+        _set_session_context("current")
+        return {"cmd": "session.current"}
+    subcmd = args[0].lower()
+    tokens = args[1:]
+    if subcmd in {"list", "ls"}:
+        _set_session_context("list")
+        return {"cmd": "session.list"}
+    if subcmd in {"close", "kill", "terminate"}:
+        if not tokens:
+            raise ValueError("session close requires <id|number>")
+        session_id = _resolve_session_identifier(tokens[0], host, port)
+        if not session_id:
+            raise ValueError(f"unknown session reference '{tokens[0]}'")
+        _set_session_context("close", target=session_id, requested=tokens[0])
+        return {"cmd": "session.terminate", "target": session_id}
+    raise ValueError("session usage: session [list|close <id|number>]")
+
+
+def _build_dmesg_payload(args: list[str], host: str | None, port: int | None) -> dict:
+    payload: dict[str, object] = {"cmd": "dmesg"}
+    tokens = list(args)
+    limit_set = False
+    session_token: Optional[str] = None
+    idx = 0
+    while idx < len(tokens):
+        token = tokens[idx]
+        lowered = token.lower()
+        if lowered in {"session", "sess", "sid"}:
+            idx += 1
+            if idx >= len(tokens):
+                raise ValueError("dmesg session requires <id|number>")
+            session_token = tokens[idx]
+        elif not limit_set:
+            try:
+                payload["limit"] = int(token, 0)
+                limit_set = True
+            except ValueError as exc:
+                raise ValueError("dmesg usage: dmesg [limit] [session <id|number>]") from exc
+        else:
+            raise ValueError("dmesg usage: dmesg [limit] [session <id|number>]")
+        idx += 1
+    if session_token:
+        if host is None or port is None:
+            raise ValueError("dmesg session filter requires host/port context")
+        session_id = _resolve_session_identifier(session_token, host, port)
+        if not session_id:
+            raise ValueError(f"unknown session reference '{session_token}'")
+        payload["session"] = session_id
+    return payload
 
 
 def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: bool = False) -> None:
@@ -3065,8 +3211,70 @@ def main() -> None:
         if handler and not force_json:
             handler(resp)
         else:
-            print(json.dumps(resp, indent=2, sort_keys=True))
+        print(json.dumps(resp, indent=2, sort_keys=True))
         return
+
+def _remember_session_list(entries: Sequence[Dict[str, Any]]) -> None:
+    with _SESSION_INDEX_LOCK:
+        _SESSION_INDEX_CACHE.clear()
+        for idx, entry in enumerate(entries, 1):
+            session_id = entry.get("id")
+            if isinstance(session_id, str) and session_id:
+                _SESSION_INDEX_CACHE[idx] = session_id
+
+
+def _lookup_session_by_index(index: int) -> Optional[str]:
+    with _SESSION_INDEX_LOCK:
+        return _SESSION_INDEX_CACHE.get(index)
+
+
+def _fetch_sessions(host: str, port: int) -> List[Dict[str, Any]]:
+    response = send_request(host, port, {"cmd": "session.list"})
+    if response.get("status") != "ok":
+        raise RuntimeError(f"session.list failed: {response.get('error')}")
+    sessions = response.get("sessions") or []
+    if isinstance(sessions, list):
+        entries = [entry for entry in sessions if isinstance(entry, dict)]
+    else:
+        entries = []
+    _remember_session_list(entries)
+    return entries
+
+
+def _resolve_session_identifier(token: str, host: str, port: int) -> Optional[str]:
+    raw = token.strip()
+    if not raw:
+        return None
+    lowered = raw.lower()
+    if lowered.startswith("id:"):
+        value = raw.split(":", 1)[1].strip()
+        return value or None
+    try:
+        index = int(raw, 0)
+    except ValueError:
+        return raw
+    cached = _lookup_session_by_index(index)
+    if cached:
+        return cached
+    entries = _fetch_sessions(host, port)
+    cached = _lookup_session_by_index(index)
+    if cached:
+        return cached
+    if 1 <= index <= len(entries):
+        session_id = entries[index - 1].get("id")
+        if isinstance(session_id, str) and session_id:
+            return session_id
+    return None
+
+
+def _format_duration(seconds: float) -> str:
+    if seconds < 1:
+        return f"{seconds * 1000:.0f}ms"
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    minutes = int(seconds // 60)
+    secs = seconds % 60
+    return f"{minutes}m{secs:04.1f}s"
 
     if cmd in {'load', 'exec'}:
         tokens = list(args)
