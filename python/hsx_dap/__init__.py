@@ -203,6 +203,7 @@ class HSXDebugAdapter:
         self._symbol_mtime: Optional[float] = None
         self._watch_expr_to_id: Dict[str, int] = {}
         self._watch_id_to_expr: Dict[int, str] = {}
+        self._pending_breakpoints: Dict[str, Dict[str, Any]] = {}
         self._sym_hint: Optional[Path] = None
 
     def serve(self) -> None:
@@ -273,6 +274,7 @@ class HSXDebugAdapter:
                 self._sym_hint = path
                 break
         self._connect(host, port, self.current_pid)
+        self._reapply_pending_breakpoints()
         return {}
 
     def _handle_attach(self, args: JsonDict) -> JsonDict:
@@ -372,45 +374,25 @@ class HSXDebugAdapter:
         return {"variables": scope.variables[:] if scope else []}
 
     def _handle_setBreakpoints(self, args: JsonDict) -> JsonDict:  # noqa: N802
-        self._ensure_client()
         source = args.get("source") or {}
         source_path = source.get("path") or source.get("name")
         source_key = self._canonical_source_key(source)
         breakpoints = args.get("breakpoints") or []
         self._ensure_symbol_mapper()
-        self._clear_breakpoints(source_key)
-
-        results: List[JsonDict] = []
-        new_entries: List[JsonDict] = []
-        for bp in breakpoints:
-            line = bp.get("line")
-            addresses = self._resolve_breakpoint_addresses(source_path, line, bp)
-            if not addresses:
-                reason = "unmapped source line" if line and self._symbol_mapper else "address required"
-                results.append({"verified": False, "line": line, "message": reason})
-                continue
-            verified_any = False
-            failed_error: Optional[str] = None
-            for addr in addresses:
-                try:
-                    self.client.set_breakpoint(addr, pid=self.current_pid)
-                    verified_any = True
-                except Exception as exc:
-                    failed_error = str(exc)
-                    self.logger.debug("breakpoint set failed for 0x%X: %s", addr, exc)
-            entry = {
-                "verified": verified_any,
-                "instructionReference": f"{addresses[0]:#x}",
-                "address": addresses[0],
-                "id": addresses[0],
-                "line": line,
-            }
-            if failed_error and not verified_any:
-                entry["message"] = failed_error
-            new_entries.append({"addresses": addresses})
-            results.append(entry)
-
-        self._breakpoints[source_key] = new_entries
+        if not self.client:
+            self._pending_breakpoints[source_key] = {"source": source, "breakpoints": breakpoints}
+            results = []
+            for bp in breakpoints:
+                results.append(
+                    {
+                        "verified": False,
+                        "line": bp.get("line"),
+                        "message": "pending connection",
+                    }
+                )
+            return {"breakpoints": results}
+        results, entries = self._apply_breakpoints_for_source(source_key, source_path, source, breakpoints)
+        self._breakpoints[source_key] = entries
         return {"breakpoints": results}
 
     def _handle_threadsRequest(self, args: JsonDict) -> JsonDict:  # pragma: no cover - compatibility alias
@@ -667,6 +649,61 @@ class HSXDebugAdapter:
         except Exception as exc:
             self.logger.warning("failed to parse %s: %s", resolved, exc)
             self._symbol_mapper = None
+
+    def _apply_breakpoints_for_source(
+        self,
+        source_key: str,
+        source_path: Optional[str],
+        source: JsonDict,
+        breakpoints: List[JsonDict],
+    ) -> tuple[List[JsonDict], List[JsonDict]]:
+        self._clear_breakpoints(source_key)
+        results: List[JsonDict] = []
+        new_entries: List[JsonDict] = []
+        for bp in breakpoints:
+            line = bp.get("line")
+            addresses = self._resolve_breakpoint_addresses(source_path, line, bp)
+            if not addresses:
+                reason = "unmapped source line" if line and self._symbol_mapper else "address required"
+                results.append({"verified": False, "line": line, "message": reason})
+                continue
+            verified_any = False
+            failed_error: Optional[str] = None
+            for addr in addresses:
+                try:
+                    self.client.set_breakpoint(addr, pid=self.current_pid)
+                    verified_any = True
+                except Exception as exc:
+                    failed_error = str(exc)
+                    self.logger.debug("breakpoint set failed for 0x%X: %s", addr, exc)
+            entry = {
+                "verified": verified_any,
+                "instructionReference": f"{addresses[0]:#x}",
+                "address": addresses[0],
+                "id": addresses[0],
+                "line": line,
+                "source": source if source else None,
+            }
+            if failed_error and not verified_any:
+                entry["message"] = failed_error
+            new_entries.append({"addresses": addresses})
+            results.append(entry)
+        return results, new_entries
+
+    def _reapply_pending_breakpoints(self) -> None:
+        if not self.client or not self._pending_breakpoints:
+            return
+        pending = dict(self._pending_breakpoints)
+        self._pending_breakpoints.clear()
+        for source_key, entry in pending.items():
+            source = entry.get("source") or {}
+            bps = entry.get("breakpoints") or []
+            source_path = source.get("path") or source.get("name")
+            results, new_entries = self._apply_breakpoints_for_source(source_key, source_path, source, bps)
+            self._breakpoints[source_key] = new_entries
+            for bp in results:
+                if bp.get("verified"):
+                    self.protocol.send_event("breakpoint", {"reason": "changed", "breakpoint": bp})
 
     def _ensure_watch_entry(self, expression: str):
         expr = expression.strip()
