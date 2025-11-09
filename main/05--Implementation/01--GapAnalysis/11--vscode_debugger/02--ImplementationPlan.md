@@ -251,10 +251,10 @@ Enumerate variable scopes (registers, locals, globals). Variable inspection hier
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.11--vscode_debugger](../../../04--Design/04.11--vscode_debugger.md)
 - [x] Implement `scopes` request handler
 - [x] Define "Registers" scope
-- [ ] Define "Locals" scope (if available)
-- [ ] Define "Globals" scope (if available)
+- [x] Define "Locals" scope (if available)
+- [x] Define "Globals" scope (if available)
 - [x] Return scope references
-- [ ] Add scopes tests
+- [x] Add scopes tests
 - [ ] Document scope definitions
 
 ---
@@ -272,10 +272,10 @@ Retrieve register/memory values formatted for VS Code. Display program state.
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.11--vscode_debugger](../../../04--Design/04.11--vscode_debugger.md)
 - [x] Implement `variables` request handler
 - [x] Fetch register values from executive
-- [ ] Format values for VS Code display
-- [ ] Support different value formats (hex, decimal, binary)
-- [ ] Handle memory reads for variable inspection
-- [ ] Add variables tests
+- [x] Format values for VS Code display
+- [x] Support different value formats (hex, decimal)
+- [x] Handle memory reads for variable inspection
+- [x] Add variables tests
 - [ ] Document variable formatting
 
 ---

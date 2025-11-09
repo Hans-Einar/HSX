@@ -131,6 +131,8 @@ class SymbolMapper:
         self.path = path
         self._line_map: Dict[str, Dict[int, List[int]]] = defaultdict(lambda: defaultdict(list))
         self._pc_map: Dict[int, Dict[str, Any]] = {}
+        self._locals_by_function: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+        self._globals: List[Dict[str, Any]] = []
         self._load()
 
     def _load(self) -> None:
@@ -163,6 +165,19 @@ class SymbolMapper:
                 "line": line,
                 "column": inst.get("column"),
             }
+        symbols_block = data.get("symbols") or {}
+        if isinstance(symbols_block, dict):
+            locals_block = symbols_block.get("locals") or []
+            if isinstance(locals_block, list):
+                for loc in locals_block:
+                    func = loc.get("function")
+                    if isinstance(func, str):
+                        self._locals_by_function[func].append(loc)
+            globals_block = symbols_block.get("variables") or []
+            if isinstance(globals_block, list):
+                self._globals = [entry for entry in globals_block if isinstance(entry, dict)]
+        elif isinstance(symbols_block, list):
+            self._globals = [entry for entry in symbols_block if isinstance(entry, dict)]
 
     def lookup(self, source_path: str, line: int) -> List[int]:
         key = _canonical_path(source_path)
@@ -174,6 +189,14 @@ class SymbolMapper:
     def lookup_pc(self, pc: int) -> Optional[Dict[str, Any]]:
         return self._pc_map.get(int(pc) & 0xFFFF)
 
+    def locals_for_function(self, func_name: Optional[str]) -> List[Dict[str, Any]]:
+        if not func_name:
+            return []
+        return list(self._locals_by_function.get(func_name, []))
+
+    def globals_list(self) -> List[Dict[str, Any]]:
+        return list(self._globals)
+
 
 @dataclass
 class _FrameRecord:
@@ -183,6 +206,8 @@ class _FrameRecord:
     column: int
     file: Optional[str]
     pc: Optional[int]
+    sp: Optional[int] = None
+    fp: Optional[int] = None
 
 
 @dataclass
@@ -350,6 +375,8 @@ class HSXDebugAdapter:
                 column=1,
                 file=frame.file,
                 pc=frame.pc,
+                sp=frame.sp,
+                fp=frame.fp,
             )
             if (not self._frames[frame_id].file or not self._frames[frame_id].line) and frame.pc is not None:
                 mapped = self._map_pc_to_source(frame.pc)
@@ -379,6 +406,12 @@ class HSXDebugAdapter:
         registers = self._format_registers()
         if registers:
             scopes.append(self._make_scope("Registers", registers, expensive=False))
+        locals_scope = self._format_locals(frame)
+        if locals_scope:
+            scopes.append(self._make_scope("Locals", locals_scope, expensive=False))
+        globals_scope = self._format_globals()
+        if globals_scope:
+            scopes.append(self._make_scope("Globals", globals_scope, expensive=True))
         watches = self._format_watches()
         scopes.append(self._make_scope("Watches", watches, expensive=False))
         return {"scopes": scopes}
@@ -535,6 +568,51 @@ class HSXDebugAdapter:
         self._next_scope_id += 1
         self._scopes[scope_id] = _ScopeRecord(variables=variables)
         return {"name": name, "variablesReference": scope_id, "expensive": expensive}
+
+    def _format_locals(self, frame: _FrameRecord) -> List[JsonDict]:
+        if not self._symbol_mapper or not frame.name:
+            return []
+        symbols = self._symbol_mapper.locals_for_function(frame.name)
+        variables: List[JsonDict] = []
+        for symbol in symbols:
+            name = symbol.get("name") or "<local>"
+            value = self._format_symbol_value(symbol, frame)
+            location_desc = value or self._describe_local_symbol(symbol)
+            variables.append(
+                {
+                    "name": name,
+                    "value": location_desc,
+                    "type": "local",
+                }
+            )
+        return variables
+
+    def _format_globals(self) -> List[JsonDict]:
+        if not self._symbol_mapper:
+            return []
+        entries = self._symbol_mapper.globals_list()
+        variables: List[JsonDict] = []
+        for entry in entries:
+            name = entry.get("name") or "<global>"
+            address = entry.get("address")
+            if isinstance(address, str) and address.startswith("0x"):
+                try:
+                    address = int(address, 16)
+                except ValueError:
+                    address = None
+            if isinstance(address, (int, float)):
+                located = self._format_symbol_value(entry, None, address=int(address))
+                value = located or f"@0x{int(address):04X} (use watch to inspect)"
+            else:
+                value = "use watch to inspect"
+            variables.append(
+                {
+                    "name": name,
+                    "value": value,
+                    "type": "global",
+                }
+            )
+        return variables
 
     def _parse_address(self, bp: JsonDict) -> Optional[int]:
         value = bp.get("instructionReference") or bp.get("address")
@@ -879,6 +957,73 @@ class HSXDebugAdapter:
         except Exception:
             path = Path(file_value)
         return {"path": str(path), "line": info.get("line"), "column": info.get("column")}
+
+    def _describe_local_symbol(self, symbol: Dict[str, Any]) -> str:
+        locations = symbol.get("locations")
+        if not isinstance(locations, list) or not locations:
+            return "location unknown"
+        loc = locations[0].get("location") if isinstance(locations[0], dict) else None
+        if not isinstance(loc, dict):
+            return "location unknown"
+        kind = loc.get("kind")
+        if kind == "stack":
+            offset = loc.get("offset")
+            return f"stack offset {offset}"
+        if kind == "register":
+            return f"register {loc.get('name')}"
+        if kind == "address":
+            addr = loc.get("address")
+            return f"@0x{int(addr):04X}" if isinstance(addr, (int, float)) else str(addr)
+        return str(loc)
+
+    def _format_symbol_value(self, symbol: Dict[str, Any], frame: Optional[_FrameRecord], *, address: Optional[int] = None) -> Optional[str]:
+        addr = address
+        size = symbol.get("size") or symbol.get("length") or 4
+        if addr is None:
+            resolved = self._resolve_symbol_address(symbol, frame)
+            addr = resolved
+        if addr is None or not self.client:
+            return None
+        data = self.client.read_memory(int(addr), int(size), pid=self.current_pid)
+        if not data:
+            return None
+        value = int.from_bytes(data[: min(len(data), 4)], byteorder="big")
+        return f"0x{value:08X} ({value})"
+
+    def _resolve_symbol_address(self, symbol: Dict[str, Any], frame: Optional[_FrameRecord]) -> Optional[int]:
+        locations = symbol.get("locations")
+        if isinstance(locations, list):
+            for location in locations:
+                loc = location.get("location") if isinstance(location, dict) else None
+                if not isinstance(loc, dict):
+                    continue
+                kind = loc.get("kind")
+                if kind == "stack" and frame:
+                    offset = loc.get("offset")
+                    base = frame.sp if loc.get("relative") != "fp" else frame.fp
+                    if base is not None and offset is not None:
+                        try:
+                            return int(base) + int(offset)
+                        except (TypeError, ValueError):
+                            continue
+                if kind == "address":
+                    addr = loc.get("address")
+                    if isinstance(addr, str) and addr.startswith("0x"):
+                        try:
+                            addr = int(addr, 16)
+                        except ValueError:
+                            addr = None
+                    if isinstance(addr, (int, float)):
+                        return int(addr)
+        addr_field = symbol.get("address")
+        if isinstance(addr_field, str) and addr_field.startswith("0x"):
+            try:
+                return int(addr_field, 16)
+            except ValueError:
+                return None
+        if isinstance(addr_field, (int, float)):
+            return int(addr_field)
+        return None
 
 
 def main(argv: Optional[List[str]] = None) -> int:

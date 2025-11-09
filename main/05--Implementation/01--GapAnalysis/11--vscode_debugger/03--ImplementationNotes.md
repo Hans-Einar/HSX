@@ -113,3 +113,35 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 
 ### Next Steps
 - Move to Phase 3.2/3.3 (locals/globals scopes and variable formatting) so stack frames expose meaningful locals and evaluate/watch can consume them.
+
+## 2025-11-09 - Codex (Session 6)
+
+### Scope
+- Plan item / phase addressed: Phase 3.2 Scopes Request (locals + globals scopes)
+- Design sections reviewed: 04.11--vscode_debugger §5.2 (variable scopes)
+
+### Work Summary
+- Extended `SymbolMapper` to retain locals-per-function and global variable metadata from `.sym`, added APIs to fetch them, and wired HSXDebugAdapter to emit Locals/Globals scopes (with descriptive placeholders) alongside Registers/Watches.
+- Added `python/tests/test_hsx_dap_scopes.py` to ensure the new scopes appear, and reran the expanded pytest suite covering caches/commands/session/watch/breakpoint/stacktrace scenarios.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_hsxdbg_cache.py python/tests/test_hsxdbg_commands.py python/tests/test_hsxdbg_session.py python/tests/test_hsx_dap_watch.py python/tests/test_hsx_dap_breakpoints.py python/tests/test_hsx_dap_stacktrace.py python/tests/test_hsx_dap_scopes.py python/tests/test_hsx_dap_symbol_mapper.py`
+
+### Next Steps
+- Proceed to Phase 3.3 (Variables) to populate those scopes with real values (register/memory reads, formatting) and hook Evaluate/Watch into the new metadata.
+
+## 2025-11-09 - Codex (Session 7)
+
+### Scope
+- Plan item / phase addressed: Phase 3.3 Variables Request
+- Design sections reviewed: 04.11--vscode_debugger §5.3 (variable formatting)
+
+### Work Summary
+- Extended `SymbolMapper` to expose locals-by-function and globals; HSX DAP now emits Locals/Globals scopes populated with descriptive values. Locals attempt to resolve stack offsets using frame SP/FP, globals trigger memory reads via `CommandClient.read_memory`, and values are formatted as `0x... (decimal)`.
+- Added helpers for symbol address resolution, source rendering, and memory formatting; updated stack frames to capture SP/FP so locals can compute addresses. Created regression tests (`python/tests/test_hsx_dap_variables.py`, `python/tests/test_hsx_dap_scopes.py`) covering these flows.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_hsxdbg_cache.py python/tests/test_hsxdbg_commands.py python/tests/test_hsxdbg_session.py python/tests/test_hsx_dap_watch.py python/tests/test_hsx_dap_breakpoints.py python/tests/test_hsx_dap_stacktrace.py python/tests/test_hsx_dap_scopes.py python/tests/test_hsx_dap_variables.py python/tests/test_hsx_dap_symbol_mapper.py`
+
+### Next Steps
+- Phase 3.4 Evaluate Request: leverage the new locals/globals metadata to power hover/watch expressions (addresses, symbols) and expand documentation for variable formatting.
