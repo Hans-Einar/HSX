@@ -36,11 +36,11 @@ New `hsx-dap.py` implementing Debug Adapter Protocol server. Foundation for IDE 
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.11--vscode_debugger](../../../04--Design/04.11--vscode_debugger.md)
-- [ ] Create `python/hsx_dap.py` as main DAP server
-- [ ] Study DAP specification (https://microsoft.github.io/debug-adapter-protocol/)
-- [ ] Integrate with `hsxdbg` core package
-- [ ] Add command-line argument parsing
-- [ ] Add logging configuration
+- [x] Create `python/hsx_dap.py` as main DAP server
+- [x] Study DAP specification (https://microsoft.github.io/debug-adapter-protocol/)
+- [x] Integrate with `hsxdbg` core package
+- [x] Add command-line argument parsing
+- [x] Add logging configuration
 - [ ] Create DAP adapter tests
 - [ ] Document DAP adapter architecture
 
@@ -57,10 +57,10 @@ Abstract base implementing stdio/TCP communication per DAP spec. Protocol commun
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.11--vscode_debugger](../../../04--Design/04.11--vscode_debugger.md)
-- [ ] Implement DAP base class with protocol handling
-- [ ] Implement stdio communication (standard DAP mode)
-- [ ] Implement message framing (Content-Length headers)
-- [ ] Implement JSON-RPC request/response handling
+- [x] Implement DAP base class with protocol handling
+- [x] Implement stdio communication (standard DAP mode)
+- [x] Implement message framing (Content-Length headers)
+- [x] Implement JSON-RPC request/response handling
 - [ ] Add message validation
 - [ ] Add protocol tests
 - [ ] Document protocol implementation
@@ -78,11 +78,11 @@ Use `hsxdbg` core for HSX executive RPC connection. Bridge between DAP and execu
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.11--vscode_debugger](../../../04--Design/04.11--vscode_debugger.md)
-- [ ] Integrate hsxdbg core connection
-- [ ] Implement session management (attach to executive)
-- [ ] Subscribe to executive events
+- [x] Integrate hsxdbg core connection
+- [x] Implement session management (attach to executive)
+- [x] Subscribe to executive events
 - [ ] Map executive events to DAP events
-- [ ] Handle connection lifecycle
+- [ ] Handle connection lifecycle (keepalive/reconnect)
 - [ ] Add integration tests
 - [ ] Document executive integration
 
@@ -122,9 +122,9 @@ Capability negotiation (breakpoints, stepping, variables). First DAP handshake.
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.11--vscode_debugger](../../../04--Design/04.11--vscode_debugger.md)
-- [ ] Implement `initialize` request handler
-- [ ] Declare supported capabilities (supportsConfigurationDoneRequest, etc.)
-- [ ] Return capability response
+- [x] Implement `initialize` request handler
+- [x] Declare supported capabilities (supportsConfigurationDoneRequest, etc.)
+- [x] Return capability response
 - [ ] Add initialize tests
 - [ ] Document capabilities
 
@@ -141,12 +141,12 @@ Start debug session with HXE path, spawn executive if needed. Begin debugging wo
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.11--vscode_debugger](../../../04--Design/04.11--vscode_debugger.md)
-- [ ] Implement `launch` request handler
-- [ ] Parse launch configuration (hxePath, execHost, execPort)
-- [ ] Connect to executive using hsxdbg core
+- [x] Implement `launch` request handler
+- [x] Parse launch configuration (hxePath, execHost, execPort)
+- [x] Connect to executive using hsxdbg core
 - [ ] Load HXE into executive
 - [ ] Load .sym file for source mapping
-- [ ] Send `initialized` event when ready
+- [x] Send `initialized` event when ready
 - [ ] Add launch tests
 - [ ] Document launch configuration
 
@@ -184,12 +184,12 @@ Implement `continue`, `next`, `stepIn`, `stepOut`, `pause` requests. Stepping an
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.11--vscode_debugger](../../../04--Design/04.11--vscode_debugger.md)
-- [ ] Implement `continue` request (resume execution)
-- [ ] Implement `next` request (step over)
-- [ ] Implement `stepIn` request (step into)
-- [ ] Implement `stepOut` request (step out of function)
-- [ ] Implement `pause` request (interrupt execution)
-- [ ] Send `stopped` event when execution pauses
+- [x] Implement `continue` request (resume execution)
+- [x] Implement `next` request (step over)
+- [x] Implement `stepIn` request (step into)
+- [x] Implement `stepOut` request (step out of function)
+- [x] Implement `pause` request (interrupt execution)
+- [ ] Send `stopped` event when execution pauses (breakpoint + pause reasons)
 - [ ] Add execution control tests
 - [ ] Document execution control behavior
 
@@ -228,8 +228,8 @@ Retrieve call stack from executive, map addresses to source locations. Essential
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.11--vscode_debugger](../../../04--Design/04.11--vscode_debugger.md)
-- [ ] Implement `stackTrace` request handler
-- [ ] Fetch stack frames from executive
+- [x] Implement `stackTrace` request handler
+- [x] Fetch stack frames from executive
 - [ ] Map frame addresses to source locations using .sym
 - [ ] Return stack trace with source file:line
 - [ ] Handle frames without source info
@@ -249,11 +249,11 @@ Enumerate variable scopes (registers, locals, globals). Variable inspection hier
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.11--vscode_debugger](../../../04--Design/04.11--vscode_debugger.md)
-- [ ] Implement `scopes` request handler
-- [ ] Define "Registers" scope
+- [x] Implement `scopes` request handler
+- [x] Define "Registers" scope
 - [ ] Define "Locals" scope (if available)
 - [ ] Define "Globals" scope (if available)
-- [ ] Return scope references
+- [x] Return scope references
 - [ ] Add scopes tests
 - [ ] Document scope definitions
 
@@ -270,8 +270,8 @@ Retrieve register/memory values formatted for VS Code. Display program state.
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.11--vscode_debugger](../../../04--Design/04.11--vscode_debugger.md)
-- [ ] Implement `variables` request handler
-- [ ] Fetch register values from executive
+- [x] Implement `variables` request handler
+- [x] Fetch register values from executive
 - [ ] Format values for VS Code display
 - [ ] Support different value formats (hex, decimal, binary)
 - [ ] Handle memory reads for variable inspection
@@ -291,7 +291,7 @@ Support watch expressions and hover queries. Interactive expression evaluation.
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.11--vscode_debugger](../../../04--Design/04.11--vscode_debugger.md)
-- [ ] Implement `evaluate` request handler
+- [x] Implement `evaluate` request handler
 - [ ] Support register name evaluation (e.g., "r0")
 - [ ] Support address evaluation (e.g., "@0x1000")
 - [ ] Support symbol evaluation (if available)
@@ -735,3 +735,20 @@ This implementation is considered complete when all of the following criteria ar
 **Last Updated:** 2025-10-31  
 **Status:** Initial Plan  
 **Owner:** VS Code Debugger Implementation Team
+### 2.6 Session Resilience & Watch Integration
+
+**Priority:** HIGH  
+**Dependencies:** 2.2 (Launch), Executive session APIs  
+**Estimated Effort:** 3-4 days
+
+**Rationale:**  
+VS Code pauses/watches currently lose executive sessions and cannot resolve expressions. We need automatic keepalive/reconnect plus symbol-aware watch handling before pursuing polish.
+
+**Todo:**
+> Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.11--vscode_debugger](../../../04--Design/04.11--vscode_debugger.md)
+- [ ] Add session heartbeat + reconnection logic to hsx-dap (CommandClient + SessionManager)
+- [ ] Ensure DAP adapter re-subscribes to events on reconnect
+- [ ] Translate VS Code watch expressions to `watch add`/`list` with graceful errors
+- [ ] Surface watch updates in Variables/Watch panes (invalidate scopes on updates)
+- [ ] Add regression tests covering session timeout + reconnect
+- [ ] Document required executive session settings / limits
