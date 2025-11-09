@@ -23,6 +23,7 @@ class HSXAdapterFactory {
 
   createDebugAdapterDescriptor(session) {
     const config = session.configuration || {};
+    const config = session.configuration || {};
     const pythonCommand =
       config.pythonPath ||
       process.env.PYTHON ||
@@ -34,9 +35,7 @@ class HSXAdapterFactory {
           )
         : undefined) ||
       (process.platform === "win32" ? "python" : "python3");
-
     const adapterPath = this.context.asAbsolutePath(path.join("debugAdapter", "hsx-dap.py"));
-    const config = session.configuration || {};
     const pid = config.pid ?? 1;
     const host = config.host || "127.0.0.1";
     const port = config.port || 9998;
