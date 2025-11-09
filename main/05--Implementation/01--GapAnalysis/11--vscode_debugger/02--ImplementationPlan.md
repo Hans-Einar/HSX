@@ -230,10 +230,10 @@ Retrieve call stack from executive, map addresses to source locations. Essential
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.11--vscode_debugger](../../../04--Design/04.11--vscode_debugger.md)
 - [x] Implement `stackTrace` request handler
 - [x] Fetch stack frames from executive
-- [ ] Map frame addresses to source locations using .sym
-- [ ] Return stack trace with source file:line
-- [ ] Handle frames without source info
-- [ ] Add stack trace tests
+- [x] Map frame addresses to source locations using .sym
+- [x] Return stack trace with source file:line
+- [x] Handle frames without source info
+- [x] Add stack trace tests
 - [ ] Document stack trace mapping
 
 ---

@@ -130,6 +130,7 @@ class SymbolMapper:
     def __init__(self, path: Path) -> None:
         self.path = path
         self._line_map: Dict[str, Dict[int, List[int]]] = defaultdict(lambda: defaultdict(list))
+        self._pc_map: Dict[int, Dict[str, Any]] = {}
         self._load()
 
     def _load(self) -> None:
@@ -156,6 +157,12 @@ class SymbolMapper:
             for key in keys:
                 lines = self._line_map[key]
                 lines.setdefault(int(line), []).append(int(pc))
+            self._pc_map[int(pc)] = {
+                "file": file_value,
+                "directory": directory,
+                "line": line,
+                "column": inst.get("column"),
+            }
 
     def lookup(self, source_path: str, line: int) -> List[int]:
         key = _canonical_path(source_path)
@@ -163,6 +170,9 @@ class SymbolMapper:
             return self._line_map[key].get(int(line), [])
         filename_key = _canonical_path(Path(source_path).name)
         return self._line_map.get(filename_key, {}).get(int(line), [])
+
+    def lookup_pc(self, pc: int) -> Optional[Dict[str, Any]]:
+        return self._pc_map.get(int(pc) & 0xFFFF)
 
 
 @dataclass
@@ -341,13 +351,18 @@ class HSXDebugAdapter:
                 file=frame.file,
                 pc=frame.pc,
             )
+            if (not self._frames[frame_id].file or not self._frames[frame_id].line) and frame.pc is not None:
+                mapped = self._map_pc_to_source(frame.pc)
+                if mapped:
+                    self._frames[frame_id].file = mapped.get("path")
+                    self._frames[frame_id].line = mapped.get("line", 0)
             dap_frames.append(
                 {
                     "id": frame_id,
                     "name": self._frames[frame_id].name,
                     "line": self._frames[frame_id].line,
                     "column": 1,
-                    "source": {"name": frame.file or "unknown", "path": frame.file} if frame.file else None,
+                    "source": self._render_source(self._frames[frame_id].file),
                     "instructionPointerReference": f"{frame.pc:#x}" if frame.pc is not None else None,
                 }
             )
@@ -784,6 +799,11 @@ class HSXDebugAdapter:
             self.session = None
         self.client = None
 
+    def _render_source(self, path: Optional[str]) -> Optional[JsonDict]:
+        if not path:
+            return None
+        return {"name": Path(path).name, "path": path}
+
     def _evaluate_register_expression(self, expression: str) -> Optional[str]:
         token = expression.strip().upper()
         normalized = REGISTER_NAMES.get(token)
@@ -841,6 +861,24 @@ class HSXDebugAdapter:
                 if isinstance(loc, dict) and loc.get("kind") == "stack":
                     return True
         return False
+
+    def _map_pc_to_source(self, pc: int) -> Optional[Dict[str, Any]]:
+        if not self._symbol_mapper:
+            return None
+        info = self._symbol_mapper.lookup_pc(pc)
+        if not info:
+            return None
+        directory = info.get("directory")
+        file_value = info.get("file")
+        if not file_value:
+            return None
+        try:
+            path = Path(file_value)
+            if directory:
+                path = Path(directory) / path
+        except Exception:
+            path = Path(file_value)
+        return {"path": str(path), "line": info.get("line"), "column": info.get("column")}
 
 
 def main(argv: Optional[List[str]] = None) -> int:

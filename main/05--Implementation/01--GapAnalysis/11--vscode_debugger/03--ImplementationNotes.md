@@ -96,3 +96,20 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 
 ### Next Steps
 - With Phase 2.6 complete, proceed to Phase 3 (stack/scopes/variables) to surface locals and support symbol-driven watches that rely on per-frame metadata.
+
+## 2025-11-09 - Codex (Session 5)
+
+### Scope
+- Plan item / phase addressed: Phase 3.1 StackTrace Request (source mapping + tests)
+- Design sections reviewed: 04.11--vscode_debugger §5.1 (stack tracing requirements)
+
+### Work Summary
+- Extended `SymbolMapper` to retain a PC→source map and exposed `lookup_pc`, then taught `HSXDebugAdapter._handle_stackTrace()` to fill in missing file/line info using that mapping.
+- Added helper methods (`_map_pc_to_source`, `_render_source`) and regression tests (`python/tests/test_hsx_dap_stacktrace.py`) verifying that frames without source metadata now inherit the `.sym` file/line pair.
+- Updated Implementation Plan §3.1 checklist (all items checked except documentation) and reran the expanded pytest suite.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_hsxdbg_cache.py python/tests/test_hsxdbg_commands.py python/tests/test_hsxdbg_session.py python/tests/test_hsx_dap_watch.py python/tests/test_hsx_dap_breakpoints.py python/tests/test_hsx_dap_stacktrace.py python/tests/test_hsx_dap_symbol_mapper.py`
+
+### Next Steps
+- Move to Phase 3.2/3.3 (locals/globals scopes and variable formatting) so stack frames expose meaningful locals and evaluate/watch can consume them.
