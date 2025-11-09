@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+    print(f"[hsx-dap] Added repo root to sys.path: {REPO_ROOT}", flush=True)
 
 from python.hsxdbg import (
     CommandClient,
@@ -152,6 +153,7 @@ class HSXDebugAdapter:
         while True:
             message = self.protocol.read_message()
             if message is None:
+                print("[hsx-dap] EOF on stdin, shutting down", flush=True)
                 break
             if message.get("type") != "request":
                 continue
@@ -456,6 +458,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--log-file")
     parser.add_argument("--log-level", default="INFO")
     args, _ = parser.parse_known_args(argv)
+    print(f"[hsx-dap] CLI args: pid={args.pid} host={args.host} port={args.port} log={args.log_file}", flush=True)
     if args.log_file:
         log_path = Path(args.log_file)
         log_path.parent.mkdir(parents=True, exist_ok=True)
