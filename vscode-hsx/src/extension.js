@@ -23,7 +23,6 @@ class HSXAdapterFactory {
 
   createDebugAdapterDescriptor(session) {
     const config = session.configuration || {};
-    const config = session.configuration || {};
     const pythonCommand =
       config.pythonPath ||
       process.env.PYTHON ||
