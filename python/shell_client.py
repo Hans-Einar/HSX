@@ -1631,10 +1631,8 @@ def _pretty_dmesg(payload: dict) -> None:
             event_type = event.get("type", event_type)
         session_id = entry.get("session_id")
         session_number = _session_number_for(session_id)
-        if session_number is not None and session_id:
-            session_text = f"{session_number}({session_id})"
-        elif session_id:
-            session_text = session_id
+        if session_number is not None:
+            session_text = str(session_number)
         else:
             session_text = "-"
         parts = [
