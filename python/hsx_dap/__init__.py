@@ -37,6 +37,10 @@ from python.hsxdbg.transport import TransportConfig
 
 
 JsonDict = Dict[str, Any]
+REGISTER_NAMES = {
+    f"R{idx}": f"R{idx}" for idx in range(16)
+}
+REGISTER_NAMES.update({"PC": "PC", "SP": "SP", "PSW": "PSW"})
 
 
 class DAPProtocol:
@@ -417,8 +421,13 @@ class HSXDebugAdapter:
         expression = str(args.get("expression") or "").strip()
         if context == "watch" and expression:
             self._ensure_client()
+            reg_value = self._evaluate_register_expression(expression)
+            if reg_value is not None:
+                return {"result": reg_value, "variablesReference": 0}
             try:
                 watch = self._ensure_watch_entry(expression)
+            except RuntimeError as exc:
+                return {"result": str(exc), "variablesReference": 0}
             except Exception as exc:
                 return {"result": f"watch error: {exc}", "variablesReference": 0}
             if not watch:
@@ -664,6 +673,13 @@ class HSXDebugAdapter:
         if not expr or not self.client:
             return None
         self._ensure_symbol_mapper()
+        kind = self._classify_watch_expression(expr)
+        if kind == "symbol":
+            symbol_meta = self._lookup_symbol_metadata(expr)
+            if symbol_meta is None:
+                raise RuntimeError(f"symbol '{expr}' not found (ensure .sym is loaded)")
+            if self._symbol_requires_stack(symbol_meta):
+                raise RuntimeError(f"symbol '{expr}' refers to a local/stack variable (not yet supported)")
         watch_id = self._watch_expr_to_id.get(expr)
         if watch_id is None:
             record = self.client.add_watch(expr, pid=self.current_pid)
@@ -730,6 +746,64 @@ class HSXDebugAdapter:
                 pass
             self.session = None
         self.client = None
+
+    def _evaluate_register_expression(self, expression: str) -> Optional[str]:
+        token = expression.strip().upper()
+        normalized = REGISTER_NAMES.get(token)
+        if not normalized or not self.client:
+            return None
+        state = self.client.get_register_state(self.current_pid)
+        if not state:
+            return None
+        if normalized == "PC":
+            value = state.pc
+        elif normalized == "SP":
+            value = state.sp
+        elif normalized == "PSW":
+            value = state.psw
+        else:
+            value = state.registers.get(normalized)
+        if value is None:
+            return None
+        return f"0x{int(value) & 0xFFFFFFFF:08X}"
+
+    def _classify_watch_expression(self, expression: str) -> str:
+        token = expression.strip()
+        if not token:
+            return "unknown"
+        upper = token.upper()
+        if upper in REGISTER_NAMES:
+            return "register"
+        try:
+            int(token, 0)
+            return "address"
+        except ValueError:
+            pass
+        if token.startswith("&") or token.startswith("*"):
+            return "address"
+        if all(ch.isalnum() or ch == "_" for ch in token):
+            return "symbol"
+        return "expression"
+
+    def _lookup_symbol_metadata(self, name: str) -> Optional[Dict[str, Any]]:
+        if not self.client or self.current_pid is None:
+            return None
+        if hasattr(self.client, "symbol_lookup_name"):
+            try:
+                return self.client.symbol_lookup_name(name, pid=self.current_pid)
+            except Exception:
+                return None
+        return None
+
+    @staticmethod
+    def _symbol_requires_stack(symbol: Dict[str, Any]) -> bool:
+        locations = symbol.get("locations")
+        if isinstance(locations, list):
+            for location in locations:
+                loc = location.get("location") if isinstance(location, dict) else None
+                if isinstance(loc, dict) and loc.get("kind") == "stack":
+                    return True
+        return False
 
 
 def main(argv: Optional[List[str]] = None) -> int:

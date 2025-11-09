@@ -192,6 +192,16 @@ class CommandClient:
             raise RuntimeError(f"sym load failed: {response}")
         return response.get("symbols") or {}
 
+    def symbol_lookup_name(self, name: str, pid: Optional[int] = None) -> Optional[Dict]:
+        target = pid or self.session.state.pid
+        if target is None:
+            return None
+        payload = {"cmd": "sym", "op": "lookup_name", "pid": target, "name": name}
+        response = self._request(payload)
+        if response.get("status") != "ok":
+            return None
+        return response.get("symbol")
+
     def read_memory(
         self,
         addr: int,
