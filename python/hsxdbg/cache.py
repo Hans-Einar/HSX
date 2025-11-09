@@ -121,10 +121,10 @@ class RuntimeCache:
 
         reg_map: Dict[str, int] = {}
         if isinstance(regs, Mapping):
-            for idx in range(16):
-                raw_value = self._lookup_reg_value(regs, idx)
-                reg_map[f"R{idx}"] = _to_int(raw_value) or 0
-            pc = _to_int(pc if pc is not None else (regs.get("PC") or regs.get("pc")))
+        for idx in range(16):
+            raw_value = self._lookup_reg_value(regs, idx)
+            reg_map[f"R{idx}"] = _to_int(raw_value) or 0
+        pc = _to_int(pc if pc is not None else (regs.get("PC") or regs.get("pc")))
             sp = _to_int(sp if sp is not None else (regs.get("SP") or regs.get("sp")))
             psw = _to_int(psw if psw is not None else (regs.get("PSW") or regs.get("psw")))
         else:
@@ -168,7 +168,9 @@ class RuntimeCache:
         ]
         for key in candidates:
             if key in regs:
-                return regs.get(key)
+                value = regs.get(key)
+                if value is not None:
+                    return value
         return None
 
     # ------------------------------------------------------------------
