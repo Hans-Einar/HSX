@@ -80,6 +80,41 @@ class DAPProtocol:
         self.seq += 1
         self._send_message(payload)
 
+    def _send_message(self, message: JsonDict) -> None:
+        data = json.dumps(message)
+        encoded = data.encode("utf-8")
+        header = f"Content-Length: {len(encoded)}\r\n\r\n".encode("ascii")
+        with self._write_lock:
+            self.writer.write(header)
+            self.writer.write(encoded)
+            self.writer.flush()
+
+    def read_message(self) -> Optional[JsonDict]:
+        """Read a single DAP message. Returns None on EOF."""
+        content_length: Optional[int] = None
+        while True:
+            line = self.reader.readline()
+            if not line:
+                return None
+            if isinstance(line, bytes):
+                decoded = line.decode("utf-8")
+            else:
+                decoded = line
+            decoded = decoded.strip()
+            if not decoded:
+                break
+            if decoded.lower().startswith("content-length:"):
+                _, value = decoded.split(":", 1)
+                content_length = int(value.strip())
+        if content_length is None:
+            return None
+        body = self.reader.read(content_length)
+        if not body:
+            return None
+        if isinstance(body, bytes):
+            body = body.decode("utf-8")
+        return json.loads(body)
+
 
 def _canonical_path(value: str) -> str:
     return str(value).replace("\\", "/").lower()
@@ -124,41 +159,6 @@ class SymbolMapper:
             return self._line_map[key].get(int(line), [])
         filename_key = _canonical_path(Path(source_path).name)
         return self._line_map.get(filename_key, {}).get(int(line), [])
-
-    def _send_message(self, message: JsonDict) -> None:
-        data = json.dumps(message)
-        encoded = data.encode("utf-8")
-        header = f"Content-Length: {len(encoded)}\r\n\r\n".encode("ascii")
-        with self._write_lock:
-            self.writer.write(header)
-            self.writer.write(encoded)
-            self.writer.flush()
-
-    def read_message(self) -> Optional[JsonDict]:
-        """Read a single DAP message. Returns None on EOF."""
-        content_length: Optional[int] = None
-        while True:
-            line = self.reader.readline()
-            if not line:
-                return None
-            if isinstance(line, bytes):
-                decoded = line.decode("utf-8")
-            else:
-                decoded = line
-            decoded = decoded.strip()
-            if not decoded:
-                break
-            if decoded.lower().startswith("content-length:"):
-                _, value = decoded.split(":", 1)
-                content_length = int(value.strip())
-        if content_length is None:
-            return None
-        body = self.reader.read(content_length)
-        if not body:
-            return None
-        if isinstance(body, bytes):
-            body = body.decode("utf-8")
-        return json.loads(body)
 
 
 @dataclass
