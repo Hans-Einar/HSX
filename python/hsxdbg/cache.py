@@ -121,9 +121,15 @@ class RuntimeCache:
 
         reg_map: Dict[str, int] = {}
         if isinstance(regs, Mapping):
-            for idx in range(16):
-                raw_value = self._lookup_reg_value(regs, idx)
-                reg_map[f"R{idx}"] = _to_int(raw_value) or 0
+            regs_vector = regs.get("regs")
+            if isinstance(regs_vector, (list, tuple)):
+                for idx in range(16):
+                    value = regs_vector[idx] if idx < len(regs_vector) else None
+                    reg_map[f"R{idx}"] = _to_int(value) or 0
+            else:
+                for idx in range(16):
+                    raw_value = self._lookup_reg_value(regs, idx)
+                    reg_map[f"R{idx}"] = _to_int(raw_value) or 0
             pc = _to_int(pc if pc is not None else (self._lookup_reg_alias(regs, "PC")))
             sp = _to_int(sp if sp is not None else (self._lookup_reg_alias(regs, "SP")))
             psw = _to_int(psw if psw is not None else (self._lookup_reg_alias(regs, "PSW")))

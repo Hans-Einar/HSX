@@ -48,6 +48,21 @@ def test_update_registers_accepts_zero_padded_keys():
     assert cache.query_registers(5, "r15") == 0xAA55
 
 
+def test_update_registers_handles_regs_vector():
+    cache = RuntimeCache()
+    payload = {
+        "regs": [i for i in range(16)],
+        "pc": 0x1234,
+        "sp": 0x2000,
+        "psw": 0xFF,
+    }
+    state = cache.update_registers(6, payload)
+    assert state.registers["R10"] == 10
+    assert state.pc == 0x1234
+    assert state.sp == 0x2000
+    assert state.psw == 0xFF
+
+
 def test_memory_cache_read_exact_range():
     cache = RuntimeCache()
     block = cache.cache_memory(1, base=0x100, data=b"abcdef")
