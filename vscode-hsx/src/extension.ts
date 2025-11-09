@@ -63,8 +63,9 @@ export class HSXAdapterFactory implements vscode.DebugAdapterDescriptorFactory, 
     const pythonCommand = this.resolvePythonCommand(config);
     const args = this.buildArguments(config);
     const options: vscode.DebugAdapterExecutableOptions = {};
-    if (config.env) {
-      options.env = { ...process.env, ...config.env };
+    const mergedEnv = this.mergeEnv(config.env);
+    if (mergedEnv) {
+      options.env = mergedEnv;
     }
     return new vscode.DebugAdapterExecutable(pythonCommand, args, options);
   }
@@ -120,6 +121,24 @@ export class HSXAdapterFactory implements vscode.DebugAdapterDescriptorFactory, 
       console.warn(`[hsx-dap] unable to create log directory ${dir}: ${error}`);
     }
     return path.join(dir, `hsx-dap-${Date.now()}.log`);
+  }
+
+  private mergeEnv(extra?: Record<string, string>): Record<string, string> | undefined {
+    const result: Record<string, string> = {};
+    for (const key of Object.keys(process.env)) {
+      const value = process.env[key];
+      if (typeof value === "string") {
+        result[key] = value;
+      }
+    }
+    if (extra) {
+      for (const [key, value] of Object.entries(extra)) {
+        if (typeof value === "string") {
+          result[key] = value;
+        }
+      }
+    }
+    return Object.keys(result).length ? result : undefined;
   }
 }
 

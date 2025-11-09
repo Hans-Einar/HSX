@@ -12,7 +12,7 @@ function resolve(config: HSXDebugConfiguration): HSXDebugConfiguration {
 }
 
 (() => {
-  const cfg = resolve({});
+  const cfg = resolve({} as HSXDebugConfiguration);
   assert.strictEqual(cfg.type, "hsx");
   assert.strictEqual(cfg.name, "HSX Launch");
   assert.strictEqual(cfg.host, "127.0.0.1");
