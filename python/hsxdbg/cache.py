@@ -124,9 +124,9 @@ class RuntimeCache:
             for idx in range(16):
                 raw_value = self._lookup_reg_value(regs, idx)
                 reg_map[f"R{idx}"] = _to_int(raw_value) or 0
-            pc = _to_int(pc if pc is not None else (regs.get("PC") or regs.get("pc")))
-            sp = _to_int(sp if sp is not None else (regs.get("SP") or regs.get("sp")))
-            psw = _to_int(psw if psw is not None else (regs.get("PSW") or regs.get("psw")))
+            pc = _to_int(pc if pc is not None else (self._lookup_reg_alias(regs, "PC")))
+            sp = _to_int(sp if sp is not None else (self._lookup_reg_alias(regs, "SP")))
+            psw = _to_int(psw if psw is not None else (self._lookup_reg_alias(regs, "PSW")))
         else:
             seq = list(regs)
             for idx in range(16):
@@ -166,6 +166,16 @@ class RuntimeCache:
             f"R{idx:02d}",
             f"r{idx:02d}",
         ]
+        for key in candidates:
+            if key in regs:
+                value = regs.get(key)
+                if value is not None:
+                    return value
+        return None
+
+    @staticmethod
+    def _lookup_reg_alias(regs: Mapping[str, Any], name: str) -> Any:
+        candidates = [name.upper(), name.lower()]
         for key in candidates:
             if key in regs:
                 value = regs.get(key)

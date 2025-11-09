@@ -60,15 +60,28 @@ class CommandClient:
         return response
 
     def set_breakpoint(self, address: int, pid: Optional[int] = None) -> Dict:
-        payload = {"cmd": "bp", "op": "set", "pid": pid or self.session.state.pid, "addr": address}
+        payload = {
+            "cmd": "bp",
+            "op": "set",
+            "pid": pid or self.session.state.pid,
+            "addr": address,
+        }
+        payload.setdefault("session", self.session.state.session_id)
         return self._request(payload)
 
     def clear_breakpoint(self, address: int, pid: Optional[int] = None) -> Dict:
-        payload = {"cmd": "bp", "op": "clear", "pid": pid or self.session.state.pid, "addr": address}
+        payload = {
+            "cmd": "bp",
+            "op": "clear",
+            "pid": pid or self.session.state.pid,
+            "addr": address,
+        }
+        payload.setdefault("session", self.session.state.session_id)
         return self._request(payload)
 
     def list_breakpoints(self, pid: Optional[int] = None) -> Dict:
         payload = {"cmd": "bp", "op": "list", "pid": pid or self.session.state.pid}
+        payload.setdefault("session", self.session.state.session_id)
         return self._request(payload)
 
     def _invalidate_cache(

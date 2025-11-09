@@ -38,8 +38,9 @@ from python.hsxdbg.transport import TransportConfig
 
 
 JsonDict = Dict[str, Any]
-REGISTER_NAMES = {f"R{idx}": f"R{idx}" for idx in range(16)}
+REGISTER_NAMES = {}
 for idx in range(16):
+    REGISTER_NAMES[f"R{idx}"] = f"R{idx}"
     REGISTER_NAMES[f"R{idx:02d}"] = f"R{idx}"
 REGISTER_NAMES.update({"PC": "PC", "SP": "SP", "PSW": "PSW"})
 
