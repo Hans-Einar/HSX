@@ -3499,7 +3499,8 @@ class ExecutiveState:
     def stop_auto(self) -> None:
         if self.auto_thread and self.auto_thread.is_alive():
             self.auto_event.set()
-            self.auto_thread.join(timeout=1.0)
+            if threading.current_thread() is not self.auto_thread:
+                self.auto_thread.join(timeout=1.0)
         self.auto_thread = None
         self.clock_mode = "stopped"
         self._clock_throttle_reason = None
