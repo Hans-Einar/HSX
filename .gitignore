@@ -9,4 +9,4 @@ examples/demos/build/
 docs/html/
 docs/latex/
 dist/
-
+vscode-hsx/node_modules/
