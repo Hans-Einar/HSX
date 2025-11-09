@@ -8,6 +8,7 @@ import sys
 
 
 def main() -> int:
+    print("hsx-dap argv:", sys.argv, flush=True)
     repo_root = pathlib.Path(__file__).resolve().parents[2]
     sys.path.insert(0, str(repo_root))
     from python.hsx_dap import main as dap_main  # noqa: WPS433
