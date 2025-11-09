@@ -12,6 +12,7 @@
 | Date | Commit hash | Message | Author | Notes |
 | --- | --- | --- | --- | --- |
 | 2025-11-09 | `6b5be80` | `Session Resilience & Symbols` | Hans Einar | Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dap_symbol_mapper.py` |
+| 2025-11-09 | `95fe9e6` | `vscode-dap: implement Phase 3 (stack/scopes/variables)` | Hans Einar | Tests: `PYTHONPATH=. pytest python/tests/test_hsxdbg_cache.py python/tests/test_hsxdbg_commands.py python/tests/test_hsxdbg_session.py python/tests/test_hsx_dap_watch.py python/tests/test_hsx_dap_breakpoints.py python/tests/test_hsx_dap_stacktrace.py python/tests/test_hsx_dap_scopes.py python/tests/test_hsx_dap_variables.py python/tests/test_hsx_dap_symbol_mapper.py` |
 
 ## Pull Request
 - PR URL / ID: `<link or ID>`

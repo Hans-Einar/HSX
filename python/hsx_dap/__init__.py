@@ -699,12 +699,13 @@ class HSXDebugAdapter:
             return
         if not info.get("loaded"):
             hint = str(self._sym_hint) if self._sym_hint else None
-            try:
-                self.client.load_symbols(self.current_pid, path=hint)
-                info = self.client.symbol_info(self.current_pid)
-            except Exception as exc:
-                self.logger.warning("symbol load failed for pid %s: %s", self.current_pid, exc)
-                info = {}
+            if hint:
+                try:
+                    self.client.load_symbols(self.current_pid, path=hint)
+                    info = self.client.symbol_info(self.current_pid)
+                except Exception as exc:
+                    self.logger.warning("symbol load failed for pid %s: %s", self.current_pid, exc)
+                    info = {}
             if not info.get("loaded"):
                 if force:
                     self.logger.info("symbols not loaded for pid %s", self.current_pid)
