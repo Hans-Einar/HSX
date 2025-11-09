@@ -44,3 +44,18 @@ def test_pending_breakpoints_reapplied_on_connect():
     adapter._reapply_pending_breakpoints()
     assert adapter.client.breaks == [0x10]
     assert protocol.events[0][0] == "breakpoint"
+
+
+def test_breakpoint_lookup_falls_back_to_basename():
+    adapter, _ = _make_adapter()
+
+    class Mapper:
+        def lookup(self, path, line):
+            if path == "main.c" and line == 5:
+                return [0x40]
+            return []
+
+    adapter._symbol_mapper = Mapper()
+    adapter.client = DummyClient()
+    adapter._handle_setBreakpoints({"source": {"path": "/work/src/main.c"}, "breakpoints": [{"line": 5}]})
+    assert adapter.client.breaks == [0x40]

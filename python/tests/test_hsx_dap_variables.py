@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from python.hsx_dap import HSXDebugAdapter
+from python.hsx_dap import HSXDebugAdapter, _FrameRecord
 
 
 class DummyProtocol:
@@ -72,3 +72,25 @@ def test_local_scope_formats_stack_variable():
     assert "counter" in variables[0]["name"]
     assert "0x" in variables[0]["value"]
     assert variables[0]["variablesReference"] == 0
+
+
+def test_local_stack_defaults_to_fp_when_available():
+    adapter = HSXDebugAdapter(DummyProtocol())
+    adapter.current_pid = 1
+    adapter._symbol_mapper = FakeMapperLocals()
+    captured = {}
+
+    def fake_read(addr, size, pid=None):
+        captured["addr"] = addr
+        value = 0x1234 & ((1 << (size * 8)) - 1)
+        return value.to_bytes(size, "big")
+
+    adapter.client = SimpleNamespace(
+        read_memory=fake_read,
+        get_register_state=lambda pid: None,
+    )
+    frame = _FrameRecord(pid=1, name="main", line=0, column=0, file=None, pc=None, sp=0x1000, fp=0x2000)
+    symbol = adapter._symbol_mapper.locals_for_function("main")[0]
+    value = adapter._format_symbol_value(symbol, frame)
+    assert captured["addr"] == frame.fp - 2
+    assert "0x00001234" in value

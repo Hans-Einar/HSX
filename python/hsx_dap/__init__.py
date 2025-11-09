@@ -708,7 +708,12 @@ class HSXDebugAdapter:
         lookup_path = source_path or bp.get("sourcePath") or bp.get("sourceName")
         if self._symbol_mapper and lookup_path and line:
             try:
-                addresses.extend(self._symbol_mapper.lookup(lookup_path, int(line)))
+                canonical = _canonical_path(lookup_path)
+                addresses.extend(self._symbol_mapper.lookup(canonical, int(line)))
+                if not addresses:
+                    filename = Path(lookup_path).name
+                    if filename:
+                        addresses.extend(self._symbol_mapper.lookup(filename, int(line)))
             except Exception as exc:
                 self.logger.debug("symbol lookup failed for %s:%s (%s)", lookup_path, line, exc)
         parsed = self._parse_address(bp)
@@ -1303,7 +1308,14 @@ class HSXDebugAdapter:
                 kind = loc.get("kind")
                 if kind == "stack" and frame:
                     offset = loc.get("offset")
-                    base = frame.sp if loc.get("relative") != "fp" else frame.fp
+                    relative = loc.get("relative")
+                    base: Optional[int]
+                    if relative == "fp":
+                        base = frame.fp
+                    elif relative == "sp":
+                        base = frame.sp
+                    else:
+                        base = frame.fp if frame.fp is not None else frame.sp
                     if base is not None and offset is not None:
                         try:
                             return int(base) + int(offset)
