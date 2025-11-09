@@ -294,15 +294,21 @@ class HSXDebugAdapter:
         sym_arg = args.get("symPath") or args.get("sym_path")
         program_path = args.get("program")
         self._sym_hint = None
-        for candidate in [sym_arg, program_path]:
+        search_paths = [sym_arg]
+        if program_path:
+            search_paths.append(program_path)
+        for candidate in search_paths:
             if not candidate:
                 continue
             try:
                 path = Path(candidate)
             except Exception:
                 continue
-            if program_path and candidate == program_path:
-                path = path.with_suffix(".sym")
+            try:
+                if program_path and Path(candidate) == Path(program_path):
+                    path = path.with_suffix(".sym")
+            except Exception:
+                pass
             if not path.is_absolute():
                 path = (Path.cwd() / path).resolve(strict=False)
             if path.exists():
