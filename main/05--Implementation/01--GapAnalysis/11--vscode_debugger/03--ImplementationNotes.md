@@ -43,3 +43,21 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 ### Next Steps
 - User to create feature branch.
 - Once branch is ready, begin Phase 2.6 work: implement session resilience in `hsxdbg`/`hsx_dap`, improve watch handling, add regression tests, update docs accordingly.
+
+## 2025-11-09 - Codex (Session 2)
+
+### Scope
+- Plan item / phase addressed: Phase 2.6 Session Resilience & Watch Integration (Implementation Plan §2.6)
+- Design sections reviewed: 04.11--vscode_debugger §5, docs/executive_protocol.md (watch expressions)
+
+### Work Summary
+- Added keepalive/reopen support to `hsxdbg.SessionManager` so adapter sessions no longer expire silently.
+- Updated `CommandClient` to retry once on `session_required` and added `load_symbols` helper.
+- Enhanced DAP adapter: accept optional `symPath`, auto-load symbols via executive when missing, reuse path as SymbolMapper hint, and ensure watches re-evaluate after reconnect.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_hsx_dap_symbol_mapper.py`
+
+### Next Steps
+- Monitor VS Code session to confirm automatic keepalive/reconnect fixes pause/watch errors.
+- Triage breakpoint/stopped events once symbol data verified; expand automated tests for CommandClient retries.

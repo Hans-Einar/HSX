@@ -199,6 +199,7 @@ class HSXDebugAdapter:
         self._symbol_mtime: Optional[float] = None
         self._watch_expr_to_id: Dict[str, int] = {}
         self._watch_id_to_expr: Dict[int, str] = {}
+        self._sym_hint: Optional[Path] = None
 
     def serve(self) -> None:
         while True:
@@ -250,6 +251,23 @@ class HSXDebugAdapter:
         if pid_value is None:
             raise ValueError("launch request missing 'pid'")
         self.current_pid = int(pid_value)
+        sym_arg = args.get("symPath") or args.get("sym_path")
+        program_path = args.get("program")
+        self._sym_hint = None
+        for candidate in [sym_arg, program_path]:
+            if not candidate:
+                continue
+            try:
+                path = Path(candidate)
+            except Exception:
+                continue
+            if program_path and candidate == program_path:
+                path = path.with_suffix(".sym")
+            if not path.is_absolute():
+                path = (Path.cwd() / path).resolve(strict=False)
+            if path.exists():
+                self._sym_hint = path
+                break
         self._connect(host, port, self.current_pid)
         return {}
 
@@ -589,19 +607,28 @@ class HSXDebugAdapter:
             return
         if not force and self._symbol_mapper is not None:
             return
+        info: Dict[str, Any]
         try:
             info = self.client.symbol_info(self.current_pid)
         except Exception as exc:
             self.logger.debug("symbol_info failed: %s", exc)
             return
         if not info.get("loaded"):
-            if force:
-                self.logger.info("symbols not loaded for pid %s", self.current_pid)
-            self._symbol_mapper = None
-            self._symbol_path = None
-            self._symbol_mtime = None
-            return
-        path_value = info.get("path")
+            hint = str(self._sym_hint) if self._sym_hint else None
+            try:
+                self.client.load_symbols(self.current_pid, path=hint)
+                info = self.client.symbol_info(self.current_pid)
+            except Exception as exc:
+                self.logger.warning("symbol load failed for pid %s: %s", self.current_pid, exc)
+                info = {}
+            if not info.get("loaded"):
+                if force:
+                    self.logger.info("symbols not loaded for pid %s", self.current_pid)
+                self._symbol_mapper = None
+                self._symbol_path = None
+                self._symbol_mtime = None
+                return
+        path_value = info.get("path") or (str(self._sym_hint) if self._sym_hint else None)
         if not path_value:
             return
         resolved = self._resolve_sym_path(path_value)
@@ -625,6 +652,8 @@ class HSXDebugAdapter:
             self._symbol_mapper = SymbolMapper(resolved)
             self._symbol_path = resolved
             self._symbol_mtime = mtime
+            if not self._sym_hint:
+                self._sym_hint = resolved
             self.logger.info("Loaded symbol map for pid %s from %s", self.current_pid, resolved)
         except Exception as exc:
             self.logger.warning("failed to parse %s: %s", resolved, exc)

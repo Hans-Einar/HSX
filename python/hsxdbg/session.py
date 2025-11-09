@@ -67,6 +67,9 @@ class SessionManager:
         self._ack_stop = threading.Event()
         self._ack_interval = 0.5
         self._cache_controller: Optional[CacheController] = None
+        self._keepalive_thread: Optional[threading.Thread] = None
+        self._keepalive_stop = threading.Event()
+        self._keepalive_interval = 5.0
         if self.event_bus and self.runtime_cache:
             self._attach_cache_controller()
 
@@ -130,6 +133,7 @@ class SessionManager:
             warnings=list(session_payload.get("warnings", [])),
             locked=bool(pid_locks),
         )
+        self._start_keepalive_thread()
         return self.state
 
     def keepalive(self) -> None:
@@ -144,11 +148,26 @@ class SessionManager:
         if not self.state.session_id:
             return
         self.unsubscribe_events()
+        self._stop_keepalive_thread()
         payload = {"cmd": "session.close", "session": self.state.session_id}
         try:
             self.transport.send_request(payload)
         finally:
             self.state = SessionState()
+
+    def reopen(self) -> None:
+        """Re-establish the session and restore subscriptions after timeouts."""
+
+        filters = self._event_filters
+        auto_ack = self._ack_thread is not None
+        ack_interval = self._ack_interval
+        self.close()
+        self.open()
+        if filters:
+            try:
+                self.subscribe_events(filters, auto_ack=auto_ack, ack_interval=ack_interval)
+            except Exception:
+                logger.exception("failed to resubscribe events after session reopen")
 
     def reopen(self) -> None:
         """Re-open the session and restore event subscriptions if needed."""
@@ -286,3 +305,33 @@ class SessionManager:
         if self._cache_controller is not None:
             self._cache_controller.detach()
             self._cache_controller = None
+
+    def _start_keepalive_thread(self) -> None:
+        if not self.state.session_id:
+            return
+        if self._keepalive_thread and self._keepalive_thread.is_alive():
+            return
+        heartbeat = self.state.heartbeat_s or self.session_config.heartbeat_s or 30
+        interval = max(1.0, float(heartbeat) / 2.0)
+        self._keepalive_interval = interval
+        self._keepalive_stop.clear()
+        self._keepalive_thread = threading.Thread(target=self._keepalive_loop, daemon=True)
+        self._keepalive_thread.start()
+
+    def _stop_keepalive_thread(self) -> None:
+        self._keepalive_stop.set()
+        thread = self._keepalive_thread
+        if thread and thread.is_alive():
+            thread.join(timeout=0.5)
+        self._keepalive_thread = None
+
+    def _keepalive_loop(self) -> None:
+        while not self._keepalive_stop.wait(self._keepalive_interval):
+            if not self.state.session_id:
+                break
+            try:
+                self.keepalive()
+            except Exception as exc:
+                logger.debug("session keepalive failed: %s", exc)
+                break
+        self._keepalive_thread = None

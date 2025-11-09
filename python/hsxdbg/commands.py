@@ -182,6 +182,16 @@ class CommandClient:
             raise RuntimeError(f"sym info failed: {response}")
         return response.get("symbols") or {}
 
+    def load_symbols(self, pid: Optional[int] = None, path: Optional[str] = None) -> Dict:
+        target = pid or self.session.state.pid
+        payload: Dict[str, object] = {"cmd": "sym", "op": "load", "pid": target}
+        if path:
+            payload["path"] = path
+        response = self._request(payload)
+        if response.get("status") != "ok":
+            raise RuntimeError(f"sym load failed: {response}")
+        return response.get("symbols") or {}
+
     def read_memory(
         self,
         addr: int,
