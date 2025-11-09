@@ -3277,6 +3277,13 @@ def _resolve_session_identifier(token: str, host: str, port: int) -> Optional[st
     return None
 
 
+def _session_number_for(session_id: Optional[str]) -> Optional[int]:
+    if not session_id:
+        return None
+    with _SESSION_INDEX_LOCK:
+        return _SESSION_REVERSE_CACHE.get(session_id)
+
+
 def _format_duration(seconds: float) -> str:
     if seconds < 1:
         return f"{seconds * 1000:.0f}ms"
