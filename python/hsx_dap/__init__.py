@@ -572,13 +572,22 @@ class HSXDebugAdapter:
             return []
         variables = []
         for name in sorted(state.registers.keys()):
-            variables.append({"name": name, "value": f"0x{state.registers[name]:08X}", "type": "register"})
+            variables.append(
+                {
+                    "name": name,
+                    "value": f"0x{state.registers[name]:08X}",
+                    "type": "register",
+                    "variablesReference": 0,
+                }
+            )
         if state.pc is not None:
-            variables.append({"name": "PC", "value": f"0x{state.pc:08X}", "type": "register"})
+            variables.append({"name": "PC", "value": f"0x{state.pc:08X}", "type": "register", "variablesReference": 0})
         if state.sp is not None:
-            variables.append({"name": "SP", "value": f"0x{state.sp:08X}", "type": "register"})
+            variables.append({"name": "SP", "value": f"0x{state.sp:08X}", "type": "register", "variablesReference": 0})
         if state.psw is not None:
-            variables.append({"name": "PSW", "value": f"0x{state.psw:08X}", "type": "register"})
+            variables.append(
+                {"name": "PSW", "value": f"0x{state.psw:08X}", "type": "register", "variablesReference": 0}
+            )
         return variables
 
     def _format_watches(self) -> List[JsonDict]:
@@ -621,6 +630,7 @@ class HSXDebugAdapter:
                     "name": name,
                     "value": location_desc,
                     "type": "local",
+                    "variablesReference": 0,
                 }
             )
         return variables
@@ -648,6 +658,7 @@ class HSXDebugAdapter:
                     "name": name,
                     "value": value,
                     "type": "global",
+                    "variablesReference": 0,
                 }
             )
         return variables

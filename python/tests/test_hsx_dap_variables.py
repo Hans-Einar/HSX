@@ -61,6 +61,7 @@ def test_global_scope_reads_memory():
     globals_scope = next(scope for scope in scopes if scope["name"] == "Globals")
     variables = adapter._scopes[globals_scope["variablesReference"]].variables
     assert "0x00001000" in variables[0]["value"]
+    assert variables[0]["variablesReference"] == 0
 
 
 def test_local_scope_formats_stack_variable():
@@ -70,3 +71,4 @@ def test_local_scope_formats_stack_variable():
     variables = adapter._scopes[locals_scope["variablesReference"]].variables
     assert "counter" in variables[0]["name"]
     assert "0x" in variables[0]["value"]
+    assert variables[0]["variablesReference"] == 0
