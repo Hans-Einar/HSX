@@ -345,6 +345,7 @@ class HSXDebugAdapter:
 
     def _handle_continue(self, args: JsonDict) -> JsonDict:
         self._ensure_client()
+        self.logger.info("Continue: resuming PID %s", self.current_pid)
         self.client.resume(self.current_pid)
         try:
             self.client.clock_start()
@@ -452,8 +453,10 @@ class HSXDebugAdapter:
         source_path = source.get("path") or source.get("name")
         source_key = self._canonical_source_key(source)
         breakpoints = args.get("breakpoints") or []
+        self.logger.info("setBreakpoints: source=%s, count=%d", source_path, len(breakpoints))
         self._ensure_symbol_mapper()
         if not self.client:
+            self.logger.warning("setBreakpoints: no client connected, storing as pending")
             self._pending_breakpoints[source_key] = {"source": source, "breakpoints": breakpoints}
             results = []
             for bp in breakpoints:
@@ -467,6 +470,7 @@ class HSXDebugAdapter:
             return {"breakpoints": results}
         results, entries = self._apply_breakpoints_for_source(source_key, source_path, source, breakpoints)
         self._breakpoints[source_key] = entries
+        self.logger.info("setBreakpoints: set %d breakpoints for %s", len(results), source_path)
         return {"breakpoints": results}
 
     def _handle_threadsRequest(self, args: JsonDict) -> JsonDict:  # pragma: no cover - compatibility alias
@@ -548,6 +552,7 @@ class HSXDebugAdapter:
             self._handle_trace_step_event(event)
         elif isinstance(event, DebugBreakEvent):
             reason = event.reason or "breakpoint"
+            self.logger.info("DebugBreakEvent: pid=%s, pc=0x%04X, reason=%s", event.pid, event.pc or 0, reason)
             self._emit_stopped_event(
                 pid=event.pid or self.current_pid,
                 reason=reason,
@@ -772,15 +777,17 @@ class HSXDebugAdapter:
         if not info.get("loaded"):
             hint = str(self._sym_hint) if self._sym_hint else None
             if hint:
+                self.logger.info("Attempting to load symbols from hint: %s", hint)
                 try:
                     self.client.load_symbols(self.current_pid, path=hint)
                     info = self.client.symbol_info(self.current_pid)
+                    self.logger.info("Symbols loaded successfully from: %s", hint)
                 except Exception as exc:
                     self.logger.warning("symbol load failed for pid %s: %s", self.current_pid, exc)
                     info = {}
             if not info.get("loaded"):
                 if force:
-                    self.logger.info("symbols not loaded for pid %s", self.current_pid)
+                    self.logger.warning("Symbols not loaded for pid %s - breakpoint source mapping will not work", self.current_pid)
                 self._symbol_mapper = None
                 self._symbol_path = None
                 self._symbol_mtime = None
@@ -831,6 +838,7 @@ class HSXDebugAdapter:
             addresses = self._resolve_breakpoint_addresses(source_path, line, bp)
             if not addresses:
                 reason = "unmapped source line" if line and self._symbol_mapper else "address required"
+                self.logger.warning("Breakpoint at %s:%s could not be resolved: %s", source_path, line, reason)
                 results.append({"verified": False, "line": line, "message": reason})
                 continue
             verified_any = False
@@ -839,9 +847,10 @@ class HSXDebugAdapter:
                 try:
                     self.client.set_breakpoint(addr, pid=self.current_pid)
                     verified_any = True
+                    self.logger.info("Breakpoint set at %s:%s -> 0x%04X", source_path, line, addr)
                 except Exception as exc:
                     failed_error = str(exc)
-                    self.logger.debug("breakpoint set failed for 0x%X: %s", addr, exc)
+                    self.logger.warning("Breakpoint set failed for 0x%04X at %s:%s: %s", addr, source_path, line, exc)
             entry = {
                 "verified": verified_any,
                 "instructionReference": f"{addresses[0]:#x}",
@@ -859,17 +868,24 @@ class HSXDebugAdapter:
     def _reapply_pending_breakpoints(self) -> None:
         if not self.client or not self._pending_breakpoints:
             return
+        self.logger.info("Reapplying %d pending breakpoint sources", len(self._pending_breakpoints))
         pending = dict(self._pending_breakpoints)
         self._pending_breakpoints.clear()
         for source_key, entry in pending.items():
             source = entry.get("source") or {}
             bps = entry.get("breakpoints") or []
             source_path = source.get("path") or source.get("name")
+            self.logger.info("Reapplying breakpoints for source: %s (%d breakpoints)", source_path, len(bps))
             results, new_entries = self._apply_breakpoints_for_source(source_key, source_path, source, bps)
             self._breakpoints[source_key] = new_entries
             for bp in results:
                 if bp.get("verified"):
+                    self.logger.info("Breakpoint verified after connection: %s:%s -> 0x%04X", 
+                                   source_path, bp.get("line"), bp.get("address", 0))
                     self.protocol.send_event("breakpoint", {"reason": "changed", "breakpoint": bp})
+                else:
+                    self.logger.warning("Breakpoint not verified after connection: %s:%s - %s",
+                                      source_path, bp.get("line"), bp.get("message", "unknown reason"))
 
     def _ensure_watch_entry(self, expression: str):
         expr = expression.strip()
@@ -986,6 +1002,12 @@ class HSXDebugAdapter:
                     body["line"] = mapped.get("line")
                 if mapped.get("column") is not None:
                     body["column"] = mapped.get("column")
+                self.logger.info("Stopped event: reason=%s, pc=0x%04X, source=%s:%s", 
+                                reason_value, pc_int, mapped.get("path"), mapped.get("line"))
+            else:
+                self.logger.info("Stopped event: reason=%s, pc=0x%04X (no source mapping)", reason_value, pc_int)
+        else:
+            self.logger.info("Stopped event: reason=%s (no PC available)", reason_value)
         self.protocol.send_event("stopped", body)
 
     def _handle_trace_step_event(self, event: TraceStepEvent) -> None:
