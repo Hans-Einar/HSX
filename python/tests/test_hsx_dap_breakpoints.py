@@ -59,3 +59,18 @@ def test_breakpoint_lookup_falls_back_to_basename():
     adapter.client = DummyClient()
     adapter._handle_setBreakpoints({"source": {"path": "/work/src/main.c"}, "breakpoints": [{"line": 5}]})
     assert adapter.client.breaks == [0x40]
+
+
+def test_breakpoint_only_uses_first_address_for_line():
+    adapter, _ = _make_adapter()
+
+    class Mapper:
+        def lookup(self, path, line):
+            if line == 7:
+                return [0x100, 0x104, 0x108]
+            return []
+
+    adapter._symbol_mapper = Mapper()
+    adapter.client = DummyClient()
+    adapter._handle_setBreakpoints({"source": {"path": "foo.c"}, "breakpoints": [{"line": 7}]})
+    assert adapter.client.breaks == [0x100]

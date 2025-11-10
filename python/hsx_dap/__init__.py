@@ -705,20 +705,24 @@ class HSXDebugAdapter:
 
     def _resolve_breakpoint_addresses(self, source_path: Optional[str], line: Optional[int], bp: JsonDict) -> List[int]:
         addresses: List[int] = []
+        explicit_addresses: List[int] = []
         lookup_path = source_path or bp.get("sourcePath") or bp.get("sourceName")
         if self._symbol_mapper and lookup_path and line:
             try:
                 canonical = _canonical_path(lookup_path)
-                addresses.extend(self._symbol_mapper.lookup(canonical, int(line)))
-                if not addresses:
+                candidates = self._symbol_mapper.lookup(canonical, int(line))
+                if not candidates:
                     filename = Path(lookup_path).name
                     if filename:
-                        addresses.extend(self._symbol_mapper.lookup(filename, int(line)))
+                        candidates = self._symbol_mapper.lookup(filename, int(line))
+                if candidates:
+                    addresses.append(int(candidates[0]))
             except Exception as exc:
                 self.logger.debug("symbol lookup failed for %s:%s (%s)", lookup_path, line, exc)
         parsed = self._parse_address(bp)
         if parsed is not None:
-            addresses.append(parsed)
+            explicit_addresses.append(parsed)
+        addresses.extend(explicit_addresses)
         ordered: List[int] = []
         seen: set[int] = set()
         for addr in addresses:
