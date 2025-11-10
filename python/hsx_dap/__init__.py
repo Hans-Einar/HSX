@@ -356,13 +356,18 @@ class HSXDebugAdapter:
     def _handle_pause(self, args: JsonDict) -> JsonDict:
         self._ensure_client()
         self.client.pause(self.current_pid)
-        self.protocol.send_event(
-            "stopped",
-            {
-                "reason": "pause",
-                "threadId": self.current_pid,
-                "description": "Paused by client",
-            },
+        # Get current register state to include PC in stopped event
+        try:
+            state = self.client.get_register_state(self.current_pid)
+            pc = state.pc if state else None
+        except Exception:
+            self.logger.debug("Failed to get register state on pause", exc_info=True)
+            pc = None
+        self._emit_stopped_event(
+            pid=self.current_pid,
+            reason="pause",
+            description="Paused by client",
+            pc=pc,
         )
         return {}
 
