@@ -247,6 +247,7 @@ class HSXDebugAdapter:
         self._sym_hint: Optional[Path] = None
         self._pending_step_reason: Optional[str] = None
         self._thread_states: Dict[int, Dict[str, Any]] = {}
+        self._pending_pause: bool = False
 
     def serve(self) -> None:
         while True:
@@ -349,6 +350,7 @@ class HSXDebugAdapter:
     def _handle_continue(self, args: JsonDict) -> JsonDict:
         self._ensure_client()
         self.logger.info("Continue: resuming PID %s", self.current_pid)
+        self._pending_pause = False  # Clear any pending pause state
         self.client.resume(self.current_pid)
         try:
             self.client.clock_start()
@@ -359,20 +361,11 @@ class HSXDebugAdapter:
 
     def _handle_pause(self, args: JsonDict) -> JsonDict:
         self._ensure_client()
+        self.logger.info("Pause requested for PID %s", self.current_pid)
+        self._pending_pause = True
         self.client.pause(self.current_pid)
-        # Get current register state to include PC in stopped event
-        try:
-            state = self.client.get_register_state(self.current_pid)
-            pc = state.pc if state else None
-        except Exception:
-            self.logger.debug("Failed to get register state on pause", exc_info=True)
-            pc = None
-        self._emit_stopped_event(
-            pid=self.current_pid,
-            reason="pause",
-            description="Paused by client",
-            pc=pc,
-        )
+        # Note: We don't emit stopped event immediately - we'll wait for the TaskStateEvent
+        # with reason "user_pause" which will have the actual PC at pause time
         return {}
 
     def _handle_next(self, args: JsonDict) -> JsonDict:
@@ -526,6 +519,7 @@ class HSXDebugAdapter:
         self.logger.info("Connecting to executive at %s:%d (PID %d)", host, port, pid)
         self._thread_states.clear()
         self._pending_step_reason = None
+        self._pending_pause = False
         self.event_bus = EventBus()
         self.event_bus.start()
         self.runtime_cache = RuntimeCache()
@@ -1061,6 +1055,10 @@ class HSXDebugAdapter:
         if state in {"paused", "stopped"} or reason in {"debug_break", "user_pause"}:
             pc = self._extract_task_state_pc(event)
             description = f"Task {state}" if state else (event.reason or "stopped")
+            # Clear pending pause flag if this is the response to our pause request
+            if reason == "user_pause" and self._pending_pause:
+                self._pending_pause = False
+                self.logger.info("Pause completed for PID %s", pid)
             self._emit_stopped_event(
                 pid=pid,
                 reason=reason or state or "stopped",
