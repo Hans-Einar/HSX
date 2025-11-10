@@ -284,8 +284,8 @@ class HSXDebugAdapter:
             "supportsEvaluateForHovers": False,
             "supportsConditionalBreakpoints": False,
             "supportsStepBack": False,
-            "supportsReadMemoryRequest": False,
-            "supportsWriteMemoryRequest": False,
+            "supportsReadMemoryRequest": True,
+            "supportsWriteMemoryRequest": True,
             "supportsTerminateRequest": True,
         }
         self._initialized = True
@@ -513,6 +513,101 @@ class HSXDebugAdapter:
 
     def _handle_setExceptionBreakpoints(self, args: JsonDict) -> JsonDict:  # noqa: N802
         return {"breakpoints": []}
+
+    def _handle_readMemory(self, args: JsonDict) -> JsonDict:  # noqa: N802
+        """Handle DAP readMemory request to read raw memory from the target."""
+        self._ensure_client()
+        memory_reference = args.get("memoryReference")
+        offset = int(args.get("offset", 0))
+        count = int(args.get("count", 0))
+        
+        if not memory_reference:
+            raise ValueError("memoryReference is required")
+        
+        # Parse memory reference (should be hex address like "0x1234")
+        try:
+            if isinstance(memory_reference, str):
+                base_addr = int(memory_reference, 0)
+            else:
+                base_addr = int(memory_reference)
+        except (ValueError, TypeError) as exc:
+            raise ValueError(f"Invalid memoryReference: {memory_reference}") from exc
+        
+        # Calculate actual address with offset
+        address = (base_addr + offset) & 0xFFFFFFFF
+        
+        if count <= 0 or count > 0x10000:  # Limit to 64KB
+            raise ValueError(f"Invalid count: {count} (must be 1-65536)")
+        
+        self.logger.info("readMemory: address=0x%08X, count=%d", address, count)
+        
+        # Read memory from executive
+        data = self.client.read_memory(address, count, pid=self.current_pid)
+        
+        if data is None:
+            # Return unreadable memory indication
+            return {
+                "address": f"0x{address:08X}",
+                "unreadableBytes": count,
+            }
+        
+        # Encode data as base64 for DAP protocol
+        import base64
+        encoded_data = base64.b64encode(data).decode("ascii")
+        
+        return {
+            "address": f"0x{address:08X}",
+            "data": encoded_data,
+            "unreadableBytes": max(0, count - len(data)),
+        }
+
+    def _handle_writeMemory(self, args: JsonDict) -> JsonDict:  # noqa: N802
+        """Handle DAP writeMemory request to write raw memory to the target."""
+        self._ensure_client()
+        memory_reference = args.get("memoryReference")
+        offset = int(args.get("offset", 0))
+        data_b64 = args.get("data")
+        
+        if not memory_reference:
+            raise ValueError("memoryReference is required")
+        if not data_b64:
+            raise ValueError("data is required")
+        
+        # Parse memory reference
+        try:
+            if isinstance(memory_reference, str):
+                base_addr = int(memory_reference, 0)
+            else:
+                base_addr = int(memory_reference)
+        except (ValueError, TypeError) as exc:
+            raise ValueError(f"Invalid memoryReference: {memory_reference}") from exc
+        
+        # Calculate actual address with offset
+        address = (base_addr + offset) & 0xFFFFFFFF
+        
+        # Decode base64 data
+        import base64
+        try:
+            data = base64.b64decode(data_b64)
+        except Exception as exc:
+            raise ValueError(f"Invalid base64 data: {exc}") from exc
+        
+        if not data or len(data) > 0x10000:  # Limit to 64KB
+            raise ValueError(f"Invalid data length: {len(data)} (must be 1-65536)")
+        
+        self.logger.info("writeMemory: address=0x%08X, count=%d", address, len(data))
+        
+        # Write memory to executive
+        try:
+            self.client.write_memory(address, data, pid=self.current_pid)
+            bytes_written = len(data)
+        except Exception as exc:
+            self.logger.warning("writeMemory failed: %s", exc)
+            bytes_written = 0
+        
+        return {
+            "bytesWritten": bytes_written,
+        }
 
     # Internal helpers -------------------------------------------------
     def _connect(self, host: str, port: int, pid: int) -> None:
