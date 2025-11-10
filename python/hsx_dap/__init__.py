@@ -346,6 +346,10 @@ class HSXDebugAdapter:
     def _handle_continue(self, args: JsonDict) -> JsonDict:
         self._ensure_client()
         self.client.resume(self.current_pid)
+        try:
+            self.client.clock_start()
+        except Exception:
+            self.logger.debug("clock_start failed (continuing anyway)", exc_info=True)
         self.protocol.send_event("continued", {"threadId": self.current_pid})
         return {"allThreadsContinued": True}
 
@@ -513,7 +517,7 @@ class HSXDebugAdapter:
         self.event_bus = EventBus()
         self.event_bus.start()
         self.runtime_cache = RuntimeCache()
-        session_config = SessionConfig(client_name="hsx-dap", pid_lock=pid)
+        session_config = SessionConfig(client_name="hsx-dap", pid_lock=pid, max_events=2048, heartbeat_s=10)
         transport_config = TransportConfig(host=host, port=port)
         self.session = SessionManager(
             transport_config=transport_config,
@@ -523,7 +527,7 @@ class HSXDebugAdapter:
         )
         self.session.open()
         categories = ["debug_break", "watch_update", "stdout", "stderr", "warning", "trace_step", "task_state"]
-        self.session.subscribe_events({"pid": [pid], "categories": categories})
+        self.session.subscribe_events({"pid": [pid], "categories": categories}, ack_interval=0.1)
         self.client = CommandClient(session=self.session, cache=self.runtime_cache)
         self._watch_expr_to_id.clear()
         self._watch_id_to_expr.clear()

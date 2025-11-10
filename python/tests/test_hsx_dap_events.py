@@ -114,3 +114,21 @@ def test_task_state_events_emit_thread_and_stopped():
     assert proto.events[-1]["event"] == "thread"
     assert proto.events[-1]["body"]["reason"] == "exited"
     assert 1 not in adapter._thread_states
+
+
+def test_continue_request_starts_clock():
+    adapter, proto = _make_adapter()
+    calls = []
+
+    class Client:
+        def resume(self, pid):
+            calls.append(("resume", pid))
+
+        def clock_start(self):
+            calls.append(("clock_start", None))
+
+    adapter.client = Client()
+    adapter.current_pid = 7
+    adapter._handle_continue({})
+    assert calls == [("resume", 7), ("clock_start", None)]
+    assert proto.events[-1]["event"] == "continued"

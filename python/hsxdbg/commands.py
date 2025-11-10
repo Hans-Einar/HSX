@@ -84,6 +84,18 @@ class CommandClient:
         payload.setdefault("session", self.session.state.session_id)
         return self._request(payload)
 
+    def clock_start(self) -> Dict:
+        payload = {"cmd": "clock", "op": "start"}
+        return self._request(payload)
+
+    def clock_stop(self) -> Dict:
+        payload = {"cmd": "clock", "op": "stop"}
+        return self._request(payload)
+
+    def clock_status(self) -> Dict:
+        payload = {"cmd": "clock", "op": "status"}
+        return self._request(payload)
+
     def _invalidate_cache(
         self,
         pid: Optional[int],
