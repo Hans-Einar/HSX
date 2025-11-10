@@ -1292,7 +1292,7 @@ class HSXDebugAdapter:
             addr = resolved
         if addr is None or not self.client:
             return None
-        data = self.client.read_memory(int(addr), int(size), pid=self.current_pid)
+        data = self.client.read_memory(int(addr), int(size), pid=self.current_pid, refresh=True)
         if not data:
             return None
         value = int.from_bytes(data[: min(len(data), 4)], byteorder="big")
