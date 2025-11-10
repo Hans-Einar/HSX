@@ -249,6 +249,19 @@ class CommandClient:
 
         return self.cache.query_memory(pid, addr, length, fallback=fallback)
 
+    def write_memory(self, addr: int, data: bytes, *, pid: Optional[int] = None) -> Dict:
+        """Write raw bytes to memory at the specified address."""
+        pid = pid or self.session.state.pid
+        if pid is None:
+            raise ValueError("pid is required")
+        data_hex = data.hex()
+        payload = {"cmd": "poke", "pid": pid, "addr": int(addr), "data": data_hex}
+        response = self._request(payload)
+        if self.cache:
+            # Invalidate all cached memory for this pid since we modified it
+            self.cache.invalidate_memory(pid)
+        return response
+
     # ------------------------------------------------------------------
     # RPC fetchers
     # ------------------------------------------------------------------
