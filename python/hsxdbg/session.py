@@ -289,11 +289,21 @@ class SessionManager:
             response = self.transport.send_request(payload)
         except TransportError as exc:
             logger.debug("events.ack transport error: %s", exc)
+            try:
+                self.reopen()
+            except Exception:
+                logger.debug("session reopen after ack transport error failed", exc_info=True)
             return
         if response.get("status") == "ok":
             self._last_ack_seq = target
         else:
+            error_msg = str(response.get("error") or "")
             logger.debug("events.ack failed: %s", response)
+            if error_msg.startswith("session_required"):
+                try:
+                    self.reopen()
+                except Exception:
+                    logger.debug("session reopen after ack failure failed", exc_info=True)
 
     def _attach_cache_controller(self) -> None:
         if not self.runtime_cache or not self.event_bus:
@@ -333,5 +343,9 @@ class SessionManager:
                 self.keepalive()
             except Exception as exc:
                 logger.debug("session keepalive failed: %s", exc)
-                break
+                try:
+                    self.reopen()
+                except Exception:
+                    logger.debug("session reopen after keepalive failure failed", exc_info=True)
+                    break
         self._keepalive_thread = None

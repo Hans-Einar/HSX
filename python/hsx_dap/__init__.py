@@ -526,7 +526,7 @@ class HSXDebugAdapter:
             runtime_cache=self.runtime_cache,
         )
         self.session.open()
-        categories = ["debug_break", "watch_update", "stdout", "stderr", "warning", "trace_step", "task_state"]
+        categories = ["debug_break", "watch_update", "stdout", "stderr", "warning", "task_state"]
         self.session.subscribe_events({"pid": [pid], "categories": categories}, ack_interval=0.1)
         self.client = CommandClient(session=self.session, cache=self.runtime_cache)
         self._watch_expr_to_id.clear()

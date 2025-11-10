@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import atexit
+import itertools
 import json
 import math
 import os
@@ -118,6 +119,7 @@ _LAST_COMMAND_CONTEXT: Dict[str, Any] = {}
 _SESSION_INDEX_LOCK = threading.Lock()
 _SESSION_INDEX_CACHE: Dict[int, str] = {}
 _SESSION_REVERSE_CACHE: Dict[str, int] = {}
+_SESSION_NUMBER_COUNTER = itertools.count(1)
 _SESSION_CMD_CONTEXT: Dict[str, Any] = {}
 def _set_session_context(op: str, **extra: Any) -> None:
     _SESSION_CMD_CONTEXT.clear()
@@ -1634,7 +1636,7 @@ def _pretty_dmesg(payload: dict) -> None:
         if session_number is not None:
             session_text = str(session_number)
         else:
-            session_text = "-"
+            session_text = "0"
         parts = [
             f"[{seq}]",
             timestamp,
@@ -3220,15 +3222,22 @@ def main() -> None:
             print(json.dumps(resp, indent=2, sort_keys=True))
         return
 
+def _assign_session_number_locked(session_id: str) -> int:
+    number = _SESSION_REVERSE_CACHE.get(session_id)
+    if number is None:
+        number = next(_SESSION_NUMBER_COUNTER)
+        _SESSION_REVERSE_CACHE[session_id] = number
+    return number
+
+
 def _remember_session_list(entries: Sequence[Dict[str, Any]]) -> None:
     with _SESSION_INDEX_LOCK:
         _SESSION_INDEX_CACHE.clear()
-        _SESSION_REVERSE_CACHE.clear()
         for idx, entry in enumerate(entries, 1):
             session_id = entry.get("id")
             if isinstance(session_id, str) and session_id:
                 _SESSION_INDEX_CACHE[idx] = session_id
-                _SESSION_REVERSE_CACHE[session_id] = idx
+                _assign_session_number_locked(session_id)
 
 
 def _lookup_session_by_index(index: int) -> Optional[str]:
@@ -3279,7 +3288,7 @@ def _session_number_for(session_id: Optional[str]) -> Optional[int]:
     if not session_id:
         return None
     with _SESSION_INDEX_LOCK:
-        return _SESSION_REVERSE_CACHE.get(session_id)
+        return _assign_session_number_locked(session_id)
 
 
 def _format_duration(seconds: float) -> str:
