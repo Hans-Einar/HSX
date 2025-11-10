@@ -160,8 +160,11 @@ class SymbolMapper:
                     pass
             for key in keys:
                 lines = self._line_map[key]
-                lines.setdefault(int(line), []).append(int(pc))
-            self._pc_map[int(pc)] = {
+                # Mask PC to 16-bit to match executive's breakpoint storage
+                pc_masked = int(pc) & 0xFFFF
+                lines.setdefault(int(line), []).append(pc_masked)
+            # Store with 16-bit masking for consistency with lookup_pc
+            self._pc_map[int(pc) & 0xFFFF] = {
                 "file": file_value,
                 "directory": directory,
                 "line": line,
@@ -731,6 +734,10 @@ class HSXDebugAdapter:
                         candidates = self._symbol_mapper.lookup(filename, int(line))
                 if candidates:
                     addresses.append(int(candidates[0]))
+                    self.logger.debug("Resolved %s:%s to addresses: %s", lookup_path, line, 
+                                    [f"0x{addr:04X}" for addr in candidates])
+                else:
+                    self.logger.debug("No address mapping found for %s:%s", lookup_path, line)
             except Exception as exc:
                 self.logger.debug("symbol lookup failed for %s:%s (%s)", lookup_path, line, exc)
         parsed = self._parse_address(bp)
