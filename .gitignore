@@ -10,3 +10,4 @@ docs/html/
 docs/latex/
 dist/
 vscode-hsx/node_modules/
+hsx-dap-debug.log
