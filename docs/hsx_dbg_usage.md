@@ -86,3 +86,18 @@ specifications.
 `stack bt <pid>` fetches a backtrace and caches frames locally. Use `stack frame <pid> <n>`
 to select a specific frame, `stack up <pid>` / `stack down <pid>` to move between frames,
 and note that the CLI highlights the currently selected frame in `stack bt` output.
+
+## Memory Inspection
+
+`mem read <pid> <address>` mirrors the classic `x/<fmt>` syntax. Choose formats with
+`--format x|d|i|s` and widths via `--width`. `mem dump <pid> <start> <end>` produces a
+16-byte-per-row hex dump that always includes an ASCII gutter, making it easier to detect
+string fragments or padding bytes. The CLI also understands the executive's `memory regions`
+metadata so you can quickly list mapped ranges with `mem regions <pid>`.
+
+## Disassembly
+
+`disasm <pid> [symbol|address]` streams instructions with function annotations and source
+locations (when the executive provides them). The arrow prefix (`=>`) marks the current PC
+and offsets appear as `<function+0xN>` to match the design document. Add `--source` to force
+source lookups even when symbol data is sparse.

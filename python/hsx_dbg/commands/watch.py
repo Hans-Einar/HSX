@@ -20,6 +20,8 @@ class WatchCommand(Command):
         add = sub.add_parser("add")
         add.add_argument("pid", type=int)
         add.add_argument("expr")
+        add.add_argument("--type", choices=["address", "symbol", "local"], help="Force watch type")
+        add.add_argument("--length", type=int, help="Byte length for memory watches")
 
         remove = sub.add_parser("remove")
         remove.add_argument("pid", type=int)
@@ -36,15 +38,20 @@ class WatchCommand(Command):
         except SystemExit:
             return 1
         if args.subcmd == "add":
-            return self._handle_add(ctx, args.pid, args.expr)
+            return self._handle_add(ctx, args.pid, args.expr, watch_type=args.type, length=args.length)
         if args.subcmd == "remove":
             return self._handle_remove(ctx, args.pid, args.watch_id)
         return self._handle_list(ctx, args.pid)
 
-    def _handle_add(self, ctx: DebuggerContext, pid: int, expr: str) -> int:
+    def _handle_add(self, ctx: DebuggerContext, pid: int, expr: str, *, watch_type: str | None, length: int | None) -> int:
         session = ctx.ensure_session()
+        payload = {"cmd": "watch", "op": "add", "pid": pid, "expr": expr}
+        if watch_type:
+            payload["type"] = watch_type
+        if length is not None:
+            payload["length"] = max(1, int(length))
         try:
-            response = session.request({"cmd": "watch", "op": "add", "pid": pid, "expr": expr})
+            response = session.request(payload)
         except Exception as exc:
             emit_error(ctx, message=f"watch add failed: {exc}")
             return 2

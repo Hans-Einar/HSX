@@ -21,6 +21,8 @@ from .observer import ObserverCommand
 from .breakpoints import BreakpointCommand
 from .watch import WatchCommand
 from .stack import StackCommand
+from .memory import MemoryCommand
+from .disasm import DisasmCommand
 
 
 class CommandRegistry:
@@ -62,6 +64,8 @@ def build_registry() -> CommandRegistry:
         BreakpointCommand(),
         WatchCommand(),
         StackCommand(),
+        MemoryCommand(),
+        DisasmCommand(),
         AliasCommand(),
         ExitCommand(),
     ]

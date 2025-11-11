@@ -1,0 +1,13 @@
+mem <subcommand>
+
+Subcommands:
+  regions <pid>          List memory regions (start, end, kind).
+  read <pid> <addr> [--count N] [--format x|d|i|s]
+  dump <pid> <start> <end>
+    Hex dump with ASCII preview (16 bytes per row).
+
+Formats:
+  x = hex words (default)
+  d = signed decimal
+  i = disassemble instructions
+  s = ASCII string

@@ -307,12 +307,12 @@ Automatic keepalive messages per heartbeat interval. Prevents session timeout.
 `x/<fmt> <addr>`, `dump <start> <end>` commands per section 5.6. Inspect memory contents.
 
 **Todo:**
-- [ ] Implement `x/<format> <address>` command (examine memory)
-- [ ] Support format specifiers (x=hex, d=decimal, i=instruction, s=string)
-- [ ] Implement `dump <start> <end>` command (hex dump)
-- [ ] Add ASCII preview for dumps
-- [ ] Add memory command tests
-- [ ] Document memory commands
+- [x] Implement `x/<format> <address>` command (examine memory)
+- [x] Support format specifiers (x=hex, d=decimal, i=instruction, s=string)
+- [x] Implement `dump <start> <end>` command (hex dump)
+- [x] Add ASCII preview for dumps
+- [x] Add memory command tests
+- [x] Document memory commands
 
 ---
 
@@ -326,13 +326,13 @@ Automatic keepalive messages per heartbeat interval. Prevents session timeout.
 `disasm <addr/symbol>`, `disasm /s` commands per section 5.7. View assembly instructions with symbols.
 
 **Todo:**
-- [ ] Implement `disasm <address>` command (disassemble at address)
-- [ ] Implement `disasm <symbol>` command (disassemble function)
-- [ ] Implement `disasm /s` flag (show source lines)
-- [ ] Annotate instructions with symbol names
-- [ ] Highlight current PC
-- [ ] Add disassembly command tests
-- [ ] Document disassembly commands
+- [x] Implement `disasm <address>` command (disassemble at address)
+- [x] Implement `disasm <symbol>` command (disassemble function)
+- [x] Implement `disasm /s` flag (show source lines)
+- [x] Annotate instructions with symbol names
+- [x] Highlight current PC
+- [x] Add disassembly command tests
+- [x] Document disassembly commands
 
 ---
 

@@ -17,6 +17,7 @@
 | 2025-11-11 | 94849c5 | pause/continue/step controls | Codex | Tests: `PYTHONPATH=. python python/hsx_dbg.py --command "pause 1"; PYTHONPATH=. python python/hsx_dbg.py --command "continue 1"; PYTHONPATH=. python python/hsx_dbg.py --command "step 1 5"; PYTHONPATH=. python python/hsx_dbg.py --json --command "step 1 2"` |
 | 2025-11-11 | 0662c80 | finish Phase 1/2 (aliases/observer/session info) | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py` |
 | 2025-11-11 | df988f7 | add symbol-aware breakpoint/watch commands | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py` |
+| 2025-11-11 | 044962d | begin Phase 4 (stack/watch UI, symbols path) | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py` |
 
 ## Pull Request
 - PR URL / ID: `<link or ID>`
@@ -26,5 +27,6 @@
 - Notes: `<follow-up items>`
 
 ## Additional Notes
+- Pending: Phase 4 inspection commands (memory dump ASCII preview, disasm annotations). Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py`.
 - Update this file whenever new commits land or PR state changes.
 - Link CI runs, code reviews, or related issues as the implementation progresses.

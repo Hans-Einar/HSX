@@ -17,7 +17,9 @@ from hsx_dbg.commands.attach import AttachCommand
 from hsx_dbg.commands.breakpoints import BreakpointCommand
 from hsx_dbg.commands.control import ContinueCommand, PauseCommand, StepCommand
 from hsx_dbg.commands.detach import DetachCommand
+from hsx_dbg.commands.disasm import DisasmCommand
 from hsx_dbg.commands.info import InfoCommand
+from hsx_dbg.commands.memory import MemoryCommand
 from hsx_dbg.commands.ps import PsCommand
 from hsx_dbg.commands.session import SessionCommand
 from hsx_dbg.commands.stack import StackCommand
@@ -186,9 +188,12 @@ def test_json_output_schema_for_pause(capsys):
 
 
 def test_watch_add_and_list(capsys):
-    ctx = StubContext([{"status": "ok", "watch": {"watch_id": 1, "expr": "counter", "value": 0}}, {"status": "ok", "watches": [{"watch_id": 1, "expr": "counter", "value": 0}]}])
+    ctx = StubContext([
+        {"status": "ok", "watch": {"watch_id": 1, "expr": "counter", "value": 0}},
+        {"status": "ok", "watches": [{"watch_id": 1, "expr": "counter", "value": 0}]},
+    ])
     cmd = WatchCommand()
-    assert cmd.run(ctx, ["add", "1", "counter"]) == 0
+    assert cmd.run(ctx, ["add", "1", "counter", "--type", "address", "--length", "4"]) == 0
     assert cmd.run(ctx, ["list", "1"]) == 0
     out = capsys.readouterr().out
     assert "watch 1" in out
@@ -206,6 +211,47 @@ def test_stack_bt_and_frame(capsys):
     assert cmd.run(ctx, ["bt", "1"]) == 0
     ctx._dummy_session.responses = []  # frame command should use cache
     assert cmd.run(ctx, ["frame", "1", "1"]) == 0
+
+
+def test_memory_read_command(capsys):
+    ctx = StubContext([{"status": "ok", "data": [{"address": 0, "value": "0xDEADBEEF"}]}])
+    cmd = MemoryCommand()
+    assert cmd.run(ctx, ["read", "1", "0x0", "--count", "1", "--format", "x", "--width", "4"]) == 0
+
+
+def test_memory_dump_command_formats_hex_ascii(capsys):
+    dump_block = {
+        "pid": 1,
+        "start": 0x1000,
+        "bytes": list(range(16)),
+    }
+    ctx = StubContext([{"status": "ok", "dump": dump_block}])
+    cmd = MemoryCommand()
+    assert cmd.run(ctx, ["dump", "1", "0x1000", "0x1010"]) == 0
+    out = capsys.readouterr().out
+    assert "0x00001000" in out
+    assert "00 01 02" in out
+    assert "........" in out
+
+
+def test_disasm_command(capsys):
+    ctx = StubContext([{"status": "ok", "instructions": [{"pc": 0x10, "text": "NOP"}]}])
+    cmd = DisasmCommand()
+    assert cmd.run(ctx, ["1", "0x10", "--count", "1"]) == 0
+
+
+def test_disasm_command_annotations(capsys):
+    instructions = [
+        {"pc": 0x10, "mnemonic": "LDI", "operands": "R0, #1", "symbol": {"name": "main"}, "file": "main.c", "line": 5, "current": True},
+        {"pc": 0x14, "text": "ADD R0, R1, R2", "symbol": "helper", "file": "main.c", "line": 6},
+    ]
+    ctx = StubContext([{"status": "ok", "instructions": instructions, "current_pc": 0x10}])
+    cmd = DisasmCommand()
+    assert cmd.run(ctx, ["1", "main"]) == 0
+    out = capsys.readouterr().out
+    assert "=>" in out
+    assert "<main>" in out
+    assert "main.c:5" in out
 
 
 def test_break_add_symbol_line(tmp_path):
