@@ -348,14 +348,14 @@ Automatic keepalive messages per heartbeat interval. Prevents session timeout.
 Design specifies tab completion for commands, symbols, addresses, registers using symbol files (section 6.3).
 
 **Todo:**
-- [ ] Implement command name completion
-- [ ] Implement symbol name completion (functions, variables)
-- [ ] Implement register name completion
-- [ ] Implement file path completion
-- [ ] Load symbols from .sym files
-- [ ] Integrate with prompt_toolkit completion API
-- [ ] Add completion tests
-- [ ] Document completion behavior
+- [x] Implement command name completion
+- [x] Implement symbol name completion (functions, variables)
+- [x] Implement register name completion
+- [x] Implement file path completion
+- [x] Load symbols from .sym files
+- [x] Integrate with prompt_toolkit completion API
+- [x] Add completion tests
+- [x] Document completion behavior
 
 ---
 
@@ -369,12 +369,12 @@ Design specifies tab completion for commands, symbols, addresses, registers usin
 Design specifies history across sessions (section 6.4). Save to `~/.hsx_history`.
 
 **Todo:**
-- [ ] Implement history save to `~/.hsx_history`
-- [ ] Implement history load on startup
-- [ ] Limit history size (configurable)
-- [ ] Add history search (Ctrl+R)
-- [ ] Add history tests
-- [ ] Document history file location
+- [x] Implement history save to `~/.hsx_history`
+- [x] Implement history load on startup
+- [x] Limit history size (configurable)
+- [x] Add history search (Ctrl+R)
+- [x] Add history tests
+- [x] Document history file location
 
 ---
 

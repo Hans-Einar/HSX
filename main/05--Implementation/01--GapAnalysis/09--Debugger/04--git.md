@@ -19,6 +19,7 @@
 | 2025-11-11 | df988f7 | add symbol-aware breakpoint/watch commands | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py` |
 | 2025-11-11 | 044962d | begin Phase 4 (stack/watch UI, symbols path) | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py` |
 | 2025-11-11 | bb0f9d0 | Phase 4 updates (memory/disasm polish) | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py` |
+| 2025-11-11 | 34ea6a3 | Phase 4 progress (gdb-style mem examine) | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py` |
 
 ## Pull Request
 - PR URL / ID: `<link or ID>`
@@ -28,6 +29,6 @@
 - Notes: `<follow-up items>`
 
 ## Additional Notes
-- Pending: Phase 4 polish (gdb-style `x/<spec>` command, expanded docs/tests). Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py`.
+- Next focus: Phase 5 UX enhancements (completion/history/scripting) before DAP refactor. Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py`.
 - Update this file whenever new commits land or PR state changes.
 - Link CI runs, code reviews, or related issues as the implementation progresses.

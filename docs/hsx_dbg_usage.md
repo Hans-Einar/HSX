@@ -34,6 +34,28 @@ hsxdbg> break main \
 > loop
 ```
 
+## Tab Completion
+
+When `prompt_toolkit` is available (default on developer workstations) the REPL enables
+tab completion for commands, symbols, registers, and file paths. Examples:
+
+- Type `br<Tab>` to expand to `break`
+- Use `disasm 1 ma<Tab>` to pick symbol names from the active `.sym` file
+- Enter `symbols /tmp/<Tab>` to browse the filesystem for symbol files
+- Register names such as `R00`, `SP`, or `PC` complete automatically when typing
+
+Completion also reacts to aliases and dynamically updates whenever you change the
+symbol file via the `symbols` command.
+
+## Command History
+
+Command history is persisted to `~/.hsx_history` by default. Use `--history <path>` to
+store it elsewhere and `--history-limit N` to cap the number of retained entries
+(defaults to 2,000). Press `Ctrl+R` in the interactive prompt to search backwards
+through history; the fallback readline mode loads the same file so the shortcut works
+there as well. History is not written when a command is blank or repeats the previous
+entry, keeping the log tidy.
+
 ## Aliases
 
 Use `alias foo bar` to map `foo` to command `bar`. `alias` with no arguments lists

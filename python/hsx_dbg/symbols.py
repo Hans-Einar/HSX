@@ -109,3 +109,9 @@ class SymbolIndex:
 
     def lookup_symbol(self, name: str) -> List[int]:
         return list(dict.fromkeys(self._symbol_map.get(name, [])))
+
+    def complete_symbols(self, prefix: str = "") -> List[str]:
+        if not prefix:
+            return sorted(self._symbol_map.keys())
+        needle = prefix.lower()
+        return sorted(name for name in self._symbol_map if name.lower().startswith(needle))

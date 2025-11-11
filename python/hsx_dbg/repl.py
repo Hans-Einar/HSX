@@ -8,36 +8,65 @@ from typing import Optional
 from .commands import CommandRegistry
 from .commands.help import HelpCommand
 from .context import DebuggerContext
+from .history import HistoryStore
 from .parser import split_command
+
+try:
+    from .completion import DebuggerCompleter
+except Exception:  # pragma: no cover - prompt_toolkit missing
+    DebuggerCompleter = None  # type: ignore
 
 LOGGER = logging.getLogger("hsx_dbg.repl")
 
 try:
     from prompt_toolkit import PromptSession
-    from prompt_toolkit.history import FileHistory
+    from prompt_toolkit.history import InMemoryHistory
     from prompt_toolkit.patch_stdout import patch_stdout
 except ImportError:  # pragma: no cover - fallback path
     PromptSession = None  # type: ignore
-    FileHistory = None
+    InMemoryHistory = None  # type: ignore
     patch_stdout = None
+
+try:  # pragma: no cover - optional dependency
+    import readline
+except ImportError:  # pragma: no cover
+    readline = None
 
 
 class DebuggerREPL:
     """Minimal prompt-toolkit REPL with fallback to input()."""
 
-    def __init__(self, ctx: DebuggerContext, registry: CommandRegistry, *, history_path: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        ctx: DebuggerContext,
+        registry: CommandRegistry,
+        *,
+        history_store: Optional[HistoryStore] = None,
+    ) -> None:
         self.ctx = ctx
         self.registry = registry
-        self.history_path = history_path
+        self.history_store = history_store
         help_command = self.registry.get("help")
         if isinstance(help_command, HelpCommand):
             help_command.bind(registry)
+        self._readline_enabled = False
 
     def run(self) -> int:
         if PromptSession is None:
             return self._fallback_loop()
-        history = FileHistory(self.history_path) if (self.history_path and FileHistory) else None
-        session = PromptSession("> ", history=history)
+        history = None
+        if InMemoryHistory is not None:
+            history = InMemoryHistory()
+            if self.history_store:
+                for entry in self.history_store.snapshot():
+                    history.append_string(entry)
+        completer = None
+        if DebuggerCompleter is not None:
+            try:
+                completer = DebuggerCompleter(self.ctx, self.registry)
+            except RuntimeError:
+                completer = None
+        session = PromptSession("> ", history=history, completer=completer, complete_while_typing=True)
         buffer: list[str] = []
         while True:
             try:
@@ -50,10 +79,19 @@ class DebuggerREPL:
                 continue
             payload = " ".join(buffer) if buffer else line
             buffer.clear()
+            self._record_history(payload)
             self._dispatch(payload)
 
     def _fallback_loop(self) -> int:
         buffer: list[str] = []
+        use_readline = bool(readline and self.history_store)
+        if use_readline:
+            for entry in self.history_store.snapshot():
+                try:
+                    readline.add_history(entry)
+                except Exception:
+                    break
+        self._readline_enabled = use_readline
         while True:
             try:
                 line = input("> ")
@@ -64,6 +102,7 @@ class DebuggerREPL:
                 continue
             payload = " ".join(buffer) if buffer else line
             buffer.clear()
+            self._record_history(payload)
             self._dispatch(payload)
 
     def _dispatch(self, line: str) -> None:
@@ -99,3 +138,19 @@ class DebuggerREPL:
             buffer.append(stripped)
             return False
         return False
+
+    def _record_history(self, entry: str) -> None:
+        stripped = entry.strip()
+        if not stripped:
+            return
+        if self.history_store:
+            self.history_store.append(stripped)
+        if self._readline_enabled and readline:
+            try:
+                readline.add_history(stripped)
+                if self.history_store:
+                    limit = self.history_store.limit
+                    while readline.get_current_history_length() > limit:
+                        readline.remove_history_item(0)
+            except Exception:
+                pass

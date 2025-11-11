@@ -160,6 +160,12 @@ class DebuggerContext:
         if disabled:
             disabled.discard(address)
 
+    def symbol_completions(self, prefix: str = "") -> List[str]:
+        index = self._ensure_symbol_index()
+        if not index:
+            return []
+        return index.complete_symbols(prefix)
+
     def set_stack_cache(self, pid: int, stack: Dict[str, Any]) -> None:
         self._stack_cache[pid] = stack
         if pid not in self.current_frames:

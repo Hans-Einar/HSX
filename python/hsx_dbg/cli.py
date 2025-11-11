@@ -11,6 +11,7 @@ from typing import List
 
 from .commands import build_registry
 from .context import DebuggerContext
+from .history import HistoryStore
 from .parser import split_command
 from .repl import DebuggerREPL
 
@@ -38,8 +39,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--history",
         type=Path,
-        default=Path.home() / ".hsx-dbg-history",
-        help="Path to command history file (prompt_toolkit mode)",
+        default=Path.home() / ".hsx_history",
+        help="Path to command history file (persistent across sessions)",
+    )
+    parser.add_argument(
+        "--history-limit",
+        type=int,
+        default=2000,
+        help="Maximum number of commands to keep in history",
     )
     parser.add_argument(
         "--symbols",
@@ -73,9 +80,10 @@ def main(argv: List[str] | None = None) -> int:
         symbol_path=symbol_path,
     )
     registry = build_registry()
+    history_store = HistoryStore(str(args.history), limit=args.history_limit) if args.history else None
     if args.command:
         return _run_single_command(ctx, registry, args.command)
-    repl = DebuggerREPL(ctx, registry, history_path=str(args.history))
+    repl = DebuggerREPL(ctx, registry, history_store=history_store)
     try:
         return repl.run()
     except SystemExit:
