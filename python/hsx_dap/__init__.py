@@ -30,7 +30,6 @@ from python.hsxdbg import (
     SessionManager,
     StdStreamEvent,
     TaskStateEvent,
-    TraceStepEvent,
     WarningEvent,
     WatchUpdateEvent,
 )
@@ -227,8 +226,6 @@ class HSXDebugAdapter:
     _EVENT_CATEGORIES = [
         "debug_break",
         "task_state",
-        "scheduler",
-        "trace_step",
         "watch_update",
         "stdout",
         "stderr",
@@ -260,7 +257,6 @@ class HSXDebugAdapter:
         self._watch_id_to_expr: Dict[int, str] = {}
         self._pending_breakpoints: Dict[str, Dict[str, Any]] = {}
         self._sym_hint: Optional[Path] = None
-        self._pending_step_reason: Optional[str] = None
         self._thread_states: Dict[int, Dict[str, Any]] = {}
         self._pending_pause: bool = False
         self._pause_fallback_timer: Optional[threading.Timer] = None
@@ -344,8 +340,8 @@ class HSXDebugAdapter:
             if path.exists():
                 self._sym_hint = path
                 break
-        self._connect(host, port, self.current_pid)
         self._update_project_root(args)
+        self._connect(host, port, self.current_pid)
         self._reapply_pending_breakpoints()
         return {}
 
@@ -433,7 +429,13 @@ class HSXDebugAdapter:
     def _handle_next(self, args: JsonDict) -> JsonDict:
         self._ensure_client()
         self.client.step(self.current_pid, source_only=False)
-        self._pending_step_reason = "step"
+        pc = self._read_current_pc()
+        self._emit_stopped_event(
+            pid=self.current_pid,
+            reason="step",
+            description="step complete",
+            pc=pc,
+        )
         return {}
 
     def _handle_stepIn(self, args: JsonDict) -> JsonDict:  # noqa: N802
@@ -706,7 +708,6 @@ class HSXDebugAdapter:
     def _connect(self, host: str, port: int, pid: int) -> None:
         self.logger.info("Connecting to executive at %s:%d (PID %d)", host, port, pid)
         self._thread_states.clear()
-        self._pending_step_reason = None
         self._pending_pause = False
         self.event_bus = EventBus()
         self.event_bus.start()
@@ -714,7 +715,7 @@ class HSXDebugAdapter:
         session_config = SessionConfig(
             client_name="hsx-dap",
             pid_lock=pid,
-            max_events=2048,
+            max_events=8192,
             heartbeat_s=10,
             features=list(self._SESSION_FEATURES),
         )
@@ -726,8 +727,13 @@ class HSXDebugAdapter:
             runtime_cache=self.runtime_cache,
         )
         self.session.open()
-        self.session.subscribe_events({"pid": [pid], "categories": self._EVENT_CATEGORIES}, ack_interval=0.1)
+        self.session.subscribe_events(
+            {"pid": [pid], "categories": self._EVENT_CATEGORIES},
+            auto_ack=True,
+            ack_interval=0.02,
+        )
         self.client = CommandClient(session=self.session, cache=self.runtime_cache)
+        self._purge_remote_breakpoints()
         self._watch_expr_to_id.clear()
         self._watch_id_to_expr.clear()
         self._ensure_symbol_mapper(force=True)
@@ -738,8 +744,6 @@ class HSXDebugAdapter:
     def _handle_exec_event(self, event) -> None:
         if isinstance(event, TaskStateEvent):
             self._handle_task_state_event(event)
-        elif isinstance(event, TraceStepEvent):
-            self._handle_trace_step_event(event)
         elif isinstance(event, DebugBreakEvent):
             reason = event.reason or "breakpoint"
             self.logger.info("DebugBreakEvent: pid=%s, pc=0x%04X, reason=%s", event.pid, event.pc or 0, reason)
@@ -918,6 +922,49 @@ class HSXDebugAdapter:
                 except Exception:
                     self.logger.debug("failed to clear breakpoint 0x%X", address)
         self._breakpoints[source_key] = []
+
+    def _clear_all_breakpoints(self) -> None:
+        if not self._breakpoints:
+            return
+        keys = list(self._breakpoints.keys())
+        for source_key in keys:
+            self._clear_breakpoints(source_key)
+        self._breakpoints.clear()
+
+    def _purge_remote_breakpoints(self) -> None:
+        if not self.client or self.current_pid is None:
+            return
+        try:
+            response = self.client.list_breakpoints(self.current_pid)
+        except Exception as exc:
+            self.logger.debug("list_breakpoints failed during session startup: %s", exc)
+            return
+        entries = response.get("breakpoints")
+        if not isinstance(entries, list):
+            return
+        stale: List[int] = []
+        for entry in entries:
+            try:
+                if isinstance(entry, str):
+                    address = int(entry, 0)
+                else:
+                    address = int(entry)
+            except (TypeError, ValueError):
+                self.logger.debug("Skipping invalid breakpoint entry from executive: %r", entry)
+                continue
+            stale.append(address & 0xFFFF)
+        if not stale:
+            return
+        cleared = 0
+        for address in stale:
+            try:
+                self.client.clear_breakpoint(address, pid=self.current_pid)
+                cleared += 1
+            except Exception as exc:
+                self.logger.warning("Failed to clear stale breakpoint 0x%04X: %s", address, exc)
+        if cleared:
+            plural = "s" if cleared != 1 else ""
+            self.logger.info("Cleared %d stale breakpoint%s left behind by previous sessions", cleared, plural)
 
     def _resolve_breakpoint_addresses(self, source_path: Optional[str], line: Optional[int], bp: JsonDict) -> List[int]:
         addresses: List[int] = []
@@ -1155,10 +1202,10 @@ class HSXDebugAdapter:
 
     def _shutdown(self) -> None:
         self._cleanup_watches()
+        self._clear_all_breakpoints()
         self._symbol_mapper = None
         self._symbol_path = None
         self._symbol_mtime = None
-        self._pending_step_reason = None
         self._thread_states.clear()
         if self._event_token and self.event_bus:
             self.event_bus.unsubscribe(self._event_token)
@@ -1196,13 +1243,26 @@ class HSXDebugAdapter:
             candidate_root = REPO_ROOT
         self.project_root = candidate_root
         base_dirs: List[Path] = []
-        for base in (candidate_root, REPO_ROOT):
-            if base and base not in base_dirs:
-                base_dirs.append(base.resolve())
+
+        def _add_base(path: Optional[Path]) -> None:
+            if not path:
+                return
+            resolved = path.resolve()
+            if resolved not in base_dirs:
+                base_dirs.append(resolved)
+
+        _add_base(candidate_root)
+        _add_base(REPO_ROOT)
         if self._sym_hint:
             sym_dir = self._sym_hint.parent.resolve()
-            if sym_dir not in base_dirs:
-                base_dirs.append(sym_dir)
+            chain: List[Path] = [sym_dir]
+            chain.extend(list(sym_dir.parents))
+            for parent in chain:
+                _add_base(parent)
+                if candidate_root and parent == candidate_root:
+                    break
+                if parent == REPO_ROOT:
+                    break
         self._source_base_dirs = base_dirs
 
     def _infer_repo_root(self, start: Path) -> Optional[Path]:
@@ -1229,10 +1289,19 @@ class HSXDebugAdapter:
                     resolved = candidate
                     break
             if resolved is None:
-                resolved = (self.project_root / source_path).resolve()
+                fallback = (self.project_root / source_path).resolve()
+                self.logger.debug(
+                    "Source path %s not found in bases %s, falling back to %s",
+                    path,
+                    [str(b) for b in self._source_base_dirs],
+                    fallback,
+                )
+                resolved = fallback
             source_path = resolved
         else:
             source_path = source_path.resolve()
+        if not source_path.exists():
+            self.logger.debug("Resolved source path %s still missing on disk", source_path)
         key = source_path.as_posix()
         ref = self._source_path_to_ref.get(key)
         if ref is None:
@@ -1240,6 +1309,8 @@ class HSXDebugAdapter:
             self._next_source_id += 1
             self._source_path_to_ref[key] = ref
             self._source_ref_to_path[ref] = key
+        else:
+            self.logger.debug("Resolved source %s -> %s (ref=%s)", path, key, ref)
         return {"name": source_path.name, "path": key, "sourceReference": ref}
 
     def _emit_stopped_event(
@@ -1278,18 +1349,6 @@ class HSXDebugAdapter:
         else:
             self.logger.info("Stopped event: reason=%s (no PC available)", reason_value)
         self.protocol.send_event("stopped", body)
-
-    def _handle_trace_step_event(self, event: TraceStepEvent) -> None:
-        if not self._pending_step_reason:
-            return
-        reason = self._pending_step_reason
-        self._pending_step_reason = None
-        self._emit_stopped_event(
-            pid=event.pid or self.current_pid,
-            reason=reason,
-            description="step complete",
-            pc=event.pc or event.next_pc,
-        )
 
     def _handle_task_state_event(self, event: TaskStateEvent) -> None:
         pid = event.pid or self.current_pid

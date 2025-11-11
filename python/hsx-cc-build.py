@@ -116,6 +116,7 @@ class HSXBuilder:
             self.debug_env = {
                 "HSX_DEBUG_PREFIX_MAP": self.debug_prefix_map,
                 "DEBUG_PREFIX_MAP": self.debug_prefix_map,
+                "HSX_CC_FORCE_FULL_DEBUG": "1",
             }
 
         self.stdlib_mvasm = (self.project_root / "lib" / "hsx_std" / "stdlib.mvasm").resolve()
@@ -223,6 +224,9 @@ class HSXBuilder:
         # Check if Makefile exists
         if not (self.project_root / 'Makefile').exists():
             raise HSXBuildError("No Makefile found in project root")
+
+        if self.args.clean:
+            self.run_command(['make', 'clean'])
         
         # Run make
         self.run_command(make_cmd)

@@ -787,8 +787,7 @@ class ExecutiveState:
             return record
 
     def session_keepalive(self, session_id: str) -> None:
-        record = self.touch_session(session_id)
-        self.log("debug", "session keepalive", session_id=record.session_id)
+        self.touch_session(session_id)
 
     def _release_session_locks(self, session: SessionRecord) -> None:
         with self.session_lock:
@@ -965,7 +964,7 @@ class ExecutiveState:
 
     def _handle_breakpoint_hit(self, pid: int, pc: int, *, phase: str) -> Dict[str, Any]:
         self.log("info", "breakpoint hit", pid=pid, pc=pc, phase=phase)
-        self.stop_auto()
+        # Keep the global clock running so other apps continue to make progress.
         self._set_task_state_pending(
             pid,
             "debug_break",
@@ -3694,7 +3693,30 @@ class ExecutiveState:
     def resume_task(self, pid: int) -> Dict[str, Any]:
         self.get_task(pid)
         self._set_task_state_pending(pid, "resume", target_state="running", ts=time.time())
+        skip_pc: Optional[int] = None
+        ctx_pc: Optional[int] = None
+        with self.event_lock:
+            bp_set = self.breakpoints.get(pid, set())
+        state_snapshot = self.task_states.get(pid) or {}
+        context = state_snapshot.get("context") if isinstance(state_snapshot, dict) else {}
+        if isinstance(context, dict):
+            pc_value = context.get("pc")
+            if isinstance(pc_value, (int, float)):
+                ctx_pc = int(pc_value) & 0xFFFFFFFF
+        if bp_set and ctx_pc is not None and ((ctx_pc & 0xFFFF) in bp_set):
+            skip_pc = ctx_pc
         with self.lock:
+            if skip_pc is not None and hasattr(self.vm, "prepare_debug_run"):
+                try:
+                    self.vm.prepare_debug_run(step_count=0, skip_break_at_pc=skip_pc)
+                except Exception:
+                    self.log(
+                        "debug",
+                        "prepare_debug_run failed during resume",
+                        pid=pid,
+                        skip_pc=skip_pc,
+                        exc_info=True,
+                    )
             self.vm.resume(pid=pid)
         self._refresh_tasks()
         return dict(self.get_task(pid))
@@ -4640,15 +4662,17 @@ class _ShellHandler(socketserver.StreamRequestHandler):
             except json.JSONDecodeError:
                 self._send({"version": 1, "status": "error", "error": "invalid_json"})
                 continue
-            try:
-                self.server.state.log(
-                    "debug",
-                    "shell request",
-                    command=str(request.get("cmd")),
-                    session=request.get("session"),
-                )
-            except Exception:
-                pass
+            cmd_name = str(request.get("cmd") or "").lower()
+            if cmd_name != "session.keepalive":
+                try:
+                    self.server.state.log(
+                        "debug",
+                        "shell request",
+                        command=str(request.get("cmd")),
+                        session=request.get("session"),
+                    )
+                except Exception:
+                    pass
             response = self.server.exec_state_handle(request)
             stream_info = response.get("__stream__") if isinstance(response, dict) else None
             if stream_info:

@@ -8,12 +8,18 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
+import re
 import shlex
 import threading
 import time
+import textwrap
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 from executive_session import ExecutiveSession
+try:
+    from tabulate import tabulate
+except ImportError:  # pragma: no cover - optional dependency
+    tabulate = None
 
 try:
     import readline  # type: ignore
@@ -119,8 +125,10 @@ _LAST_COMMAND_CONTEXT: Dict[str, Any] = {}
 _SESSION_INDEX_LOCK = threading.Lock()
 _SESSION_INDEX_CACHE: Dict[int, str] = {}
 _SESSION_REVERSE_CACHE: Dict[str, int] = {}
+_SESSION_NUMBER_TO_ID: Dict[int, str] = {}
 _SESSION_NUMBER_COUNTER = itertools.count(1)
 _SESSION_CMD_CONTEXT: Dict[str, Any] = {}
+_DMESG_MESSAGE_WIDTH = 180
 def _set_session_context(op: str, **extra: Any) -> None:
     _SESSION_CMD_CONTEXT.clear()
     _SESSION_CMD_CONTEXT["op"] = op
@@ -1452,6 +1460,75 @@ def _pretty_reload(payload: dict) -> None:
         print(f"  task      : state={state} program={program}")
 
 
+def _pretty_load(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    image = payload.get("image") or {}
+    print("load:")
+    app_name = image.get("app_name") or image.get("app_name_base") or ""
+    pid = image.get("pid")
+    entry = _as_int(image.get("entry"), 0) & 0xFFFFFFFF
+    code_len = _as_int(image.get("code_len"), 0)
+    ro_len = _as_int(image.get("ro_len"), 0)
+    bss_len = _as_int(image.get("bss"), 0)
+    allow_multi = image.get("allow_multiple_instances")
+    print(f"  app       : {app_name or '-'}")
+    print(f"  pid       : {pid}")
+    print(f"  entry     : 0x{entry:08X}")
+    print(f"  code|ro|bss: {code_len} / {ro_len} / {bss_len}")
+    print(f"  allow_multi: {allow_multi}")
+    manifest = image.get("manifest_present")
+    if manifest:
+        print(f"  manifest : {manifest}")
+    symbols = image.get("symbols") or {}
+    if symbols:
+        sym_path = symbols.get("path")
+        loaded = symbols.get("loaded")
+        sym_count = symbols.get("count")
+        print("  symbols  : loaded=%s count=%s path=%s" % (loaded, sym_count, sym_path))
+    metadata = image.get("metadata") or {}
+    if isinstance(metadata, dict):
+        meta_counts = {}
+        for key in ("sections", "values", "commands", "mailboxes"):
+            entries = metadata.get(key)
+            if isinstance(entries, list):
+                meta_counts[key] = len(entries)
+        if meta_counts:
+            counts_repr = ", ".join(f"{k}={v}" for k, v in sorted(meta_counts.items()))
+            print(f"  metadata : {counts_repr}")
+
+
+def _pretty_resume(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    summary = payload.get("task") or {}
+    print("resume:")
+    pid = summary.get("pid")
+    program = summary.get("program")
+    state = summary.get("state")
+    pc = summary.get("pc")
+    steps = summary.get("accounted_steps")
+    priority = summary.get("priority")
+    quantum = summary.get("quantum")
+    print(f"  pid    : {pid}")
+    if program:
+        print(f"  program: {program}")
+    if pc is not None:
+        print(f"  pc     : 0x{int(pc) & 0xFFFFFFFF:08X}")
+    print(f"  state  : {state}")
+    print(f"  prio   : {priority}  quantum: {quantum}")
+    if steps is not None:
+        print(f"  steps  : {steps}")
+    sleep_ms = summary.get("sleep_pending_ms")
+    if summary.get("sleep_pending"):
+        print(f"  sleep  : pending ({sleep_ms} ms)")
+    trace_flag = summary.get("trace")
+    if trace_flag is not None:
+        print(f"  trace  : {trace_flag}")
+
+
 def _print_stdio_streams(entries: list[dict], indent: str = "  ") -> None:
     for entry in entries:
         stream = entry.get("stream", "?")
@@ -1601,6 +1678,27 @@ def _pretty_sched(payload: dict) -> None:
         print("  trace: (empty)")
 
 
+_ADDR_FIELD_RE = re.compile(
+    r"\b(?P<key>(?:addr|address|pc|next_pc|target_pc|breakpoint|bp|mem(?:ory)?|ptr|pointer))=(?P<value>\d+)",
+    re.IGNORECASE,
+)
+
+
+def _format_addr_text(text: str) -> str:
+    if not text:
+        return text
+    def repl(match: re.Match[str]) -> str:
+        try:
+            raw_value = int(match.group("value"))
+        except (TypeError, ValueError):
+            return match.group(0)
+        key = match.group("key")
+        value = raw_value & 0xFFFFFFFF
+        width = 4 if value <= 0xFFFF else 8
+        return f"{key}=0x{value:0{width}X}"
+    return _ADDR_FIELD_RE.sub(repl, text)
+
+
 def _pretty_dmesg(payload: dict) -> None:
     if payload.get("status") != "ok":
         print(json.dumps(payload, indent=2, sort_keys=True))
@@ -1610,15 +1708,86 @@ def _pretty_dmesg(payload: dict) -> None:
     if not logs:
         print("  (empty)")
         return
+    if tabulate is None:
+        for entry in logs:
+            ts = entry.get("ts")
+            if isinstance(ts, (int, float)):
+                timestamp = datetime.fromtimestamp(ts).strftime("%H:%M:%S")
+            else:
+                timestamp = "--:--:--"
+            level = (entry.get("level") or "").upper()
+            message = entry.get("message", "")
+            seq = entry.get("seq")
+            clock_steps = entry.get("clock_steps", entry.get("clock_cycles"))
+            clock_text = "-" if clock_steps is None else str(clock_steps)
+            event = entry.get("event") if isinstance(entry.get("event"), dict) else None
+            pid = entry.get("pid")
+            if pid is None and isinstance(event, dict):
+                pid = event.get("pid") or event.get("src_pid")
+            if pid is None:
+                pid = entry.get("current_pid")
+            pid_text = "-" if pid is None else str(pid)
+            event_type = message
+            if isinstance(event, dict):
+                event_type = event.get("type", event_type)
+            event_type = _format_addr_text(event_type)
+            message = _format_addr_text(message)
+            session_id = entry.get("session_id")
+            session_number = _session_number_for(session_id)
+            if session_number is not None:
+                session_text = str(session_number)
+            elif isinstance(session_id, str) and session_id:
+                session_text = session_id
+            else:
+                session_text = "-"
+            parts = [
+                f"[{seq}]",
+                timestamp,
+                level or "-",
+                f"pid={pid_text}",
+                f"session={session_text}",
+                f"clock={clock_text}",
+                f"event={event_type}",
+                f"msg={message}",
+            ]
+            extra = {
+                k: v
+                for k, v in entry.items()
+                if k
+                not in {
+                    "ts",
+                    "level",
+                    "message",
+                    "seq",
+                    "clock_steps",
+                    "clock_cycles",
+                    "event",
+                    "pid",
+                }
+            }
+            if extra:
+                formatted = []
+                for key in sorted(extra.keys()):
+                    value = extra[key]
+                    if isinstance(value, (dict, list)):
+                        text = json.dumps(value, separators=(",", ":"), sort_keys=True)
+                    else:
+                        text = str(value)
+                    formatted.append(f"{key}={_format_addr_text(text)}")
+                if formatted:
+                    parts.append(" ".join(formatted))
+            print("  " + " ".join(parts))
+        return
+    rows: List[List[str]] = []
+    session_width = 1
+    max_session_id_len = 1
     for entry in logs:
         ts = entry.get("ts")
-        if isinstance(ts, (int, float)):
-            timestamp = datetime.fromtimestamp(ts).strftime("%H:%M:%S")
-        else:
-            timestamp = "--:--:--"
-        level = (entry.get("level") or "").upper()
-        message = entry.get("message", "")
+        timestamp = datetime.fromtimestamp(ts).strftime("%H:%M:%S") if isinstance(ts, (int, float)) else "--:--:--"
+        level = (entry.get("level") or "").upper() or "-"
+        message = entry.get("message", "") or ""
         seq = entry.get("seq")
+        seq_text = str(seq) if seq is not None else "-"
         clock_steps = entry.get("clock_steps", entry.get("clock_cycles"))
         clock_text = "-" if clock_steps is None else str(clock_steps)
         event = entry.get("event") if isinstance(entry.get("event"), dict) else None
@@ -1628,25 +1797,22 @@ def _pretty_dmesg(payload: dict) -> None:
         if pid is None:
             pid = entry.get("current_pid")
         pid_text = "-" if pid is None else str(pid)
-        event_type = message
+        event_type = message or "-"
         if isinstance(event, dict):
             event_type = event.get("type", event_type)
+        event_type = _format_addr_text(event_type)
+        message = _format_addr_text(message)
         session_id = entry.get("session_id")
         session_number = _session_number_for(session_id)
         if session_number is not None:
             session_text = str(session_number)
+        elif isinstance(session_id, str) and session_id:
+            session_text = session_id
         else:
-            session_text = "0"
-        parts = [
-            f"[{seq}]",
-            timestamp,
-            level or "-",
-            f"pid={pid_text}",
-            f"session={session_text}",
-            f"clock={clock_text}",
-            f"event={event_type}",
-            f"msg={message}",
-        ]
+            session_text = "-"
+        session_width = max(session_width, len(session_text))
+        if isinstance(session_id, str) and session_id:
+            max_session_id_len = max(max_session_id_len, len(session_id))
         extra = {
             k: v
             for k, v in entry.items()
@@ -1667,12 +1833,29 @@ def _pretty_dmesg(payload: dict) -> None:
             for key in sorted(extra.keys()):
                 value = extra[key]
                 if isinstance(value, (dict, list)):
-                    formatted.append(f"{key}={json.dumps(value, separators=(',', ':'), sort_keys=True)}")
+                    text = json.dumps(value, separators=(",", ":"), sort_keys=True)
                 else:
-                    formatted.append(f"{key}={value}")
+                    text = str(value)
+                formatted.append(f"{key}={_format_addr_text(text)}")
             if formatted:
-                parts.append(" ".join(formatted))
-        print("  " + " ".join(parts))
+                message = f"{message} {' '.join(formatted)}".strip()
+        rows.append([seq_text, timestamp, level, pid_text, session_text, clock_text, event_type, message])
+    session_len = max(session_width, 1)
+    candidate = max(session_len * 2, max_session_id_len + 12, 48)
+    wrap_limit = min(candidate, 120)
+    message_width = _DMESG_MESSAGE_WIDTH
+    for row in rows:
+        if len(row[6]) > wrap_limit:
+            row[6] = textwrap.fill(row[6], width=wrap_limit)
+        if len(row[7]) > message_width or "\n" in row[7]:
+            row[7] = textwrap.fill(row[7], width=message_width)
+    headers = ["#", "time", "level", "pid", "session", "clock", "event", "message"]
+    table = tabulate(rows, headers=headers, tablefmt="fancy_grid", stralign="left")
+    for line in table.splitlines():
+        if line.startswith("+"):
+            print(line)
+        else:
+            print(" " + line)
 
 
 _MAILBOX_NAMESPACE_NAMES = {
@@ -2059,6 +2242,9 @@ PRETTY_HANDLERS = {
     'cmd.list': _pretty_cmd_list,
     'cmd.call': _pretty_cmd_call,
     'session': _pretty_session,
+    'load': _pretty_load,
+    'exec': _pretty_load,
+    'resume': _pretty_resume,
 }
 
 
@@ -3227,6 +3413,7 @@ def _assign_session_number_locked(session_id: str) -> int:
     if number is None:
         number = next(_SESSION_NUMBER_COUNTER)
         _SESSION_REVERSE_CACHE[session_id] = number
+    _SESSION_NUMBER_TO_ID[number] = session_id
     return number
 
 
@@ -3242,7 +3429,10 @@ def _remember_session_list(entries: Sequence[Dict[str, Any]]) -> None:
 
 def _lookup_session_by_index(index: int) -> Optional[str]:
     with _SESSION_INDEX_LOCK:
-        return _SESSION_INDEX_CACHE.get(index)
+        session_id = _SESSION_INDEX_CACHE.get(index)
+        if session_id:
+            return session_id
+        return _SESSION_NUMBER_TO_ID.get(index)
 
 
 def _fetch_sessions(host: str, port: int) -> List[Dict[str, Any]]:
@@ -3587,9 +3777,3 @@ def _build_cmd_command_payload(cmd: str, args: list[str], host: str, port: int) 
         return payload
 
     raise ValueError(f"unsupported cmd.* command '{cmd}'")
-def _session_number_for(session_id: Optional[str]) -> Optional[int]:
-    if not session_id:
-        return None
-    with _SESSION_INDEX_LOCK:
-        number = _SESSION_REVERSE_CACHE.get(session_id)
-    return number

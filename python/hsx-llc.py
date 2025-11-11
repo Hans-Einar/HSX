@@ -2195,6 +2195,10 @@ def lower_function(
     def _lower_ir_instruction(raw_line: str, block_label: str) -> str:
             orig_line = raw_line
             stripped_line = orig_line.strip()
+            if not stripped_line:
+                return None
+            if stripped_line.startswith("#dbg"):
+                return None
             if stripped_line.startswith("call void @llvm.dbg.declare"):
                 _handle_dbg_declare(stripped_line)
                 return None

@@ -37,8 +37,13 @@ DEBUG_PREFIX_MAP_ENV := $(or $(HSX_DEBUG_PREFIX_MAP),$(DEBUG_PREFIX_MAP))
 
 ifeq ($(DEBUG),1)
   BUILD_DIR := build/debug
-  # Limit to line tables to avoid LLVM #dbg_* directives hsx-llc cannot parse yet
-  CLANGFLAGS += -gline-tables-only
+  # Allow hsx-cc-build --debug to force full DWARF info for locals/watches
+  ifeq ($(strip $(HSX_CC_FORCE_FULL_DEBUG)),1)
+    CLANGFLAGS += -g
+  else
+    # Legacy fallback when invoking make debug directly
+    CLANGFLAGS += -gline-tables-only
+  endif
   ifneq ($(strip $(DEBUG_PREFIX_MAP_ENV)),)
     CLANGFLAGS += -fdebug-prefix-map=$(DEBUG_PREFIX_MAP_ENV)
   endif
