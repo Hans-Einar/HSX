@@ -388,12 +388,12 @@ Design specifies history across sessions (section 6.4). Save to `~/.hsx_history`
 Execute command files with `-x <script>` flag. Enables automated debugging workflows.
 
 **Todo:**
-- [ ] Add `-x <script>` command-line flag
-- [ ] Implement script file execution (read and execute commands)
-- [ ] Support comments in script files
-- [ ] Add error handling for script errors
-- [ ] Add scripting tests
-- [ ] Document script file format
+- [x] Add `-x <script>` command-line flag
+- [x] Implement script file execution (read and execute commands)
+- [x] Support comments in script files
+- [x] Add error handling for script errors
+- [x] Add scripting tests
+- [x] Document script file format
 
 ---
 
@@ -407,12 +407,12 @@ Execute command files with `-x <script>` flag. Enables automated debugging workf
 Protocol error recovery, reconnection logic per section 7. Robust error handling.
 
 **Todo:**
-- [ ] Implement connection loss detection
-- [ ] Add automatic reconnection with backoff
-- [ ] Handle protocol version mismatches gracefully
-- [ ] Display clear error messages for user
-- [ ] Add error recovery tests
-- [ ] Document error handling behavior
+- [x] Implement connection loss detection
+- [x] Add automatic reconnection with backoff
+- [x] Handle protocol version mismatches gracefully
+- [x] Display clear error messages for user
+- [x] Add error recovery tests
+- [x] Document error handling behavior
 
 ---
 

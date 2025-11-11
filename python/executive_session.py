@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import copy
 import json
+import logging
 import socket
 import threading
 import time
@@ -22,6 +23,8 @@ except ImportError:
 from typing import Any, Callable, Deque, Dict, Iterable, List, Optional, Tuple
 
 
+LOGGER = logging.getLogger("hsx.executive_session")
+
 JsonDict = Dict[str, Any]
 EventCallback = Callable[[JsonDict], None]
 
@@ -32,6 +35,14 @@ def _json_dumps(payload: JsonDict) -> str:
 
 class ExecutiveSessionError(RuntimeError):
     """Raised when an expected session negotiation step fails."""
+
+
+class ConnectionLostError(ExecutiveSessionError):
+    """Raised when the transport drops unexpectedly."""
+
+
+class ProtocolVersionError(ExecutiveSessionError):
+    """Raised when the executive reports a protocol version mismatch."""
 
 
 @dataclass
@@ -84,6 +95,8 @@ class ExecutiveSession:
         self._symbols_supported: Optional[bool] = None
         self._memory_supported: Optional[bool] = None
         self._watch_supported: Optional[bool] = None
+        self._last_connection_error: Optional[str] = None
+        self._transport_retry_limit = 3
 
     # ------------------------------------------------------------------ Basics
 
@@ -121,7 +134,7 @@ class ExecutiveSession:
         retries once if the server reports ``session_required`` and the session
         can be re-established.
         """
-        attempts = 2 if retry else 1
+        attempts = max(2 if retry else 1, self._transport_retry_limit if retry else 1)
         last_error: Optional[Exception] = None
         for attempt in range(attempts):
             payload = dict(payload)
@@ -132,6 +145,10 @@ class ExecutiveSession:
                     payload.setdefault("session", self.session_id)
             try:
                 response = self._send_raw(payload)
+            except ConnectionLostError as exc:
+                last_error = exc
+                self._handle_connection_loss(exc, attempt)
+                continue
             except ExecutiveSessionError as exc:
                 last_error = exc
                 if attempt + 1 >= attempts:
@@ -522,6 +539,25 @@ class ExecutiveSession:
 
     # ---------------------------------------------------------------- Private
 
+    def _handle_connection_loss(self, exc: ConnectionLostError, attempt: int) -> None:
+        self._last_connection_error = str(exc)
+        LOGGER.warning("connection lost (%s); retrying (attempt %s)", exc, attempt + 1)
+        with self._session_lock:
+            self._stop_event_stream_locked()
+            self._stop_keepalive_locked()
+            self.session_id = None
+        delay = min(2.0, 0.5 * (attempt + 1))
+        time.sleep(delay)
+
+    @staticmethod
+    def _is_protocol_mismatch(error: str, details: Optional[Any]) -> bool:
+        lowered = error.lower()
+        if "protocol" in lowered and "version" in lowered:
+            return True
+        if isinstance(details, dict) and details.get("protocol_version") is not None:
+            return True
+        return False
+
     def _send_raw(self, payload: JsonDict) -> JsonDict:
         data = _json_dumps(payload)
         try:
@@ -534,12 +570,12 @@ class ExecutiveSession:
                     wfile.flush()
                     line = rfile.readline()
                     if not line:
-                        raise ExecutiveSessionError("executive closed connection")
+                        raise ConnectionLostError("executive closed connection")
                     return json.loads(line)
         except socket.timeout as exc:
-            raise ExecutiveSessionError("transport timeout") from exc
+            raise ConnectionLostError("transport timeout") from exc
         except OSError as exc:
-            raise ExecutiveSessionError(f"transport error: {exc}") from exc
+            raise ConnectionLostError(f"transport error: {exc}") from exc
 
     def _ensure_session(self, *, force: bool = False) -> None:
         if self.session_disabled:
@@ -566,6 +602,8 @@ class ExecutiveSession:
             response = self._send_raw(payload)
             if response.get("status") != "ok":
                 error = str(response.get("error", "exec error"))
+                if self._is_protocol_mismatch(error, response.get("details")):
+                    raise ProtocolVersionError(error)
                 if "unknown_cmd" in error or "unsupported" in error:
                     self.session_disabled = True
                     self._stop_keepalive_locked()

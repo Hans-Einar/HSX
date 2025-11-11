@@ -20,6 +20,7 @@
 | 2025-11-11 | 044962d | begin Phase 4 (stack/watch UI, symbols path) | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py` |
 | 2025-11-11 | bb0f9d0 | Phase 4 updates (memory/disasm polish) | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py` |
 | 2025-11-11 | 34ea6a3 | Phase 4 progress (gdb-style mem examine) | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py` |
+| 2025-11-11 | b991694 | Phase 5.1/5.2 completion (completion + history) | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py python/tests/test_hsx_dbg_history.py python/tests/test_hsx_dbg_completion.py` |
 
 ## Pull Request
 - PR URL / ID: `<link or ID>`
@@ -29,6 +30,6 @@
 - Notes: `<follow-up items>`
 
 ## Additional Notes
-- Next focus: Phase 5 UX enhancements (completion/history/scripting) before DAP refactor. Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py`.
+- Next focus: Phase 5 scripting support (`-x` files) and error handling polish before starting the DAP refactor. Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py python/tests/test_hsx_dbg_history.py python/tests/test_hsx_dbg_completion.py`.
 - Update this file whenever new commits land or PR state changes.
 - Link CI runs, code reviews, or related issues as the implementation progresses.

@@ -37,6 +37,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Execute a single command non-interactively (quote the command string)",
     )
     parser.add_argument(
+        "-x",
+        "--execute",
+        action="append",
+        metavar="FILE",
+        help="Execute commands from FILE before processing other input",
+    )
+    parser.add_argument(
         "--history",
         type=Path,
         default=Path.home() / ".hsx_history",
@@ -81,6 +88,10 @@ def main(argv: List[str] | None = None) -> int:
     )
     registry = build_registry()
     history_store = HistoryStore(str(args.history), limit=args.history_limit) if args.history else None
+    for script in args.execute or []:
+        rc = _run_script(ctx, registry, script)
+        if rc != 0:
+            return rc
     if args.command:
         return _run_single_command(ctx, registry, args.command)
     repl = DebuggerREPL(ctx, registry, history_store=history_store)
@@ -120,6 +131,24 @@ def _run_single_command(ctx: DebuggerContext, registry, command_line: str) -> in
         LOG.exception("command failed")
         print(f"Command '{cmd_name}' failed: {exc}")
         return 1
+
+
+def _run_script(ctx: DebuggerContext, registry, path: str) -> int:
+    script_path = Path(path).expanduser()
+    try:
+        lines = script_path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        print(f"Failed to read script {script_path}: {exc}")
+        return 1
+    for idx, line in enumerate(lines, 1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        rc = _run_single_command(ctx, registry, stripped)
+        if rc != 0:
+            print(f"Script {script_path}:{idx} failed with exit code {rc}")
+            return rc
+    return 0
 
 
 if __name__ == "__main__":  # pragma: no cover

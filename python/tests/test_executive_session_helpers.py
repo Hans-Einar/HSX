@@ -2,7 +2,13 @@ import threading
 
 import pytest
 
-from python.executive_session import ExecutiveSession, ExecutiveSessionError, _EventStream
+from python.executive_session import (
+    ConnectionLostError,
+    ExecutiveSession,
+    ExecutiveSessionError,
+    ProtocolVersionError,
+    _EventStream,
+)
 
 
 class StubSession(ExecutiveSession):
@@ -15,7 +21,10 @@ class StubSession(ExecutiveSession):
         self.sent.append(payload)
         if not self._responses:
             raise AssertionError("no response queued")
-        return self._responses.pop(0)
+        result = self._responses.pop(0)
+        if isinstance(result, Exception):
+            raise result
+        return result
 
 
 def make_handshake(features):
@@ -189,6 +198,30 @@ def test_watch_unknown_marks_unsupported():
     result = session.watch_list(2)
     assert result is None
     assert session.supports_watch() is False
+
+
+def test_request_retries_after_connection_loss():
+    session = StubSession(
+        [
+            make_handshake(["events"]),
+            ConnectionLostError("transport error"),
+            make_handshake(["events"]),
+            {"status": "ok", "result": {"ok": True}},
+        ],
+        features=["events"],
+    )
+    response = session.request({"cmd": "ps"})
+    assert response["status"] == "ok"
+    handshake_calls = [entry for entry in session.sent if entry.get("cmd") == "session.open"]
+    assert len(handshake_calls) == 2
+
+
+def test_protocol_version_mismatch_raises():
+    session = StubSession([
+        {"status": "error", "error": "protocol version mismatch"}
+    ], features=["events"])
+    with pytest.raises(ProtocolVersionError):
+        session.request({"cmd": "ps"})
 
 
 def test_start_event_stream_establishes_once():

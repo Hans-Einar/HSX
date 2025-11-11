@@ -126,3 +126,25 @@ list mapped ranges with `mem regions <pid>`.
 locations (when the executive provides them). The arrow prefix (`=>`) marks the current PC
 and offsets appear as `<function+0xN>` to match the design document. Add `--source` to force
 source lookups even when symbol data is sparse.
+
+## Scripting
+
+Use `-x script.txt` (repeatable) to execute batches of commands before the interactive prompt
+or `--command`. Each file is read line-by-line; blank lines and lines that start with `#`
+are ignored, and the script stops on the first failing command so you can surface errors
+early in CI. Example:
+
+```
+python python/hsx_dbg.py -x setup.txt -x breakpoints.txt
+```
+
+Scripts share the same command syntax as the REPL, so anything you can type interactively
+can be captured for automated workflows.
+
+## Connection Loss & Errors
+
+`hsx-dbg` now watches for transport failures and will automatically try to reconnect to the
+executive (with a short backoff) whenever the TCP socket drops. If recovery ultimately fails,
+you will see a clear `connection lost` error pointing at the underlying transport issue.
+Protocol mismatches (for example when the CLI is older than the executive) surface as
+`protocol version mismatch` errors—update either side to resolve the incompatibility.
