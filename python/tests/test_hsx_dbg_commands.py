@@ -219,6 +219,16 @@ def test_memory_read_command(capsys):
     assert cmd.run(ctx, ["read", "1", "0x0", "--count", "1", "--format", "x", "--width", "4"]) == 0
 
 
+def test_memory_examine_gdb_syntax(capsys):
+    ctx = StubContext([{"status": "ok", "data": [{"address": 0, "value": "0x1"}]}])
+    cmd = MemoryCommand()
+    assert cmd.run(ctx, ["/4xb", "1", "0x0"]) == 0
+    request = ctx.session.requests[0]  # type: ignore[arg-type]
+    assert request["count"] == 4
+    assert request["format"] == "x"
+    assert request["width"] == 1
+
+
 def test_memory_dump_command_formats_hex_ascii(capsys):
     dump_block = {
         "pid": 1,

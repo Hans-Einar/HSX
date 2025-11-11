@@ -36,6 +36,11 @@ class MemoryCommand(Command):
         self._parser = parser
 
     def run(self, ctx: DebuggerContext, argv: List[str]) -> int:
+        if not argv:
+            self._parser.print_help()
+            return 1
+        if argv[0].startswith("/"):
+            return self._handle_examine(ctx, argv)
         try:
             args = self._parser.parse_args(argv)
         except SystemExit:
@@ -69,6 +74,54 @@ class MemoryCommand(Command):
                 kind = region.get("kind")
                 print(f"  0x{int(start):08X}-0x{int(end):08X} {kind}")
         return 0
+
+    def _handle_examine(self, ctx: DebuggerContext, argv: List[str]) -> int:
+        spec = argv[0]
+        if len(argv) < 3:
+            emit_error(ctx, message="x usage: x/<count><format><size> <pid> <address>")
+            return 1
+        try:
+            pid = int(argv[1], 0)
+        except ValueError:
+            emit_error(ctx, message=f"invalid pid: {argv[1]}")
+            return 1
+        address = argv[2]
+        try:
+            count, fmt, width = self._parse_examine_spec(spec)
+        except ValueError as exc:
+            emit_error(ctx, message=str(exc))
+            return 1
+        return self._handle_read(ctx, pid, address, count, fmt, width)
+
+    def _parse_examine_spec(self, spec_token: str) -> tuple[int, str, int]:
+        if not spec_token.startswith("/"):
+            spec = spec_token
+        else:
+            spec = spec_token[1:]
+        if not spec:
+            return 1, "x", 4
+        idx = 0
+        count_text = []
+        while idx < len(spec) and spec[idx].isdigit():
+            count_text.append(spec[idx])
+            idx += 1
+        count = int("".join(count_text)) if count_text else 1
+        fmt = None
+        size = None
+        format_map = {"x": "x", "d": "d", "i": "i", "s": "s"}
+        size_map = {"b": 1, "h": 2, "w": 4, "g": 8}
+        while idx < len(spec):
+            ch = spec[idx].lower()
+            if ch in format_map and fmt is None:
+                fmt = format_map[ch]
+            elif ch in size_map and size is None:
+                size = size_map[ch]
+            else:
+                raise ValueError(f"unsupported examine spec '/{spec}'")
+            idx += 1
+        fmt = fmt or "x"
+        width = size or (4 if fmt != "s" else 1)
+        return max(1, count), fmt, width
 
     def _handle_read(
         self,

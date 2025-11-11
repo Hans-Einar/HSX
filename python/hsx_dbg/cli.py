@@ -94,6 +94,13 @@ def _run_single_command(ctx: DebuggerContext, registry, command_line: str) -> in
         print(f"Parse error: {' '.join(cmd_args)}")
         return 1
     command = registry.get(cmd_name)
+    if not command and "/" in cmd_name:
+        base, _, suffix = cmd_name.partition("/")
+        if base:
+            command = registry.get(base)
+            if command:
+                cmd_args = (["/" + suffix] if suffix else ["/"]) + cmd_args
+                cmd_name = base
     if not command:
         print(f"Unknown command: {cmd_name}")
         return 1

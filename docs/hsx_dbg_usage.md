@@ -90,10 +90,13 @@ and note that the CLI highlights the currently selected frame in `stack bt` outp
 ## Memory Inspection
 
 `mem read <pid> <address>` mirrors the classic `x/<fmt>` syntax. Choose formats with
-`--format x|d|i|s` and widths via `--width`. `mem dump <pid> <start> <end>` produces a
-16-byte-per-row hex dump that always includes an ASCII gutter, making it easier to detect
-string fragments or padding bytes. The CLI also understands the executive's `memory regions`
-metadata so you can quickly list mapped ranges with `mem regions <pid>`.
+`--format x|d|i|s` and widths via `--width`. When muscle memory kicks in, type
+`x/16xb <pid> <address>` (or even `x/16xb` with no space) and the CLI parses the
+count/format/size triplet, calling the same memory RPC with the right width and repeat
+count. `mem dump <pid> <start> <end>` produces a 16-byte-per-row hex dump that always
+includes an ASCII gutter, making it easier to detect string fragments or padding bytes.
+The CLI also understands the executive's `memory regions` metadata so you can quickly
+list mapped ranges with `mem regions <pid>`.
 
 ## Disassembly
 

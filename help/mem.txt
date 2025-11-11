@@ -6,6 +6,13 @@ Subcommands:
   dump <pid> <start> <end>
     Hex dump with ASCII preview (16 bytes per row).
 
+Shortcuts:
+  x/<count><format><size> <pid> <addr>
+    Examine memory using GDB-style syntax (e.g. `x/16xb 1 0x200`). Format tokens:
+      count   = repeat count (default 1)
+      format  = x (hex), d (decimal), i (instructions), s (string)
+      size    = b/h/w/g (1/2/4/8 bytes)
+
 Formats:
   x = hex words (default)
   d = signed decimal
