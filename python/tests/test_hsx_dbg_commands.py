@@ -14,11 +14,13 @@ sys.path.append(str(REPO_ROOT / "python"))
 
 from hsx_dbg.commands.alias import AliasCommand
 from hsx_dbg.commands.attach import AttachCommand
+from hsx_dbg.commands.breakpoints import BreakpointCommand
 from hsx_dbg.commands.control import ContinueCommand, PauseCommand, StepCommand
 from hsx_dbg.commands.detach import DetachCommand
 from hsx_dbg.commands.info import InfoCommand
 from hsx_dbg.commands.ps import PsCommand
 from hsx_dbg.commands.session import SessionCommand
+from hsx_dbg.commands.watch import WatchCommand
 from hsx_dbg.context import DebuggerContext
 
 
@@ -35,10 +37,18 @@ class DummySession:
 
 
 class StubContext(DebuggerContext):
-    def __init__(self, responses: Optional[List[Dict[str, Any]]] = None, *, json_output: bool = False):
+    def __init__(
+        self,
+        responses: Optional[List[Dict[str, Any]]] = None,
+        *,
+        json_output: bool = False,
+        symbol_path: Optional[str] = None,
+    ):
         super().__init__(host="127.0.0.1", port=9998, json_output=json_output)
         self._dummy_session = DummySession(list(responses or []))
         self._session = self._dummy_session
+        if symbol_path:
+            self.set_symbol_file(symbol_path)
 
     def ensure_session(self, *, auto_events: bool = True):  # type: ignore[override]
         return self._dummy_session
@@ -172,3 +182,41 @@ def test_json_output_schema_for_pause(capsys):
     assert cmd.run(ctx, ["1"]) == 0
     out = capsys.readouterr().out.strip()
     assert out.startswith("{") and '"status": "ok"' in out
+
+
+def test_watch_add_and_list(capsys):
+    ctx = StubContext([{"status": "ok", "watch": {"watch_id": 1, "expr": "counter", "value": 0}}, {"status": "ok", "watches": [{"watch_id": 1, "expr": "counter", "value": 0}]}])
+    cmd = WatchCommand()
+    assert cmd.run(ctx, ["add", "1", "counter"]) == 0
+    assert cmd.run(ctx, ["list", "1"]) == 0
+    out = capsys.readouterr().out
+    assert "watch 1" in out
+
+
+def test_break_add_symbol_line(tmp_path):
+    sym_path = "examples/demos/build/debug/longrun/main.sym"
+    ctx = StubContext([{"status": "ok"}], symbol_path=sym_path)
+    cmd = BreakpointCommand()
+    # use a real line from the sym file
+    addresses = ctx.lookup_line("examples/demos/longrun/main.c", 6)
+    assert addresses, "symbol lookup should produce at least one address"
+    responses = ["ok"] * len(addresses)
+    ctx._dummy_session.responses = [{"status": "ok"} for _ in addresses]
+    rc = cmd.run(ctx, ["add", "1", "examples/demos/longrun/main.c:6"])
+    assert rc == 0
+    reqs = ctx.session.requests  # type: ignore[arg-type]
+    assert len(reqs) == len(addresses)
+    for request in reqs:
+        assert request["cmd"] == "bp"
+        assert request["op"] == "set"
+        assert request["pid"] == 1
+
+
+def test_break_disable_enable_tracks_state():
+    ctx = StubContext([{"status": "ok"}, {"status": "ok"}, {"status": "ok"}])
+    cmd = BreakpointCommand()
+    assert cmd.run(ctx, ["disable", "1", "0x12"]) == 0
+    assert 0x12 in ctx.disabled_breakpoints.get(1, set())
+    ctx._dummy_session.responses = [{"status": "ok"}]
+    assert cmd.run(ctx, ["enable", "1", "0x12"]) == 0
+    assert 0x12 not in ctx.disabled_breakpoints.get(1, set())

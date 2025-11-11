@@ -186,14 +186,14 @@ Automatic keepalive messages per heartbeat interval. Prevents session timeout.
 `break <addr/symbol>`, `break <file>:<line>` commands per section 5.3. Essential debugger functionality.
 
 **Todo:**
-- [ ] Implement `break <address>` command (numeric address)
-- [ ] Implement `break <symbol>` command (function name)
-- [ ] Implement `break <file>:<line>` command (source location)
-- [ ] Resolve symbols using .sym files
-- [ ] Map source lines to addresses
-- [ ] Handle breakpoint set confirmation
-- [ ] Add breakpoint set tests
-- [ ] Document breakpoint syntax
+- [x] Implement `break <address>` command (numeric address)
+- [x] Implement `break <symbol>` command (function name)
+- [x] Implement `break <file>:<line>` command (source location)
+- [x] Resolve symbols using .sym files
+- [x] Map source lines to addresses
+- [x] Handle breakpoint set confirmation
+- [x] Add breakpoint set tests
+- [x] Document breakpoint syntax
 
 ---
 
@@ -208,11 +208,11 @@ Automatic keepalive messages per heartbeat interval. Prevents session timeout.
 
 **Todo:**
 - [ ] Implement `delete <bp_id>` command (by ID)
-- [ ] Implement `clear <addr/symbol>` command (by location)
-- [ ] Implement `clear` command (all breakpoints)
-- [ ] Handle breakpoint removal confirmation
-- [ ] Add clear breakpoint tests
-- [ ] Document clear commands
+- [x] Implement `clear <addr/symbol>` command (by location)
+- [x] Implement `clear` command (all breakpoints)
+- [x] Handle breakpoint removal confirmation
+- [x] Add clear breakpoint tests
+- [x] Document clear commands
 
 ---
 
@@ -226,13 +226,13 @@ Automatic keepalive messages per heartbeat interval. Prevents session timeout.
 `info breakpoints` command shows all breakpoints with hit counts.
 
 **Todo:**
-- [ ] Implement `info breakpoints` command
-- [ ] Display breakpoint ID, location, type, enabled status
-- [ ] Show hit counts if available
-- [ ] Format output as table
-- [ ] Add JSON output for `info breakpoints`
-- [ ] Add list breakpoint tests
-- [ ] Document info breakpoints command
+- [x] Implement `info breakpoints` command
+- [x] Display breakpoint ID, location, type, enabled status (mark disabled entries)
+- [x] Show hit counts if available
+- [x] Format output as table
+- [x] Add JSON output for `info breakpoints`
+- [x] Add list breakpoint tests
+- [x] Document info breakpoints command
 
 ---
 
@@ -246,11 +246,11 @@ Automatic keepalive messages per heartbeat interval. Prevents session timeout.
 `enable <bp_id>`, `disable <bp_id>` commands toggle breakpoints without deletion.
 
 **Todo:**
-- [ ] Implement `enable <bp_id>` command
-- [ ] Implement `disable <bp_id>` command
-- [ ] Update breakpoint state in executive
-- [ ] Add enable/disable tests
-- [ ] Document enable/disable commands
+- [x] Implement `enable <bp_id>` command (CLI-managed reapply)
+- [x] Implement `disable <bp_id>` command (CLI-managed removal)
+- [x] Update breakpoint state in executive
+- [x] Add enable/disable tests
+- [x] Document enable/disable commands
 
 ---
 

@@ -61,3 +61,22 @@ Task listings include:
 - Trace state and steps
 
 Register dumps include `selected_registers` when the executive provides them.
+
+## Breakpoints
+
+`break add <pid> <spec>` accepts raw addresses (`0x1234`), symbol names (requires
+`--symbols` or `symbols <path>`), or `file.c:42` source locations. Use `break list`
+to show active and locally disabled breakpoints, `break disable`/`break enable`
+to toggle without losing context, and `break clearall` to remove everything for a PID.
+
+## Watches
+
+`watch add <pid> <expr>` registers a memory or local watch (the executive evaluates
+the expression). `watch remove` and `watch list` manage existing watches. Watch
+updates arrive via the event stream when expressions change.
+
+## Symbol Files
+
+Provide a .sym path via `--symbols /path/to/app.sym` or the `symbols <path>`
+command. This enables `break` to resolve symbols (`main`) and `file.c:line`
+specifications.

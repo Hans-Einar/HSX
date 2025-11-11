@@ -15,8 +15,11 @@ from .help import HelpCommand
 from .info import InfoCommand
 from .status import StatusCommand
 from .session import SessionCommand
+from .symbols import SymbolsCommand
 from .ps import PsCommand
 from .observer import ObserverCommand
+from .breakpoints import BreakpointCommand
+from .watch import WatchCommand
 
 
 class CommandRegistry:
@@ -46,6 +49,7 @@ def build_registry() -> CommandRegistry:
         ConnectCommand(),
         StatusCommand(),
         SessionCommand(),
+        SymbolsCommand(),
         AttachCommand(),
         DetachCommand(),
         PauseCommand(),
@@ -54,6 +58,8 @@ def build_registry() -> CommandRegistry:
         PsCommand(),
         InfoCommand(),
         ObserverCommand(),
+        BreakpointCommand(),
+        WatchCommand(),
         AliasCommand(),
         ExitCommand(),
     ]

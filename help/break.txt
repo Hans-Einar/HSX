@@ -1,0 +1,11 @@
+break <subcommand>
+
+Subcommands:
+  add <pid> <addr|symbol|file:line>    Add breakpoint(s).
+  clear <pid> <addr|symbol|file:line>  Remove breakpoint(s).
+  clearall <pid>                       Remove all breakpoints for PID.
+  list <pid>                           Show active breakpoints (marks disabled ones).
+  disable <pid> <spec>                 Remove breakpoint but remember it locally.
+  enable <pid> <spec>                  Re-add previously disabled breakpoint.
+
+Requires a symbol file (`--symbols` or `symbols <path>`) for symbol/line resolution.

@@ -122,3 +122,20 @@ Append sessions chronologically. Ensure every entry references the relevant desi
 
 ### Next Steps
 - Begin Phase 3 (breakpoints/watch commands) now that the CLI foundation and session plumbing are complete.
+
+## 2025-11-11 - Codex (Session 6)
+
+### Scope
+- Plan item / phase addressed: Phase 3.1–3.4 (breakpoint management) kickoff.
+- Design sections reviewed: 04.09--Debugger §5.3, docs/executive_protocol (`bp` RPC), Implementation Plan §3.
+
+### Work Summary
+- Added symbol management infrastructure (`symbols` command, `SymbolIndex`, CLI `--symbols`) so file:line and symbol breakpoints map to addresses.
+- Implemented `break` command (aliases `bp`) with subcommands for add/clear/list/clearall plus CLI-level enable/disable tracking. Breakpoints accept numeric addresses, symbols, or `file:line` specs.
+- Introduced observer mode toggles, keepalive configuration flags, and session info/list commands earlier in phase to unblock breakpoint work; documentation/help updated accordingly.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py`
+
+### Next Steps
+- Continue Phase 3 by wiring watch management (`watch`/`unwatch`/`watches`) and prepare to feed breakpoint events into future Phase 4 inspection commands.

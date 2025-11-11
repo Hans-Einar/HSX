@@ -1,22 +1,9 @@
-﻿watch
-=====
+watch <subcommand>
 
-Manage memory/change watches for a task.
+Subcommands:
+  add <pid> <expr> [--type address|symbol|local] [--length N]
+  remove <pid> <watch_id>
+  list <pid>
 
-Usage::
-
-    watch list <pid>
-    watch add <pid> <expr> [--type address|symbol] [--length N]
-    watch remove <pid> <id>
-
-Arguments:
-- ``pid``: Target task id.
-- ``expr``: Address or symbol expression for ``watch add``.
-- ``id``: Watch identifier returned by ``watch add`` (for ``remove``).
-
-Options:
-- ``--type`` / ``-t``: Force interpretation as ``address`` or ``symbol``.
-- ``--length`` / ``--len`` / ``-n``: Number of bytes to monitor (default: 4).
-
-The shell prints trigger updates on value changes and lists current watches with their last read value.
-
+Adds, removes, or lists watch expressions via the executive `watch` RPC. Watch
+updates appear in the event stream when values change.

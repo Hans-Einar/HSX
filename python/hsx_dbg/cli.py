@@ -42,6 +42,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Path to command history file (prompt_toolkit mode)",
     )
     parser.add_argument(
+        "--symbols",
+        type=str,
+        help="Path to preferred .sym file for breakpoint resolution",
+    )
+    parser.add_argument(
         "--keepalive-interval",
         type=int,
         help="Override keepalive interval (seconds)",
@@ -58,12 +63,14 @@ def main(argv: List[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
     _configure_logging(args.log_level)
+    symbol_path = Path(args.symbols).expanduser() if args.symbols else None
     ctx = DebuggerContext(
         host=args.host,
         port=args.port,
         json_output=args.json,
         keepalive_enabled=not args.no_keepalive,
         keepalive_interval=args.keepalive_interval,
+        symbol_path=symbol_path,
     )
     registry = build_registry()
     if args.command:
