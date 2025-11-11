@@ -1,2 +1,5 @@
-info [pid]
-Show VM status, current task table, and optionally dump registers for the selected PID.
+info [pid]
+
+Show global VM status (program path, running/paused/attached state) plus the task table.
+Task rows include app name, metadata counts (values/commands/mailboxes), and trace flags
+when exposed by the executive.  Passing a PID prints detailed task/register information.

@@ -14,6 +14,7 @@
 | 2025-11-11 | 165595b | hsx-dbg scaffolding (Phase 1.1-1.3) | Codex | Tests: `PYTHONPATH=. python python/hsx_dbg.py --command "help"; PYTHONPATH=. python python/hsx_dbg.py --command "status"` |
 | 2025-11-11 | 6d8c81f | Attach/detach/info commands & plan sync | Codex | Tests: `PYTHONPATH=. python python/hsx_dbg.py --command "help"; PYTHONPATH=. python python/hsx_dbg.py --command "attach"; PYTHONPATH=. python python/hsx_dbg.py --command "info"` |
 | 2025-11-11 | 0c5bfb4 | ps command + metadata output | Codex | Tests: `PYTHONPATH=. python python/hsx_dbg.py --command "ps"; PYTHONPATH=. python python/hsx_dbg.py --command "ps 1"; PYTHONPATH=. python python/hsx_dbg.py --json --command "ps"` |
+| 2025-11-11 | 94849c5 | pause/continue/step controls | Codex | Tests: `PYTHONPATH=. python python/hsx_dbg.py --command "pause 1"; PYTHONPATH=. python python/hsx_dbg.py --command "continue 1"; PYTHONPATH=. python python/hsx_dbg.py --command "step 1 5"; PYTHONPATH=. python python/hsx_dbg.py --json --command "step 1 2"` |
 
 ## Pull Request
 - PR URL / ID: `<link or ID>`

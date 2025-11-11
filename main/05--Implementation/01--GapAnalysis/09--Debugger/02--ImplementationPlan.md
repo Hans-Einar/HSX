@@ -137,11 +137,11 @@ Provide CLI subcommands for the `attach`/`detach` RPCs defined in `docs/executiv
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.09--Debugger](../../../04--Design/04.09--Debugger.md)
-- [ ] Implement `attach` command (wraps `{ "cmd": "attach" }`)
-- [ ] Implement `detach` command (wraps `{ "cmd": "detach" }`)
-- [ ] Surface session state (attached/not attached, locks) in CLI status output
-- [ ] Handle session errors (`pid_locked`, `session_required`) gracefully
-- [ ] Add attach/detach regression tests and document command usage
+- [x] Implement `attach` command (wraps `{ "cmd": "attach" }`)
+- [x] Implement `detach` command (wraps `{ "cmd": "detach" }`)
+- [x] Surface session state (attached/not attached, locks) in CLI status output
+- [x] Handle session errors (`pid_locked`, `session_required`) gracefully
+- [x] Add attach/detach regression tests and document command usage
 
 ---
 
@@ -157,8 +157,8 @@ Executive now surfaces app names and metadata counts; CLI debugger should displa
 
 **Todo:**
 > Reference: [Implementation Notes](../02--Executive/03--ImplementationNotes.md) | [Design 04.09--Debugger.md](../../../04--Design/04.09--Debugger.md)
-- [ ] Show `app_name`/instance suffixes in task listings
-- [ ] Display metadata count (values/commands/mailboxes) when present
-- [ ] Gate feature behind capability flag until executive Phase 3.3 merges
-- [ ] Update CLI help/docs to mention the new columns
-- [ ] Add regression tests once executive metadata summary is stable
+- [x] Show `app_name`/instance suffixes in task listings
+- [x] Display metadata count (values/commands/mailboxes) when present
+- [x] Gate feature behind capability flag until executive Phase 3.3 merges
+- [x] Update CLI help/docs to mention the new columns
+- [x] Add regression tests once executive metadata summary is stable
