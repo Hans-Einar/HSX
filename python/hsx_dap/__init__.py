@@ -265,6 +265,10 @@ class HSXDebugAdapter:
         self._pending_pause: bool = False
         self._pause_fallback_timer: Optional[threading.Timer] = None
         self._synthetic_pause_pending: bool = False
+        self._source_ref_to_path: Dict[int, str] = {}
+        self._source_path_to_ref: Dict[str, int] = {}
+        self._next_source_id: int = 1
+        self.project_root = Path.cwd()
 
     def serve(self) -> None:
         while True:
@@ -383,9 +387,9 @@ class HSXDebugAdapter:
         self.logger.info("Pause requested for PID %s", self.current_pid)
         self._pending_pause = True
         self.client.pause(self.current_pid)
-        self._schedule_pause_fallback()
-        # Note: We don't emit stopped event immediately - we'll wait for the TaskStateEvent
-        # with reason "user_pause" which will have the actual PC at pause time
+        # Emit the stopped event immediately using a register snapshot so VS Code
+        # reflects the paused state even if the executive never publishes an event.
+        self._emit_pause_snapshot(description="pause")
         return {}
 
     def _schedule_pause_fallback(self) -> None:
@@ -408,14 +412,19 @@ class HSXDebugAdapter:
         self._pause_fallback_timer = None
         if not self._pending_pause or not self.client or not self.current_pid:
             return
-        self.logger.warning("Pause response missing task_state event; emitting fallback stopped event")
+        self.logger.debug("Pause response missing task_state event; emitting fallback stopped event")
+        self._emit_pause_snapshot(description="pause (fallback)")
+
+    def _emit_pause_snapshot(self, description: str) -> None:
         pc = self._read_current_pc()
         self._pending_pause = False
         self._synthetic_pause_pending = True
+        self._cancel_pause_fallback()
+        self.logger.info("Pause completed for PID %s (%s)", self.current_pid, description)
         self._emit_stopped_event(
             pid=self.current_pid,
             reason="user_pause",
-            description="pause (fallback)",
+            description=description,
             pc=pc,
         )
 
@@ -468,6 +477,37 @@ class HSXDebugAdapter:
                 }
             )
         return {"stackFrames": dap_frames, "totalFrames": len(frames)}
+
+    def _handle_source(self, args: JsonDict) -> JsonDict:
+        source_obj = args.get("source") or {}
+        ref = source_obj.get("sourceReference") or args.get("sourceReference")
+        path = source_obj.get("path") or args.get("path")
+        resolved_path: Optional[Path] = None
+        if ref is not None:
+            try:
+                ref_id = int(ref)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"Invalid sourceReference: {ref}") from exc
+            stored = self._source_ref_to_path.get(ref_id)
+            if stored:
+                resolved_path = Path(stored)
+        if resolved_path is None and path:
+            candidate = Path(path)
+            if not candidate.is_absolute():
+                candidate = (Path.cwd() / candidate).resolve()
+            resolved_path = candidate
+        if resolved_path is None:
+            raise RuntimeError("Source request missing valid path/sourceReference")
+        try:
+            content = resolved_path.read_text(encoding="utf-8")
+        except FileNotFoundError as exc:
+            raise RuntimeError(f"Source file not found: {resolved_path}") from exc
+        except OSError as exc:
+            raise RuntimeError(f"Failed to read source file {resolved_path}: {exc}") from exc
+        return {
+            "content": content,
+            "mimeType": "text/x-c",
+        }
 
     def _handle_scopes(self, args: JsonDict) -> JsonDict:
         frame_id = int(args.get("frameId"))
@@ -1133,11 +1173,31 @@ class HSXDebugAdapter:
                 pass
             self.session = None
         self.client = None
+        self._source_ref_to_path.clear()
+        self._source_path_to_ref.clear()
+        self._next_source_id = 1
+        self.project_root = Path.cwd()
 
     def _render_source(self, path: Optional[str]) -> Optional[JsonDict]:
         if not path:
             return None
-        return {"name": Path(path).name, "path": path}
+        source_path = Path(path)
+        if not source_path.is_absolute():
+            if self.project_root:
+                candidate = self.project_root / source_path
+            else:
+                candidate = Path.cwd() / source_path
+            source_path = candidate.resolve()
+        else:
+            source_path = source_path.resolve()
+        key = source_path.as_posix()
+        ref = self._source_path_to_ref.get(key)
+        if ref is None:
+            ref = self._next_source_id
+            self._next_source_id += 1
+            self._source_path_to_ref[key] = ref
+            self._source_ref_to_path[ref] = key
+        return {"name": source_path.name, "path": key, "sourceReference": ref}
 
     def _emit_stopped_event(
         self,
@@ -1220,16 +1280,16 @@ class HSXDebugAdapter:
         if state in {"paused", "stopped"} or reason in {"debug_break", "user_pause"}:
             pc = self._extract_task_state_pc(event)
             description = f"Task {state}" if state else (event.reason or "stopped")
-            # Clear pending pause flag if this is the response to our pause request
-            if reason == "user_pause" and self._pending_pause:
-                self._pending_pause = False
-                self._cancel_pause_fallback()
-                pending_synth = self._synthetic_pause_pending
-                self._synthetic_pause_pending = False
-                self.logger.info("Pause completed for PID %s", pid)
-                if pending_synth:
-                    self.logger.debug("Suppressing duplicate user_pause event (fallback already emitted)")
+            if reason == "user_pause":
+                if self._pending_pause:
+                    self._pending_pause = False
+                    self._cancel_pause_fallback()
+                    self.logger.info("Pause completed for PID %s (event)", pid)
+                if self._synthetic_pause_pending:
+                    self.logger.debug("Suppressing duplicate user_pause event (snapshot already emitted)")
+                    self._synthetic_pause_pending = False
                     return
+                self._synthetic_pause_pending = False
             self._emit_stopped_event(
                 pid=pid,
                 reason=reason or state or "stopped",

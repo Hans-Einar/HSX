@@ -7,3 +7,122 @@
 [2025-11-10 16:41:44,597] INFO: Pause requested for PID 1
 [2025-11-10 16:42:13,122] INFO: Pause requested for PID 1
 [2025-11-10 16:42:13,992] INFO: Pause requested for PID 1
+[2025-11-11 08:12:13,408] INFO: HSX DAP adapter starting (pid=1078567)
+[2025-11-11 08:12:13,410] INFO: Connecting to executive at 127.0.0.1:9998 (PID 1)
+[2025-11-11 08:12:16,877] DEBUG: events.ack failed: {'version': 1, 'status': 'error', 'error': 'session_required'}
+[2025-11-11 08:12:16,878] DEBUG: session reopen after ack failure failed
+Traceback (most recent call last):
+  File "/home/warloc/git/HSX/python/hsxdbg/session.py", line 304, in _send_pending_ack
+    self.reopen()
+    ~~~~~~~~~~~^^
+  File "/home/warloc/git/HSX/python/hsxdbg/session.py", line 178, in reopen
+    self.close()
+    ~~~~~~~~~~^^
+  File "/home/warloc/git/HSX/python/hsxdbg/session.py", line 150, in close
+    self.unsubscribe_events()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/warloc/git/HSX/python/hsxdbg/session.py", line 232, in unsubscribe_events
+    self._stop_ack_thread()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/warloc/git/HSX/python/hsxdbg/session.py", line 272, in _stop_ack_thread
+    thread.join(timeout=0.5)
+    ~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/usr/lib64/python3.13/threading.py", line 1087, in join
+    raise RuntimeError("cannot join current thread")
+RuntimeError: cannot join current thread
+[2025-11-11 08:12:20,422] DEBUG: symbol_info failed: sym info failed: {'version': 1, 'status': 'error', 'error': 'session_required'}
+[2025-11-11 08:12:20,523] DEBUG: events.ack failed: {'version': 1, 'status': 'error', 'error': 'session_required'}
+[2025-11-11 08:12:20,523] DEBUG: session reopen after ack failure failed
+Traceback (most recent call last):
+  File "/home/warloc/git/HSX/python/hsxdbg/session.py", line 304, in _send_pending_ack
+    self.reopen()
+    ~~~~~~~~~~~^^
+  File "/home/warloc/git/HSX/python/hsxdbg/session.py", line 178, in reopen
+    self.close()
+    ~~~~~~~~~~^^
+  File "/home/warloc/git/HSX/python/hsxdbg/session.py", line 150, in close
+    self.unsubscribe_events()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/warloc/git/HSX/python/hsxdbg/session.py", line 232, in unsubscribe_events
+    self._stop_ack_thread()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/warloc/git/HSX/python/hsxdbg/session.py", line 272, in _stop_ack_thread
+    thread.join(timeout=0.5)
+    ~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/usr/lib64/python3.13/threading.py", line 1087, in join
+    raise RuntimeError("cannot join current thread")
+RuntimeError: cannot join current thread
+[2025-11-11 08:12:20,524] DEBUG: events.ack failed: {'version': 1, 'status': 'error', 'error': 'session_required'}
+[2025-11-11 08:12:20,524] DEBUG: session reopen after ack failure failed
+Traceback (most recent call last):
+  File "/home/warloc/git/HSX/python/hsxdbg/session.py", line 304, in _send_pending_ack
+    self.reopen()
+    ~~~~~~~~~~~^^
+  File "/home/warloc/git/HSX/python/hsxdbg/session.py", line 178, in reopen
+    self.close()
+    ~~~~~~~~~~^^
+  File "/home/warloc/git/HSX/python/hsxdbg/session.py", line 150, in close
+    self.unsubscribe_events()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/warloc/git/HSX/python/hsxdbg/session.py", line 232, in unsubscribe_events
+    self._stop_ack_thread()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/warloc/git/HSX/python/hsxdbg/session.py", line 272, in _stop_ack_thread
+    thread.join(timeout=0.5)
+    ~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/usr/lib64/python3.13/threading.py", line 1087, in join
+    raise RuntimeError("cannot join current thread")
+RuntimeError: cannot join current thread
+[2025-11-11 08:12:49,188] INFO: Pause requested for PID 1
+[2025-11-11 08:12:49,489] WARNING: Pause response missing task_state event; emitting fallback stopped event
+[2025-11-11 08:12:49,495] INFO: Loaded symbol map for pid 1 from /home/warloc/git/HSX/examples/demos/build/debug/longrun/main.sym
+[2025-11-11 08:12:49,496] INFO: Stopped event: reason=user_pause, pc=0x0050, source=longrun/main.c:7
+[2025-11-11 08:13:26,017] INFO: Continue: resuming PID 1
+[2025-11-11 08:13:27,714] INFO: Pause requested for PID 1
+[2025-11-11 08:13:28,015] WARNING: Pause response missing task_state event; emitting fallback stopped event
+[2025-11-11 08:13:28,016] INFO: Stopped event: reason=user_pause, pc=0x0074, source=longrun/main.c:7
+[2025-11-11 08:14:47,255] INFO: Continue: resuming PID 1
+[2025-11-11 08:14:51,484] INFO: Pause requested for PID 1
+[2025-11-11 08:14:51,785] WARNING: Pause response missing task_state event; emitting fallback stopped event
+[2025-11-11 08:14:51,786] INFO: Stopped event: reason=user_pause, pc=0x0054, source=longrun/main.c:7
+[2025-11-11 08:15:04,111] INFO: setBreakpoints: source=/home/warloc/git/HSX/examples/demos/longrun/main.c, count=1
+[2025-11-11 08:15:04,112] DEBUG: Resolved /home/warloc/git/HSX/examples/demos/longrun/main.c:6 to addresses: ['0x003C', '0x0040', '0x0044', '0x0048', '0x004C']
+[2025-11-11 08:15:04,112] INFO: Breakpoint set at /home/warloc/git/HSX/examples/demos/longrun/main.c:6 -> 0x003C
+[2025-11-11 08:15:04,112] INFO: setBreakpoints: set 1 breakpoints for /home/warloc/git/HSX/examples/demos/longrun/main.c
+[2025-11-11 08:15:14,690] INFO: HSX DAP adapter starting (pid=1080192)
+[2025-11-11 08:15:14,691] INFO: setBreakpoints: source=/home/warloc/git/HSX/examples/demos/longrun/main.c, count=1
+[2025-11-11 08:15:14,691] WARNING: setBreakpoints: no client connected, storing as pending
+[2025-11-11 08:15:14,692] INFO: Connecting to executive at 127.0.0.1:9998 (PID 1)
+[2025-11-11 08:15:20,203] INFO: Loaded symbol map for pid 1 from /home/warloc/git/HSX/examples/demos/build/debug/longrun/main.sym
+[2025-11-11 08:15:20,203] INFO: Reapplying 1 pending breakpoint sources
+[2025-11-11 08:15:20,203] INFO: Reapplying breakpoints for source: /home/warloc/git/HSX/examples/demos/longrun/main.c (1 breakpoints)
+[2025-11-11 08:15:20,203] DEBUG: Resolved /home/warloc/git/HSX/examples/demos/longrun/main.c:6 to addresses: ['0x003C', '0x0040', '0x0044', '0x0048', '0x004C']
+[2025-11-11 08:15:20,204] INFO: Breakpoint set at /home/warloc/git/HSX/examples/demos/longrun/main.c:6 -> 0x003C
+[2025-11-11 08:15:20,204] INFO: Breakpoint verified after connection: /home/warloc/git/HSX/examples/demos/longrun/main.c:6 -> 0x003C
+[2025-11-11 08:15:22,533] INFO: Pause requested for PID 1
+[2025-11-11 08:15:22,836] WARNING: Pause response missing task_state event; emitting fallback stopped event
+[2025-11-11 08:15:22,839] INFO: Stopped event: reason=user_pause, pc=0x0054, source=longrun/main.c:7
+[2025-11-11 08:15:22,878] ERROR: DAP command failed: source
+Traceback (most recent call last):
+  File "/home/warloc/git/HSX/python/hsx_dap/__init__.py", line 496, in _handle_source
+    content = resolved_path.read_text(encoding="utf-8")
+  File "/usr/lib64/python3.13/pathlib/_local.py", line 546, in read_text
+    return PathBase.read_text(self, encoding, errors, newline)
+           ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.13/pathlib/_abc.py", line 632, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.13/pathlib/_local.py", line 537, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/home/warloc/longrun/main.c'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/warloc/git/HSX/python/hsx_dap/__init__.py", line 293, in _handle_request
+    body = handler(arguments) or {}
+           ~~~~~~~^^^^^^^^^^^
+  File "/home/warloc/git/HSX/python/hsx_dap/__init__.py", line 498, in _handle_source
+    raise RuntimeError(f"Source file not found: {resolved_path}") from exc
+RuntimeError: Source file not found: /home/warloc/longrun/main.c

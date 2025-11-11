@@ -269,7 +269,11 @@ class SessionManager:
         self._ack_stop.set()
         thread = self._ack_thread
         if thread and thread.is_alive():
-            thread.join(timeout=0.5)
+            if thread is threading.current_thread():
+                # Avoid joining ourselves when _stop_ack_thread is invoked from the ack thread
+                pass
+            else:
+                thread.join(timeout=0.5)
         self._ack_thread = None
 
     def _ack_loop(self) -> None:
