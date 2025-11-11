@@ -268,7 +268,8 @@ class HSXDebugAdapter:
         self._source_ref_to_path: Dict[int, str] = {}
         self._source_path_to_ref: Dict[str, int] = {}
         self._next_source_id: int = 1
-        self.project_root = Path.cwd()
+        self.project_root = REPO_ROOT
+        self._source_base_dirs: List[Path] = [REPO_ROOT]
 
     def serve(self) -> None:
         while True:
@@ -344,6 +345,7 @@ class HSXDebugAdapter:
                 self._sym_hint = path
                 break
         self._connect(host, port, self.current_pid)
+        self._update_project_root(args)
         self._reapply_pending_breakpoints()
         return {}
 
@@ -1176,18 +1178,59 @@ class HSXDebugAdapter:
         self._source_ref_to_path.clear()
         self._source_path_to_ref.clear()
         self._next_source_id = 1
-        self.project_root = Path.cwd()
+        self.project_root = REPO_ROOT
+        self._source_base_dirs = [REPO_ROOT]
+
+    def _update_project_root(self, args: JsonDict) -> None:
+        workspace_hint = args.get("workspaceFolder") or args.get("workspaceRoot") or args.get("workspace")
+        candidate_root: Optional[Path] = None
+        if workspace_hint:
+            try:
+                candidate_root = Path(workspace_hint).expanduser().resolve()
+            except Exception:
+                self.logger.debug("Failed to resolve workspace hint %s", workspace_hint, exc_info=True)
+        if candidate_root is None and self._sym_hint:
+            inferred = self._infer_repo_root(self._sym_hint.parent)
+            candidate_root = inferred or self._sym_hint.parent
+        if candidate_root is None:
+            candidate_root = REPO_ROOT
+        self.project_root = candidate_root
+        base_dirs: List[Path] = []
+        for base in (candidate_root, REPO_ROOT):
+            if base and base not in base_dirs:
+                base_dirs.append(base.resolve())
+        if self._sym_hint:
+            sym_dir = self._sym_hint.parent.resolve()
+            if sym_dir not in base_dirs:
+                base_dirs.append(sym_dir)
+        self._source_base_dirs = base_dirs
+
+    def _infer_repo_root(self, start: Path) -> Optional[Path]:
+        try:
+            current = start.resolve()
+        except Exception:
+            current = start
+        for candidate in [current] + list(current.parents):
+            if (candidate / ".git").is_dir():
+                return candidate
+            if (candidate / "python").is_dir() and (candidate / "examples").is_dir():
+                return candidate
+        return None
 
     def _render_source(self, path: Optional[str]) -> Optional[JsonDict]:
         if not path:
             return None
         source_path = Path(path)
         if not source_path.is_absolute():
-            if self.project_root:
-                candidate = self.project_root / source_path
-            else:
-                candidate = Path.cwd() / source_path
-            source_path = candidate.resolve()
+            resolved: Optional[Path] = None
+            for base in self._source_base_dirs:
+                candidate = (base / source_path).resolve()
+                if candidate.exists():
+                    resolved = candidate
+                    break
+            if resolved is None:
+                resolved = (self.project_root / source_path).resolve()
+            source_path = resolved
         else:
             source_path = source_path.resolve()
         key = source_path.as_posix()
