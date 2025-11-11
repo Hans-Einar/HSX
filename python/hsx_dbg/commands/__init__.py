@@ -12,6 +12,7 @@ from .exit import ExitCommand
 from .help import HelpCommand
 from .info import InfoCommand
 from .status import StatusCommand
+from .ps import PsCommand
 
 
 class CommandRegistry:
@@ -42,6 +43,7 @@ def build_registry() -> CommandRegistry:
         StatusCommand(),
         AttachCommand(),
         DetachCommand(),
+        PsCommand(),
         InfoCommand(),
         ExitCommand(),
     ]

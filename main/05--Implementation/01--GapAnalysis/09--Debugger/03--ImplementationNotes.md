@@ -65,3 +65,22 @@ Append sessions chronologically. Ensure every entry references the relevant desi
 
 ### Next Steps
 - Finish Phase 1 JSON output polish (command parser help, richer formatting) and start porting debugger primitives (attach/detach already done; next up: task/status/detail commands, breakpoint/watch plumbing).
+
+## 2025-11-11 - Codex (Session 3)
+
+### Scope
+- Plan item / phase addressed: Phase 2.2 session-info commands + Phase 1.4 metadata/JSON output requirements.
+- Design sections reviewed: 04.09--Debugger §6.2 (`ps`, metadata columns), docs/executive_protocol.md (`ps`, `info` RPCs).
+
+### Work Summary
+- Added reusable formatting helpers (`normalise_task_list`, `render_task_table`, `render_register_block`) so both `info` and the new commands produce consistent output and expose `app_name` + metadata counts when available.
+- Implemented the `ps` command with optional PID detail view. `ps` lists tasks, marks the current PID, and shows metadata counts per plan Phase 1.4; `ps <pid>` reuses the info RPC to display detailed task + register data. All commands now respect `--json` output.
+- Updated the design spec (§5.3, §6.2) to describe the current attach/detach semantics and the richer `ps` output so the docs match the implementation.
+
+### Testing
+- `PYTHONPATH=. python python/hsx_dbg.py --command "ps"`
+- `PYTHONPATH=. python python/hsx_dbg.py --command "ps 1"`
+- `PYTHONPATH=. python python/hsx_dbg.py --json --command "ps"`
+
+### Next Steps
+- Continue Phase 2: add session-info summaries (`status` already in place) and start introducing execution control commands (`pause`, `continue`, `step`) plus breakpoint management per design §5.3/5.4.
