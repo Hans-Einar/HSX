@@ -133,17 +133,15 @@ Design specifies machine-readable output for CI/CD (section 6.2). Enables automa
 **Estimated Effort:** 3-4 days
 
 **Rationale:**  
-Implement `attach <pid>`, `detach`, `observer <pid>` commands per session protocol 5.1. Core debugger functionality.
+Provide CLI subcommands for the `attach`/`detach` RPCs defined in `docs/executive_protocol.md`. These pause/resume the VM globally (per current executive implementation) and are prerequisites for driving PID-scoped operations. Observer mode remains future work once the executive exposes per-PID locks.
 
 **Todo:**
 > Reference: [Implementation Notes](03--ImplementationNotes.md) | [Design 04.09--Debugger](../../../04--Design/04.09--Debugger.md)
-- [ ] Implement `attach <pid>` command (exclusive session)
-- [ ] Implement `detach` command (release PID lock)
-- [ ] Implement `observer <pid>` command (read-only session)
-- [ ] Handle session conflicts (PID already locked)
-- [ ] Add session state tracking
-- [ ] Add attach/detach tests
-- [ ] Document session commands
+- [ ] Implement `attach` command (wraps `{ "cmd": "attach" }`)
+- [ ] Implement `detach` command (wraps `{ "cmd": "detach" }`)
+- [ ] Surface session state (attached/not attached, locks) in CLI status output
+- [ ] Handle session errors (`pid_locked`, `session_required`) gracefully
+- [ ] Add attach/detach regression tests and document command usage
 
 ---
 
@@ -164,4 +162,3 @@ Executive now surfaces app names and metadata counts; CLI debugger should displa
 - [ ] Gate feature behind capability flag until executive Phase 3.3 merges
 - [ ] Update CLI help/docs to mention the new columns
 - [ ] Add regression tests once executive metadata summary is stable
-

@@ -3,15 +3,15 @@
 > File name: `04--git.md`. Use this log to capture branch, commits, and PR status for the Debugger implementation track.
 
 ## Branch
-- Name: `<branch-name>`
-- Created on: `<YYYY-MM-DD>`
-- Owner: `<team or lead>`
-- Based on commit: `<commit-id>`
+- Name: `Implementation/vscode`
+- Created on: `2025-11-11`
+- Owner: `Debugger team`
+- Based on commit: `165595b`
 
 ## Commit Log
 | Date | Commit hash | Message | Author | Notes |
 | --- | --- | --- | --- | --- |
-| <YYYY-MM-DD> | <commit-hash> | <short message> | <author> | Tests: `<command>` |
+| 2025-11-11 | 165595b | hsx-dbg scaffolding (Phase 1.1-1.3) | Codex | Tests: `PYTHONPATH=. python python/hsx_dbg.py --command "help"; PYTHONPATH=. python python/hsx_dbg.py --command "status"` |
 
 ## Pull Request
 - PR URL / ID: `<link or ID>`

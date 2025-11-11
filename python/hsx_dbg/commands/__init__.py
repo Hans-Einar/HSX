@@ -5,9 +5,12 @@ from __future__ import annotations
 from typing import Dict, Iterable, List, Optional
 
 from .base import Command
+from .attach import AttachCommand
 from .connect import ConnectCommand
+from .detach import DetachCommand
 from .exit import ExitCommand
 from .help import HelpCommand
+from .info import InfoCommand
 from .status import StatusCommand
 
 
@@ -37,6 +40,9 @@ def build_registry() -> CommandRegistry:
         HelpCommand(),
         ConnectCommand(),
         StatusCommand(),
+        AttachCommand(),
+        DetachCommand(),
+        InfoCommand(),
         ExitCommand(),
     ]
     for command in commands:

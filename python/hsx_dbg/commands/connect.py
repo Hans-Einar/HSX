@@ -7,6 +7,7 @@ from typing import List
 
 from .base import Command
 from ..context import DebuggerContext
+from ..output import emit_error, emit_result
 
 
 class ConnectCommand(Command):
@@ -28,12 +29,15 @@ class ConnectCommand(Command):
             ctx.port = args.port
         try:
             ctx.ensure_session(auto_events=not args.no_events)
-            session = ctx.session
-            if session and session.session_id:
-                print(f"Connected to {ctx.host}:{ctx.port} session={session.session_id}")
-            else:
-                print(f"Connected to {ctx.host}:{ctx.port}")
-            return 0
         except Exception as exc:
-            print(f"connect failed: {exc}")
+            emit_error(ctx, message=f"connect failed: {exc}")
             return 2
+        session = ctx.session
+        session_id = session.session_id if session else None
+        data = {"result": "connected", "session": session_id, "host": ctx.host, "port": ctx.port}
+        emit_result(
+            ctx,
+            message=f"Connected to {ctx.host}:{ctx.port} session={session_id or '-'}",
+            data=data,
+        )
+        return 0
