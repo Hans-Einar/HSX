@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Dict, Iterable, List, Optional
 
 from .base import Command
+from .alias import AliasCommand
 from .attach import AttachCommand
 from .connect import ConnectCommand
 from .control import ContinueCommand, PauseCommand, StepCommand
@@ -13,7 +14,9 @@ from .exit import ExitCommand
 from .help import HelpCommand
 from .info import InfoCommand
 from .status import StatusCommand
+from .session import SessionCommand
 from .ps import PsCommand
+from .observer import ObserverCommand
 
 
 class CommandRegistry:
@@ -42,6 +45,7 @@ def build_registry() -> CommandRegistry:
         HelpCommand(),
         ConnectCommand(),
         StatusCommand(),
+        SessionCommand(),
         AttachCommand(),
         DetachCommand(),
         PauseCommand(),
@@ -49,6 +53,8 @@ def build_registry() -> CommandRegistry:
         StepCommand(),
         PsCommand(),
         InfoCommand(),
+        ObserverCommand(),
+        AliasCommand(),
         ExitCommand(),
     ]
     for command in commands:

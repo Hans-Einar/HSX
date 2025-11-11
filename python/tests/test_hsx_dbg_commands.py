@@ -12,11 +12,13 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.append(str(REPO_ROOT / "python"))
 
+from hsx_dbg.commands.alias import AliasCommand
 from hsx_dbg.commands.attach import AttachCommand
 from hsx_dbg.commands.control import ContinueCommand, PauseCommand, StepCommand
 from hsx_dbg.commands.detach import DetachCommand
 from hsx_dbg.commands.info import InfoCommand
 from hsx_dbg.commands.ps import PsCommand
+from hsx_dbg.commands.session import SessionCommand
 from hsx_dbg.context import DebuggerContext
 
 
@@ -25,7 +27,7 @@ class DummySession:
     responses: List[Dict[str, Any]] = field(default_factory=list)
     requests: List[Dict[str, Any]] = field(default_factory=list)
 
-    def request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def request(self, payload: Dict[str, Any], **_: Any) -> Dict[str, Any]:
         self.requests.append(payload)
         if self.responses:
             return self.responses.pop(0)
@@ -140,3 +142,33 @@ def test_info_pid_outputs_registers(capsys):
     out = capsys.readouterr().out
     assert "task pid=3" in out
     assert "R00" in out
+
+
+def test_alias_command_sets_mapping(capsys):
+    ctx = StubContext()
+    cmd = AliasCommand()
+    assert cmd.run(ctx, []) == 0  # list
+    assert cmd.run(ctx, ["b", "break"]) == 0
+    assert ctx.aliases["b"] == "break"
+    out = capsys.readouterr().out
+    assert "b -> break" in out
+
+
+def test_session_list_command(capsys):
+    sessions = [
+        {"id": "abc", "client": "hsx-dbg", "pid_locks": [1], "features": ["events"]}
+    ]
+    ctx = StubContext([{"status": "ok", "session": {"id": "abc", "client": "hsx-dbg"}}, {"status": "ok", "sessions": sessions}])
+    cmd = SessionCommand()
+    assert cmd.run(ctx, []) == 0
+    assert cmd.run(ctx, ["list"]) == 0
+    out = capsys.readouterr().out
+    assert "sessions:" in out
+
+
+def test_json_output_schema_for_pause(capsys):
+    ctx = StubContext([{"status": "ok"}], json_output=True)
+    cmd = PauseCommand()
+    assert cmd.run(ctx, ["1"]) == 0
+    out = capsys.readouterr().out.strip()
+    assert out.startswith("{") and '"status": "ok"' in out

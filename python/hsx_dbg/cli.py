@@ -41,6 +41,16 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=Path.home() / ".hsx-dbg-history",
         help="Path to command history file (prompt_toolkit mode)",
     )
+    parser.add_argument(
+        "--keepalive-interval",
+        type=int,
+        help="Override keepalive interval (seconds)",
+    )
+    parser.add_argument(
+        "--no-keepalive",
+        action="store_true",
+        help="Disable automatic keepalive pings",
+    )
     return parser
 
 
@@ -48,7 +58,13 @@ def main(argv: List[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
     _configure_logging(args.log_level)
-    ctx = DebuggerContext(host=args.host, port=args.port, json_output=args.json)
+    ctx = DebuggerContext(
+        host=args.host,
+        port=args.port,
+        json_output=args.json,
+        keepalive_enabled=not args.no_keepalive,
+        keepalive_interval=args.keepalive_interval,
+    )
     registry = build_registry()
     if args.command:
         return _run_single_command(ctx, registry, args.command)

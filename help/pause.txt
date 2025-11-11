@@ -1,2 +1,4 @@
-pause <pid>
-Pause the specified task. The scheduler leaves it paused until you issue 'resume'.
+pause <pid>
+
+Pause the specified task. The scheduler leaves it paused until you issue `resume`.
+Unavailable while observer mode is enabled.

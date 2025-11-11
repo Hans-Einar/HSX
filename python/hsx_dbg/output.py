@@ -14,17 +14,22 @@ def _json_dump(payload: Mapping[str, Any]) -> str:
 
 def emit_result(ctx: DebuggerContext, *, message: str, data: Optional[Mapping[str, Any]] = None) -> None:
     """Emit a successful command result."""
-    if ctx.json_output and data is not None:
-        print(_json_dump(data))
+    if ctx.json_output:
+        payload: Dict[str, Any] = {"status": "ok"}
+        if data is not None:
+            payload["result"] = data
+        else:
+            payload["message"] = message
+        print(_json_dump(payload))
     else:
         print(message)
 
 
 def emit_error(ctx: DebuggerContext, *, message: str, data: Optional[Mapping[str, Any]] = None) -> None:
     """Emit an error message respecting JSON mode."""
-    payload = {"error": message}
+    payload: Dict[str, Any] = {"status": "error", "error": message}
     if data:
-        payload.update(data)
+        payload["details"] = dict(data)
     if ctx.json_output:
         print(_json_dump(payload))
     else:

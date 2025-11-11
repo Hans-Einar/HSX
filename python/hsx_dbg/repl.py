@@ -38,6 +38,7 @@ class DebuggerREPL:
             return self._fallback_loop()
         history = FileHistory(self.history_path) if (self.history_path and FileHistory) else None
         session = PromptSession("> ", history=history)
+        buffer: list[str] = []
         while True:
             try:
                 with patch_stdout():
@@ -45,16 +46,25 @@ class DebuggerREPL:
             except (EOFError, KeyboardInterrupt):
                 print()
                 return 0
-            self._dispatch(line)
+            if self._handle_multiline(buffer, line):
+                continue
+            payload = " ".join(buffer) if buffer else line
+            buffer.clear()
+            self._dispatch(payload)
 
     def _fallback_loop(self) -> int:
+        buffer: list[str] = []
         while True:
             try:
                 line = input("> ")
             except (EOFError, KeyboardInterrupt):
                 print()
                 return 0
-            self._dispatch(line)
+            if self._handle_multiline(buffer, line):
+                continue
+            payload = " ".join(buffer) if buffer else line
+            buffer.clear()
+            self._dispatch(payload)
 
     def _dispatch(self, line: str) -> None:
         stripped = line.strip()
@@ -67,6 +77,7 @@ class DebuggerREPL:
         if cmd_name.startswith("#parse-error"):
             print(f"Parse error: {cmd_args[-1] if cmd_args else cmd_name}")
             return
+        cmd_name = self.ctx.resolve_alias(cmd_name)
         command = self.registry.get(cmd_name)
         if not command:
             print(f"Unknown command: {cmd_name}")
@@ -78,3 +89,13 @@ class DebuggerREPL:
         except Exception as exc:  # pragma: no cover - defensive logging
             LOGGER.exception("command failed")
             print(f"Command '{cmd_name}' failed: {exc}")
+
+    def _handle_multiline(self, buffer: list[str], line: str) -> bool:
+        stripped = line.rstrip()
+        if stripped.endswith("\\"):
+            buffer.append(stripped[:-1])
+            return True
+        if buffer:
+            buffer.append(stripped)
+            return False
+        return False

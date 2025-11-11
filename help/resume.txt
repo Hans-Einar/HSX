@@ -1,2 +1,3 @@
-resume <pid>
-Resume a previously paused task so it re-enters the ready queue.
+resume <pid>
+
+Resume execution for a paused task (alias `continue`). Unavailable while observer mode is enabled.

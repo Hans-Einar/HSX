@@ -76,6 +76,7 @@ class ExecutiveSession:
         self._event_buffer: Deque[JsonDict] = deque(maxlen=max(1, event_buffer))
         self._event_buffer_lock = threading.Lock()
         self._event_callback: Optional[EventCallback] = None
+        self._keepalive_enabled = True
         self._stack_supported: Optional[bool] = None
         self._stack_cache: Dict[int, Tuple[float, JsonDict]] = {}
         self._stack_cache_lock = threading.Lock()
@@ -590,7 +591,10 @@ class ExecutiveSession:
             max_events = session_block.get("max_events")
             if isinstance(max_events, int) and max_events > 0:
                 self.max_events_requested = max_events
-            self._start_keepalive_locked()
+            if self._keepalive_enabled:
+                self._start_keepalive_locked()
+            else:
+                self._stop_keepalive_locked()
 
     # Keepalive management ----------------------------------------------------
 
@@ -620,6 +624,22 @@ class ExecutiveSession:
                 # Allow retry on next loop; if the call raised because the
                 # session expired the next regular RPC will attempt a reopen.
                 continue
+
+    def configure_keepalive(self, *, enabled: bool, interval: Optional[int] = None) -> None:
+        """Enable/disable keepalive thread and optionally override interval."""
+
+        with self._session_lock:
+            self._keepalive_enabled = enabled
+            if interval is not None:
+                try:
+                    self.session_heartbeat = max(5, int(interval))
+                except (TypeError, ValueError):
+                    pass
+            if not self._keepalive_enabled:
+                self._stop_keepalive_locked()
+            elif self.session_id:
+                self._stop_keepalive_locked()
+                self._start_keepalive_locked()
 
     # Event streaming ---------------------------------------------------------
 

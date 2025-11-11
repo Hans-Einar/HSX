@@ -1,2 +1,4 @@
-attach
-Attach the executive to the VM and take over scheduling. Safe to call multiple times.
+attach
+
+Attach the executive to the VM and take over scheduling. Safe to call multiple times.
+Disabled when observer mode is enabled (`observer on`). Use `detach` to release control.

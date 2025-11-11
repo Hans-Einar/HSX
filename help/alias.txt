@@ -1,0 +1,5 @@
+alias [name command]
+
+List or define command aliases. Running `alias` with no arguments prints
+current mappings. `alias foo bar` maps `foo` to run command `bar`. Use
+`alias --clear` to remove all aliases.

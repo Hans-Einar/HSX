@@ -21,6 +21,9 @@ class PauseCommand(Command):
             args = self._parser.parse_args(argv)
         except SystemExit:
             return 1
+        if ctx.observer_mode:
+            emit_error(ctx, message="Observer mode does not permit pause")
+            return 1
         session = ctx.ensure_session()
         try:
             response = session.request({"cmd": "pause", "pid": args.pid})
@@ -44,6 +47,9 @@ class ContinueCommand(Command):
         try:
             args = self._parser.parse_args(argv)
         except SystemExit:
+            return 1
+        if ctx.observer_mode:
+            emit_error(ctx, message="Observer mode does not permit continue")
             return 1
         session = ctx.ensure_session()
         try:
@@ -69,6 +75,9 @@ class StepCommand(Command):
         try:
             args = self._parser.parse_args(argv)
         except SystemExit:
+            return 1
+        if ctx.observer_mode:
+            emit_error(ctx, message="Observer mode does not permit stepping")
             return 1
         session = ctx.ensure_session()
         payload = {"cmd": "step", "pid": args.pid, "steps": max(1, args.count)}

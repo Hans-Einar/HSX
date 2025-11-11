@@ -1,2 +1,3 @@
-step [steps] [-p <pid>]
-Compatibility alias for `clock step`. Retires one guest instruction per step; optionally limit execution to a specific PID.
+step <pid> [count]
+
+Single-step the specified task (default 1 instruction). Unavailable while observer mode is enabled.

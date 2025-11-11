@@ -14,6 +14,9 @@ class DetachCommand(Command):
         super().__init__("detach", "Detach from the executive")
 
     def run(self, ctx: DebuggerContext, argv: List[str]) -> int:
+        if ctx.observer_mode:
+            emit_result(ctx, message="Observer mode does not acquire locks", data={"result": "observer"})
+            return 0
         session = ctx.session or ctx.ensure_session()
         try:
             response = session.request({"cmd": "detach"})

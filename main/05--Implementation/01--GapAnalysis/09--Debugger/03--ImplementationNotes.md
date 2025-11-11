@@ -105,3 +105,20 @@ Append sessions chronologically. Ensure every entry references the relevant desi
 
 ### Next Steps
 - Continue Phase 2 by adding breakpoint/watch commands and remaining session helpers (clock control, resume-all). Start planning Phase 3 work (breakpoint management, watch expressions) once execution control flow is stable.
+
+## 2025-11-11 - Codex (Session 5)
+
+### Scope
+- Plan item / phase addressed: Wrap-up Phase 1/2 remaining todos (aliases, multiline input, docs, session info/list, JSON schema consistency).
+- Design sections reviewed: 04.09--Debugger §6 (CLI UX), docs/executive_protocol (session APIs).
+
+### Work Summary
+- Added alias management (`alias` command + REPL alias resolution) and multiline command continuation (line ending with `\`).
+- Introduced `session info` / `session list` commands and helper docs, along with structured JSON output across all commands (`status` + `result/details`).
+- Documented CLI usage/JSON format in `docs/hsx_dbg_usage.md`, updated `help/ps.txt`, `help/info.txt`, and added regression tests (`python/tests/test_hsx_dbg_commands.py`) covering session, alias, and JSON behaviors.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py`
+
+### Next Steps
+- Begin Phase 3 (breakpoints/watch commands) now that the CLI foundation and session plumbing are complete.

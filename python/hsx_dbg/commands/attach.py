@@ -14,6 +14,9 @@ class AttachCommand(Command):
         super().__init__("attach", "Attach to the executive (global)")
 
     def run(self, ctx: DebuggerContext, argv: List[str]) -> int:
+        if ctx.observer_mode:
+            emit_error(ctx, message="Observer mode enabled; attach disabled")
+            return 1
         session = ctx.ensure_session()
         try:
             response = session.request({"cmd": "attach"})

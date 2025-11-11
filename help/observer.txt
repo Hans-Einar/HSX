@@ -1,0 +1,5 @@
+observer [on|off|status]
+
+Enable or disable observer (read-only) mode. While enabled, `attach`, `pause`,
+`resume`, and `step` are blocked to prevent accidental control of the VM.
+`observer status` prints the current state.

@@ -1,14 +1,6 @@
-session [list|close <id|number>]
-Show or manage executive sessions.
+session [info|list]
 
-Examples
-  session             # show the current session id details
-  session list        # list all sessions with numeric identifiers
-  session close 3     # close the session numbered 3
-  session close id:abcd-1234  # close a specific session by id
-
-Notes
-- The ``session list`` output assigns numbers starting at 1; use these
-  numbers with ``session close`` or the ``dmesg session`` filter.
-- Sessions may only be terminated by clients that still hold an active
-  session with the executive.
+`session info` shows details about the current debugger session (id, client,
+features, heartbeat, PID locks). `session list` queries the executive for all
+active sessions and prints lock ownership + negotiated capabilities. Use these
+commands to coordinate when multiple users share the executive.

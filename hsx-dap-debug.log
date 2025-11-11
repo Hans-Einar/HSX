@@ -8,3 +8,13 @@
 [2025-11-11 16:07:11,716] DEBUG: Resolved /home/warloc/git/HSX/examples/demos/longrun/main.c:6 to addresses: ['0x003C', '0x0040', '0x0044', '0x0048', '0x004C']
 [2025-11-11 16:07:11,716] INFO: Breakpoint set at /home/warloc/git/HSX/examples/demos/longrun/main.c:6 -> 0x003C
 [2025-11-11 16:07:11,716] INFO: Breakpoint verified after connection: /home/warloc/git/HSX/examples/demos/longrun/main.c:6 -> 0x003C
+[2025-11-11 17:59:19,533] INFO: HSX DAP adapter starting (pid=1221231)
+[2025-11-11 17:59:19,535] INFO: setBreakpoints: source=/home/warloc/git/HSX/examples/demos/longrun/main.c, count=1
+[2025-11-11 17:59:19,535] WARNING: setBreakpoints: no client connected, storing as pending
+[2025-11-11 17:59:19,536] INFO: Connecting to executive at 127.0.0.1:9998 (PID 1)
+[2025-11-11 17:59:19,540] INFO: Loaded symbol map for pid 1 from /home/warloc/git/HSX/examples/demos/build/debug/longrun/main.sym
+[2025-11-11 17:59:19,540] INFO: Reapplying 1 pending breakpoint sources
+[2025-11-11 17:59:19,540] INFO: Reapplying breakpoints for source: /home/warloc/git/HSX/examples/demos/longrun/main.c (1 breakpoints)
+[2025-11-11 17:59:19,540] DEBUG: Resolved /home/warloc/git/HSX/examples/demos/longrun/main.c:6 to addresses: ['0x003C', '0x0040', '0x0044', '0x0048', '0x004C']
+[2025-11-11 17:59:19,540] INFO: Breakpoint set at /home/warloc/git/HSX/examples/demos/longrun/main.c:6 -> 0x003C
+[2025-11-11 17:59:19,540] INFO: Breakpoint verified after connection: /home/warloc/git/HSX/examples/demos/longrun/main.c:6 -> 0x003C
