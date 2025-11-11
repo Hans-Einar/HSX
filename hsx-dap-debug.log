@@ -1,0 +1,9 @@
+[2025-11-10 16:39:53,739] INFO: HSX DAP adapter starting (pid=1049012)
+[2025-11-10 16:39:53,741] INFO: Connecting to executive at 127.0.0.1:9998 (PID 1)
+[2025-11-10 16:39:59,248] INFO: Loaded symbol map for pid 1 from /home/warloc/git/HSX/examples/demos/build/debug/longrun/main.sym
+[2025-11-10 16:40:44,964] INFO: Pause requested for PID 1
+[2025-11-10 16:40:46,385] INFO: Pause requested for PID 1
+[2025-11-10 16:41:19,792] INFO: Pause requested for PID 1
+[2025-11-10 16:41:44,597] INFO: Pause requested for PID 1
+[2025-11-10 16:42:13,122] INFO: Pause requested for PID 1
+[2025-11-10 16:42:13,992] INFO: Pause requested for PID 1

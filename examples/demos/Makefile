@@ -32,9 +32,10 @@ endif
 CLANG ?= $(if $(HSX_CLANG),$(HSX_CLANG),clang)
 VM := $(REPO_ROOT)/platforms/python/host_vm.py
 BUILD_DIR ?= build
-BUILD_DIR ?= build
-CLANGFLAGS ?= -S -emit-llvm -O0 -fno-builtin
 RUN_ARGS ?=
+
+CLANGFLAGS_BASE := -S -emit-llvm -O0 -fno-builtin -fno-ms-compatibility -fno-ms-extensions -target wasm32-unknown-unknown
+CLANGFLAGS     := $(CLANGFLAGS_BASE)
 
 # mkdir som funker på begge OS (kjøres i recipe, derfor siteres "$@")
 MKDIR_CMD = "$(PYTHON)" -c "import os,sys; p=os.path.abspath(sys.argv[1]); os.makedirs(os.path.dirname(p),exist_ok=True)" "$@"
@@ -42,10 +43,15 @@ MKDIR_CMD = "$(PYTHON)" -c "import os,sys; p=os.path.abspath(sys.argv[1]); os.ma
 LIB_DIR := $(REPO_ROOT)/examples/lib
 INCLUDE_DIR := $(REPO_ROOT)/include
 DEBUG ?= 0
+DEBUG_PREFIX_MAP_ENV := $(or $(HSX_DEBUG_PREFIX_MAP),$(DEBUG_PREFIX_MAP))
 
 ifeq ($(DEBUG),1)
   BUILD_DIR := build/debug
-  CLANGFLAGS += -g
+  # Limit debug info to line tables; hsx-llc cannot parse LLVM #dbg_* pseudo ops yet
+  CLANGFLAGS += -gline-tables-only
+  ifneq ($(strip $(DEBUG_PREFIX_MAP_ENV)),)
+    CLANGFLAGS += -fdebug-prefix-map=$(DEBUG_PREFIX_MAP_ENV)
+  endif
 endif
 
 HSX_EXTRA_MVASM_mailbox_producer := \

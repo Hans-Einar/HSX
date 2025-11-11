@@ -25,12 +25,24 @@ HXE_BUILDER := $(REPO_ROOT)/python/build_hxe.py
 
 # NB: -target beholdes som hos deg
 CLANGFLAGS_BASE := -S -emit-llvm -O0 -fno-builtin -fno-ms-compatibility -fno-ms-extensions -target wasm32-unknown-unknown
+CLANGFLAGS     := $(CLANGFLAGS_BASE)
 
 # Inkludérstier (siteres der de brukes)
 LIB_DIR     := $(REPO_ROOT)/examples/lib
 INCLUDE_DIR := $(REPO_ROOT)/include
 
 RUN_ARGS ?=
+DEBUG ?= 0
+DEBUG_PREFIX_MAP_ENV := $(or $(HSX_DEBUG_PREFIX_MAP),$(DEBUG_PREFIX_MAP))
+
+ifeq ($(DEBUG),1)
+  BUILD_DIR := build/debug
+  # Limit to line tables to avoid LLVM #dbg_* directives hsx-llc cannot parse yet
+  CLANGFLAGS += -gline-tables-only
+  ifneq ($(strip $(DEBUG_PREFIX_MAP_ENV)),)
+    CLANGFLAGS += -fdebug-prefix-map=$(DEBUG_PREFIX_MAP_ENV)
+  endif
+endif
 
 # Kryssplattform mkdir som tåler mellomrom i $@
 MKDIR_CMD = "$(PYTHON)" -c "import os,sys; p=os.path.abspath(sys.argv[1]); os.makedirs(os.path.dirname(p),exist_ok=True)" "$@"
@@ -49,6 +61,7 @@ LINKER_COMPONENTS := main lib
 LINKER_LL         := $(addsuffix .ll,$(addprefix $(BUILD_DIR)/$(LINKER_TEST)/,$(LINKER_COMPONENTS)))
 LINKER_MVA        := $(LINKER_LL:.ll=.mvasm)
 LINKER_HXO        := $(LINKER_LL:.ll=.hxo)
+LINKER_DBG        := $(LINKER_LL:.ll=.dbg)
 
 .SECONDARY: $(LL_ARTIFACTS) $(MVA_ARTIFACTS) $(HXE_ARTIFACTS) $(LINKER_LL) $(LINKER_MVA) $(LINKER_HXO)
 
@@ -57,7 +70,7 @@ HSX_EXTRA_MVASM_test_stdio_mailbox_c    := examples/lib/hsx_mailbox.mvasm exampl
 HSX_EXTRA_MVASM_test_mailbox_producer_c := examples/lib/hsx_mailbox.mvasm
 HSX_EXTRA_MVASM_test_mailbox_consumer_c := examples/lib/hsx_mailbox.mvasm examples/lib/hsx_stdio.mvasm
 
-.PHONY: all tests run-% clean list print-root
+.PHONY: all tests run-% clean list print-root debug
 
 # ---------- Utility ----------
 print-root:
@@ -67,6 +80,9 @@ print-root:
 
 # ---------- Default ----------
 all: $(HXE_ARTIFACTS)
+
+debug:
+	$(MAKE) DEBUG=1 all
 
 ifeq ($(strip $(TESTS)),)
 $(warning No test_* directories with main.c found under $(CURDIR).)
@@ -83,7 +99,9 @@ run-%: $(BUILD_DIR)/%/main.hxe
 # ---------- Linker test pipeline ----------
 $(BUILD_DIR)/$(LINKER_TEST)/main.hxe: $(LINKER_HXO)
 	$(MKDIR_CMD)
-	"$(PYTHON)" "$(REPO_ROOT)/python/hld.py" -o "$@" $(foreach f,$^,"$(f)")
+	"$(PYTHON)" "$(REPO_ROOT)/python/hld.py" -o "$@" \
+		$(foreach f,$^,"$(f)") \
+		$(if $(DEBUG),$(foreach dbg,$(LINKER_DBG),--debug-info "$(dbg)") --emit-sym "$(@:.hxe=.sym)",)
 
 $(BUILD_DIR)/$(LINKER_TEST)/%.hxo: $(BUILD_DIR)/$(LINKER_TEST)/%.mvasm
 	$(MKDIR_CMD)
@@ -91,11 +109,12 @@ $(BUILD_DIR)/$(LINKER_TEST)/%.hxo: $(BUILD_DIR)/$(LINKER_TEST)/%.mvasm
 
 $(BUILD_DIR)/$(LINKER_TEST)/%.mvasm: $(BUILD_DIR)/$(LINKER_TEST)/%.ll
 	$(MKDIR_CMD)
-	"$(PYTHON)" "$(REPO_ROOT)/python/hsx-llc.py" "$<" -o "$@"
+	"$(PYTHON)" "$(REPO_ROOT)/python/hsx-llc.py" "$<" -o "$@" \
+		$(if $(DEBUG),--emit-debug "$(@:.mvasm=.dbg)",)
 
 $(BUILD_DIR)/$(LINKER_TEST)/%.ll: $(LINKER_TEST)/%.c
 	$(MKDIR_CMD)
-	"$(CLANG)" $(CLANGFLAGS_BASE) -I"$(LIB_DIR)" -I"$(INCLUDE_DIR)" "$<" -o "$@"
+	"$(CLANG)" $(CLANGFLAGS) -I"$(LIB_DIR)" -I"$(INCLUDE_DIR)" "$<" -o "$@"
 
 # ---------- Generic test pipeline ----------
 $(BUILD_DIR)/%/main.hxe: $(BUILD_DIR)/%/main.mvasm
@@ -104,15 +123,18 @@ $(BUILD_DIR)/%/main.hxe: $(BUILD_DIR)/%/main.mvasm
 		--asm "$(REPO_ROOT)/python/asm.py" \
 		--linker "$(REPO_ROOT)/python/hld.py" \
 		--main "$<" \
-		--out "$@" $(foreach lib,$(HSX_EXTRA_MVASM_$*), --extra "$(REPO_ROOT)/$(lib)")
+		--out "$@" \
+		$(foreach lib,$(HSX_EXTRA_MVASM_$*), --extra "$(REPO_ROOT)/$(lib)") \
+		$(if $(DEBUG),--debug-info "$(@:.hxe=.dbg)"$(if $(strip $(HSX_EXTRA_MVASM_$*)),, --emit-sym "$(@:.hxe=.sym)"),)
 
 $(BUILD_DIR)/%/main.mvasm: $(BUILD_DIR)/%/main.ll
 	$(MKDIR_CMD)
-	"$(PYTHON)" "$(REPO_ROOT)/python/hsx-llc.py" "$<" -o "$@"
+	"$(PYTHON)" "$(REPO_ROOT)/python/hsx-llc.py" "$<" -o "$@" \
+		$(if $(DEBUG),--emit-debug "$(@:.mvasm=.dbg)",)
 
 $(BUILD_DIR)/%/main.ll: %/main.c
 	$(MKDIR_CMD)
-	"$(CLANG)" $(CLANGFLAGS_BASE) -I"$(LIB_DIR)" -I"$(INCLUDE_DIR)" "$<" -o "$@"
+	"$(CLANG)" $(CLANGFLAGS) -I"$(LIB_DIR)" -I"$(INCLUDE_DIR)" "$<" -o "$@"
 
 # ---------- Clean ----------
 .PHONY: clean

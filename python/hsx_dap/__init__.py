@@ -223,6 +223,21 @@ class _ScopeRecord:
 class HSXDebugAdapter:
     """DAP request dispatcher bridging VS Code to hsxdbg."""
 
+    _SESSION_FEATURES = ["events", "stack", "symbols", "memory", "watch", "disasm"]
+    _EVENT_CATEGORIES = [
+        "debug_break",
+        "task_state",
+        "scheduler",
+        "trace_step",
+        "watch_update",
+        "stdout",
+        "stderr",
+        "warning",
+        "mailbox_wait",
+        "mailbox_wake",
+        "mailbox_timeout",
+    ]
+
     def __init__(self, protocol: DAPProtocol) -> None:
         self.protocol = protocol
         self.logger = logging.getLogger("hsx-dap")
@@ -248,6 +263,8 @@ class HSXDebugAdapter:
         self._pending_step_reason: Optional[str] = None
         self._thread_states: Dict[int, Dict[str, Any]] = {}
         self._pending_pause: bool = False
+        self._pause_fallback_timer: Optional[threading.Timer] = None
+        self._synthetic_pause_pending: bool = False
 
     def serve(self) -> None:
         while True:
@@ -350,7 +367,9 @@ class HSXDebugAdapter:
     def _handle_continue(self, args: JsonDict) -> JsonDict:
         self._ensure_client()
         self.logger.info("Continue: resuming PID %s", self.current_pid)
+        self._cancel_pause_fallback()
         self._pending_pause = False  # Clear any pending pause state
+        self._synthetic_pause_pending = False
         self.client.resume(self.current_pid)
         try:
             self.client.clock_start()
@@ -364,9 +383,41 @@ class HSXDebugAdapter:
         self.logger.info("Pause requested for PID %s", self.current_pid)
         self._pending_pause = True
         self.client.pause(self.current_pid)
+        self._schedule_pause_fallback()
         # Note: We don't emit stopped event immediately - we'll wait for the TaskStateEvent
         # with reason "user_pause" which will have the actual PC at pause time
         return {}
+
+    def _schedule_pause_fallback(self) -> None:
+        if not self.current_pid:
+            return
+        self._cancel_pause_fallback()
+        timer = threading.Timer(0.3, self._pause_fallback_check)
+        timer.daemon = True
+        self._pause_fallback_timer = timer
+        timer.start()
+
+    def _cancel_pause_fallback(self) -> None:
+        timer = self._pause_fallback_timer
+        if timer is not None:
+            timer.cancel()
+            self._pause_fallback_timer = None
+
+    def _pause_fallback_check(self) -> None:
+        # Timer callback that emits a synthetic stopped event if the executive never sent one.
+        self._pause_fallback_timer = None
+        if not self._pending_pause or not self.client or not self.current_pid:
+            return
+        self.logger.warning("Pause response missing task_state event; emitting fallback stopped event")
+        pc = self._read_current_pc()
+        self._pending_pause = False
+        self._synthetic_pause_pending = True
+        self._emit_stopped_event(
+            pid=self.current_pid,
+            reason="user_pause",
+            description="pause (fallback)",
+            pc=pc,
+        )
 
     def _handle_next(self, args: JsonDict) -> JsonDict:
         self._ensure_client()
@@ -618,7 +669,13 @@ class HSXDebugAdapter:
         self.event_bus = EventBus()
         self.event_bus.start()
         self.runtime_cache = RuntimeCache()
-        session_config = SessionConfig(client_name="hsx-dap", pid_lock=pid, max_events=2048, heartbeat_s=10)
+        session_config = SessionConfig(
+            client_name="hsx-dap",
+            pid_lock=pid,
+            max_events=2048,
+            heartbeat_s=10,
+            features=list(self._SESSION_FEATURES),
+        )
         transport_config = TransportConfig(host=host, port=port)
         self.session = SessionManager(
             transport_config=transport_config,
@@ -627,8 +684,7 @@ class HSXDebugAdapter:
             runtime_cache=self.runtime_cache,
         )
         self.session.open()
-        categories = ["debug_break", "watch_update", "stdout", "stderr", "warning", "task_state"]
-        self.session.subscribe_events({"pid": [pid], "categories": categories}, ack_interval=0.1)
+        self.session.subscribe_events({"pid": [pid], "categories": self._EVENT_CATEGORIES}, ack_interval=0.1)
         self.client = CommandClient(session=self.session, cache=self.runtime_cache)
         self._watch_expr_to_id.clear()
         self._watch_id_to_expr.clear()
@@ -670,6 +726,18 @@ class HSXDebugAdapter:
     def _ensure_client(self) -> None:
         if not self.client:
             raise RuntimeError("debug session not connected")
+
+    def _read_current_pc(self) -> Optional[int]:
+        if not self.client or not self.current_pid:
+            return None
+        try:
+            state = self.client.get_register_state(self.current_pid, refresh=True)
+        except Exception:
+            self.logger.debug("Failed to refresh register state for pause fallback", exc_info=True)
+            return None
+        if state and state.pc is not None:
+            return int(state.pc)
+        return None
 
     def _format_registers(self) -> List[JsonDict]:
         if not self.client:
@@ -1056,6 +1124,8 @@ class HSXDebugAdapter:
         if self.event_bus:
             self.event_bus.stop()
             self.event_bus = None
+        self._cancel_pause_fallback()
+        self._synthetic_pause_pending = False
         if self.session:
             try:
                 self.session.close()
@@ -1153,7 +1223,13 @@ class HSXDebugAdapter:
             # Clear pending pause flag if this is the response to our pause request
             if reason == "user_pause" and self._pending_pause:
                 self._pending_pause = False
+                self._cancel_pause_fallback()
+                pending_synth = self._synthetic_pause_pending
+                self._synthetic_pause_pending = False
                 self.logger.info("Pause completed for PID %s", pid)
+                if pending_synth:
+                    self.logger.debug("Suppressing duplicate user_pause event (fallback already emitted)")
+                    return
             self._emit_stopped_event(
                 pid=pid,
                 reason=reason or state or "stopped",
