@@ -80,3 +80,9 @@ updates arrive via the event stream when expressions change.
 Provide a .sym path via `--symbols /path/to/app.sym` or the `symbols <path>`
 command. This enables `break` to resolve symbols (`main`) and `file.c:line`
 specifications.
+
+## Stack Navigation
+
+`stack bt <pid>` fetches a backtrace and caches frames locally. Use `stack frame <pid> <n>`
+to select a specific frame, `stack up <pid>` / `stack down <pid>` to move between frames,
+and note that the CLI highlights the currently selected frame in `stack bt` output.

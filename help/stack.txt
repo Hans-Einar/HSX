@@ -1,16 +1,10 @@
-stack
-=====
-
-Display the reconstructed call stack for a task.
-
-Usage::
-
-    stack <pid> [frames]
-
-Arguments:
-- ``pid``: Target task id.
-- ``frames`` (optional): Maximum number of frames to walk (default: executive setting).
-
-Shows per-frame PC/SP/FP along with symbol and source information
-when .sym data is available. Frames are truncated if the executive
-detects an invalid chain or reaches the frame limit.
+stack <subcommand>
+
+Subcommands:
+  bt <pid> [--frames N]   Show backtrace (default 32 frames) and cache frames.
+  frame <pid> <index>     Select a frame and show its details.
+  up <pid> [--count N]    Move to an older frame (default 1).
+  down <pid> [--count N]  Move to a newer frame (default 1).
+
+Stack frames display PC, SP/FP (when available), symbol, and source location.
+Requires the executive's stack feature to be enabled.

@@ -207,7 +207,7 @@ Automatic keepalive messages per heartbeat interval. Prevents session timeout.
 `delete <bp_id>`, `clear <addr/symbol>` commands remove breakpoints.
 
 **Todo:**
-- [ ] Implement `delete <bp_id>` command (by ID)
+- [x] Implement `delete <bp_id>` command (by ID)
 - [x] Implement `clear <addr/symbol>` command (by location)
 - [x] Implement `clear` command (all breakpoints)
 - [x] Handle breakpoint removal confirmation
@@ -266,14 +266,14 @@ Automatic keepalive messages per heartbeat interval. Prevents session timeout.
 `backtrace`, `frame <n>`, `up`, `down` commands per section 5.4. Essential for understanding program state.
 
 **Todo:**
-- [ ] Implement `backtrace` command (show call stack)
-- [ ] Implement `frame <n>` command (select frame)
-- [ ] Implement `up` command (move to caller frame)
-- [ ] Implement `down` command (move to callee frame)
-- [ ] Display frame info with source locations
-- [ ] Map addresses to function names using symbols
-- [ ] Add stack command tests
-- [ ] Document stack commands
+- [x] Implement `backtrace` command (show call stack)
+- [x] Implement `frame <n>` command (select frame)
+- [x] Implement `up` command (move to caller frame)
+- [x] Implement `down` command (move to callee frame)
+- [x] Display frame info with source locations
+- [x] Map addresses to function names using symbols
+- [x] Add stack command tests
+- [x] Document stack commands
 
 ---
 
@@ -287,13 +287,13 @@ Automatic keepalive messages per heartbeat interval. Prevents session timeout.
 `watch <var>`, `unwatch <var>`, `list watches` commands per section 5.5. Monitor variable changes.
 
 **Todo:**
-- [ ] Implement `watch <variable>` command
-- [ ] Implement `watch <address>` command
-- [ ] Implement `unwatch <watch_id>` command
-- [ ] Implement `list watches` command
-- [ ] Display watch values and change notifications
-- [ ] Add watch command tests
-- [ ] Document watch commands
+- [x] Implement `watch <variable>` command
+- [x] Implement `watch <address>` command
+- [x] Implement `unwatch <watch_id>` command
+- [x] Implement `list watches` command
+- [x] Display watch values and change notifications
+- [x] Add watch command tests
+- [x] Document watch commands
 
 ---
 

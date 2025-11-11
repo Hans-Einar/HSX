@@ -28,9 +28,11 @@ class DebuggerContext:
     symbol_path: Optional[Path] = None
     _symbol_index: Optional[SymbolIndex] = field(default=None, init=False, repr=False)
     disabled_breakpoints: Dict[int, set[int]] = field(default_factory=dict)
-    _breakpoint_ids: Dict[int, Dict[int, int]] = field(default_factory=dict)  # pid -> id -> addr
-    _breakpoint_lookup: Dict[int, Dict[int, int]] = field(default_factory=dict)  # pid -> addr -> id
+    _breakpoint_ids: Dict[int, Dict[int, int]] = field(default_factory=dict)
+    _breakpoint_lookup: Dict[int, Dict[int, int]] = field(default_factory=dict)
     _next_breakpoint_id: int = 1
+    current_frames: Dict[int, int] = field(default_factory=dict)
+    _stack_cache: Dict[int, Dict[str, Any]] = field(default_factory=dict)
 
     def ensure_session(self, *, auto_events: bool = True) -> ExecutiveSession:
         """Create the ExecutiveSession if needed."""
@@ -157,3 +159,24 @@ class DebuggerContext:
         disabled = self.disabled_breakpoints.get(pid)
         if disabled:
             disabled.discard(address)
+
+    def set_stack_cache(self, pid: int, stack: Dict[str, Any]) -> None:
+        self._stack_cache[pid] = stack
+        if pid not in self.current_frames:
+            self.current_frames[pid] = 0
+
+    def get_stack_cache(self, pid: int) -> Optional[Dict[str, Any]]:
+        return self._stack_cache.get(pid)
+
+    def select_frame(self, pid: int, index: int) -> int:
+        stack = self._stack_cache.get(pid)
+        if not stack:
+            self.current_frames[pid] = 0
+            return 0
+        frames = stack.get("frames") or []
+        if not isinstance(frames, list) or not frames:
+            self.current_frames[pid] = 0
+            return 0
+        clamped = max(0, min(int(index), len(frames) - 1))
+        self.current_frames[pid] = clamped
+        return clamped

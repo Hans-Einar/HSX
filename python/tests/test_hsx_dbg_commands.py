@@ -20,6 +20,7 @@ from hsx_dbg.commands.detach import DetachCommand
 from hsx_dbg.commands.info import InfoCommand
 from hsx_dbg.commands.ps import PsCommand
 from hsx_dbg.commands.session import SessionCommand
+from hsx_dbg.commands.stack import StackCommand
 from hsx_dbg.commands.watch import WatchCommand
 from hsx_dbg.context import DebuggerContext
 
@@ -191,6 +192,20 @@ def test_watch_add_and_list(capsys):
     assert cmd.run(ctx, ["list", "1"]) == 0
     out = capsys.readouterr().out
     assert "watch 1" in out
+
+
+def test_stack_bt_and_frame(capsys):
+    stack_info = {
+        "frames": [
+            {"index": 0, "pc": 0x10, "symbol": {"name": "main"}, "file": "main.c", "line": 3},
+            {"index": 1, "pc": 0x20, "symbol": {"name": "loop"}, "file": "main.c", "line": 8},
+        ]
+    }
+    ctx = StubContext([{"status": "ok", "stack": stack_info}])
+    cmd = StackCommand()
+    assert cmd.run(ctx, ["bt", "1"]) == 0
+    ctx._dummy_session.responses = []  # frame command should use cache
+    assert cmd.run(ctx, ["frame", "1", "1"]) == 0
 
 
 def test_break_add_symbol_line(tmp_path):

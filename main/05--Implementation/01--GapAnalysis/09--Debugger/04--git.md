@@ -16,6 +16,7 @@
 | 2025-11-11 | 0c5bfb4 | ps command + metadata output | Codex | Tests: `PYTHONPATH=. python python/hsx_dbg.py --command "ps"; PYTHONPATH=. python python/hsx_dbg.py --command "ps 1"; PYTHONPATH=. python python/hsx_dbg.py --json --command "ps"` |
 | 2025-11-11 | 94849c5 | pause/continue/step controls | Codex | Tests: `PYTHONPATH=. python python/hsx_dbg.py --command "pause 1"; PYTHONPATH=. python python/hsx_dbg.py --command "continue 1"; PYTHONPATH=. python python/hsx_dbg.py --command "step 1 5"; PYTHONPATH=. python python/hsx_dbg.py --json --command "step 1 2"` |
 | 2025-11-11 | 0662c80 | finish Phase 1/2 (aliases/observer/session info) | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py` |
+| 2025-11-11 | df988f7 | add symbol-aware breakpoint/watch commands | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py` |
 
 ## Pull Request
 - PR URL / ID: `<link or ID>`

@@ -20,6 +20,7 @@ from .ps import PsCommand
 from .observer import ObserverCommand
 from .breakpoints import BreakpointCommand
 from .watch import WatchCommand
+from .stack import StackCommand
 
 
 class CommandRegistry:
@@ -60,6 +61,7 @@ def build_registry() -> CommandRegistry:
         ObserverCommand(),
         BreakpointCommand(),
         WatchCommand(),
+        StackCommand(),
         AliasCommand(),
         ExitCommand(),
     ]
