@@ -7,6 +7,7 @@ from typing import Dict, Iterable, List, Optional
 from .base import Command
 from .attach import AttachCommand
 from .connect import ConnectCommand
+from .control import ContinueCommand, PauseCommand, StepCommand
 from .detach import DetachCommand
 from .exit import ExitCommand
 from .help import HelpCommand
@@ -43,6 +44,9 @@ def build_registry() -> CommandRegistry:
         StatusCommand(),
         AttachCommand(),
         DetachCommand(),
+        PauseCommand(),
+        ContinueCommand(),
+        StepCommand(),
         PsCommand(),
         InfoCommand(),
         ExitCommand(),

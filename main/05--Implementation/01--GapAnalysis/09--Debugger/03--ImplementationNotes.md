@@ -84,3 +84,22 @@ Append sessions chronologically. Ensure every entry references the relevant desi
 
 ### Next Steps
 - Continue Phase 2: add session-info summaries (`status` already in place) and start introducing execution control commands (`pause`, `continue`, `step`) plus breakpoint management per design §5.3/5.4.
+
+## 2025-11-11 - Codex (Session 4)
+
+### Scope
+- Plan item / phase addressed: Phase 2 (execution control commands) + JSON output polish.
+- Design sections reviewed: 04.09--Debugger §5.3 (pause/continue/step), CLI reference §6.2.
+
+### Work Summary
+- Added `pause`, `continue` (aliases `cont`/`resume`), and `step` commands under `python/hsx_dbg/commands/control.py`, wiring them into the command registry. Each command sends the corresponding executive RPC (`pause`, `resume`, `step`), emits structured JSON in `--json` mode, and surfaces human-readable status otherwise.
+- Extended the shared output helpers to render register blocks so `ps <pid>`/`info <pid>` include register snapshots when available.
+
+### Testing
+- `PYTHONPATH=. python python/hsx_dbg.py --command "pause 1"`
+- `PYTHONPATH=. python python/hsx_dbg.py --command "continue 1"`
+- `PYTHONPATH=. python python/hsx_dbg.py --command "step 1 5"`
+- `PYTHONPATH=. python python/hsx_dbg.py --json --command "step 1 2"`
+
+### Next Steps
+- Continue Phase 2 by adding breakpoint/watch commands and remaining session helpers (clock control, resume-all). Start planning Phase 3 work (breakpoint management, watch expressions) once execution control flow is stable.
