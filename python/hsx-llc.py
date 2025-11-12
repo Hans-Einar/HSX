@@ -2197,6 +2197,12 @@ def lower_function(
             stripped_line = orig_line.strip()
             if not stripped_line:
                 return None
+            if stripped_line.startswith("#dbg_declare"):
+                _handle_dbg_declare(stripped_line)
+                return None
+            if stripped_line.startswith("#dbg_value"):
+                _handle_dbg_value(stripped_line)
+                return None
             if stripped_line.startswith("#dbg"):
                 return None
             if stripped_line.startswith("call void @llvm.dbg.declare"):

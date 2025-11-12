@@ -27,6 +27,11 @@ class RegisterState:
     pc: Optional[int]
     sp: Optional[int]
     psw: Optional[int]
+    reg_base: Optional[int] = None
+    stack_base: Optional[int] = None
+    stack_limit: Optional[int] = None
+    stack_size: Optional[int] = None
+    sp_effective: Optional[int] = None
 
     def as_list(self) -> List[int]:
         return [self.registers.get(f"R{i}", 0) for i in range(16)]
@@ -286,10 +291,32 @@ class DebuggerBackend:
                 if isinstance(registers, dict):
                     raw = registers.get(f"R{idx}")
                 reg_map[f"R{idx}"] = _mask_u32(raw) or 0
-        pc = _mask_u32(registers.get("PC") if isinstance(registers, dict) else None)
-        sp = _mask_u32(registers.get("SP") if isinstance(registers, dict) else None)
-        psw = _mask_u32(registers.get("PSW") if isinstance(registers, dict) else None)
-        return RegisterState(reg_map, pc, sp, psw)
+        def _field(*keys: str) -> Optional[int]:
+            if not isinstance(registers, dict):
+                return None
+            for key in keys:
+                if key in registers:
+                    return registers.get(key)
+            return None
+        pc = _mask_u32(_field("PC", "pc"))
+        sp = _mask_u32(_field("SP", "sp"))
+        psw = _mask_u32(_field("PSW", "psw", "flags"))
+        reg_base = _mask_u32(_field("reg_base", "REG_BASE"))
+        stack_base = _mask_u32(_field("stack_base", "STACK_BASE"))
+        stack_limit = _mask_u32(_field("stack_limit", "STACK_LIMIT"))
+        stack_size = _mask_u32(_field("stack_size", "STACK_SIZE"))
+        sp_effective = _mask_u32(_field("sp_effective", "SP_EFFECTIVE"))
+        return RegisterState(
+            reg_map,
+            pc,
+            sp,
+            psw,
+            reg_base=reg_base,
+            stack_base=stack_base,
+            stack_limit=stack_limit,
+            stack_size=stack_size,
+            sp_effective=sp_effective,
+        )
 
     # ------------------------------------------------------------------
     # Watches

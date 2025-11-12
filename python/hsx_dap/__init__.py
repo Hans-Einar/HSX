@@ -8,6 +8,7 @@ import argparse
 import json
 import logging
 import os
+import importlib
 import sys
 import threading
 from dataclasses import dataclass, field
@@ -31,11 +32,25 @@ from hsx_dbg.symbols import SymbolIndex
 
 
 JsonDict = Dict[str, Any]
-REGISTER_NAMES = {}
+REGISTER_NAMES: Dict[str, str] = {}
 for idx in range(16):
     REGISTER_NAMES[f"R{idx}"] = f"R{idx}"
     REGISTER_NAMES[f"R{idx:02d}"] = f"R{idx}"
-REGISTER_NAMES.update({"PC": "PC", "SP": "SP", "PSW": "PSW"})
+REGISTER_NAMES.update(
+    {
+        "PC": "PC",
+        "SP": "SP",
+        "PSW": "PSW",
+        "REG_BASE": "REG_BASE",
+        "STACK_BASE": "STACK_BASE",
+        "STACK_LIMIT": "STACK_LIMIT",
+        "STACK_SIZE": "STACK_SIZE",
+        "SP_EFFECTIVE": "SP_EFFECTIVE",
+        "BP": "STACK_BASE",
+        "WP": "REG_BASE",
+    }
+)
+BACKEND_FACTORY_ENV = "HSX_DAP_BACKEND_FACTORY"
 
 
 class DAPProtocol:
@@ -241,6 +256,7 @@ class HSXDebugAdapter:
             "supportsStepBack": False,
             "supportsReadMemoryRequest": True,
             "supportsWriteMemoryRequest": True,
+            "supportsDisassembleRequest": True,
             "supportsTerminateRequest": True,
         }
         self._initialized = True
@@ -593,7 +609,7 @@ class HSXDebugAdapter:
         if pointer_value is not None:
             return pointer_value
 
-        include_globals = context != "watch"
+        include_globals = True
         symbol_value = self._evaluate_symbol_expression(
             expression,
             frame,
@@ -604,7 +620,7 @@ class HSXDebugAdapter:
 
         if context == "watch":
             try:
-                watch = self._ensure_watch_entry(expression)
+                watch = self._ensure_watch_entry(expression, frame)
             except RuntimeError as exc:
                 return {"result": str(exc), "variablesReference": 0}
             except Exception as exc:
@@ -713,6 +729,31 @@ class HSXDebugAdapter:
             "bytesWritten": bytes_written,
         }
 
+    def _handle_disassemble(self, args: JsonDict) -> JsonDict:
+        self._ensure_client()
+        count = self._coerce_positive_int(args.get("instructionCount"), default=32, limit=128)
+        offset = self._coerce_optional_int(args.get("instructionOffset")) or 0
+        address = self._coerce_address(
+            args.get("memoryReference")
+            or args.get("instructionPointerReference")
+            or args.get("address")
+            or args.get("instructionReference"),
+        )
+        if address is None:
+            frame = self._resolve_frame(args.get("frameId"))
+            address = frame.pc if frame and frame.pc is not None else self._read_current_pc()
+        if address is None:
+            raise RuntimeError("disassemble request requires address or active frame")
+        start_addr = (int(address) + int(offset)) & 0xFFFFFFFF
+        payload = {"cmd": "disasm", "pid": self.current_pid, "addr": start_addr, "count": count}
+        response = self._call_backend("request", payload)
+        if response.get("status") != "ok":
+            raise RuntimeError(response.get("error", "disassemble failed"))
+        block = response.get("disasm") or {}
+        resolve_symbols = bool(args.get("resolveSymbols"))
+        instructions = self._format_disassembly(block, resolve_symbols=resolve_symbols)
+        return {"instructions": instructions}
+
     # Internal helpers -------------------------------------------------
     def _connect(
         self,
@@ -741,14 +782,7 @@ class HSXDebugAdapter:
                 self.backend.disconnect()
             except Exception:
                 pass
-        backend = DebuggerBackend(
-            host=host,
-            port=port,
-            client_name="hsx-dap",
-            features=self._SESSION_FEATURES,
-            keepalive_enabled=True,
-            keepalive_interval=10,
-        )
+        backend = self._create_backend(host, port)
         if keepalive_interval is not None:
             backend.configure(keepalive_interval=int(keepalive_interval))
         try:
@@ -792,6 +826,25 @@ class HSXDebugAdapter:
         self._watch_expr_to_id.clear()
         self._watch_id_to_expr.clear()
         self._ensure_symbol_mapper(force=True)
+
+    def _create_backend(self, host: str, port: int) -> DebuggerBackend:
+        factory_path = os.environ.get(BACKEND_FACTORY_ENV)
+        if factory_path:
+            module_name, _, attr = factory_path.partition(":")
+            if not module_name or not attr:
+                raise RuntimeError(f"Invalid {BACKEND_FACTORY_ENV} value: {factory_path}")
+            module = importlib.import_module(module_name)
+            factory = getattr(module, attr)
+            backend = factory(host=host, port=port, features=self._SESSION_FEATURES)
+            return backend
+        return DebuggerBackend(
+            host=host,
+            port=port,
+            client_name="hsx-dap",
+            features=self._SESSION_FEATURES,
+            keepalive_enabled=True,
+            keepalive_interval=10,
+        )
 
     def _handle_exec_event(self, event: JsonDict) -> None:
         event_type = str(event.get("type") or "")
@@ -910,6 +963,51 @@ class HSXDebugAdapter:
             variables.append(
                 {"name": "PSW", "value": f"0x{state.psw:08X}", "type": "register", "variablesReference": 0}
             )
+        if state.reg_base is not None:
+            variables.append(
+                {
+                    "name": "REG_BASE",
+                    "value": f"0x{state.reg_base:08X}",
+                    "type": "register",
+                    "variablesReference": 0,
+                }
+            )
+        if state.stack_base is not None:
+            variables.append(
+                {
+                    "name": "STACK_BASE",
+                    "value": f"0x{state.stack_base:08X}",
+                    "type": "register",
+                    "variablesReference": 0,
+                }
+            )
+        if state.stack_limit is not None:
+            variables.append(
+                {
+                    "name": "STACK_LIMIT",
+                    "value": f"0x{state.stack_limit:08X}",
+                    "type": "register",
+                    "variablesReference": 0,
+                }
+            )
+        if state.stack_size is not None:
+            variables.append(
+                {
+                    "name": "STACK_SIZE",
+                    "value": f"0x{state.stack_size:08X}",
+                    "type": "register",
+                    "variablesReference": 0,
+                }
+            )
+        if state.sp_effective is not None:
+            variables.append(
+                {
+                    "name": "SP_EFFECTIVE",
+                    "value": f"0x{state.sp_effective:08X}",
+                    "type": "register",
+                    "variablesReference": 0,
+                }
+            )
         return variables
 
     def _format_watches(self) -> List[JsonDict]:
@@ -1016,6 +1114,98 @@ class HSXDebugAdapter:
             return int(value)
         except (TypeError, ValueError):
             return None
+
+    def _coerce_positive_int(self, value: Any, *, default: int, limit: Optional[int] = None) -> int:
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            parsed = default
+        parsed = parsed if parsed > 0 else default
+        if limit is not None:
+            parsed = min(parsed, limit)
+        return max(1, parsed)
+
+    def _coerce_address(self, value: Any) -> Optional[int]:
+        if value is None:
+            return None
+        if isinstance(value, (int, float)):
+            return int(value) & 0xFFFFFFFF
+        if isinstance(value, str):
+            token = value.strip()
+            if not token:
+                return None
+            try:
+                return int(token, 0) & 0xFFFFFFFF
+            except ValueError:
+                return None
+        return None
+
+    def _format_disassembly(self, block: JsonDict, *, resolve_symbols: bool) -> List[JsonDict]:
+        instructions = []
+        entries = block.get("instructions") or []
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            pc_value = entry.get("pc")
+            if pc_value is None:
+                continue
+            try:
+                pc_int = int(pc_value)
+            except (TypeError, ValueError):
+                continue
+            pc_int &= 0xFFFFFFFF
+            address = f"0x{pc_int:08X}"
+            mnemonic = str(entry.get("mnemonic") or "").strip()
+            operands_raw = entry.get("operands")
+            operands = operands_raw if isinstance(operands_raw, list) else []
+            operand_text = ", ".join(str(op) for op in operands if op is not None)
+            instruction_text = mnemonic
+            if operand_text:
+                instruction_text = f"{mnemonic} {operand_text}".strip()
+            line: JsonDict = {
+                "address": address,
+                "instructionBytes": str(entry.get("bytes") or ""),
+                "instruction": instruction_text or address,
+                "instructionPointerReference": address,
+                "memoryReference": address,
+            }
+            if resolve_symbols:
+                label = entry.get("label")
+                if not label:
+                    symbol_meta = entry.get("symbol")
+                    if isinstance(symbol_meta, dict):
+                        label = symbol_meta.get("name")
+                if label:
+                    line["symbol"] = str(label)
+            location_meta = self._disassembly_source(entry)
+            if location_meta:
+                line.update(location_meta)
+            instructions.append(line)
+        return instructions
+
+    def _disassembly_source(self, entry: Dict[str, Any]) -> Optional[JsonDict]:
+        line_info = entry.get("line")
+        if not isinstance(line_info, dict):
+            return None
+        path = line_info.get("file")
+        directory = line_info.get("directory")
+        if path and directory:
+            try:
+                resolved = Path(directory) / path
+                path = str(resolved)
+            except Exception:
+                path = str(path)
+        location: JsonDict = {}
+        source = self._render_source(path) if path else None
+        if source:
+            location["location"] = source
+        line_number = line_info.get("line")
+        if isinstance(line_number, (int, float)):
+            location["line"] = int(line_number)
+        column = line_info.get("column")
+        if isinstance(column, (int, float)):
+            location["column"] = int(column)
+        return location or None
 
     def _coerce_bool(self, value: Any) -> bool:
         if isinstance(value, bool):
@@ -1348,28 +1538,36 @@ class HSXDebugAdapter:
             self._breakpoint_specs.pop(key, None)
             self._pending_breakpoints.pop(key, None)
 
-    def _ensure_watch_entry(self, expression: str):
+    def _ensure_watch_entry(self, expression: str, frame: Optional[_FrameRecord]):
         expr = expression.strip()
         if not expr or not self.client:
             return None
+        normalized_expr = expr
         self._ensure_symbol_mapper()
-        kind = self._classify_watch_expression(expr)
+        expr_lower = expr.lower()
+        kind = "local" if expr_lower.startswith("local:") else self._classify_watch_expression(expr)
         if kind == "symbol":
-            symbol_meta = self._lookup_symbol_metadata(expr)
+            symbol_meta = self._find_symbol(expr, frame, include_globals=True)
             if symbol_meta is None:
                 raise RuntimeError(f"symbol '{expr}' not found (ensure .sym is loaded)")
             if self._symbol_requires_stack(symbol_meta):
-                raise RuntimeError(f"symbol '{expr}' refers to a local/stack variable (not yet supported)")
-        watch_id = self._watch_expr_to_id.get(expr)
+                normalized_expr = self._format_local_watch_expression(expr, frame, symbol_meta)
+                if not normalized_expr:
+                    raise RuntimeError(f"symbol '{expr}' refers to a stack variable but no frame is selected")
+        if kind == "local":
+            normalized_expr = self._format_local_watch_expression(expr, frame, None)
+            if not normalized_expr:
+                raise RuntimeError("local watches require an active stack frame")
+        watch_id = self._watch_expr_to_id.get(normalized_expr)
         if watch_id is None:
-            record = self._call_backend("add_watch", expr, pid=self.current_pid)
+            record = self._call_backend("add_watch", self.current_pid, normalized_expr)
             watch_id = getattr(record, "watch_id", None)
             if watch_id is None and isinstance(record, dict):
                 watch_id = record.get("watch_id") or record.get("id")
             watch_id = int(watch_id or 0)
             if watch_id:
-                self._watch_expr_to_id[expr] = watch_id
-                self._watch_id_to_expr[watch_id] = expr
+                self._watch_expr_to_id[normalized_expr] = watch_id
+                self._watch_id_to_expr[watch_id] = normalized_expr
                 self._invalidate_variables_scope()
         if not watch_id:
             return None
@@ -1393,6 +1591,25 @@ class HSXDebugAdapter:
             parts.append(f"({' '.join(meta)})")
         return " ".join(part for part in parts if part)
 
+    def _format_local_watch_expression(
+        self,
+        expr: str,
+        frame: Optional[_FrameRecord],
+        symbol_meta: Optional[Dict[str, Any]],
+    ) -> Optional[str]:
+        if expr.lower().startswith("local:"):
+            return expr
+        function_name = None
+        if symbol_meta:
+            function_name = symbol_meta.get("function") or symbol_meta.get("scope")
+        if not function_name and frame and frame.name:
+            function_name = frame.name
+        if not frame and not function_name:
+            return None
+        if function_name:
+            return f"local:{function_name}::{expr}"
+        return f"local:{expr}"
+
     def _invalidate_variables_scope(self) -> None:
         try:
             self.protocol.send_event("invalidated", {"areas": ["variables"]})
@@ -1405,7 +1622,7 @@ class HSXDebugAdapter:
         if self.client:
             for watch_id in set(self._watch_expr_to_id.values()):
                 try:
-                    self._call_backend("remove_watch", watch_id, pid=self.current_pid)
+                    self._call_backend("remove_watch", self.current_pid, watch_id)
                 except Exception:
                     self.logger.debug("failed to remove watch %s", watch_id)
         self._watch_expr_to_id.clear()
@@ -1418,7 +1635,7 @@ class HSXDebugAdapter:
         self._watch_id_to_expr.clear()
         for expr in expressions:
             try:
-                record = self._call_backend("add_watch", expr, pid=self.current_pid)
+                record = self._call_backend("add_watch", self.current_pid, expr)
             except DebuggerBackendError:
                 self.logger.warning("Failed to restore watch expression %s", expr)
                 continue
@@ -1717,6 +1934,16 @@ class HSXDebugAdapter:
             value = state.sp
         elif normalized == "PSW":
             value = state.psw
+        elif normalized == "REG_BASE":
+            value = state.reg_base
+        elif normalized == "STACK_BASE":
+            value = state.stack_base
+        elif normalized == "STACK_LIMIT":
+            value = state.stack_limit
+        elif normalized == "STACK_SIZE":
+            value = state.stack_size
+        elif normalized == "SP_EFFECTIVE":
+            value = state.sp_effective
         else:
             value = state.registers.get(normalized)
         if value is None:
@@ -1800,9 +2027,15 @@ class HSXDebugAdapter:
             return None
         if hasattr(self.client, "symbol_lookup_name"):
             try:
-                return self._call_backend("symbol_lookup_name", self.current_pid, name)
+                result = self._call_backend("symbol_lookup_name", self.current_pid, name)
+                if result:
+                    return result
             except Exception:
                 return None
+        if self._symbol_mapper:
+            addresses = self._symbol_mapper.lookup_symbol(name)
+            if addresses:
+                return {"name": name, "address": addresses[0]}
         return None
 
     def _lookup_local_symbol(self, name: str, frame: Optional[_FrameRecord]) -> Optional[Dict[str, Any]]:
@@ -1870,7 +2103,7 @@ class HSXDebugAdapter:
             return None
         if len(data) < length:
             data = data.ljust(length, b"\x00")
-        value = int.from_bytes(data[:length], byteorder="big")
+        value = int.from_bytes(data[:length], byteorder="little")
         return f"0x{value:08X} ({value}) @ 0x{addr:08X}"
 
     @staticmethod
@@ -1930,7 +2163,7 @@ class HSXDebugAdapter:
         data = self._call_backend("read_memory", int(addr), int(size), pid=self.current_pid)
         if not data:
             return None
-        value = int.from_bytes(data[: min(len(data), 4)], byteorder="big")
+        value = int.from_bytes(data[: min(len(data), 4)], byteorder="little")
         return f"0x{value:08X} ({value})"
 
     def _resolve_symbol_address(self, symbol: Dict[str, Any], frame: Optional[_FrameRecord]) -> Optional[int]:

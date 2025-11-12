@@ -4017,6 +4017,32 @@ class VMController:
         else:
             vm.configure_debug(enabled=False)
 
+    def _resume_debug_if_needed(self, pid: int) -> None:
+        vm = self.vm
+        if vm is None or self.current_pid != pid:
+            return
+        if not hasattr(vm, "prepare_debug_run"):
+            return
+        dbg = self.debug_sessions.get(pid)
+        debug_halted = bool(getattr(vm, "debug_halted", False))
+        if dbg is not None and dbg.halted:
+            debug_halted = True
+        if not debug_halted:
+            return
+        skip_pc = None
+        last_stop = None
+        if dbg and dbg.last_stop:
+            last_stop = dbg.last_stop
+        else:
+            last_stop = getattr(vm, "debug_last_stop", None)
+        if isinstance(last_stop, dict):
+            pc_value = last_stop.get("pc")
+            if isinstance(pc_value, int):
+                skip_pc = pc_value
+        vm.prepare_debug_run(step_count=0, skip_break_at_pc=skip_pc)
+        if dbg:
+            dbg.halted = False
+
     def _store_active_state(self) -> None:
         if self.current_pid is None or self.vm is None:
             return
@@ -4475,6 +4501,7 @@ class VMController:
         if state:
             state["context"]["state"] = "running"
         self._activate_task(pid, state_override=state)
+        self._resume_debug_if_needed(pid)
         return self._task_summary(pid)
 
     def kill_task(self, pid: int) -> Dict[str, Any]:

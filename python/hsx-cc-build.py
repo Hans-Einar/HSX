@@ -141,6 +141,39 @@ class HSXBuilder:
         """Log message if verbose"""
         if self.verbose:
             print(f"[hsx-cc-build] {msg}")
+
+    def _is_examples_demo_project(self) -> bool:
+        """Return True when we're operating inside examples/demos."""
+        try:
+            root = self.project_root.resolve()
+        except OSError:
+            root = self.project_root
+        return root.name == "demos" and root.parent.name == "examples"
+
+    def _validate_symbol_file(self, sym_path: Path) -> None:
+        """Ensure a .sym file exists and contains local symbol metadata."""
+        if not sym_path.exists():
+            raise HSXBuildError(f"Missing symbol file: {sym_path}")
+        try:
+            with sym_path.open("r", encoding="utf-8") as handle:
+                payload = json.load(handle)
+        except Exception as exc:
+            raise HSXBuildError(f"Invalid symbol file {sym_path}: {exc}") from exc
+        symbols = payload.get("symbols") or {}
+        locals_section = symbols.get("locals") or []
+        if not locals_section:
+            raise HSXBuildError(
+                f"Symbol file {sym_path} lacks local variable metadata. "
+                "Rebuild with full debug info (HSX_CC_FORCE_FULL_DEBUG=1).",
+            )
+        self.log(f"Validated symbols: {sym_path}")
+
+    def _ensure_demo_symbols(self) -> None:
+        """Validate demo symbol files after a debug build."""
+        if not self.args.debug or not self._is_examples_demo_project():
+            return
+        longrun_sym = self.build_dir / "longrun" / "main.sym"
+        self._validate_symbol_file(longrun_sym)
     
     def run_command(self, cmd: List[str], cwd: Optional[Path] = None) -> subprocess.CompletedProcess:
         """Run command and check result"""
@@ -482,6 +515,7 @@ class HSXBuilder:
                         self.generate_sources_json(source_files)
                     except HSXBuildError:
                         self.log("Warning: Could not generate sources.json")
+                    self._ensure_demo_symbols()
             
             print(f"\n{SUCCESS_MARK} Build successful!")
             print(f"  Output: {self.build_dir}")

@@ -9,8 +9,9 @@ registers, and watches from within the IDE.
 - Supports launch/attach, pause/continue, single-step, stack traces, registers,
   watch display, and console output.
 - Relies on the Python `hsx_dap` module that lives in this repository. The
-  extension's debug adapter wrapper (`debugAdapter/hsx-dap.py`) simply ensures
-  the repo root is on `sys.path` and invokes `python.hsx_dap.main()`.
+  packaged adapter automatically points `HSX_REPO_ROOT`/`PYTHONPATH` at your
+  workspace so it can import the module even when the VSIX is installed
+  elsewhere.
 - Additional features (hover evaluation, memory read/write, breakpoint source
   mapping) will land in upcoming iterations.
 

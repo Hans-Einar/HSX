@@ -9,7 +9,21 @@
   },
   "categories": ["Debuggers"],
   "main": "./dist/extension.js",
-  "activationEvents": ["onDebugResolve:hsx", "onDebugInitialConfigurations:hsx"],
+  "activationEvents": [
+    "onDebugResolve:hsx",
+    "onDebugInitialConfigurations:hsx",
+    "onView:hsxMemoryView",
+    "onView:hsxStackView",
+    "onView:hsxDisassemblyView",
+    "onCommand:hsx.views.refreshMemory",
+    "onCommand:hsx.views.setMemoryBase",
+    "onCommand:hsx.views.refreshStack",
+    "onCommand:hsx.views.refreshDisassembly",
+    "onCommand:hsx.views.setDisassemblyBase",
+    "onCommand:hsx.views.followProgramCounter",
+    "onCommand:hsx.views.goToProgramCounter",
+    "onCommand:hsx.views.copyDisassembly"
+  ],
   "contributes": {
     "debuggers": [
       {
@@ -87,7 +101,109 @@
           }
         ]
       }
-    ]
+    ],
+    "views": {
+      "debug": [
+        {
+          "id": "hsxMemoryView",
+          "name": "HSX Memory"
+        },
+        {
+          "id": "hsxStackView",
+          "name": "HSX Stack"
+        },
+        {
+          "id": "hsxDisassemblyView",
+          "name": "HSX Disassembly"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "hsx.views.refreshMemory",
+        "title": "Refresh Memory",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "hsx.views.setMemoryBase",
+        "title": "Set Memory Base Address…",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "hsx.views.refreshStack",
+        "title": "Refresh Stack",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "hsx.views.refreshDisassembly",
+        "title": "Refresh Disassembly",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "hsx.views.setDisassemblyBase",
+        "title": "Disassemble From Address…",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "hsx.views.followProgramCounter",
+        "title": "Follow Program Counter",
+        "icon": "$(target)"
+      },
+      {
+        "command": "hsx.views.goToProgramCounter",
+        "title": "Go to Program Counter",
+        "icon": "$(debug-step-back)"
+      },
+      {
+        "command": "hsx.views.copyDisassembly",
+        "title": "Copy Disassembly Rows",
+        "icon": "$(copy)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "hsx.views.refreshMemory",
+          "when": "view == hsxMemoryView",
+          "group": "navigation"
+        },
+        {
+          "command": "hsx.views.setMemoryBase",
+          "when": "view == hsxMemoryView",
+          "group": "navigation@2"
+        },
+        {
+          "command": "hsx.views.refreshStack",
+          "when": "view == hsxStackView",
+          "group": "navigation"
+        },
+        {
+          "command": "hsx.views.refreshDisassembly",
+          "when": "view == hsxDisassemblyView",
+          "group": "navigation"
+        },
+        {
+          "command": "hsx.views.setDisassemblyBase",
+          "when": "view == hsxDisassemblyView",
+          "group": "navigation@2"
+        },
+        {
+          "command": "hsx.views.goToProgramCounter",
+          "when": "view == hsxDisassemblyView",
+          "group": "navigation@3"
+        },
+        {
+          "command": "hsx.views.followProgramCounter",
+          "when": "view == hsxDisassemblyView",
+          "group": "navigation@4"
+        },
+        {
+          "command": "hsx.views.copyDisassembly",
+          "when": "view == hsxDisassemblyView",
+          "group": "navigation@9"
+        }
+      ]
+    }
   },
   "scripts": {
     "compile": "tsc -p ./",
