@@ -571,16 +571,16 @@ Evaluation/pause commands currently wedge when the tracked PID disappears (`unkn
 ### 8.1 PID Loss & Reconnect UX
 
 **Todo:**
-- [ ] Detect `unknown pid` errors after reconnect, re-run `ps`, and either update `current_pid` or surface a fatal “target exited” message.
-- [ ] Emit telemetry + VS Code notifications when a PID disappears so users know to relaunch.
-- [ ] Extend the hsx_dap harness with a backend stub that simulates PID loss mid-session to cover the new logic.
+- [x] Detect `unknown pid` errors after reconnect, re-run `ps`, and either update `current_pid` or surface a fatal “target exited” message.
+- [x] Emit telemetry + VS Code notifications when a PID disappears so users know to relaunch.
+- [x] Extend the hsx_dap harness with a backend stub that simulates PID loss mid-session to cover the new logic.
 
 ### 8.2 Instruction Breakpoints & Disassembly Refresh
 
 **Todo:**
-- [ ] Implement `setInstructionBreakpoints` to allow breakpoints directly from the disassembly tree (reusing `DebuggerBackend` APIs).
+- [x] Implement `setInstructionBreakpoints` to allow breakpoints directly from the disassembly tree (reusing `DebuggerBackend` APIs).
 - [ ] Auto-refresh disassembly on every `stopped` event (breakpoint hits included) and ensure requests always send a non-zero `instructionCount`.
-- [ ] Add harness tests verifying instruction breakpoints hit and the disassembly panel populates after breakpoint stops.
+- [x] Add harness tests verifying instruction breakpoints hit and the disassembly panel populates after breakpoint stops.
 
 ### 8.3 Breakpoint Synchronization
 

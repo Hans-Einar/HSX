@@ -906,7 +906,7 @@ class HSXDebugAdapter:
                 "observer": observer_mode,
             },
         )
-        self._purge_remote_breakpoints()
+        self._sync_remote_breakpoints()
         self._watch_expr_to_id.clear()
         self._watch_id_to_expr.clear()
         self._ensure_symbol_mapper(force=True)
@@ -947,6 +947,7 @@ class HSXDebugAdapter:
                 description=data.get("symbol") or reason,
                 pc=pc,
             )
+            self._sync_remote_breakpoints()
             return
         if event_type in {"stdout", "stderr"}:
             text = ""
@@ -1366,13 +1367,16 @@ class HSXDebugAdapter:
 
     def _clear_breakpoints(self, source_key: str) -> None:
         entries = self._breakpoints.get(source_key, [])
-        if not entries or not self.client:
+        if not entries:
             self._breakpoints[source_key] = []
             return
+        skip_backend = source_key == self._remote_breakpoint_key()
         for entry in entries:
             addresses = entry.get("addresses") or []
             if isinstance(addresses, int):
                 addresses = [addresses]
+            if entry.get("readonly") or skip_backend or not self.client:
+                continue
             for address in addresses:
                 try:
                     self._call_backend("clear_breakpoint", self.current_pid, int(address))
@@ -1388,30 +1392,51 @@ class HSXDebugAdapter:
             self._clear_breakpoints(source_key)
         self._breakpoints.clear()
 
-    def _purge_remote_breakpoints(self) -> None:
+    def _sync_remote_breakpoints(self) -> None:
         if not self.client or self.current_pid is None:
             return
         try:
             entries = self._call_backend("list_breakpoints", self.current_pid)
         except DebuggerBackendError as exc:
-            self.logger.debug("list_breakpoints failed during session startup: %s", exc)
+            self.logger.debug("list_breakpoints sync failed: %s", exc)
             return
         if not isinstance(entries, list):
             return
-        remote: List[int] = []
+        remote_addresses: Set[int] = set()
         for entry in entries:
             try:
-                address = int(entry)
+                remote_addresses.add(int(entry) & 0xFFFFFFFF)
             except (TypeError, ValueError):
-                self.logger.debug("Skipping invalid breakpoint entry from executive: %r", entry)
-                continue
-            remote.append(address & 0xFFFF)
-        if not remote:
-            return
-        self.logger.info(
-            "Executive reports %d existing breakpoint(s); leaving them active for this session",
-            len(remote),
-        )
+                self.logger.debug("Skipping invalid remote breakpoint %r", entry)
+        local_addresses = self._collect_breakpoint_addresses(include_remote=False)
+        filtered = {addr for addr in remote_addresses if addr not in local_addresses}
+        remote_key = self._remote_breakpoint_key()
+        existing = set(self._extract_addresses_for_key(remote_key))
+        added = sorted(filtered - existing)
+        removed = sorted(existing - filtered)
+        if filtered:
+            self._breakpoints[remote_key] = [{"addresses": sorted(filtered), "readonly": True}]
+        elif remote_key in self._breakpoints:
+            self._breakpoints.pop(remote_key, None)
+        for addr in added:
+            breakpoint_payload = {
+                "id": addr,
+                "verified": True,
+                "instructionReference": f"{addr:#x}",
+                "address": addr,
+                "message": "Breakpoint set outside VS Code",
+            }
+            self.protocol.send_event("breakpoint", {"reason": "new", "breakpoint": breakpoint_payload})
+            self.logger.info("Registered external breakpoint at 0x%04X", addr)
+        for addr in removed:
+            breakpoint_payload = {
+                "id": addr,
+                "verified": False,
+                "instructionReference": f"{addr:#x}",
+                "address": addr,
+            }
+            self.protocol.send_event("breakpoint", {"reason": "removed", "breakpoint": breakpoint_payload})
+            self.logger.info("External breakpoint removed at 0x%04X", addr)
 
     def _resolve_breakpoint_addresses(self, source_path: Optional[str], line: Optional[int], bp: JsonDict) -> List[int]:
         addresses: List[int] = []
@@ -1866,6 +1891,43 @@ class HSXDebugAdapter:
     def _instruction_breakpoint_key(self) -> str:
         pid = self.current_pid if self.current_pid is not None else 0
         return f"instruction::{pid}"
+
+    def _remote_breakpoint_key(self) -> str:
+        pid = self.current_pid if self.current_pid is not None else 0
+        return f"remote::{pid}"
+
+    def _extract_addresses_for_key(self, source_key: str) -> List[int]:
+        entries = self._breakpoints.get(source_key, [])
+        addresses: List[int] = []
+        for entry in entries:
+            value = entry.get("addresses")
+            if isinstance(value, int):
+                addresses.append(value & 0xFFFFFFFF)
+            elif isinstance(value, list):
+                for addr in value:
+                    try:
+                        addresses.append(int(addr) & 0xFFFFFFFF)
+                    except (TypeError, ValueError):
+                        continue
+        return addresses
+
+    def _collect_breakpoint_addresses(self, *, include_remote: bool = True) -> Set[int]:
+        addresses: Set[int] = set()
+        remote_key = self._remote_breakpoint_key()
+        for key, entries in self._breakpoints.items():
+            if not include_remote and key == remote_key:
+                continue
+            for entry in entries:
+                value = entry.get("addresses")
+                if isinstance(value, int):
+                    addresses.add(int(value) & 0xFFFFFFFF)
+                elif isinstance(value, list):
+                    for addr in value:
+                        try:
+                            addresses.add(int(addr) & 0xFFFFFFFF)
+                        except (TypeError, ValueError):
+                            continue
+        return addresses
 
     def _stop_event_stream(self) -> None:
         if self.backend:
