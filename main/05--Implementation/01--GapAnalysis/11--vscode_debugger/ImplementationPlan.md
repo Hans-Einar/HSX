@@ -45,17 +45,17 @@ symbol caches, watch support) land in one place.
 **Goal:** Capture the current shape of the adapter, document drifts from the CLI
 debugger, and ground the plan in the latest study/design notes.
 
-- [ ] Review the existing adapter stack (`vscode-hsx/src/extension.ts`,
+- [x] Review the existing adapter stack (`vscode-hsx/src/extension.ts`,
       `debugAdapter/hsx-dap.py`, `python/hsx_dap/*`, legacy `python/hsxdbg/*`)
       and document findings in `11--vscode_debugger/03--ImplementationNotes.md`.
-- [ ] Cross-reference design expectations from
+- [x] Cross-reference design expectations from
       [04.11--vscode_debugger.md](../../../04--Design/04.11--vscode_debugger.md)
       and debugger protocol details from
       [04.09--Debugger.md](../../../04--Design/04.09--Debugger.md); record mismatches.
-- [ ] Use `01--Study-v2.md` + the original study to enumerate which CLI features
+- [x] Use `01--Study-v2.md` + the original study to enumerate which CLI features
       (auto-reconnect, observer mode, symbol handling) must be reused and ensure
       the notes explicitly map the adapter gaps back to those requirements.
-- [ ] Define the adapter/CLI API boundary (shared backend module, event bridge,
+- [x] Define the adapter/CLI API boundary (shared backend module, event bridge,
       breakpoint/store reuse) and log decisions in ImplementationNotes.
 
 ---
@@ -65,15 +65,15 @@ debugger, and ground the plan in the latest study/design notes.
 **Focus:** Replace bespoke RPC glue with shared debugger infrastructure.
 
 1. **Shared context module**
-   - [ ] Extract a reusable `DebuggerBackend` (wrapping `DebuggerContext`) that
+   - [x] Extract a reusable `DebuggerBackend` (wrapping `DebuggerContext`) that
          exposes async-friendly APIs for DAP handlers.
-   - [ ] Ensure backend exposes cancellation-aware helpers for attach/detach,
+   - [x] Ensure backend exposes cancellation-aware helpers for attach/detach,
          symbol loading, breakpoint operations, and event subscription.
-   - [ ] Update CLI + adapter to import the shared backend (no logic forks).
+   - [x] Update CLI + adapter to import the shared backend (no logic forks).
 2. **DAP transport cleanup**
-   - [ ] Harden the DAP base class with message validation, logging, and JSON
+   - [x] Harden the DAP base class with message validation, logging, and JSON
          schema enforcement (carry over Phase 5 logging improvements).
-   - [ ] Add unit tests for content-length parsing, cancellation tokens, and
+   - [x] Add unit tests for content-length parsing, cancellation tokens, and
          error replies.
 
 Deliverable: Adapter boots, initializes, and shares the same context/symbol
@@ -139,7 +139,7 @@ VS Code, with shared caches and logging.
   on surfacing connection state to VS Code (status bar + notifications) and
   ensuring CLI-style auto-retry telemetry is exposed.
 - Available inputs: CLI keepalive/retry logic has regression tests
-  (`python/tests/test_hsxdbg_session.py`) and `SymbolIndex` now provides the
+  (`python/tests/test_hsx_dbg_backend.py`) and `SymbolIndex` now provides the
   same mapping data the CLI `break`/`symbols` commands consume.
 - Required setup: once Phase 1 rewiring lands, port the CLI bootstrap flags
   (observer mode, symbol search paths, keepalive interval) into the VS Code
@@ -239,6 +239,32 @@ Deliverable: Automated coverage preventing regressions between CLI and adapter.
 
 ---
 
+## Phase 6 – Breakpoint & Connection Resiliency (migrated from CLI plan)
+
+**Context:** Phase 8 from the CLI debugger plan described adapter-specific resiliency work. The detailed todo list now lives here so the VS Code stack owns the end-to-end experience.
+
+### 6.1 PID Loss & Reconnect UX
+
+- [x] Detect `unknown pid` errors after reconnect, rerun `ps`, and either update `current_pid` or emit a fatal “target exited” status/console message.
+- [x] Emit telemetry + VS Code notifications when a PID disappears so users know to relaunch.
+- [x] Extend the hsx_dap harness with a backend stub that simulates PID loss mid-session to cover the new logic (`python/tests/test_hsx_dap_harness.py`).
+
+### 6.2 Instruction Breakpoints & Disassembly Refresh
+
+- [x] Implement `setInstructionBreakpoints` to allow breakpoints directly from the disassembly tree (reusing `DebuggerBackend` APIs).
+- [ ] Auto-refresh disassembly on every `stopped` event (breakpoint hits included) and ensure requests always send a non-zero `instructionCount`.
+- [x] Add harness tests verifying instruction breakpoints hit and the disassembly panel populates after breakpoint stops.
+
+### 6.3 Breakpoint Synchronization
+
+- [x] Subscribe to executive breakpoint events (or poll) so VS Code reflects breakpoints created outside the adapter (CLI/executive UI).
+- [x] Reconcile local vs remote breakpoint sets after reconnect, removing stale entries and surfacing newly added ones via `_sync_remote_breakpoints()`.
+- [x] Document mixed breakpoint workflows and add telemetry when external breakpoints are synced (docs + VS Code notifications).
+
+Deliverable: VS Code cleanly handles PID exits, cross-source breakpoints, and post-stop disassembly refresh without relying on the CLI plan for tracking.
+
+---
+
 ## Definition of Done
 
 - Shared debugger backend module used by both CLI and VS Code adapter.
@@ -254,10 +280,6 @@ Deliverable: Automated coverage preventing regressions between CLI and adapter.
 
 ## Next Steps
 
-1. Kick off Phase 2 using the new backend: migrate session/keepalive flows,
-   breakpoint orchestration, and launch/attach parity directly on top of
-   `DebuggerBackend`.
-2. Fill out adapter-level tests (DAP harness) that exercise the backend wiring
-   before layering on Phase 2 behavior, then automate them in CI.
-3. Continue updating `03--ImplementationNotes.md` and this plan as each phase
-   lands; retire 02--ImplementationPlan.md once all v2 phases are complete.
+1. Finish the remaining Phase 6 work: auto-refresh disassembly on stops and emit telemetry/documentation for external breakpoint sync.
+2. Expand adapter-level tests (Phase 5) so the harness covers the new breakpoint/disassembly flows and integrate them into CI.
+3. Continue updating `03--ImplementationNotes.md` and this plan as each phase lands; retire 02--ImplementationPlan.md once all v2 phases are complete.

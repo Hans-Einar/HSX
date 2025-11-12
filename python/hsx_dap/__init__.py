@@ -218,6 +218,8 @@ class HSXDebugAdapter:
         self._connection_state = "idle"
         self._observer_mode: bool = False
         self._keepalive_override: Optional[int] = None
+        self._remote_breakpoint_timer: Optional[threading.Timer] = None
+        self._remote_breakpoint_interval: float = 5.0
 
     def serve(self) -> None:
         while True:
@@ -907,6 +909,7 @@ class HSXDebugAdapter:
             },
         )
         self._sync_remote_breakpoints()
+        self._schedule_remote_breakpoint_poll()
         self._watch_expr_to_id.clear()
         self._watch_id_to_expr.clear()
         self._ensure_symbol_mapper(force=True)
@@ -1010,6 +1013,22 @@ class HSXDebugAdapter:
             self.protocol.send_event("telemetry", body)
         except Exception:
             self.logger.debug("failed to emit connection status event", exc_info=True)
+
+    def _emit_breakpoint_sync_telemetry(self, added: List[int], removed: List[int]) -> None:
+        body: JsonDict = {
+            "subsystem": "hsx-breakpoints",
+            "action": "external-sync",
+            "addedCount": len(added),
+            "removedCount": len(removed),
+        }
+        if added:
+            body["addedSamples"] = [f"0x{addr:04X}" for addr in added[:8]]
+        if removed:
+            body["removedSamples"] = [f"0x{addr:04X}" for addr in removed[:8]]
+        try:
+            self.protocol.send_event("telemetry", body)
+        except Exception:
+            self.logger.debug("failed to emit breakpoint telemetry", exc_info=True)
 
     def _read_current_pc(self) -> Optional[int]:
         if not self.client or not self.current_pid:
@@ -1359,6 +1378,7 @@ class HSXDebugAdapter:
         self._emit_status_event("error", message=warning)
         self._emit_console_message(warning)
         self.current_pid = None
+        self._cancel_remote_breakpoint_poll()
 
     @staticmethod
     def _is_unknown_pid_error(error: Exception) -> bool:
@@ -1437,6 +1457,8 @@ class HSXDebugAdapter:
             }
             self.protocol.send_event("breakpoint", {"reason": "removed", "breakpoint": breakpoint_payload})
             self.logger.info("External breakpoint removed at 0x%04X", addr)
+        if added or removed:
+            self._emit_breakpoint_sync_telemetry(added, removed)
 
     def _resolve_breakpoint_addresses(self, source_path: Optional[str], line: Optional[int], bp: JsonDict) -> List[int]:
         addresses: List[int] = []
@@ -1929,6 +1951,34 @@ class HSXDebugAdapter:
                             continue
         return addresses
 
+    def _schedule_remote_breakpoint_poll(self, delay: Optional[float] = None) -> None:
+        if delay is None:
+            delay = self._remote_breakpoint_interval
+        self._cancel_remote_breakpoint_poll()
+        if not self.client or self.current_pid is None:
+            return
+        timer = threading.Timer(delay, self._run_remote_breakpoint_poll)
+        timer.daemon = True
+        self._remote_breakpoint_timer = timer
+        timer.start()
+
+    def _cancel_remote_breakpoint_poll(self) -> None:
+        timer = self._remote_breakpoint_timer
+        if timer is not None:
+            timer.cancel()
+        self._remote_breakpoint_timer = None
+
+    def _run_remote_breakpoint_poll(self) -> None:
+        self._remote_breakpoint_timer = None
+        if not self.client or self.current_pid is None:
+            return
+        try:
+            self._sync_remote_breakpoints()
+        except Exception:
+            self.logger.debug("Remote breakpoint poll failed", exc_info=True)
+        else:
+            self._schedule_remote_breakpoint_poll()
+
     def _stop_event_stream(self) -> None:
         if self.backend:
             try:
@@ -1940,6 +1990,7 @@ class HSXDebugAdapter:
     def _shutdown(self) -> None:
         self._cleanup_watches()
         self._clear_all_breakpoints()
+        self._cancel_remote_breakpoint_poll()
         self._symbol_mapper = None
         self._symbol_path = None
         self._symbol_mtime = None

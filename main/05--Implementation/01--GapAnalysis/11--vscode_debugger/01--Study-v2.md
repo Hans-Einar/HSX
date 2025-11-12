@@ -5,7 +5,7 @@
 **Design References**
 - [04.11--vscode_debugger.md](../../../04--Design/04.11--vscode_debugger.md)
 - [04.09--Debugger.md](../../../04--Design/04.09--Debugger.md)
-- Implementation plan refresh: [ImplementationPlan-v2.md](./ImplementationPlan-v2.md)
+- Implementation plan refresh: [ImplementationPlan.md](./ImplementationPlan.md)
 
 **Summary**
 The design targets a VS Code extension + Debug Adapter Protocol (DAP) bridge that exposes the same debugger behavior delivered in the CLI (`hsx-dbg`). The adapter must translate DAP requests/events to the HSX executive RPC protocol via the shared debugger backend, provide source-level breakpoints/stepping, and surface stack/variable/memory/disassembly data inside VS Code.
@@ -47,7 +47,7 @@ The design targets a VS Code extension + Debug Adapter Protocol (DAP) bridge tha
 4. **DAP tests need a fresh harness.** Rather than resurrect the old blocking tests, we should leverage a lightweight DAP client harness (Node or Python) that talks to the refactored adapter via stdio and asserts CLI parity.
 5. **Documentation must reflect the shared architecture.** Users expect the same behavior whether they run `hsx-dbg` or use VS Code; docs must explain the backend reuse, reconnection behavior, and configuration knobs.
 
-## 5. Next Actions (Phase 0 → Phase 1 of ImplementationPlan-v2)
+## 5. Next Actions (Phase 0 → Phase 1 of ImplementationPlan)
 
 1. **Inventory & Notes**
    - Update `03--ImplementationNotes.md` in both 09--Debugger and 11--vscode_debugger with the findings above (legacy modules, missing reuse, test deletions).
@@ -57,9 +57,8 @@ The design targets a VS Code extension + Debug Adapter Protocol (DAP) bridge tha
    - Replace `python/hsx_dap`’s reliance on `python/hsxdbg/*` with `hsx_dbg` backend + `executive_session` + `SymbolIndex`.
    - Remove the legacy transport/session/event cache modules once the adapter switches to the new backend.
 4. **Test Plan v2**
-   - Draft new adapter test strategy (DAP client harness, golden JSON fixtures) and capture it in `ImplementationPlan-v2.md` Phase 5.
+  - Draft new adapter test strategy (DAP client harness, golden JSON fixtures) and capture it in `ImplementationPlan.md` Phase 5.
 5. **Documentation**
    - Schedule doc updates (README, docs/vscode_adapter.md) to coincide with the refactor.
 
 Completing the steps above unblocks Phase 1 of ImplementationPlan‑v2, ensuring the VS Code adapter evolves in lock-step with the CLI debugger rather than maintaining two divergent code paths.
-

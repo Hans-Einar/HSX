@@ -455,3 +455,53 @@
 [2025-11-12 21:36:32,376] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
 [2025-11-12 21:36:32,377] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
 [2025-11-12 21:36:32,377] INFO: disassemble: view=around_pc count=31 reference=0x0000005C
+[2025-11-12 23:23:57,789] WARNING: Debugger backend error (session.open failed: pid_locked:1); attempting reconnect
+[2025-11-12 23:23:57,789] INFO: Connecting to executive at 127.0.0.1:9998 (PID 1, observer=False)
+[2025-11-12 23:23:57,796] DEBUG: list_breakpoints failed during session startup: bp list failed: unknown pid 1
+[2025-11-12 23:23:57,796] DEBUG: symbol_info failed: sym info failed: unknown pid 1
+[2025-11-12 23:23:57,797] ERROR: DAP command failed: evaluate
+Traceback (most recent call last):
+  File "/home/warloc/git/HSX/python/hsx_dbg/backend.py", line 174, in request
+    return session.request(payload)
+           ~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/warloc/git/HSX/python/executive_session.py", line 148, in request
+    self._ensure_session(force=attempt > 0)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "/home/warloc/git/HSX/python/executive_session.py", line 648, in _ensure_session
+    raise ExecutiveSessionError(f"session.open failed: {error}")
+python.executive_session.ExecutiveSessionError: session.open failed: pid_locked:1
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/warloc/git/HSX/python/hsx_dap/__init__.py", line 935, in _call_backend
+    data = event.get("data") or {}
+               ^^^^^^^^^^^^^^^^^^^
+  File "/home/warloc/git/HSX/python/hsx_dbg/backend.py", line 279, in get_register_state
+    frames = []
+           ^^^^
+  File "/home/warloc/git/HSX/python/hsx_dbg/backend.py", line 176, in request
+    raise DebuggerBackendError(str(exc)) from exc
+hsx_dbg.backend.DebuggerBackendError: session.open failed: pid_locked:1
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/warloc/git/HSX/python/hsx_dap/__init__.py", line 243, in _handle_request
+    body = handler(arguments) or {}
+           ~~~~~~~^^^^^^^^^^^
+  File "/home/warloc/git/HSX/python/hsx_dap/__init__.py", line 604, in _handle_evaluate
+    results.append({"verified": False, "message": "instructionReference required"})
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/warloc/git/HSX/python/hsx_dap/__init__.py", line 1963, in _evaluate_register_expression
+    self._source_base_dirs = [REPO_ROOT]
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/warloc/git/HSX/python/hsx_dap/__init__.py", line 940, in _call_backend
+    if event_type == "debug_break":
+                   ^^^^^^^^^^^^^^^^
+  File "/home/warloc/git/HSX/python/hsx_dbg/backend.py", line 280, in get_register_state
+    stack_block = resp.get("stack") or {}
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/warloc/git/HSX/python/hsx_dbg/backend.py", line 180, in _expect_ok
+    raise DebuggerBackendError(f"{context} failed: {response.get('error', 'unknown')}")
+hsx_dbg.backend.DebuggerBackendError: dumpregs failed: unknown pid 1

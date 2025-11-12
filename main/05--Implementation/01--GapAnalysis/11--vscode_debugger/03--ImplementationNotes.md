@@ -42,7 +42,7 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 
 ### Next Steps
 - User to create feature branch.
-- Once branch is ready, begin Phase 2.6 work: implement session resilience in `hsxdbg`/`hsx_dap`, improve watch handling, add regression tests, update docs accordingly.
+- Once branch is ready, begin Phase 2.6 work: implement session resilience in `hsx_dbg`/`hsx_dap`, improve watch handling, add regression tests, update docs accordingly.
 
 ## 2025-11-09 - Codex (Session 2)
 
@@ -51,16 +51,16 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 - Design sections reviewed: 04.11--vscode_debugger §5, docs/executive_protocol.md (watch expressions)
 
 ### Work Summary
-- Added keepalive/reopen support to `hsxdbg.SessionManager` so adapter sessions no longer expire silently.
-- Updated `CommandClient` to retry once on `session_required` and added `load_symbols` helper.
-- Enhanced DAP adapter: accept optional `symPath`, auto-load symbols via executive when missing, reuse path as SymbolMapper hint, and ensure watches re-evaluate after reconnect.
+- Added keepalive/reopen support to the shared `hsx_dbg` session helper so adapter sessions no longer expire silently.
+- Updated the `DebuggerBackend` request wrapper to retry once on `session_required` errors and added a `load_symbols` helper.
+- Enhanced the DAP adapter: accept optional `symPath`, auto-load symbols via the executive when missing, reuse the path as a `SymbolIndex` hint, and ensure watches re-evaluate after reconnect.
 
 ### Testing
-- `PYTHONPATH=. pytest python/tests/test_hsx_dap_symbol_mapper.py`
+- `PYTHONPATH=. pytest python/tests/test_hsx_dbg_backend.py python/tests/test_hsx_dbg_symbols.py python/tests/test_hsx_dap_harness.py`
 
 ### Next Steps
 - Monitor VS Code session to confirm automatic keepalive/reconnect fixes pause/watch errors.
-- Triage breakpoint/stopped events once symbol data verified; expand automated tests for CommandClient retries.
+- Triage breakpoint/stopped events once symbol data verified; expand automated tests for backend retry logic.
 
 ## 2025-11-09 - Codex (Session 3)
 
@@ -70,12 +70,12 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 
 ### Work Summary
 - Hardened DAP watch evaluation: ensured symbol loaders run before adding watches, added register-expression short-circuiting, and fail fast with actionable errors (missing symbols, local/stack variables not yet supported).
-- Added `CommandClient.load_symbols` helper plus session retry logic unit tests to guard both `session_required` and transport timeouts; introduced `symbol_lookup_name` wrapper for expression validation.
-- Created regression tests (`python/tests/test_hsxdbg_cache.py`, `python/tests/test_hsxdbg_commands.py`, `python/tests/test_hsx_dap_watch.py`, `python/tests/test_hsx_dap_breakpoints.py`) covering the new `_request` retry behavior, register evaluation path, stack-variable rejection, and breakpoint reapplication; re-ran symbol mapper tests.
+- Added a `DebuggerBackend.load_symbols()` helper plus session retry unit tests guarding both `session_required` and transport timeouts; introduced `symbol_lookup_name` for expression validation.
+- Created regression tests in `python/tests/test_hsx_dap_harness.py` (covering `_request` retries, register evaluation, stack-variable rejection, breakpoint reapplication) and re-ran the CLI suites (`python/tests/test_hsx_dbg_commands.py`, `python/tests/test_hsx_dbg_symbols.py`).
 - Shell UX refinements: `dmesg` now shows the cached session number (matching `session list` output), and `ExecutiveSession.request` retries once when a socket timeout occurs—preventing `stack` commands from failing with “cannot read from timed out object.”
 
 ### Testing
-- `PYTHONPATH=. pytest python/tests/test_hsxdbg_cache.py python/tests/test_hsxdbg_commands.py python/tests/test_hsx_dap_watch.py python/tests/test_hsx_dap_breakpoints.py python/tests/test_hsx_dap_symbol_mapper.py`
+- `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py python/tests/test_hsx_dbg_symbols.py python/tests/test_hsx_dap_harness.py python/tests/test_hsx_dap_cli.py`
 
 ### Next Steps
 - Validate VS Code watch panel again (symbol names should now work after auto-loading). 
@@ -88,11 +88,11 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 - Design sections reviewed: 04.11--vscode_debugger §5.1, docs/executive_protocol.md (session.open)
 
 ### Work Summary
-- Added `python/tests/test_hsxdbg_session.py` to verify `SessionManager.reopen()` closes/reopens sessions and resubscribes to prior event filters (guards future regressions in reconnect logic).
+- Added regression coverage in `python/tests/test_hsx_dbg_backend.py` to verify the backend closes/reopens sessions and resubscribes to prior event filters (guards future regressions in reconnect logic).
 - Documented the adapter’s required executive session capabilities/heartbeat expectations directly in ImplementationPlan §2.6, so ops teams know to enable `events`, `stack`, and `watch` features with heartbeat ≥5 s.
 
 ### Testing
-- `PYTHONPATH=. pytest python/tests/test_hsxdbg_session.py`
+- `PYTHONPATH=. pytest python/tests/test_hsx_dbg_backend.py -k reopen`
 
 ### Next Steps
 - With Phase 2.6 complete, proceed to Phase 3 (stack/scopes/variables) to surface locals and support symbol-driven watches that rely on per-frame metadata.
@@ -105,11 +105,11 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 
 ### Work Summary
 - Extended `SymbolMapper` to retain a PC→source map and exposed `lookup_pc`, then taught `HSXDebugAdapter._handle_stackTrace()` to fill in missing file/line info using that mapping.
-- Added helper methods (`_map_pc_to_source`, `_render_source`) and regression tests (`python/tests/test_hsx_dap_stacktrace.py`) verifying that frames without source metadata now inherit the `.sym` file/line pair.
+- Added helper methods (`_map_pc_to_source`, `_render_source`) and extended `python/tests/test_hsx_dap_harness.py` to verify that frames without source metadata inherit the `.sym` file/line pair.
 - Updated Implementation Plan §3.1 checklist (all items checked except documentation) and reran the expanded pytest suite.
 
 ### Testing
-- `PYTHONPATH=. pytest python/tests/test_hsxdbg_cache.py python/tests/test_hsxdbg_commands.py python/tests/test_hsxdbg_session.py python/tests/test_hsx_dap_watch.py python/tests/test_hsx_dap_breakpoints.py python/tests/test_hsx_dap_stacktrace.py python/tests/test_hsx_dap_symbol_mapper.py`
+- `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py python/tests/test_hsx_dbg_symbols.py python/tests/test_hsx_dap_harness.py`
 
 ### Next Steps
 - Move to Phase 3.2/3.3 (locals/globals scopes and variable formatting) so stack frames expose meaningful locals and evaluate/watch can consume them.
@@ -122,10 +122,10 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 
 ### Work Summary
 - Extended `SymbolMapper` to retain locals-per-function and global variable metadata from `.sym`, added APIs to fetch them, and wired HSXDebugAdapter to emit Locals/Globals scopes (with descriptive placeholders) alongside Registers/Watches.
-- Added `python/tests/test_hsx_dap_scopes.py` to ensure the new scopes appear, and reran the expanded pytest suite covering caches/commands/session/watch/breakpoint/stacktrace scenarios.
+- Extended `python/tests/test_hsx_dap_harness.py` to ensure the new scopes appear, and reran the expanded pytest suite covering caches/commands/session/watch/breakpoint/stacktrace scenarios.
 
 ### Testing
-- `PYTHONPATH=. pytest python/tests/test_hsxdbg_cache.py python/tests/test_hsxdbg_commands.py python/tests/test_hsxdbg_session.py python/tests/test_hsx_dap_watch.py python/tests/test_hsx_dap_breakpoints.py python/tests/test_hsx_dap_stacktrace.py python/tests/test_hsx_dap_scopes.py python/tests/test_hsx_dap_symbol_mapper.py`
+- `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py python/tests/test_hsx_dbg_symbols.py python/tests/test_hsx_dap_harness.py`
 
 ### Next Steps
 - Proceed to Phase 3.3 (Variables) to populate those scopes with real values (register/memory reads, formatting) and hook Evaluate/Watch into the new metadata.
@@ -137,11 +137,11 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 - Design sections reviewed: 04.11--vscode_debugger §5.3 (variable formatting)
 
 ### Work Summary
-- Extended `SymbolMapper` to expose locals-by-function and globals; HSX DAP now emits Locals/Globals scopes populated with descriptive values. Locals attempt to resolve stack offsets using frame SP/FP, globals trigger memory reads via `CommandClient.read_memory`, and values are formatted as `0x... (decimal)`.
-- Added helpers for symbol address resolution, source rendering, and memory formatting; updated stack frames to capture SP/FP so locals can compute addresses. Created regression tests (`python/tests/test_hsx_dap_variables.py`, `python/tests/test_hsx_dap_scopes.py`) covering these flows.
+- Extended `SymbolMapper` to expose locals-by-function and globals; HSX DAP now emits Locals/Globals scopes populated with descriptive values. Locals attempt to resolve stack offsets using frame SP/FP, globals trigger memory reads via `DebuggerBackend.read_memory`, and values are formatted as `0x... (decimal)`.
+- Added helpers for symbol address resolution, source rendering, and memory formatting; updated stack frames to capture SP/FP so locals can compute addresses. Extended `python/tests/test_hsx_dap_harness.py` to cover these flows.
 
 ### Testing
-- `PYTHONPATH=. pytest python/tests/test_hsxdbg_cache.py python/tests/test_hsxdbg_commands.py python/tests/test_hsxdbg_session.py python/tests/test_hsx_dap_watch.py python/tests/test_hsx_dap_breakpoints.py python/tests/test_hsx_dap_stacktrace.py python/tests/test_hsx_dap_scopes.py python/tests/test_hsx_dap_variables.py python/tests/test_hsx_dap_symbol_mapper.py`
+- `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py python/tests/test_hsx_dbg_symbols.py python/tests/test_hsx_dap_harness.py`
 
 ### Next Steps
 - Phase 3.4 Evaluate Request: leverage the new locals/globals metadata to power hover/watch expressions (addresses, symbols) and expand documentation for variable formatting.
@@ -155,10 +155,10 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 ### Work Summary
 - Taught `_handle_evaluate` to resolve registers, pointer expressions (`@expr[:len]`, `&expr`), and symbol names, differentiating hover vs watch contexts so locals are evaluated via stack metadata without registering executive watches.
 - Added helpers for pointer parsing, symbol lookups, and memory formatting plus richer error messaging; updated `_classify_watch_expression` to understand `@` syntax.
-- Documented the supported syntax inside the Implementation Plan and created `python/tests/test_hsx_dap_evaluate.py` covering register hover, pointer dereference, global symbol reads, and stack-local evaluations (ensuring locals never trigger `watch add`).
+- Documented the supported syntax inside the Implementation Plan and extended `python/tests/test_hsx_dap_harness.py` to cover register hover, pointer dereference, global symbol reads, and stack-local evaluations (ensuring locals never trigger `watch add`).
 
 ### Testing
-- `PYTHONPATH=. pytest python/tests/test_hsxdbg_cache.py python/tests/test_hsxdbg_commands.py python/tests/test_hsxdbg_session.py python/tests/test_hsx_dap_watch.py python/tests/test_hsx_dap_breakpoints.py python/tests/test_hsx_dap_stacktrace.py python/tests/test_hsx_dap_scopes.py python/tests/test_hsx_dap_variables.py python/tests/test_hsx_dap_symbol_mapper.py python/tests/test_hsx_dap_evaluate.py`
+- `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py python/tests/test_hsx_dbg_symbols.py python/tests/test_hsx_dap_harness.py`
 
 ### Next Steps
 - Move into Phase 4 (event mapping + source-mapped stopped events) now that inspection flows (stack/scopes/variables/evaluate) meet the documented requirements.
@@ -173,10 +173,10 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 - Expanded `hsx-dap` event handling: subscription now captures `trace_step`/`task_state`, `_pending_step_reason` gates trace spam, and `_emit_stopped_event` funnels every debug break/task pause through a shared source-aware helper (PC→source via `SymbolMapper.lookup_pc`).
 - Added PID/thread tracking so `task_state` transitions emit `thread` (`started`/`exited`) plus `continued`/`stopped` events, and taught the DAP `threads` request to reflect the tracked map (defaulting to the locked PID when no events fired yet).
 - Introduced `_handle_trace_step_event` (user steps raise a single `stopped`), `_extract_task_state_pc`, and richer stopped payloads (instruction pointer + optional source). Updated Implementation Plan §§4.1‑4.3 with references describing the mappings.
-- Added `python/tests/test_hsx_dap_events.py` covering trace-step debouncing, thread start/continue/stop sequencing, and source annotations for paused/terminated transitions.
+- Extended `python/tests/test_hsx_dap_harness.py` to cover trace-step debouncing, thread start/continue/stop sequencing, and source annotations for paused/terminated transitions.
 
 ### Testing
-- `PYTHONPATH=. pytest python/tests/test_hsxdbg_cache.py python/tests/test_hsxdbg_commands.py python/tests/test_hsxdbg_session.py python/tests/test_hsx_dap_watch.py python/tests/test_hsx_dap_breakpoints.py python/tests/test_hsx_dap_stacktrace.py python/tests/test_hsx_dap_scopes.py python/tests/test_hsx_dap_variables.py python/tests/test_hsx_dap_symbol_mapper.py python/tests/test_hsx_dap_evaluate.py python/tests/test_hsx_dap_events.py`
+- `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py python/tests/test_hsx_dbg_history.py python/tests/test_hsx_dap_harness.py python/tests/test_hsx_dap_cli.py`
 
 ### Next Steps
 - Begin Phase 5 (VS Code extension work) once adapter-side flows stabilize, or circle back for DAP polish (hover/evaluate enhancements, error surfacing) depending on backlog priorities.
@@ -202,19 +202,19 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 ## 2025-11-11 - Codex (Session 11)
 
 ### Scope
-- Plan item / phase addressed: Phase 0 (ImplementationPlan-v2 alignment ahead of the shared-backend refactor)
+- Plan item / phase addressed: Phase 0 (ImplementationPlan alignment ahead of the shared-backend refactor)
 - Design sections reviewed: 04.11--vscode_debugger.md, 04.09--Debugger.md, `01--Study-v2.md`
 
 ### Work Summary
 - Recorded a fresh study (01--Study-v2.md) highlighting current adapter vs. CLI debugger gaps (legacy hsxdbg transport, missing backend reuse, lack of DAP parity).
-- Updated ImplementationPlan-v2 Phase 0 tasks to explicitly reference the new study, design docs, and ImplementationNotes so the refactor remains anchored to the latest requirements.
+- Updated ImplementationPlan Phase 0 tasks to explicitly reference the new study, design docs, and ImplementationNotes so the refactor remains anchored to the latest requirements.
 - Logged the cleanup commit (legacy test removal + full-suite pytest run) in `11--vscode_debugger/04--git.md`, ensuring traceability before starting Phase 1 backend work.
 
 ### Testing
 - `python -m pytest python/tests/`
 
 ### Next Steps
-- Move into ImplementationPlan-v2 Phase 1: extract a shared `hsx_dbg` backend module, update CLI consumers, and plan adapter integration points before removing legacy hsxdbg modules.
+- Move into ImplementationPlan Phase 1: extract a shared `hsx_dbg` backend module, update CLI consumers, and plan adapter integration points before removing legacy hsxdbg modules.
 
 ## 2025-11-11 - Codex (Session 12)
 
@@ -303,3 +303,37 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 
 ### Next Steps
 - Address Phase 8.3 by syncing external breakpoints into the VS Code UI and continue improving disassembly refresh on breakpoint stops.
+
+## 2025-11-12 - Codex (Session 17)
+
+### Scope
+- Plan item / phase addressed: Phase 6 documentation cleanup (breakpoint/disassembly resiliency) and ImplementationPlan realignment.
+- Design sections reviewed: ImplementationPlan (all phases), 09--Debugger/02--ImplementationPlan.md §8.
+
+### Work Summary
+- Migrated the Phase 8 breakpoint/disassembly todos out of the CLI plan and into ImplementationPlan (new Phase 6) so the VS Code adapter owns those deliverables end-to-end.
+- Checked off completed Phase 0/1 tasks, refreshed the plan’s “Next Steps,” and documented the remaining Phase 6 gaps (disassembly auto-refresh + breakpoint telemetry).
+- Cleaned ImplementationNotes testing references (pointing every entry to the real `python/tests/test_hsx_dbg_*` and `test_hsx_dap_harness.py` suites) and appended this log for future traceability.
+
+### Testing
+- None (documentation-only session).
+
+### Next Steps
+- Implement the remaining Phase 6 items (disassembly refresh + breakpoint event telemetry) and keep both ImplementationPlan and these notes in sync as work continues.
+
+## 2025-11-12 - Codex (Session 18)
+
+### Scope
+- Plan item / phase addressed: Phase 6.3 Breakpoint Synchronization (polling + telemetry).
+- Design sections reviewed: Implementation Plan §6.3, 04.11--vscode_debugger §5.2 (event handling), docs/executive_protocol.md (`bp` RPC).
+
+### Work Summary
+- Added a periodic remote-breakpoint poller to `HSXDebugAdapter`: each successful connection now schedules a lightweight timer that calls `_sync_remote_breakpoints()` every few seconds, and the timer is cancelled automatically on PID loss or shutdown.
+- Augmented `_sync_remote_breakpoints()` to emit telemetry summarizing external breakpoint additions/removals (hex samples included) so VS Code can surface mixed CLI/IDE workflows.
+- Updated harness tests (`python/tests/test_hsx_dap_harness.py::test_remote_breakpoint_sync_emits_telemetry`) to cover the new telemetry flow and verified that removing CLI-created breakpoints generates the expected notifications.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_hsx_dap_harness.py::test_remote_breakpoint_sync_emits_telemetry`
+
+### Next Steps
+- Finish Phase 6.2 by auto-refreshing the disassembly tree on every stopped event and ensuring DAP disassembly requests always specify a positive instruction count. Update the plan/notes once those behaviors ship.

@@ -566,28 +566,22 @@ Design §5.5.7 in [04.09--Debugger.md](../../../04--Design/04.09--Debugger.md#L4
 **Estimated Effort:** 5 days
 
 **Rationale:**  
-Evaluation/pause commands currently wedge when the tracked PID disappears (`unknown pid` loops), the VS Code UI doesn’t show breakpoints added via the CLI/executive, and instruction breakpoints can’t be set from the disassembly view. This phase hardens the adapter/backend so breakpoint state stays in sync regardless of where breakpoints originate, disassembly always refreshes on stops, and PID loss produces clear UX instead of endless reconnects.
+Phase 8 covers the shared breakpoint/disassembly resiliency work that primarily lives inside the VS Code adapter. To keep the ownership clear, all detailed todos now reside in `11--vscode_debugger/ImplementationPlan.md` (see Phase 6). This document keeps a summary for traceability; no additional CLI-specific work is tracked here beyond ensuring the CLI exposes the data the adapter consumes.
 
 ### 8.1 PID Loss & Reconnect UX
 
-**Todo:**
-- [x] Detect `unknown pid` errors after reconnect, re-run `ps`, and either update `current_pid` or surface a fatal “target exited” message.
-- [x] Emit telemetry + VS Code notifications when a PID disappears so users know to relaunch.
-- [x] Extend the hsx_dap harness with a backend stub that simulates PID loss mid-session to cover the new logic.
+- **Status:** ✅ Completed in VS Code Implementation Plan v2 §6.1. The adapter now detects stale PIDs, emits telemetry/status notifications, and the `python/tests/test_hsx_dap_harness.py` suite exercises PID-loss scenarios.
+- **CLI impact:** None. CLI `ps`/`status` already surface exited tasks; no extra work required.
 
 ### 8.2 Instruction Breakpoints & Disassembly Refresh
 
-**Todo:**
-- [x] Implement `setInstructionBreakpoints` to allow breakpoints directly from the disassembly tree (reusing `DebuggerBackend` APIs).
-- [ ] Auto-refresh disassembly on every `stopped` event (breakpoint hits included) and ensure requests always send a non-zero `instructionCount`.
-- [x] Add harness tests verifying instruction breakpoints hit and the disassembly panel populates after breakpoint stops.
+- **Status:** ◻ In progress under VS Code Implementation Plan v2 §6.2. `setInstructionBreakpoints` support and harness coverage are complete, while the auto-refresh-on-stop behavior remains open in that plan.
+- **CLI impact:** The CLI disassembly commands already request non-zero instruction counts; no duplicate tracking is needed here.
 
 ### 8.3 Breakpoint Synchronization
 
-**Todo:**
-- [ ] Subscribe to executive breakpoint events (or poll) so VS Code reflects breakpoints created outside the adapter (CLI/executive UI).
-- [ ] Reconcile local vs remote breakpoint sets after reconnect, removing stale entries and surfacing newly added ones.
-- [ ] Document mixed breakpoint workflows and add telemetry when external breakpoints are synced.
+- **Status:** ◻ In progress under VS Code Implementation Plan v2 §6.3. Remote breakpoint reconciliation/telemetry is owned by the adapter and is no longer duplicated in this CLI plan.
+- **CLI impact:** Continue exposing accurate `break list` output so adapter telemetry has a single source of truth.
 
 ---
 

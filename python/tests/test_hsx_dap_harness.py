@@ -278,6 +278,42 @@ def test_instruction_breakpoints_round_trip() -> None:
     assert backend.clear_calls == [0x100]
 
 
+def test_remote_breakpoint_sync_emits_telemetry() -> None:
+    class RemoteBackend:
+        def __init__(self) -> None:
+            self.entries: List[int] = []
+
+        def list_breakpoints(self, pid: int) -> List[int]:
+            assert pid == 1
+            return list(self.entries)
+
+    backend = RemoteBackend()
+    protocol = StubProtocol()
+    adapter = hsx_dap.HSXDebugAdapter(protocol)
+    adapter.client = backend
+    adapter.current_pid = 1
+
+    backend.entries = [0x100, 0x104]
+    adapter._sync_remote_breakpoints()
+
+    telemetry_events = [
+        event for event in protocol.events if event["event"] == "telemetry" and event["body"].get("subsystem") == "hsx-breakpoints"
+    ]
+    assert telemetry_events, "expected telemetry when external breakpoints are registered"
+    first = telemetry_events[-1]["body"]
+    assert first["addedCount"] == 2
+    assert first["removedCount"] == 0
+
+    backend.entries = []
+    adapter._sync_remote_breakpoints()
+    telemetry_events = [
+        event for event in protocol.events if event["event"] == "telemetry" and event["body"].get("subsystem") == "hsx-breakpoints"
+    ]
+    latest = telemetry_events[-1]["body"]
+    assert latest["addedCount"] == 0
+    assert latest["removedCount"] == 2
+
+
 def test_pid_exists_queries_task_list() -> None:
     class TaskBackend:
         def __init__(self) -> None:
