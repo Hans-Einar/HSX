@@ -1145,6 +1145,18 @@ class MiniVM:
         end = min(a + len(data), len(self.mem))
         self.mem[a:end] = data[: end - a]
 
+    def read_code(self, addr: int, length: int) -> bytes:
+        """Return bytes from the immutable code segment."""
+        if length <= 0:
+            return b""
+        start = int(addr) & 0xFFFF
+        if start >= len(self.code):
+            return b""
+        end = min(len(self.code), start + int(length))
+        if end <= start:
+            return b""
+        return bytes(self.code[start:end])
+
     def step(self):
         if self.debug_enabled:
             if self.debug_async_break:
@@ -4558,6 +4570,26 @@ class VMController:
         end = min(a + length, len(mem))
         return bytes(mem[a:end])
 
+    def request_code(self, pid: int, addr: int, length: int) -> bytes:
+        if length <= 0:
+            return b""
+        pid_int = int(pid)
+        if pid_int == self.current_pid and self.vm is not None:
+            return self.vm.read_code(addr, length)
+        state = self.task_states.get(pid_int)
+        if not state:
+            raise ValueError(f"unknown pid {pid_int}")
+        code = state.get("code")
+        if not isinstance(code, (bytes, bytearray)):
+            return b""
+        start = int(addr) & 0xFFFF
+        if start >= len(code):
+            return b""
+        end = min(len(code), start + int(length))
+        if end <= start:
+            return b""
+        return bytes(code[start:end])
+
     def request_poke(self, pid: int, addr: int, data: bytes) -> None:
         if pid == self.current_pid and self.vm is not None:
             self.vm.write_mem(addr, data)
@@ -4885,6 +4917,14 @@ class VMController:
                     data = self.request_peek(int(pid_value), addr, length)
                 else:
                     data = self.read_mem(addr, length)
+                return {"status": "ok", "data": data.hex()}
+            if cmd == "read_code":
+                pid_value = request.get("pid")
+                if pid_value is None:
+                    raise ValueError("read_code requires 'pid'")
+                addr = int(request.get("addr", 0))
+                length = int(request.get("length", 0))
+                data = self.request_code(int(pid_value), addr, length)
                 return {"status": "ok", "data": data.hex()}
             if cmd == "write_mem":
                 addr = int(request.get("addr"))

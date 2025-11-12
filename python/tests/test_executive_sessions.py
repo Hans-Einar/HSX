@@ -871,6 +871,8 @@ class DebugVM:
         self.regs_list: List[int] = [0] * 16
         self.regs_list[7] = self.fp
         self.memory: Dict[int, int] = {}
+        self.read_code_requests: List[Dict[str, Any]] = []
+        self.fail_read_code = False
 
     def request(self, payload: dict) -> dict:
         self.requests.append(payload)
@@ -953,6 +955,13 @@ class DebugVM:
 
     def read_mem(self, addr: int, length: int, pid: int | None = None) -> bytes:
         return bytes(self.memory.get((addr + i) & 0xFFFFFFFF, 0) for i in range(length))
+
+    def read_code(self, addr: int, length: int, pid: int | None = None) -> bytes:
+        request = {"addr": addr, "length": length, "pid": pid}
+        self.read_code_requests.append(request)
+        if self.fail_read_code:
+            raise RuntimeError("unknown_cmd")
+        return self.read_mem(addr, length, pid)
     def kill(self, pid: int) -> dict:
         self.paused = False
         return {"status": "ok"}
@@ -1464,9 +1473,23 @@ def test_disasm_read_basic():
     assert instructions[0].get("label") == "func_start"
     assert instructions[1]["mnemonic"] == "ADD"
     assert instructions[2]["mnemonic"] == "BRK"
+    assert vm.read_code_requests == [{"addr": base, "length": 24, "pid": 1}]
 
     cached_first = state.disasm_read(1, address=base, count=3, mode="cached")
     assert cached_first["mode"] == "cached"
     assert cached_first["cached"] is False
     cached_second = state.disasm_read(1, address=base, count=3, mode="cached")
     assert cached_second["cached"] is True
+
+
+def test_disasm_read_falls_back_when_code_rpc_missing():
+    state, vm = make_debug_state()
+    base = 0x9100
+    word_add = (0x10 << 24) | (2 << 20) | (1 << 16) | (1 << 12)
+    _write_bytes(vm, base, word_add.to_bytes(4, "big"))
+    vm.fail_read_code = True
+
+    result = state.disasm_read(1, address=base, count=1, mode="on-demand")
+    instructions = result["instructions"]
+    assert instructions and instructions[0]["mnemonic"] == "ADD"
+    assert vm.read_code_requests == [{"addr": base, "length": 8, "pid": 1}]

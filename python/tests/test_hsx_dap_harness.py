@@ -199,6 +199,7 @@ def test_stacktrace_and_scopes(monkeypatch: pytest.MonkeyPatch) -> None:
     assert stack_result["stackFrames"][0]["line"] == 10
     assert backend.stack_calls == [{"pid": 3, "max_frames": 2}]
 
+
     frame_id = stack_result["stackFrames"][0]["id"]
     scopes = adapter._handle_scopes({"frameId": frame_id})["scopes"]
     scope_names = [scope["name"] for scope in scopes]
@@ -214,6 +215,19 @@ def test_stacktrace_and_scopes(monkeypatch: pytest.MonkeyPatch) -> None:
     watches_scope = next(scope for scope in scopes if scope["name"] == "Watches")
     watch_vars = adapter._handle_variables({"variablesReference": watches_scope["variablesReference"]})["variables"]
     assert watch_vars[0]["memoryReference"] == "0x00003000"
+
+
+def test_disassembly_formatting_accepts_operand_strings() -> None:
+    adapter = hsx_dap.HSXDebugAdapter(StubProtocol())
+    block = {
+        "instructions": [
+            {"pc": 0x10, "mnemonic": "LDI", "operands": "R1 <- 0x5", "bytes": "01020304"},
+            {"pc": 0x14, "mnemonic": "ADD", "operands": ["R0", "R1"], "bytes": "10200000"},
+        ]
+    }
+    lines = adapter._format_disassembly(block, resolve_symbols=False)
+    assert lines[0]["instruction"] == "LDI R1 <- 0x5"
+    assert lines[1]["instruction"] == "ADD R0, R1"
 
 
 def test_function_breakpoints_use_symbol_mapper() -> None:

@@ -2137,8 +2137,7 @@ class ExecutiveState:
 
         max_bytes = min(count_value * 8, 4096)
         try:
-            with self.lock:
-                raw = self.vm.read_mem(start_addr, max_bytes, pid=pid)
+            raw = self._read_instruction_bytes(pid, start_addr, max_bytes)
         except Exception as exc:
             raise ValueError(f"disassembly memory read failed: {exc}") from exc
 
@@ -2197,6 +2196,26 @@ class ExecutiveState:
             }
 
         return result
+
+    def _read_instruction_bytes(self, pid: int, address: int, length: int) -> bytes:
+        if length <= 0:
+            return b""
+        reader = getattr(self.vm, "read_code", None)
+        if callable(reader):
+            try:
+                with self.lock:
+                    return reader(address, length, pid=pid)
+            except RuntimeError as exc:
+                message = str(exc).lower()
+                if "unknown" not in message and "unsupported" not in message:
+                    raise
+            except TypeError as exc:
+                if "unexpected keyword argument" not in str(exc):
+                    raise
+            except Exception:
+                raise
+        with self.lock:
+            return self.vm.read_mem(address, length, pid=pid)
 
     def stack_info(self, pid: int, *, max_frames: Optional[int] = None) -> Dict[str, Any]:
         self.get_task(pid)

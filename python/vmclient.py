@@ -102,6 +102,14 @@ class VMClient:
         hex_bytes = resp.get("data", "")
         return bytes.fromhex(hex_bytes)
 
+    def read_code(self, addr: int, length: int, pid: int | None = None) -> bytes:
+        payload = {"cmd": "read_code", "addr": addr, "length": length}
+        if pid is not None:
+            payload["pid"] = pid
+        resp = _check_ok(self.request(payload))
+        hex_bytes = resp.get("data", "")
+        return bytes.fromhex(hex_bytes)
+
     def write_mem(self, addr: int, data: bytes, pid: int | None = None) -> None:
         payload = {"cmd": "write_mem", "addr": addr, "data": data.hex()}
         if pid is not None:

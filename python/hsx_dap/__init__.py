@@ -1157,8 +1157,11 @@ class HSXDebugAdapter:
             address = f"0x{pc_int:08X}"
             mnemonic = str(entry.get("mnemonic") or "").strip()
             operands_raw = entry.get("operands")
-            operands = operands_raw if isinstance(operands_raw, list) else []
-            operand_text = ", ".join(str(op) for op in operands if op is not None)
+            if isinstance(operands_raw, str):
+                operand_text = operands_raw.strip()
+            else:
+                operands = operands_raw if isinstance(operands_raw, list) else []
+                operand_text = ", ".join(str(op) for op in operands if op is not None)
             instruction_text = mnemonic
             if operand_text:
                 instruction_text = f"{mnemonic} {operand_text}".strip()
