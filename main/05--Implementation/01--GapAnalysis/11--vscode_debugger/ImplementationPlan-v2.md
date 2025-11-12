@@ -79,6 +79,33 @@ debugger, and ground the plan in the latest study/design notes.
 Deliverable: Adapter boots, initializes, and shares the same context/symbol
 stores as CLI. No functional parity yet.
 
+### Phase 1 Status (2025-11-11)
+
+- Completed: `python/hsx_dbg/backend.py` now exposes `DebuggerBackend` plus typed
+  helpers (registers/stack/watch/memory) and is exported via `hsx_dbg.__init__`;
+  regression tests (`python/tests/test_hsx_dbg_backend.py`, existing hsx_dbg
+  suites) run cleanly with `python -m pytest`.
+- Completed: `hsx_dbg.symbols.SymbolIndex` carries PC metadata, locals/globals,
+  and completion helpers, enabling both CLI and adapter clients to resolve
+  symbols without the legacy `SymbolMapper`.
+- Completed: `hsx-dap` now constructs a `DebuggerBackend`, routes all pause/
+  resume/step/stack/watch/memory/breakpoint calls through it, streams events via
+  `ExecutiveSession.start_event_stream`, and the obsolete `python/hsxdbg/*`
+  modules have been removed.
+
+### Phase 1 – Immediate Work Items
+
+Completed (Nov 2025):
+
+- Adapter now uses `DebuggerBackend` exclusively; all RPC helpers (resume/pause,
+  stack/registers, watches/memory, breakpoints) call the shared backend, event
+  streaming comes from `ExecutiveSession`, and transport keepalive matches the
+  CLI path.
+- Legacy `python/hsxdbg/*` (SessionManager, CommandClient, EventBus, caches)
+  removed after confirming the backend wiring passes the hsx_dbg regression
+  suite. Future adapter tests should rely on backend fakes instead of the
+  deleted modules.
+
 ---
 
 ## Phase 2 – Session & Breakpoint Pipeline
@@ -103,6 +130,41 @@ stores as CLI. No functional parity yet.
 
 Deliverable: Breakpoints and session lifecycle behave identically in CLI and
 VS Code, with shared caches and logging.
+
+### Phase 2 Readiness (2025-11-11)
+
+- Blocked: `hsx-dap` still instantiates `SessionManager/CommandClient`, so none
+  of the adapter requests exercise `DebuggerBackend` attach/detach or its
+  keepalive hooks; DAP-level reconnect/observer UX therefore still diverges
+  from 04.09 §5.1 expectations.
+- Available inputs: CLI keepalive/retry logic has regression tests
+  (`python/tests/test_hsxdbg_session.py`) and `SymbolIndex` now provides the
+  same mapping data the CLI `break`/`symbols` commands consume.
+- Required setup: once Phase 1 rewiring lands, port the CLI bootstrap flags
+  (observer mode, symbol search paths, keepalive interval) into the VS Code
+  configuration surface so Phase 2 can immediately validate launch/attach
+  parity.
+
+### Phase 2 – Detailed Work Items
+
+1. **Session lifecycle parity**
+   - DAP `initialize`/`launch`/`attach` must call into `DebuggerBackend` attach
+     helpers, enabling observer mode, PID locks, and heartbeat timers defined in
+     04.09 §5.1. Integrate `executive_session` retry callbacks so reconnects
+     reuse the CLI-tested logic, and emit VS Code UI notifications for lock
+     conflicts or connection loss.
+2. **Breakpoint orchestration**
+   - Replace the remaining `CommandClient` breakpoint RPC calls with
+     `DebuggerBackend` equivalents, feed every `setBreakpoints`/`setFunctionBreakpoints`
+     request through `SymbolIndex`, and reuse the CLI disabled-breakpoint tracking
+     so VS Code and CLI share identical breakpoint IDs/hex formatting. Add golden
+     JSON fixtures comparing CLI vs adapter tables.
+3. **Launch/attach workflow**
+   - Teach the adapter to reuse the CLI symbol discovery rules (workspace-root
+     defaults, `symbolPath` overrides, prompts when missing) and to share the
+     same logging + history metadata when spawning or attaching to an executive.
+     Update `vscode-hsx` configuration snippets so users can opt into observer
+     mode, keepalive overrides, and custom symbol search paths.
 
 ---
 
@@ -181,8 +243,10 @@ Deliverable: Automated coverage preventing regressions between CLI and adapter.
 
 ## Next Steps
 
-1. Finish Phase 0 inventory and update ImplementationNotes with identified gaps.
-2. Prioritize Phase 1 shared-backend work so later phases inherit the new
-   abstractions.
-3. Track progress using this v2 plan alongside the legacy plan until migration
-   completes; retire 02--ImplementationPlan.md once all phases here are complete.
+1. Kick off Phase 2 using the new backend: migrate session/keepalive flows,
+   breakpoint orchestration, and launch/attach parity directly on top of
+   `DebuggerBackend`.
+2. Fill out adapter-level tests (DAP harness) that exercise the backend wiring
+   before layering on Phase 2 behavior, then automate them in CI.
+3. Continue updating `03--ImplementationNotes.md` and this plan as each phase
+   lands; retire 02--ImplementationPlan.md once all v2 phases are complete.

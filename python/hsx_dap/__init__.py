@@ -19,21 +19,14 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
     print(f"[hsx-dap] Added repo root to sys.path: {REPO_ROOT}", flush=True)
 
-from python.hsxdbg import (
-    CommandClient,
-    DebugBreakEvent,
-    EventBus,
-    EventSubscription,
-    RuntimeCache,
-    SessionConfig,
-    SessionManager,
-    StdStreamEvent,
-    TaskStateEvent,
-    WarningEvent,
-    WatchUpdateEvent,
+from hsx_dbg import (
+    DebuggerBackend,
+    DebuggerBackendError,
+    RegisterState,
+    StackFrame,
+    WatchValue,
 )
-from python.hsxdbg.transport import TransportConfig
-from hsx_dbg.symbols import SymbolIndex as SymbolMapper
+from hsx_dbg.symbols import SymbolIndex
 
 
 JsonDict = Dict[str, Any]
@@ -125,6 +118,21 @@ def _canonical_path(value: str) -> str:
     return str(value).replace("\\", "/").lower()
 
 
+def _to_int(value: Any) -> Optional[int]:
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value, 0)
+        except ValueError:
+            return None
+    return None
+
+
 @dataclass
 class _FrameRecord:
     pid: int
@@ -161,19 +169,17 @@ class HSXDebugAdapter:
     def __init__(self, protocol: DAPProtocol) -> None:
         self.protocol = protocol
         self.logger = logging.getLogger("hsx-dap")
-        self.event_bus: Optional[EventBus] = None
-        self.runtime_cache: Optional[RuntimeCache] = None
-        self.session: Optional[SessionManager] = None
-        self.client: Optional[CommandClient] = None
+        self.backend: Optional[DebuggerBackend] = None
+        self.client: Optional[DebuggerBackend] = None
         self.current_pid: Optional[int] = None
         self._initialized = False
-        self._event_token: Optional[int] = None
+        self._event_stream_active = False
         self._frames: Dict[int, _FrameRecord] = {}
         self._next_frame_id = 1
         self._scopes: Dict[int, _ScopeRecord] = {}
         self._next_scope_id = 1
         self._breakpoints: Dict[str, List[JsonDict]] = {}
-        self._symbol_mapper: Optional[SymbolMapper] = None
+        self._symbol_mapper: Optional[SymbolIndex] = None
         self._symbol_path: Optional[Path] = None
         self._symbol_mtime: Optional[float] = None
         self._watch_expr_to_id: Dict[str, int] = {}
@@ -632,65 +638,90 @@ class HSXDebugAdapter:
         self.logger.info("Connecting to executive at %s:%d (PID %d)", host, port, pid)
         self._thread_states.clear()
         self._pending_pause = False
-        self.event_bus = EventBus()
-        self.event_bus.start()
-        self.runtime_cache = RuntimeCache()
-        session_config = SessionConfig(
+        self._synthetic_pause_pending = False
+        self._cancel_pause_fallback()
+        self._stop_event_stream()
+        if self.backend:
+            try:
+                self.backend.disconnect()
+            except Exception:
+                pass
+        backend = DebuggerBackend(
+            host=host,
+            port=port,
             client_name="hsx-dap",
-            pid_lock=pid,
-            max_events=8192,
-            heartbeat_s=10,
-            features=list(self._SESSION_FEATURES),
+            features=self._SESSION_FEATURES,
+            keepalive_enabled=True,
+            keepalive_interval=10,
         )
-        transport_config = TransportConfig(host=host, port=port)
-        self.session = SessionManager(
-            transport_config=transport_config,
-            session_config=session_config,
-            event_bus=self.event_bus,
-            runtime_cache=self.runtime_cache,
-        )
-        self.session.open()
-        self.session.subscribe_events(
-            {"pid": [pid], "categories": self._EVENT_CATEGORIES},
-            auto_ack=True,
-            ack_interval=0.02,
-        )
-        self.client = CommandClient(session=self.session, cache=self.runtime_cache)
+        try:
+            backend.ensure_session()
+        except DebuggerBackendError as exc:
+            self.logger.error("Failed to establish debugger session: %s", exc)
+            raise
+        self.backend = backend
+        self.client = backend
+        try:
+            started = backend.start_event_stream(
+                filters={"pid": [pid], "categories": self._EVENT_CATEGORIES},
+                callback=self._handle_exec_event,
+                ack_interval=16,
+            )
+            self._event_stream_active = started
+            if not started:
+                self.logger.warning("Executive did not accept event stream subscription; stop/console events may be delayed")
+        except DebuggerBackendError as exc:
+            self.logger.warning("Unable to start event stream: %s", exc)
+            self._event_stream_active = False
         self._purge_remote_breakpoints()
         self._watch_expr_to_id.clear()
         self._watch_id_to_expr.clear()
         self._ensure_symbol_mapper(force=True)
-        if self.event_bus:
-            subscription = EventSubscription(handler=self._handle_exec_event)
-            self._event_token = self.event_bus.subscribe(subscription)
 
-    def _handle_exec_event(self, event) -> None:
-        if isinstance(event, TaskStateEvent):
+    def _handle_exec_event(self, event: JsonDict) -> None:
+        event_type = str(event.get("type") or "")
+        data = event.get("data") or {}
+        pid = event.get("pid")
+        if event_type == "task_state":
             self._handle_task_state_event(event)
-        elif isinstance(event, DebugBreakEvent):
-            reason = event.reason or "breakpoint"
-            self.logger.info("DebugBreakEvent: pid=%s, pc=0x%04X, reason=%s", event.pid, event.pc or 0, reason)
+            return
+        if event_type == "debug_break":
+            reason = data.get("reason") or "breakpoint"
+            pc = _to_int(data.get("pc"))
+            self.logger.info("DebugBreakEvent: pid=%s, pc=%s, reason=%s", pid, f"0x{pc:04X}" if pc is not None else "?", reason)
             self._emit_stopped_event(
-                pid=event.pid or self.current_pid,
+                pid=pid or self.current_pid,
                 reason=reason,
-                description=event.symbol or reason,
-                pc=event.pc,
+                description=data.get("symbol") or reason,
+                pc=pc,
             )
-        elif isinstance(event, WarningEvent):
-            text = f"warning: {event.reason or 'warning'}\n"
+            return
+        if event_type in {"stdout", "stderr"}:
+            text = ""
+            if isinstance(data, dict):
+                text = str(data.get("text") or "")
+            if text and not text.endswith("\n"):
+                text += "\n"
+            category = "stdout" if event_type == "stdout" else "stderr"
+            self.protocol.send_event("output", {"category": category, "output": text})
+            return
+        if event_type == "warning":
+            reason = data.get("reason") or "warning"
+            text = f"warning: {reason}\n"
             self.protocol.send_event("output", {"category": "console", "output": text})
-        elif isinstance(event, StdStreamEvent):
-            category = "stdout" if event.stream == "stdout" else "stderr"
-            self.protocol.send_event("output", {"category": category, "output": event.text + ("\n" if not event.text.endswith("\n") else "")})
-        elif isinstance(event, WatchUpdateEvent):
-            if event.watch_id is not None and event.expr:
-                self._watch_expr_to_id.setdefault(event.expr, event.watch_id)
-                self._watch_id_to_expr.setdefault(event.watch_id, event.expr)
-            expr = event.expr or self._watch_id_to_expr.get(event.watch_id or -1) or ""
-            label = f"{expr} " if expr else ""
-            text = f"watch {label}[{event.watch_id}] -> {event.new_value}\n"
+            return
+        if event_type == "watch_update":
+            watch_id = _to_int(data.get("watch_id"))
+            expr = data.get("expr")
+            if watch_id is not None and expr:
+                self._watch_expr_to_id.setdefault(expr, watch_id)
+                self._watch_id_to_expr.setdefault(watch_id, expr)
+            resolved_expr = expr or self._watch_id_to_expr.get(watch_id or -1) or ""
+            label = f"{resolved_expr} " if resolved_expr else ""
+            text = f"watch {label}[{watch_id}] -> {data.get('new')}\n"
             self.protocol.send_event("output", {"category": "console", "output": text})
             self._invalidate_variables_scope()
+            return
 
     def _ensure_client(self) -> None:
         if not self.client:
@@ -700,7 +731,7 @@ class HSXDebugAdapter:
         if not self.client or not self.current_pid:
             return None
         try:
-            state = self.client.get_register_state(self.current_pid, refresh=True)
+            state = self.client.get_register_state(self.current_pid)
         except Exception:
             self.logger.debug("Failed to refresh register state for pause fallback", exc_info=True)
             return None
@@ -741,7 +772,7 @@ class HSXDebugAdapter:
     def _format_watches(self) -> List[JsonDict]:
         if not self.client:
             return []
-        watches = self.client.list_watches(self.current_pid, refresh=True)
+        watches = self.client.list_watches(self.current_pid)
         results = []
         for watch in watches:
             display = self._describe_watch_value(watch)
@@ -858,20 +889,16 @@ class HSXDebugAdapter:
         if not self.client or self.current_pid is None:
             return
         try:
-            response = self.client.list_breakpoints(self.current_pid)
-        except Exception as exc:
+            entries = self.client.list_breakpoints(self.current_pid)
+        except DebuggerBackendError as exc:
             self.logger.debug("list_breakpoints failed during session startup: %s", exc)
             return
-        entries = response.get("breakpoints")
         if not isinstance(entries, list):
             return
         stale: List[int] = []
         for entry in entries:
             try:
-                if isinstance(entry, str):
-                    address = int(entry, 0)
-                else:
-                    address = int(entry)
+                address = int(entry)
             except (TypeError, ValueError):
                 self.logger.debug("Skipping invalid breakpoint entry from executive: %r", entry)
                 continue
@@ -989,7 +1016,7 @@ class HSXDebugAdapter:
         ):
             return
         try:
-            self._symbol_mapper = SymbolMapper(resolved)
+            self._symbol_mapper = SymbolIndex(resolved)
             self._symbol_path = resolved
             self._symbol_mtime = mtime
             if not self._sym_hint:
@@ -1078,14 +1105,14 @@ class HSXDebugAdapter:
         watch_id = self._watch_expr_to_id.get(expr)
         if watch_id is None:
             record = self.client.add_watch(expr, pid=self.current_pid)
-            watch_id = int(record.get("watch_id") or record.get("id") or 0)
+            watch_id = int(getattr(record, "watch_id", 0))
             if watch_id:
                 self._watch_expr_to_id[expr] = watch_id
                 self._watch_id_to_expr[watch_id] = expr
                 self._invalidate_variables_scope()
         if not watch_id:
             return None
-        watches = self.client.list_watches(self.current_pid, refresh=True)
+        watches = self.client.list_watches(self.current_pid)
         for watch in watches:
             if getattr(watch, "watch_id", None) == watch_id:
                 return watch
@@ -1123,6 +1150,14 @@ class HSXDebugAdapter:
         self._watch_expr_to_id.clear()
         self._watch_id_to_expr.clear()
 
+    def _stop_event_stream(self) -> None:
+        if self.backend:
+            try:
+                self.backend.stop_event_stream()
+            except DebuggerBackendError:
+                pass
+        self._event_stream_active = False
+
     def _shutdown(self) -> None:
         self._cleanup_watches()
         self._clear_all_breakpoints()
@@ -1130,20 +1165,15 @@ class HSXDebugAdapter:
         self._symbol_path = None
         self._symbol_mtime = None
         self._thread_states.clear()
-        if self._event_token and self.event_bus:
-            self.event_bus.unsubscribe(self._event_token)
-            self._event_token = None
-        if self.event_bus:
-            self.event_bus.stop()
-            self.event_bus = None
         self._cancel_pause_fallback()
         self._synthetic_pause_pending = False
-        if self.session:
+        self._stop_event_stream()
+        if self.backend:
             try:
-                self.session.close()
+                self.backend.disconnect()
             except Exception:
                 pass
-            self.session = None
+        self.backend = None
         self.client = None
         self._source_ref_to_path.clear()
         self._source_path_to_ref.clear()
@@ -1273,16 +1303,17 @@ class HSXDebugAdapter:
             self.logger.info("Stopped event: reason=%s (no PC available)", reason_value)
         self.protocol.send_event("stopped", body)
 
-    def _handle_task_state_event(self, event: TaskStateEvent) -> None:
-        pid = event.pid or self.current_pid
+    def _handle_task_state_event(self, event: JsonDict) -> None:
+        data = event.get("data") or {}
+        pid = event.get("pid") or self.current_pid
         if pid is None:
             return
         name = None
-        if isinstance(event.data, dict):
-            name = event.data.get("name")
+        if isinstance(data, dict):
+            name = data.get("name")
         created = self._ensure_thread_entry(pid, name=name)
-        state = str(event.new_state or "").lower()
-        reason = str(event.reason or "").lower()
+        state = str(data.get("new_state") or "").lower()
+        reason = str(data.get("reason") or "").lower()
         previous_state = self._thread_states.get(pid, {}).get("state")
         meta = self._thread_states.get(pid)
         if meta is not None:
@@ -1303,8 +1334,8 @@ class HSXDebugAdapter:
                 self.protocol.send_event("continued", {"threadId": pid})
             return
         if state in {"paused", "stopped"} or reason in {"debug_break", "user_pause"}:
-            pc = self._extract_task_state_pc(event)
-            description = f"Task {state}" if state else (event.reason or "stopped")
+            pc = self._extract_task_state_pc(data)
+            description = f"Task {state}" if state else (data.get("reason") or "stopped")
             if reason == "user_pause":
                 if self._pending_pause:
                     self._pending_pause = False
@@ -1332,10 +1363,10 @@ class HSXDebugAdapter:
             self._thread_states[pid]["name"] = name
         return False
 
-    def _extract_task_state_pc(self, event: TaskStateEvent) -> Optional[int]:
+    def _extract_task_state_pc(self, task_data: JsonDict) -> Optional[int]:
         details = None
-        if isinstance(event.data, dict):
-            details = event.data.get("details")
+        if isinstance(task_data, dict):
+            details = task_data.get("details")
         if isinstance(details, dict):
             pc = details.get("pc")
             if isinstance(pc, str):
@@ -1588,7 +1619,7 @@ class HSXDebugAdapter:
             addr = resolved
         if addr is None or not self.client:
             return None
-        data = self.client.read_memory(int(addr), int(size), pid=self.current_pid, refresh=True)
+        data = self.client.read_memory(int(addr), int(size), pid=self.current_pid)
         if not data:
             return None
         value = int.from_bytes(data[: min(len(data), 4)], byteorder="big")

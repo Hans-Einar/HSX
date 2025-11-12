@@ -130,6 +130,34 @@ class DebuggerBackend:
             pass
         self._session = None
 
+    def start_event_stream(
+        self,
+        *,
+        filters: Optional[Dict[str, Any]] = None,
+        callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        ack_interval: int = 10,
+    ) -> bool:
+        """Start streaming events from the executive."""
+
+        session = self.ensure_session()
+        return session.start_event_stream(filters=filters, callback=callback, ack_interval=ack_interval)
+
+    def stop_event_stream(self) -> None:
+        """Stop the active event stream, if any."""
+
+        session = self._session
+        if session is None:
+            return
+        session.stop_event_stream()
+
+    def recent_events(self, limit: int = 20) -> List[Dict[str, Any]]:
+        """Return up to *limit* of the most recent streamed events."""
+
+        session = self._session
+        if session is None:
+            return []
+        return session.get_recent_events(limit)
+
     # ------------------------------------------------------------------
     # Generic RPC helper
     # ------------------------------------------------------------------
@@ -155,6 +183,10 @@ class DebuggerBackend:
     def resume(self, pid: int) -> None:
         resp = self.request({"cmd": "resume", "pid": pid})
         self._expect_ok(resp, "resume")
+
+    def clock_start(self) -> None:
+        resp = self.request({"cmd": "clock", "op": "start"})
+        self._expect_ok(resp, "clock start")
 
     def step(self, pid: int, *, source_only: bool = False) -> None:
         payload: Dict[str, Any] = {"cmd": "step", "pid": pid}

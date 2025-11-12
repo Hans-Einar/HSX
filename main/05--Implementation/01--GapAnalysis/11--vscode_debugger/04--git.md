@@ -14,6 +14,7 @@
 | 2025-11-09 | `6b5be80` | `Session Resilience & Symbols` | Hans Einar | Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dap_symbol_mapper.py` |
 | 2025-11-09 | `95fe9e6` | `vscode-dap: implement Phase 3 (stack/scopes/variables)` | Hans Einar | Tests: `PYTHONPATH=. pytest python/tests/test_hsxdbg_cache.py python/tests/test_hsxdbg_commands.py python/tests/test_hsxdbg_session.py python/tests/test_hsx_dap_watch.py python/tests/test_hsx_dap_breakpoints.py python/tests/test_hsx_dap_stacktrace.py python/tests/test_hsx_dap_scopes.py python/tests/test_hsx_dap_variables.py python/tests/test_hsx_dap_symbol_mapper.py` |
 | 2025-11-11 | `36ed765` | `Cleanup Legacy hsxdbg/hsx_dap tests; Phase 5 foundations` | Codex | Tests: `python -m pytest python/tests/` |
+| 2025-11-11 | `77cf0b1` | `Phase 1 kickoff: shared backend + symbol reuse` | Codex | Tests: `python -m pytest python/tests/test_hsx_dbg_backend.py python/tests/test_hsx_dbg_symbols.py python/tests/test_hsx_dbg_commands.py python/tests/test_hsx_dbg_history.py python/tests/test_hsx_dbg_scripts.py` |
 
 ## Pull Request
 - PR URL / ID: `<link or ID>`
