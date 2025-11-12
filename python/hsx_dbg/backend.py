@@ -77,6 +77,7 @@ class DebuggerBackend:
         self.keepalive_interval = keepalive_interval
         self._session_factory = session_factory
         self._session: Optional[ExecutiveSession] = None
+        self._attached_pid: Optional[int] = None
 
     # ------------------------------------------------------------------
     # Session lifecycle
@@ -129,6 +130,7 @@ class DebuggerBackend:
         except Exception:  # pragma: no cover - best effort
             pass
         self._session = None
+        self._attached_pid = None
 
     def start_event_stream(
         self,
@@ -194,6 +196,25 @@ class DebuggerBackend:
             payload["source_only"] = True
         resp = self.request(payload)
         self._expect_ok(resp, "step")
+
+    def attach(self, pid: Optional[int], *, observer: bool = False, heartbeat_s: Optional[int] = None) -> None:
+        """Request a pid lock (or observer mode) for the current session."""
+
+        session = self.ensure_session()
+        lock_value: Optional[int]
+        if observer:
+            lock_value = None
+        elif pid is None:
+            lock_value = None
+        else:
+            lock_value = int(pid)
+        session.configure_session(pid_lock=lock_value, heartbeat_s=heartbeat_s)
+        self._attached_pid = pid
+
+    def attached_pid(self) -> Optional[int]:
+        """Return the most recently attached PID (if any)."""
+
+        return self._attached_pid
 
     # ------------------------------------------------------------------
     # Breakpoints

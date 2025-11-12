@@ -39,6 +39,34 @@ def make_handshake(features):
     }
 
 
+def test_configure_session_sets_pid_lock_on_first_open():
+    stack_payload = {"status": "ok", "stack": {"frames": []}}
+    session = StubSession(
+        [make_handshake(["events", "stack"]), stack_payload],
+        features=["stack"],
+    )
+    session.configure_session(pid_lock=5, heartbeat_s=12)
+    session.stack_info(1)
+    assert session.sent[0]["cmd"] == "session.open"
+    assert session.sent[0]["pid_lock"] == 5
+    assert session.sent[0]["heartbeat_s"] == 12
+
+
+def test_configure_session_reopens_existing_session():
+    responses = [
+        make_handshake(["events", "stack"]),
+        {"status": "ok", "stack": {"frames": []}},
+        make_handshake(["events", "stack"]),
+    ]
+    session = StubSession(responses, features=["stack"])
+    session.stack_info(1)
+    session.configure_session(pid_lock=None)
+    # The most recent payload should be a reopened handshake with explicit null pid_lock.
+    assert session.sent[-1]["cmd"] == "session.open"
+    assert "pid_lock" in session.sent[-1]
+    assert session.sent[-1]["pid_lock"] is None
+
+
 def test_stack_info_success_and_cache():
     stack_payload = {
         "status": "ok",

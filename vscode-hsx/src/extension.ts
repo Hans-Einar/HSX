@@ -16,6 +16,9 @@ export interface HSXDebugConfiguration extends vscode.DebugConfiguration {
   logLevel?: string;
   adapterArgs?: (string | number)[];
   env?: Record<string, string>;
+  observerMode?: boolean;
+  keepaliveInterval?: number;
+  sessionHeartbeat?: number;
 }
 
 export class HSXConfigurationProvider implements vscode.DebugConfigurationProvider {
@@ -46,6 +49,25 @@ export class HSXConfigurationProvider implements vscode.DebugConfigurationProvid
     }
     if (!config.logLevel) {
       config.logLevel = DEFAULT_LOG_LEVEL;
+    }
+    if (typeof config.observerMode !== "boolean") {
+      config.observerMode = false;
+    }
+    if (config.keepaliveInterval != null) {
+      const parsed = Number(config.keepaliveInterval);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        config.keepaliveInterval = parsed;
+      } else {
+        delete config.keepaliveInterval;
+      }
+    }
+    if (config.sessionHeartbeat != null) {
+      const parsed = Number(config.sessionHeartbeat);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        config.sessionHeartbeat = parsed;
+      } else {
+        delete config.sessionHeartbeat;
+      }
     }
     return config;
   }

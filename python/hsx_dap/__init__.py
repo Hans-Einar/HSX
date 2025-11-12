@@ -195,6 +195,8 @@ class HSXDebugAdapter:
         self._next_source_id: int = 1
         self.project_root = REPO_ROOT
         self._source_base_dirs: List[Path] = [REPO_ROOT]
+        self._observer_mode: bool = False
+        self._keepalive_override: Optional[int] = None
 
     def serve(self) -> None:
         while True:
@@ -246,6 +248,13 @@ class HSXDebugAdapter:
         if pid_value is None:
             raise ValueError("launch request missing 'pid'")
         self.current_pid = int(pid_value)
+        observer_mode = self._coerce_bool(args.get("observerMode") or args.get("observer_mode"))
+        keepalive_interval = self._coerce_optional_int(args.get("keepaliveInterval") or args.get("keepalive_interval"))
+        heartbeat_override = self._coerce_optional_int(
+            args.get("sessionHeartbeat") or args.get("heartbeatSeconds") or args.get("heartbeatInterval")
+        )
+        if heartbeat_override is None:
+            heartbeat_override = keepalive_interval
         sym_arg = args.get("symPath") or args.get("sym_path")
         program_path = args.get("program")
         self._sym_hint = None
@@ -270,7 +279,16 @@ class HSXDebugAdapter:
                 self._sym_hint = path
                 break
         self._update_project_root(args)
-        self._connect(host, port, self.current_pid)
+        self._observer_mode = observer_mode
+        self._keepalive_override = keepalive_interval
+        self._connect(
+            host,
+            port,
+            self.current_pid,
+            observer_mode=observer_mode,
+            keepalive_interval=keepalive_interval,
+            heartbeat_override=heartbeat_override,
+        )
         self._reapply_pending_breakpoints()
         return {}
 
@@ -634,8 +652,23 @@ class HSXDebugAdapter:
         }
 
     # Internal helpers -------------------------------------------------
-    def _connect(self, host: str, port: int, pid: int) -> None:
-        self.logger.info("Connecting to executive at %s:%d (PID %d)", host, port, pid)
+    def _connect(
+        self,
+        host: str,
+        port: int,
+        pid: int,
+        *,
+        observer_mode: bool = False,
+        keepalive_interval: Optional[int] = None,
+        heartbeat_override: Optional[int] = None,
+    ) -> None:
+        self.logger.info(
+            "Connecting to executive at %s:%d (PID %d, observer=%s)",
+            host,
+            port,
+            pid,
+            observer_mode,
+        )
         self._thread_states.clear()
         self._pending_pause = False
         self._synthetic_pause_pending = False
@@ -654,8 +687,10 @@ class HSXDebugAdapter:
             keepalive_enabled=True,
             keepalive_interval=10,
         )
+        if keepalive_interval is not None:
+            backend.configure(keepalive_interval=int(keepalive_interval))
         try:
-            backend.ensure_session()
+            backend.attach(pid, observer=observer_mode, heartbeat_s=heartbeat_override)
         except DebuggerBackendError as exc:
             self.logger.error("Failed to establish debugger session: %s", exc)
             raise
@@ -860,6 +895,29 @@ class HSXDebugAdapter:
             return _canonical_path(path)
         name = source.get("name")
         return str(name).lower() if name else "<global>"
+
+    def _coerce_optional_int(self, value: Any) -> Optional[int]:
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            return int(value)
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _coerce_bool(self, value: Any) -> bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return bool(value)
+        if isinstance(value, str):
+            lowered = value.strip().lower()
+            if lowered in {"1", "true", "yes", "on"}:
+                return True
+            if lowered in {"0", "false", "no", "off"}:
+                return False
+        return False
 
     def _clear_breakpoints(self, source_key: str) -> None:
         entries = self._breakpoints.get(source_key, [])

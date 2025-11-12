@@ -28,6 +28,8 @@ LOGGER = logging.getLogger("hsx.executive_session")
 JsonDict = Dict[str, Any]
 EventCallback = Callable[[JsonDict], None]
 
+_UNSET = object()
+
 
 def _json_dumps(payload: JsonDict) -> str:
     return json.dumps(payload, separators=(",", ":"))
@@ -78,6 +80,9 @@ class ExecutiveSession:
         self.session_heartbeat: int = 30
         self.session_disabled = False
         self.negotiated_features: List[str] = []
+        self._pid_lock_specified = False
+        self._pid_lock_value: Optional[Any] = None
+        self._heartbeat_override: Optional[int] = None
 
         self._keepalive_thread: Optional[threading.Thread] = None
         self._keepalive_stop = threading.Event()
@@ -592,6 +597,8 @@ class ExecutiveSession:
                 "cmd": "session.open",
                 "client": self.client_name,
             }
+            if self._pid_lock_specified:
+                payload["pid_lock"] = self._pid_lock_value
             capabilities: JsonDict = {}
             if self.features_requested:
                 capabilities["features"] = list(self.features_requested)
@@ -599,6 +606,8 @@ class ExecutiveSession:
                 capabilities["max_events"] = self.max_events_requested
             if capabilities:
                 payload["capabilities"] = capabilities
+            if self._heartbeat_override is not None:
+                payload["heartbeat_s"] = self._heartbeat_override
             response = self._send_raw(payload)
             if response.get("status") != "ok":
                 error = str(response.get("error", "exec error"))
@@ -678,6 +687,32 @@ class ExecutiveSession:
             elif self.session_id:
                 self._stop_keepalive_locked()
                 self._start_keepalive_locked()
+
+    def configure_session(
+        self,
+        *,
+        pid_lock: Any = _UNSET,
+        heartbeat_s: Any = _UNSET,
+    ) -> None:
+        """Update session parameters such as pid locks or heartbeat interval."""
+
+        changed = False
+        with self._session_lock:
+            if pid_lock is not _UNSET:
+                self._pid_lock_specified = True
+                self._pid_lock_value = self._normalise_pid_lock(pid_lock)
+                changed = True
+            if heartbeat_s is not _UNSET:
+                if heartbeat_s is None:
+                    self._heartbeat_override = None
+                else:
+                    try:
+                        self._heartbeat_override = max(1, int(heartbeat_s))
+                    except (TypeError, ValueError) as exc:
+                        raise ExecutiveSessionError("heartbeat_s must be integer-compatible") from exc
+                changed = True
+        if changed and not self.session_disabled and self.session_id:
+            self._ensure_session(force=True)
 
     # Event streaming ---------------------------------------------------------
 
@@ -802,6 +837,23 @@ class ExecutiveSession:
             stream.thread.join(timeout=1.0)
         self._event_stream = None
         self._event_callback = None
+
+    def _normalise_pid_lock(self, value: Any) -> Optional[Any]:
+        if value is None:
+            return None
+        if isinstance(value, (list, tuple, set)):
+            result = [self._coerce_pid(item) for item in value]
+            return result
+        return self._coerce_pid(value)
+
+    def _coerce_pid(self, value: Any) -> int:
+        try:
+            pid = int(value)
+        except (TypeError, ValueError) as exc:
+            raise ExecutiveSessionError("pid_lock must be integer-compatible") from exc
+        if pid < 0:
+            raise ExecutiveSessionError("pid_lock values must be non-negative")
+        return pid
 
 
 __all__ = ["ExecutiveSession", "ExecutiveSessionError"]

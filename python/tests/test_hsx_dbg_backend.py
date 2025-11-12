@@ -26,9 +26,13 @@ class StubSession:
         self.session_disabled = False
         self.closed = False
         self.keepalive = None
+        self.session_options: List[Dict[str, Any]] = []
 
     def configure_keepalive(self, *, enabled: bool, interval: Optional[int]) -> None:
         self.keepalive = (enabled, interval)
+
+    def configure_session(self, **options: Any) -> None:
+        self.session_options.append(options)
 
     def request(self, payload: Dict[str, Any], **_: Any) -> Dict[str, Any]:
         self.requests.append(payload)
@@ -89,3 +93,14 @@ def test_backend_errors_raise_exception():
     backend = DebuggerBackend(session_factory=lambda *args, **kwargs: stub)
     with pytest.raises(DebuggerBackendError):
         backend.symbol_info(pid=1)
+
+
+def test_backend_attach_configures_session_options():
+    stub = StubSession("127.0.0.1", 9998)
+    backend = DebuggerBackend(session_factory=lambda *args, **kwargs: stub)
+    backend.attach(pid=4, observer=False, heartbeat_s=20)
+    assert stub.session_options[-1]["pid_lock"] == 4
+    assert stub.session_options[-1]["heartbeat_s"] == 20
+    assert backend.attached_pid() == 4
+    backend.attach(pid=None, observer=True)
+    assert stub.session_options[-1]["pid_lock"] is None
