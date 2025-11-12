@@ -1014,6 +1014,18 @@ class HSXDebugAdapter:
         except Exception:
             self.logger.debug("failed to emit connection status event", exc_info=True)
 
+    def _emit_disassembly_refresh_event(self, pc: Optional[int]) -> None:
+        body: JsonDict = {
+            "subsystem": "hsx-disassembly",
+            "action": "refresh",
+        }
+        if pc is not None:
+            body["pc"] = f"0x{int(pc) & 0xFFFFFFFF:04X}"
+        try:
+            self.protocol.send_event("telemetry", body)
+        except Exception:
+            self.logger.debug("failed to emit disassembly refresh event", exc_info=True)
+
     def _emit_breakpoint_sync_telemetry(self, added: List[int], removed: List[int]) -> None:
         body: JsonDict = {
             "subsystem": "hsx-breakpoints",
@@ -2134,6 +2146,7 @@ class HSXDebugAdapter:
         else:
             self.logger.info("Stopped event: reason=%s (no PC available)", reason_value)
         self.protocol.send_event("stopped", body)
+        self._emit_disassembly_refresh_event(pc)
 
     def _handle_task_state_event(self, event: JsonDict) -> None:
         data = event.get("data") or {}

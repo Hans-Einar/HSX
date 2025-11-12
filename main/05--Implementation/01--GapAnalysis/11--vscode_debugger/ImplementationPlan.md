@@ -252,7 +252,7 @@ Deliverable: Automated coverage preventing regressions between CLI and adapter.
 ### 6.2 Instruction Breakpoints & Disassembly Refresh
 
 - [x] Implement `setInstructionBreakpoints` to allow breakpoints directly from the disassembly tree (reusing `DebuggerBackend` APIs).
-- [ ] Auto-refresh disassembly on every `stopped` event (breakpoint hits included) and ensure requests always send a non-zero `instructionCount`.
+- [x] Auto-refresh disassembly on every `stopped` event (breakpoint hits included) and ensure requests always send a non-zero `instructionCount`.
 - [x] Add harness tests verifying instruction breakpoints hit and the disassembly panel populates after breakpoint stops.
 
 ### 6.3 Breakpoint Synchronization

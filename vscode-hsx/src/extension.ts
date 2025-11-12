@@ -519,6 +519,14 @@ class HSXDebugViewCoordinator {
       return;
     }
     const eventName = (message as DebugEventMessage).event;
+    if (eventName === "telemetry") {
+      const body = isRecord((message as DebugEventMessage).body) ? ((message as DebugEventMessage).body as Record<string, unknown>) : undefined;
+      const subsystem = optionalString(body?.subsystem);
+      if (subsystem === "hsx-disassembly") {
+        void this.refreshDisassembly("auto");
+      }
+      return;
+    }
     if (eventName === "stopped" || eventName === "continued" || eventName === "initialized") {
       void this.refreshAll("auto");
     }
@@ -565,6 +573,24 @@ class HSXDebugViewCoordinator {
       perSession.set(frameId, { address, order: index, name });
     });
     this.frameMetadata.set(session.id, perSession);
+  }
+
+  private async refreshDisassembly(reason: RefreshReason): Promise<void> {
+    const targets = Array.from(this.views).filter(
+      (view): view is HSXDisassemblyViewProvider => view instanceof HSXDisassemblyViewProvider,
+    );
+    if (!targets.length) {
+      return;
+    }
+    await Promise.all(
+      targets.map(async (view) => {
+        try {
+          await view.refresh(reason);
+        } catch (error) {
+          console.warn("[hsx-debug] disassembly refresh failed", error);
+        }
+      }),
+    );
   }
 }
 
@@ -799,8 +825,9 @@ class HSXDisassemblyViewProvider implements vscode.TreeDataProvider<vscode.TreeI
       return;
     }
     const normalizedCenter = center >>> 0;
+    const instructionCount = Math.max(1, this.instructionWindowSize);
     const requestPayload: Record<string, unknown> = {
-      instructionCount: this.instructionWindowSize,
+      instructionCount,
       resolveSymbols: true,
     };
     if (this.followPc && this.manualBase === undefined) {

@@ -314,6 +314,25 @@ def test_remote_breakpoint_sync_emits_telemetry() -> None:
     assert latest["removedCount"] == 2
 
 
+def test_stopped_event_emits_disassembly_telemetry(monkeypatch: pytest.MonkeyPatch) -> None:
+    protocol = StubProtocol()
+    adapter = hsx_dap.HSXDebugAdapter(protocol)
+    adapter.current_pid = 1
+
+    monkeypatch.setattr(adapter, "_ensure_symbol_mapper", lambda *args, **kwargs: None)
+    monkeypatch.setattr(adapter, "_map_pc_to_source", lambda pc: None)
+
+    adapter._emit_stopped_event(pid=1, reason="breakpoint", description="hit", pc=0x1234)
+
+    telemetry_events = [
+        event for event in protocol.events if event["event"] == "telemetry" and event["body"].get("subsystem") == "hsx-disassembly"
+    ]
+    assert telemetry_events, "expected disassembly telemetry after stopped event"
+    last = telemetry_events[-1]["body"]
+    assert last.get("action") == "refresh"
+    assert last.get("pc") == "0x1234"
+
+
 def test_pid_exists_queries_task_list() -> None:
     class TaskBackend:
         def __init__(self) -> None:

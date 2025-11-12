@@ -337,3 +337,20 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 
 ### Next Steps
 - Finish Phase 6.2 by auto-refreshing the disassembly tree on every stopped event and ensuring DAP disassembly requests always specify a positive instruction count. Update the plan/notes once those behaviors ship.
+
+## 2025-11-12 - Codex (Session 19)
+
+### Scope
+- Plan item / phase addressed: Phase 6.2 (disassembly refresh + instructionCount guard).
+- Design sections reviewed: 04.11--vscode_debugger §5.2 (disassembly), Implementation Plan §6.2.
+
+### Work Summary
+- Extended `HSXDebugAdapter` to emit a dedicated `hsx-disassembly` telemetry event every time `_emit_stopped_event` fires, and taught the VS Code coordinator to refresh only the disassembly view when that telemetry arrives, guaranteeing the panel updates immediately after breakpoint hits (instruction or source) without redundant refreshes.
+- Clamped disassembly requests from the view so `instructionCount` is always ≥1 (even if window tuning changes) and updated the TypeScript tree to auto-refresh when telemetry arrives, fulfilling the “auto-refresh on stopped” requirement.
+- Added harness coverage for the new telemetry path (`python/tests/test_hsx_dap_harness.py::test_stopped_event_emits_disassembly_telemetry`) alongside the existing remote-breakpoint sync test to guard against regressions.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_hsx_dap_harness.py::test_remote_breakpoint_sync_emits_telemetry python/tests/test_hsx_dap_harness.py::test_stopped_event_emits_disassembly_telemetry`
+
+### Next Steps
+- Start Phase 5 (adapter test automation/CI wiring) or iterate on Phase 4 UX polish per backlog priorities now that Phase 6 is complete.
