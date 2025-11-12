@@ -1493,3 +1493,17 @@ def test_disasm_read_falls_back_when_code_rpc_missing():
     instructions = result["instructions"]
     assert instructions and instructions[0]["mnemonic"] == "ADD"
     assert vm.read_code_requests == [{"addr": base, "length": 8, "pid": 1}]
+
+
+def test_disasm_read_around_pc_mode():
+    state, vm = make_debug_state()
+    base = 0x9200
+    for idx in range(6):
+        word = (0x01 << 24) | ((idx & 0xF) << 20)
+        _write_bytes(vm, base + idx * 4, word.to_bytes(4, "big"))
+    vm.pc = base + 8  # third instruction
+
+    result = state.disasm_read(1, count=4, view="around_pc")
+    assert result["view"] == "around_pc"
+    assert result.get("reference") == (base + 8)
+    assert vm.read_code_requests[-1]["addr"] == base

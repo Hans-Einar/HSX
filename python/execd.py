@@ -2103,6 +2103,7 @@ class ExecutiveState:
         address: Optional[int] = None,
         count: Optional[int] = None,
         mode: Optional[str] = None,
+        view: Optional[str] = None,
     ) -> Dict[str, Any]:
         self.get_task(pid)
         try:
@@ -2111,22 +2112,42 @@ class ExecutiveState:
             raise ValueError("count must be an integer") from None
         count_value = max(1, min(count_value, 64))
 
-        mode_value = (mode or "on-demand").strip().lower()
-        if mode_value not in {"on-demand", "cached"}:
-            raise ValueError("mode must be 'on-demand' or 'cached'")
-        cache_enabled = mode_value == "cached"
+        cache_mode = (mode or "on-demand").strip().lower()
+        if cache_mode not in {"on-demand", "cached"}:
+            cache_mode = "on-demand"
+        cache_enabled = cache_mode == "cached"
+
+        view_mode = (view or "").strip().lower()
+        if not view_mode and cache_mode in {"around_pc", "from_addr"}:
+            view_mode = cache_mode
+            cache_mode = "on-demand"
+            cache_enabled = False
+        if view_mode not in {"from_addr", "around_pc"}:
+            view_mode = "from_addr"
 
         regs = self.request_dump_regs(pid)
         pc = regs.get("pc")
-        if address is None:
-            start_addr = int(pc) & 0xFFFFFFFF if isinstance(pc, int) else 0
+        if view_mode == "around_pc":
+            if address is not None:
+                try:
+                    center_addr = int(address) & 0xFFFFFFFF
+                except (TypeError, ValueError) as exc:
+                    raise ValueError("address must be integer") from exc
+            else:
+                center_addr = int(pc) & 0xFFFFFFFF if isinstance(pc, int) else 0
+            offset_instrs = max(0, count_value // 2)
+            start_addr = (center_addr - (offset_instrs * 4)) & 0xFFFFFFFF
         else:
-            try:
-                start_addr = int(address) & 0xFFFFFFFF
-            except (TypeError, ValueError) as exc:
-                raise ValueError("address must be integer") from exc
+            if address is None:
+                start_addr = int(pc) & 0xFFFFFFFF if isinstance(pc, int) else 0
+            else:
+                try:
+                    start_addr = int(address) & 0xFFFFFFFF
+                except (TypeError, ValueError) as exc:
+                    raise ValueError("address must be integer") from exc
+            center_addr = None
 
-        cache_key = (start_addr, count_value)
+        cache_key = (view_mode, start_addr, count_value)
         if cache_enabled:
             cache_for_pid = self.disasm_cache.get(pid, {})
             cached_entry = cache_for_pid.get(cache_key)
@@ -2180,13 +2201,16 @@ class ExecutiveState:
             "address": start_addr,
             "count": len(instructions),
             "requested": count_value,
-            "mode": mode_value,
+            "mode": cache_mode,
+            "view": view_mode,
             "cached": False,
             "truncated": truncated,
             "bytes_read": consumed,
             "data": raw_bytes[:consumed].hex(),
             "instructions": instructions,
         }
+        if center_addr is not None:
+            result["reference"] = center_addr
 
         if cache_enabled:
             cache_for_pid = self.disasm_cache.setdefault(pid, {})
@@ -5101,7 +5125,7 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                     info = self.state.watch_list(pid_int)
                     return {"version": 1, "status": "ok", "watch": info}
                 raise ValueError(f"unknown watch op '{op}'")
-            if cmd == "disasm":
+            if cmd in {"disasm", "disasm.read"}:
                 pid_value = request.get("pid")
                 if pid_value is None:
                     raise ValueError("disasm requires 'pid'")
@@ -5109,6 +5133,8 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 addr_value = request.get("addr") or request.get("address")
                 count_value = request.get("count")
                 mode_value = request.get("mode")
+                view_value = request.get("view")
+                cache_value = request.get("cache") or request.get("cache_mode")
                 address = None
                 if addr_value is not None:
                     if isinstance(addr_value, str):
@@ -5121,7 +5147,23 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                         count = int(count_value, 0)
                     else:
                         count = int(count_value)
-                info = self.state.disasm_read(pid_int, address=address, count=count, mode=mode_value)
+                view_mode = None
+                if isinstance(view_value, str):
+                    view_mode = view_value
+                elif isinstance(mode_value, str) and mode_value.strip().lower() in {"around_pc", "from_addr"}:
+                    view_mode = mode_value
+                cache_mode = None
+                if isinstance(cache_value, str):
+                    cache_mode = cache_value
+                elif isinstance(mode_value, str) and mode_value.strip().lower() in {"on-demand", "cached"}:
+                    cache_mode = mode_value
+                info = self.state.disasm_read(
+                    pid_int,
+                    address=address,
+                    count=count,
+                    mode=cache_mode,
+                    view=view_mode,
+                )
                 return {"version": 1, "status": "ok", "disasm": info}
             if cmd == "sym":
                 op = str(request.get("op") or "info").lower()

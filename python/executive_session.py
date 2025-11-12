@@ -512,35 +512,62 @@ class ExecutiveSession:
         address: Optional[int] = None,
         count: Optional[int] = None,
         mode: Optional[str] = None,
+        view: Optional[str] = None,
     ) -> Optional[JsonDict]:
-        payload: JsonDict = {"cmd": "disasm", "pid": int(pid)}
+        payload_base: JsonDict = {"pid": int(pid)}
         if address is not None:
             try:
-                payload["addr"] = int(str(address), 0)
+                payload_base["addr"] = int(str(address), 0)
             except (TypeError, ValueError) as exc:
                 raise ExecutiveSessionError("address must be integer-compatible") from exc
         if count is not None:
             try:
-                payload["count"] = int(count)
+                payload_base["count"] = int(count)
             except (TypeError, ValueError) as exc:
                 raise ExecutiveSessionError("count must be integer-compatible") from exc
+
         if mode is not None:
-            payload["mode"] = str(mode)
-        try:
-            response = self.request(payload)
-        except Exception as exc:  # pragma: no cover - transport errors
-            raise ExecutiveSessionError(f"disasm request failed: {exc}") from exc
-        if response.get("status") != "ok":
-            error = str(response.get("error", "disasm error"))
-            if "unknown_cmd" in error or "unsupported" in error:
-                self._disasm_supported = False
+            payload_base["mode"] = str(mode)
+            mode_lower = str(mode).strip().lower()
+            if mode_lower in {"on-demand", "cached"}:
+                payload_base["cache"] = mode_lower
+
+        if view is not None:
+            payload_base["view"] = str(view)
+
+        commands = ["disasm.read", "disasm"]
+        last_error: Optional[str] = None
+        for command in commands:
+            payload = dict(payload_base)
+            payload["cmd"] = command
+            if command == "disasm":
+                payload.pop("view", None)
+                payload.pop("cache", None)
+            if mode is not None:
+                payload.setdefault("mode", str(mode))
+            try:
+                response = self.request(payload)
+            except Exception as exc:  # pragma: no cover - transport errors
+                last_error = str(exc)
+                continue
+            if response.get("status") != "ok":
+                error = str(response.get("error", "disasm error"))
+                if "unknown_cmd" in error and command != commands[-1]:
+                    last_error = error
+                    continue
+                if "unknown_cmd" in error or "unsupported" in error:
+                    self._disasm_supported = False
+                    return None
+                raise ExecutiveSessionError(error)
+            block = response.get("disasm")
+            if not isinstance(block, dict):
                 return None
-            raise ExecutiveSessionError(error)
-        block = response.get("disasm")
-        if not isinstance(block, dict):
-            return None
-        self._disasm_supported = True
-        return copy.deepcopy(block)
+            self._disasm_supported = True
+            return copy.deepcopy(block)
+        if last_error:
+            raise ExecutiveSessionError(f"disasm request failed: {last_error}")
+        self._disasm_supported = False
+        return None
 
     # ---------------------------------------------------------------- Private
 
