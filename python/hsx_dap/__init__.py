@@ -733,6 +733,7 @@ class HSXDebugAdapter:
         self._ensure_client()
         count = self._coerce_positive_int(args.get("instructionCount"), default=32, limit=128)
         offset = self._coerce_optional_int(args.get("instructionOffset")) or 0
+        around_pc = self._coerce_bool(args.get("aroundPc"))
         address = self._coerce_address(
             args.get("memoryReference")
             or args.get("instructionPointerReference")
@@ -745,14 +746,38 @@ class HSXDebugAdapter:
         if address is None:
             raise RuntimeError("disassemble request requires address or active frame")
         start_addr = (int(address) + int(offset)) & 0xFFFFFFFF
-        payload = {"cmd": "disasm", "pid": self.current_pid, "addr": start_addr, "count": count}
+        view_mode = "around_pc" if around_pc else "from_addr"
+        payload = {
+            "cmd": "disasm.read",
+            "pid": self.current_pid,
+            "addr": start_addr,
+            "count": count,
+            "view": view_mode,
+        }
         response = self._call_backend("request", payload)
+        if response.get("status") != "ok" and payload["cmd"] == "disasm.read":
+            error_text = str(response.get("error", ""))
+            if "unknown_cmd" in error_text or "unsupported" in error_text:
+                payload = {
+                    "cmd": "disasm",
+                    "pid": self.current_pid,
+                    "addr": start_addr,
+                    "count": count,
+                }
+                response = self._call_backend("request", payload)
         if response.get("status") != "ok":
             raise RuntimeError(response.get("error", "disassemble failed"))
         block = response.get("disasm") or {}
         resolve_symbols = bool(args.get("resolveSymbols"))
         instructions = self._format_disassembly(block, resolve_symbols=resolve_symbols)
-        return {"instructions": instructions}
+        body: JsonDict = {"instructions": instructions}
+        reference_addr = block.get("reference")
+        if isinstance(reference_addr, (int, float)):
+            body["referenceAddress"] = f"0x{int(reference_addr) & 0xFFFFFFFF:08X}"
+        view_value = block.get("view")
+        if isinstance(view_value, str):
+            body["view"] = view_value
+        return body
 
     # Internal helpers -------------------------------------------------
     def _connect(

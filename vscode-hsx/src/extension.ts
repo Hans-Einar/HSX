@@ -799,14 +799,20 @@ class HSXDisassemblyViewProvider implements vscode.TreeDataProvider<vscode.TreeI
       return;
     }
     const normalizedCenter = center >>> 0;
-    this.referenceAddress = normalizedCenter;
-    const startAddress = this.computeWindowStart(normalizedCenter);
+    const requestPayload: Record<string, unknown> = {
+      instructionCount: this.instructionWindowSize,
+      resolveSymbols: true,
+    };
+    if (this.followPc && this.manualBase === undefined) {
+      requestPayload.instructionPointerReference = formatAddress(normalizedCenter);
+      requestPayload.aroundPc = true;
+    } else {
+      const startAddress = this.computeWindowStart(normalizedCenter);
+      requestPayload.memoryReference = formatAddress(startAddress);
+    }
+    let highlightAddress = normalizedCenter;
     try {
-      const response = await session.customRequest("disassemble", {
-        instructionCount: this.instructionWindowSize,
-        memoryReference: formatAddress(startAddress),
-        resolveSymbols: true,
-      });
+      const response = await session.customRequest("disassemble", requestPayload);
       const instructions = Array.isArray(response?.instructions)
         ? (response.instructions as DisassembledInstruction[])
         : [];
@@ -814,6 +820,16 @@ class HSXDisassemblyViewProvider implements vscode.TreeDataProvider<vscode.TreeI
         this.rows = [createMessageItem("No disassembly available for this region.")];
         return;
       }
+      const referenceAddress =
+        typeof response?.referenceAddress === "string"
+          ? parseNumericLiteral(response.referenceAddress)
+          : typeof response?.referenceAddress === "number"
+            ? response.referenceAddress
+            : undefined;
+      if (referenceAddress !== undefined) {
+        highlightAddress = referenceAddress >>> 0;
+      }
+      this.referenceAddress = highlightAddress;
       this.instructions = instructions;
       this.rows = instructions.map((inst) => createDisassemblyRow(inst, this.referenceAddress));
     } catch (error) {
