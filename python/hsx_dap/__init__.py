@@ -11,6 +11,7 @@ import os
 import sys
 import threading
 from dataclasses import dataclass, field
+import copy
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -185,6 +186,7 @@ class HSXDebugAdapter:
         self._watch_expr_to_id: Dict[str, int] = {}
         self._watch_id_to_expr: Dict[int, str] = {}
         self._pending_breakpoints: Dict[str, Dict[str, Any]] = {}
+        self._breakpoint_specs: Dict[str, Dict[str, Any]] = {}
         self._sym_hint: Optional[Path] = None
         self._thread_states: Dict[int, Dict[str, Any]] = {}
         self._pending_pause: bool = False
@@ -195,6 +197,9 @@ class HSXDebugAdapter:
         self._next_source_id: int = 1
         self.project_root = REPO_ROOT
         self._source_base_dirs: List[Path] = [REPO_ROOT]
+        self._connection_config: Dict[str, Any] = {}
+        self._reconnecting = False
+        self._has_session = False
         self._observer_mode: bool = False
         self._keepalive_override: Optional[int] = None
 
@@ -319,9 +324,9 @@ class HSXDebugAdapter:
         self._cancel_pause_fallback()
         self._pending_pause = False  # Clear any pending pause state
         self._synthetic_pause_pending = False
-        self.client.resume(self.current_pid)
+        self._call_backend("resume", self.current_pid)
         try:
-            self.client.clock_start()
+            self._call_backend("clock_start")
         except Exception:
             self.logger.debug("clock_start failed (continuing anyway)", exc_info=True)
         self.protocol.send_event("continued", {"threadId": self.current_pid})
@@ -331,7 +336,7 @@ class HSXDebugAdapter:
         self._ensure_client()
         self.logger.info("Pause requested for PID %s", self.current_pid)
         self._pending_pause = True
-        self.client.pause(self.current_pid)
+        self._call_backend("pause", self.current_pid)
         # Emit the stopped event immediately using a register snapshot so VS Code
         # reflects the paused state even if the executive never publishes an event.
         self._emit_pause_snapshot(description="pause")
@@ -375,7 +380,7 @@ class HSXDebugAdapter:
 
     def _handle_next(self, args: JsonDict) -> JsonDict:
         self._ensure_client()
-        self.client.step(self.current_pid, source_only=False)
+        self._call_backend("step", self.current_pid, source_only=False)
         pc = self._read_current_pc()
         self._emit_stopped_event(
             pid=self.current_pid,
@@ -395,7 +400,7 @@ class HSXDebugAdapter:
         self._ensure_client()
         start = int(args.get("startFrame") or 0)
         levels = int(args.get("levels") or 20)
-        frames = self.client.get_call_stack(self.current_pid, max_frames=start + levels)
+        frames = self._call_backend("get_call_stack", self.current_pid, max_frames=start + levels)
         dap_frames = []
         self._frames.clear()
         self._next_frame_id = 1
@@ -496,6 +501,10 @@ class HSXDebugAdapter:
         if not self.client:
             self.logger.warning("setBreakpoints: no client connected, storing as pending")
             self._pending_breakpoints[source_key] = {"source": source, "breakpoints": breakpoints}
+            if breakpoints:
+                self._record_breakpoint_spec(source_key, source, breakpoints)
+            else:
+                self._breakpoint_specs.pop(source_key, None)
             results = []
             for bp in breakpoints:
                 results.append(
@@ -508,6 +517,10 @@ class HSXDebugAdapter:
             return {"breakpoints": results}
         results, entries = self._apply_breakpoints_for_source(source_key, source_path, source, breakpoints)
         self._breakpoints[source_key] = entries
+        if breakpoints:
+            self._record_breakpoint_spec(source_key, source, breakpoints)
+        else:
+            self._breakpoint_specs.pop(source_key, None)
         self.logger.info("setBreakpoints: set %d breakpoints for %s", len(results), source_path)
         return {"breakpoints": results}
 
@@ -584,7 +597,7 @@ class HSXDebugAdapter:
         self.logger.info("readMemory: address=0x%08X, count=%d", address, count)
         
         # Read memory from executive
-        data = self.client.read_memory(address, count, pid=self.current_pid)
+        data = self._call_backend("read_memory", address, count, pid=self.current_pid)
         
         if data is None:
             # Return unreadable memory indication
@@ -641,7 +654,7 @@ class HSXDebugAdapter:
         
         # Write memory to executive
         try:
-            self.client.write_memory(address, data, pid=self.current_pid)
+            self._call_backend("write_memory", address, data, pid=self.current_pid)
             bytes_written = len(data)
         except Exception as exc:
             self.logger.warning("writeMemory failed: %s", exc)
@@ -696,6 +709,14 @@ class HSXDebugAdapter:
             raise
         self.backend = backend
         self.client = backend
+        self._connection_config = {
+            "host": host,
+            "port": port,
+            "pid": pid,
+            "observer_mode": observer_mode,
+            "keepalive_interval": keepalive_interval,
+            "heartbeat_override": heartbeat_override,
+        }
         try:
             started = backend.start_event_stream(
                 filters={"pid": [pid], "categories": self._EVENT_CATEGORIES},
@@ -762,11 +783,24 @@ class HSXDebugAdapter:
         if not self.client:
             raise RuntimeError("debug session not connected")
 
+    def _call_backend(self, method: str, *args, **kwargs):
+        self._ensure_client()
+        backend = self.client
+        func = getattr(backend, method)
+        try:
+            return func(*args, **kwargs)
+        except DebuggerBackendError as exc:
+            if self._attempt_reconnect(exc):
+                backend = self.client
+                func = getattr(backend, method)
+                return func(*args, **kwargs)
+            raise
+
     def _read_current_pc(self) -> Optional[int]:
         if not self.client or not self.current_pid:
             return None
         try:
-            state = self.client.get_register_state(self.current_pid)
+            state = self._call_backend("get_register_state", self.current_pid)
         except Exception:
             self.logger.debug("Failed to refresh register state for pause fallback", exc_info=True)
             return None
@@ -777,7 +811,7 @@ class HSXDebugAdapter:
     def _format_registers(self) -> List[JsonDict]:
         if not self.client:
             return []
-        state = self.client.get_register_state(self.current_pid)
+        state = self._call_backend("get_register_state", self.current_pid)
         if not state:
             return []
         variables: List[JsonDict] = []
@@ -807,7 +841,7 @@ class HSXDebugAdapter:
     def _format_watches(self) -> List[JsonDict]:
         if not self.client:
             return []
-        watches = self.client.list_watches(self.current_pid)
+        watches = self._call_backend("list_watches", self.current_pid)
         results = []
         for watch in watches:
             display = self._describe_watch_value(watch)
@@ -930,7 +964,7 @@ class HSXDebugAdapter:
                 addresses = [addresses]
             for address in addresses:
                 try:
-                    self.client.clear_breakpoint(int(address), pid=self.current_pid)
+                    self._call_backend("clear_breakpoint", self.current_pid, int(address))
                 except Exception:
                     self.logger.debug("failed to clear breakpoint 0x%X", address)
         self._breakpoints[source_key] = []
@@ -947,7 +981,7 @@ class HSXDebugAdapter:
         if not self.client or self.current_pid is None:
             return
         try:
-            entries = self.client.list_breakpoints(self.current_pid)
+            entries = self._call_backend("list_breakpoints", self.current_pid)
         except DebuggerBackendError as exc:
             self.logger.debug("list_breakpoints failed during session startup: %s", exc)
             return
@@ -966,7 +1000,7 @@ class HSXDebugAdapter:
         cleared = 0
         for address in stale:
             try:
-                self.client.clear_breakpoint(address, pid=self.current_pid)
+                self._call_backend("clear_breakpoint", self.current_pid, address)
                 cleared += 1
             except Exception as exc:
                 self.logger.warning("Failed to clear stale breakpoint 0x%04X: %s", address, exc)
@@ -1031,7 +1065,7 @@ class HSXDebugAdapter:
             return
         info: Dict[str, Any]
         try:
-            info = self.client.symbol_info(self.current_pid)
+            info = self._call_backend("symbol_info", self.current_pid)
         except Exception as exc:
             self.logger.debug("symbol_info failed: %s", exc)
             return
@@ -1040,8 +1074,8 @@ class HSXDebugAdapter:
             if hint:
                 self.logger.info("Attempting to load symbols from hint: %s", hint)
                 try:
-                    self.client.load_symbols(self.current_pid, path=hint)
-                    info = self.client.symbol_info(self.current_pid)
+                    self._call_backend("load_symbols", self.current_pid, path=hint)
+                    info = self._call_backend("symbol_info", self.current_pid)
                     self.logger.info("Symbols loaded successfully from: %s", hint)
                 except Exception as exc:
                     self.logger.warning("symbol load failed for pid %s: %s", self.current_pid, exc)
@@ -1106,7 +1140,7 @@ class HSXDebugAdapter:
             failed_error: Optional[str] = None
             for addr in addresses:
                 try:
-                    self.client.set_breakpoint(addr, pid=self.current_pid)
+                    self._call_backend("set_breakpoint", self.current_pid, addr)
                     verified_any = True
                     self.logger.info("Breakpoint set at %s:%s -> 0x%04X", source_path, line, addr)
                 except Exception as exc:
@@ -1125,6 +1159,11 @@ class HSXDebugAdapter:
             new_entries.append({"addresses": addresses})
             results.append(entry)
         return results, new_entries
+
+    def _record_breakpoint_spec(self, source_key: str, source: JsonDict, breakpoints: List[JsonDict]) -> None:
+        cloned_source = copy.deepcopy(source)
+        cloned_bps = copy.deepcopy(breakpoints)
+        self._breakpoint_specs[source_key] = {"source": cloned_source, "breakpoints": cloned_bps}
 
     def _reapply_pending_breakpoints(self) -> None:
         if not self.client or not self._pending_breakpoints:
@@ -1162,15 +1201,18 @@ class HSXDebugAdapter:
                 raise RuntimeError(f"symbol '{expr}' refers to a local/stack variable (not yet supported)")
         watch_id = self._watch_expr_to_id.get(expr)
         if watch_id is None:
-            record = self.client.add_watch(expr, pid=self.current_pid)
-            watch_id = int(getattr(record, "watch_id", 0))
+            record = self._call_backend("add_watch", expr, pid=self.current_pid)
+            watch_id = getattr(record, "watch_id", None)
+            if watch_id is None and isinstance(record, dict):
+                watch_id = record.get("watch_id") or record.get("id")
+            watch_id = int(watch_id or 0)
             if watch_id:
                 self._watch_expr_to_id[expr] = watch_id
                 self._watch_id_to_expr[watch_id] = expr
                 self._invalidate_variables_scope()
         if not watch_id:
             return None
-        watches = self.client.list_watches(self.current_pid)
+        watches = self._call_backend("list_watches", self.current_pid)
         for watch in watches:
             if getattr(watch, "watch_id", None) == watch_id:
                 return watch
@@ -1202,11 +1244,53 @@ class HSXDebugAdapter:
         if self.client:
             for watch_id in set(self._watch_expr_to_id.values()):
                 try:
-                    self.client.remove_watch(watch_id, pid=self.current_pid)
+                    self._call_backend("remove_watch", watch_id, pid=self.current_pid)
                 except Exception:
                     self.logger.debug("failed to remove watch %s", watch_id)
         self._watch_expr_to_id.clear()
         self._watch_id_to_expr.clear()
+
+    def _restore_watches(self, expressions: List[str]) -> None:
+        if not self.client or self.current_pid is None:
+            return
+        self._watch_expr_to_id.clear()
+        self._watch_id_to_expr.clear()
+        for expr in expressions:
+            try:
+                record = self._call_backend("add_watch", expr, pid=self.current_pid)
+            except DebuggerBackendError:
+                self.logger.warning("Failed to restore watch expression %s", expr)
+                continue
+            watch_id = getattr(record, "watch_id", None)
+            if watch_id is None and isinstance(record, dict):
+                watch_id = record.get("watch_id") or record.get("id")
+            if watch_id is None:
+                continue
+            watch_id = int(watch_id)
+            self._watch_expr_to_id[expr] = watch_id
+            self._watch_id_to_expr[watch_id] = expr
+
+    def _attempt_reconnect(self, exc: Exception) -> bool:
+        if self._reconnecting or not self._connection_config:
+            return False
+        self._reconnecting = True
+        stored_specs = copy.deepcopy(self._breakpoint_specs)
+        watch_exprs = list(self._watch_expr_to_id.keys())
+        self.logger.warning("Debugger backend error (%s); attempting reconnect", exc)
+        try:
+            self._connect(**self._connection_config)
+            if stored_specs:
+                self._pending_breakpoints.update(stored_specs)
+                self._reapply_pending_breakpoints()
+            if watch_exprs:
+                self._restore_watches(watch_exprs)
+            return True
+        except DebuggerBackendError as reconnect_exc:
+            self.logger.error("Reconnect failed: %s", reconnect_exc)
+            return False
+        finally:
+            self._reconnecting = False
+        return False
 
     def _stop_event_stream(self) -> None:
         if self.backend:
@@ -1233,6 +1317,7 @@ class HSXDebugAdapter:
                 pass
         self.backend = None
         self.client = None
+        self._connection_config.clear()
         self._source_ref_to_path.clear()
         self._source_path_to_ref.clear()
         self._next_source_id = 1
@@ -1458,7 +1543,7 @@ class HSXDebugAdapter:
         normalized = REGISTER_NAMES.get(token)
         if not normalized or not self.client:
             return None
-        state = self.client.get_register_state(self.current_pid)
+        state = self._call_backend("get_register_state", self.current_pid)
         if not state:
             return None
         if normalized == "PC":
@@ -1550,7 +1635,7 @@ class HSXDebugAdapter:
             return None
         if hasattr(self.client, "symbol_lookup_name"):
             try:
-                return self.client.symbol_lookup_name(name, pid=self.current_pid)
+                return self._call_backend("symbol_lookup_name", self.current_pid, name)
             except Exception:
                 return None
         return None
@@ -1615,7 +1700,7 @@ class HSXDebugAdapter:
     def _format_memory_value(self, addr: int, *, length: int = 4) -> Optional[str]:
         if not self.client:
             return None
-        data = self.client.read_memory(addr, length, pid=self.current_pid)
+        data = self._call_backend("read_memory", addr, length, pid=self.current_pid)
         if not data:
             return None
         if len(data) < length:
@@ -1677,7 +1762,7 @@ class HSXDebugAdapter:
             addr = resolved
         if addr is None or not self.client:
             return None
-        data = self.client.read_memory(int(addr), int(size), pid=self.current_pid)
+        data = self._call_backend("read_memory", int(addr), int(size), pid=self.current_pid)
         if not data:
             return None
         value = int.from_bytes(data[: min(len(data), 4)], byteorder="big")

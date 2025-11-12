@@ -27,3 +27,6 @@
 ## Additional Notes
 - Update this file whenever new commits land or PR state changes.
 - Link CI runs, code reviews, or related issues as the implementation progresses.
+- Pending: Lightweight DAP harness tests (`python -m pytest python/tests/test_hsx_dap_harness.py`) now cover both the
+  initial adapter wiring and the reconnection path that reapplies breakpoints after a dropped session; include alongside
+  the backend/executive session pytest targets before landing the commit.

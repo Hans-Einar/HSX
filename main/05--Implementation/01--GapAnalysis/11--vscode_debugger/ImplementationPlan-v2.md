@@ -133,10 +133,11 @@ VS Code, with shared caches and logging.
 
 ### Phase 2 Readiness (2025-11-11)
 
-- Blocked: `hsx-dap` still instantiates `SessionManager/CommandClient`, so none
-  of the adapter requests exercise `DebuggerBackend` attach/detach or its
-  keepalive hooks; DAP-level reconnect/observer UX therefore still diverges
-  from 04.09 §5.1 expectations.
+- Session lifecycle plumbing now routes through `DebuggerBackend`: launch/attach
+  honor observer mode + keepalive/heartbeat overrides, and connection loss
+  triggers a reconnect that reapplies breakpoints/watches. Remaining gaps focus
+  on surfacing connection state to VS Code (status bar + notifications) and
+  ensuring CLI-style auto-retry telemetry is exposed.
 - Available inputs: CLI keepalive/retry logic has regression tests
   (`python/tests/test_hsxdbg_session.py`) and `SymbolIndex` now provides the
   same mapping data the CLI `break`/`symbols` commands consume.
