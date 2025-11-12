@@ -21,6 +21,7 @@
 | 2025-11-11 | bb0f9d0 | Phase 4 updates (memory/disasm polish) | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py` |
 | 2025-11-11 | 34ea6a3 | Phase 4 progress (gdb-style mem examine) | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py` |
 | 2025-11-11 | b991694 | Phase 5.1/5.2 completion (completion + history) | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dbg_commands.py python/tests/test_hsx_dbg_history.py python/tests/test_hsx_dbg_completion.py` |
+| 2025-11-11 | (pending) | Phase 5.4 error handling improvements | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_executive_session_helpers.py python/tests/test_hsx_dbg_commands.py python/tests/test_hsx_dbg_history.py python/tests/test_hsx_dbg_scripts.py python/tests/test_hsx_dbg_completion.py` |
 
 ## Pull Request
 - PR URL / ID: `<link or ID>`

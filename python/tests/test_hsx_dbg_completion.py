@@ -9,7 +9,10 @@ from typing import List
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-sys.path.append(str(REPO_ROOT / "python"))
+PYTHON_SRC = REPO_ROOT / "python"
+for entry in (REPO_ROOT, PYTHON_SRC):
+    if str(entry) not in sys.path:
+        sys.path.append(str(entry))
 
 try:  # pragma: no cover - optional dependency guard
     from prompt_toolkit.document import Document

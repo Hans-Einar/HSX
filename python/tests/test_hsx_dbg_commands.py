@@ -10,7 +10,10 @@ from typing import Any, Dict, Iterable, List, Optional
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-sys.path.append(str(REPO_ROOT / "python"))
+PYTHON_SRC = REPO_ROOT / "python"
+for entry in (REPO_ROOT, PYTHON_SRC):
+    if str(entry) not in sys.path:
+        sys.path.append(str(entry))
 
 from hsx_dbg.commands.alias import AliasCommand
 from hsx_dbg.commands.attach import AttachCommand
@@ -265,11 +268,14 @@ def test_disasm_command_annotations(capsys):
 
 
 def test_break_add_symbol_line(tmp_path):
-    sym_path = "examples/demos/build/debug/longrun/main.sym"
-    ctx = StubContext([{"status": "ok"}], symbol_path=sym_path)
+    sym_rel = Path("examples/demos/build/debug/longrun/main.sym")
+    sym_path = REPO_ROOT / sym_rel
+    assert sym_path.exists(), f"missing sym file: {sym_path}"
+    ctx = StubContext([{"status": "ok"}], symbol_path=str(sym_path))
     cmd = BreakpointCommand()
     # use a real line from the sym file
-    addresses = ctx.lookup_line("examples/demos/longrun/main.c", 6)
+    source_path = REPO_ROOT / "examples/demos/longrun/main.c"
+    addresses = ctx.lookup_line(str(source_path), 6)
     assert addresses, "symbol lookup should produce at least one address"
     responses = ["ok"] * len(addresses)
     ctx._dummy_session.responses = [{"status": "ok"} for _ in addresses]
