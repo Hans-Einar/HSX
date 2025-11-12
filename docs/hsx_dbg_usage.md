@@ -125,7 +125,12 @@ list mapped ranges with `mem regions <pid>`.
 `disasm <pid> [symbol|address]` streams instructions with function annotations and source
 locations (when the executive provides them). The arrow prefix (`=>`) marks the current PC
 and offsets appear as `<function+0xN>` to match the design document. Add `--source` to force
-source lookups even when symbol data is sparse.
+source lookups even when symbol data is sparse. Behind the scenes the command uses the
+executive’s `disasm.read` RPC so decoded words always come from the immutable HXE code
+section rather than writable RAM. IDE clients (VS Code, CLIs calling the DAP adapter) also
+request `view=around_pc` windows, which keeps the listing centered on the selected frame’s
+PC; you can emulate that behavior manually by re-running `disasm` without an address to
+refresh the area around the current PC.
 
 ## Scripting
 

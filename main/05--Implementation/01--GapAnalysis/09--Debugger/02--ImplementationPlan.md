@@ -514,11 +514,11 @@ Design §5.5.7 in [04.09--Debugger.md](../../../04--Design/04.09--Debugger.md#L4
 **Estimated Effort:** 2 days
 
 **Todo:**
-- [ ] Document the current mismatch (code lives in `MiniVM.code`, `disasm_read` reads `vm.read_mem`) and capture reproduction steps in `main/05--Implementation/01--GapAnalysis/09--Debugger/03--ImplementationNotes.md`.
-- [ ] Introduce a safe way to fetch instruction bytes (e.g., `MiniVM.read_code` or copying the HXE code section into the task snapshot) so `disasm_read` always decodes from the executable image, not mutable RAM.
-- [ ] Ensure symbol and source annotations are preserved when switching buffers (`symbol_lookup_addr/line` already provide metadata; keep offsets so labels render only at function entries).
-- [ ] Update caching/invalidation so cached disassembly is keyed on code bytes + pid; expire caches automatically on reload/unload.
-- [ ] Extend `python/tests/test_executive_sessions.py::test_disasm_read_basic` (and add new tests) to assert the byte stream mirrors the .sym metadata and that BRK/JMP opcodes round-trip.
+- [x] Document the current mismatch (code lives in `MiniVM.code`, `disasm_read` reads `vm.read_mem`) and capture reproduction steps in `main/05--Implementation/01--GapAnalysis/09--Debugger/03--ImplementationNotes.md`.
+- [x] Introduce a safe way to fetch instruction bytes (e.g., `MiniVM.read_code` or copying the HXE code section into the task snapshot) so `disasm_read` always decodes from the executable image, not mutable RAM.
+- [x] Ensure symbol and source annotations are preserved when switching buffers (`symbol_lookup_addr/line` already provide metadata; keep offsets so labels render only at function entries).
+- [x] Update caching/invalidation so cached disassembly is keyed on code bytes + pid; expire caches automatically on reload/unload.
+- [x] Extend `python/tests/test_executive_sessions.py::test_disasm_read_basic` (and add new tests) to assert the byte stream mirrors the .sym metadata and that BRK/JMP opcodes round-trip.
 
 ### 7.2 VS Code Adapter & Tree View Formatting
 
@@ -527,10 +527,10 @@ Design §5.5.7 in [04.09--Debugger.md](../../../04--Design/04.09--Debugger.md#L4
 **Estimated Effort:** 1-2 days
 
 **Todo:**
-- [ ] Update `HSXDebugAdapter._format_disassembly` to consume operand *strings* as emitted by `disasm_util.format_operands` (fallback to list join when structured operands are added later) so mnemonics render as `LDI R1 <- 0x5`.
-- [ ] Ensure location metadata uses the canonical `{directory, file}` pairs coming from the executive rather than only `line.file` strings.
-- [ ] Expand adapter unit tests to cover operand rendering, symbol labels, and source click-through (e.g., add fixtures under `python/tests/test_hsx_dap_disassembly.py`).
-- [ ] Refresh the VS Code tree view copy/highlight logic so the PC-highlight icon only appears when the decoded address matches `referenceAddress`, and ensure copy-to-clipboard paths include operands and `; file:line` annotations.
+- [x] Update `HSXDebugAdapter._format_disassembly` to consume operand *strings* as emitted by `disasm_util.format_operands` (fallback to list join when structured operands are added later) so mnemonics render as `LDI R1 <- 0x5`.
+- [x] Ensure location metadata uses the canonical `{directory, file}` pairs coming from the executive rather than only `line.file` strings.
+- [x] Expand adapter unit tests to cover operand rendering, symbol labels, and source click-through (e.g., add fixtures under `python/tests/test_hsx_dap_disassembly.py`).
+- [x] Refresh the VS Code tree view copy/highlight logic so the PC-highlight icon only appears when the decoded address matches `referenceAddress`, and ensure copy-to-clipboard paths include operands and `; file:line` annotations.
 
 ### 7.3 Protocol Alignment & Client UX
 
@@ -539,10 +539,10 @@ Design §5.5.7 in [04.09--Debugger.md](../../../04--Design/04.09--Debugger.md#L4
 **Estimated Effort:** 1-2 days
 
 **Todo:**
-- [ ] Add the documented `cmd:"disasm.read"` entry point alongside the legacy `disasm` command; honor `mode:"around_pc"` (split `count` before/after the PC) and `mode:"from_addr"` semantics from the design.
-- [ ] Have the adapter request `mode:"around_pc"` + `addr: current_pc` by default to reduce bespoke window math in the extension, but keep backward-compatible behavior when running against older executives.
-- [ ] Update CLI (`hsx-dbg`) and VS Code docs to mention the new capability negotiation flag so other clients can detect when disassembly is unavailable.
-- [ ] Extend RPC tests (e.g., `python/tests/test_executive_sessions.py`) to cover the new request shape, cached/on-demand paths, and error handling when code bytes cannot be read.
+- [x] Add the documented `cmd:"disasm.read"` entry point alongside the legacy `disasm` command; honor `mode:"around_pc"` (split `count` before/after the PC) and `mode:"from_addr"` semantics from the design.
+- [x] Have the adapter request `mode:"around_pc"` + `addr: current_pc` by default to reduce bespoke window math in the extension, but keep backward-compatible behavior when running against older executives.
+- [x] Update CLI (`hsx-dbg`) and VS Code docs to mention the new capability negotiation flag so other clients can detect when disassembly is unavailable.
+- [x] Extend RPC tests (e.g., `python/tests/test_executive_sessions.py`) to cover the new request shape, cached/on-demand paths, and error handling when code bytes cannot be read.
 
 ### 7.4 Documentation & Telemetry
 
@@ -551,10 +551,10 @@ Design §5.5.7 in [04.09--Debugger.md](../../../04--Design/04.09--Debugger.md#L4
 **Estimated Effort:** 1 day
 
 **Todo:**
-- [ ] Update `docs/hsx_dbg_usage.md` (disassembly section) and `docs/hxe_format.md` (code/rodata handling) to reflect the fixed pipeline and any new flags.
-- [ ] Add troubleshooting notes to `main/04--Design/04.11--vscode_debugger.md` describing how the adapter surfaces disassembly errors in the Run/Debug view.
-- [ ] Instrument the adapter with debug logs summarizing opcode/operand counts (sampling) so regressions surface quickly in `hsx-dap-debug.log`.
-- [ ] Capture verification steps (CLI disasm, VS Code panel screenshot references) in Implementation Notes for traceability.
+- [x] Update `docs/hsx_dbg_usage.md` (disassembly section) and `docs/hxe_format.md` (code/rodata handling) to reflect the fixed pipeline and any new flags.
+- [x] Add troubleshooting notes to `main/04--Design/04.11--vscode_debugger.md` describing how the adapter surfaces disassembly errors in the Run/Debug view.
+- [x] Instrument the adapter with debug logs summarizing opcode/operand counts (sampling) so regressions surface quickly in `hsx-dap-debug.log`.
+- [x] Capture verification steps (CLI disasm, VS Code panel screenshot references) in Implementation Notes for traceability.
 
 ---
 

@@ -40,7 +40,7 @@ All multi-byte fields use big-endian unless stated otherwise.
 - `meta_offset` / `meta_count` enable the metadata section table described below. Loaders must reject tables that overlap the code or rodata segments.
 
 Immediately following the header:
-1. `code` section (`code_len` bytes) – executable VM code.
+1. `code` section (`code_len` bytes) – executable VM code. The executive must expose this segment as immutable: disassemblers (`disasm.read`) fetch words directly from the code image (or host VM `read_code`) rather than from writable task RAM to guarantee instruction listings reflect the deployed binary.
 2. `rodata` section (`ro_len` bytes) – read-only data.
 3. Metadata sections (`.value`, `.cmd`, `.mailbox`) if `meta_count > 0`.
 4. Optional embedded manifest if `flags & 0x01` is set.

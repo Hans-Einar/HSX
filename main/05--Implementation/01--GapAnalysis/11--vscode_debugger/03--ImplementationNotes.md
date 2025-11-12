@@ -249,3 +249,22 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 
 ### Next Steps
 - Wire `python/hsx_dap` to instantiate `DebuggerBackend` instead of the legacy `SessionManager`/`CommandClient`, then start removing the obsolete `python/hsxdbg` modules once the adapter uses the new helpers.
+
+## 2025-11-12 - Codex (Session 14)
+
+### Scope
+- Plan item / phase addressed: Phase 7 (Executive disassembly remediation & VS Code parity)
+- Design sections reviewed: 04.09--Debugger §5.5.7 (`disasm.read`), 04.11--vscode_debugger §§5.2/5.4 (disassembly UI), docs/hxe_format.md (code/rodata handling)
+
+### Work Summary
+- Captured the disassembly mismatch (executive read RAM instead of immutable code) and tracked the fix here per Phase 7.1’s first bullet.
+- Added `MiniVM.read_code`, exposed a `read_code` RPC + VMClient helper, and taught `ExecutiveState.disasm_read` to honor `view=around_pc/from_addr`, with caching keyed on view/address. Added fallback logic when older executives lack the RPC.
+- Updated HSX Debug Adapter + VS Code tree view: requests now use `disasm.read` with `aroundPc` when following the current PC, consume `referenceAddress` metadata for highlighting, and log view/reference info for telemetry. `_format_disassembly` also preserves operand strings so mnemonics render correctly.
+- Refreshed docs (`docs/hsx_dbg_usage.md`, `docs/hxe_format.md`, `04.11--vscode_debugger.md`) to describe the immutable code fetch, DAP behavior, and troubleshooting guidance; Implementation Plan Phase 7 checkboxes ticked.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_executive_sessions.py::test_disasm_read_basic python/tests/test_executive_sessions.py::test_disasm_read_falls_back_when_code_rpc_missing python/tests/test_executive_sessions.py::test_disasm_read_around_pc_mode python/tests/test_hsx_dap_harness.py::test_disassembly_formatting_accepts_operand_strings`
+
+### Next Steps
+- Monitor telemetry for any residual fallback to legacy `disasm`; if seen frequently, coordinate an executive upgrade.
+- With Phase 7 closed, shift attention to deferred backlog items (Phase 5 packaging) once QA signs off.

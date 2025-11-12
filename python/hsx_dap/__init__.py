@@ -770,13 +770,20 @@ class HSXDebugAdapter:
         block = response.get("disasm") or {}
         resolve_symbols = bool(args.get("resolveSymbols"))
         instructions = self._format_disassembly(block, resolve_symbols=resolve_symbols)
-        body: JsonDict = {"instructions": instructions}
+        view_mode = block.get("view") or ("around_pc" if around_pc else "from_addr")
         reference_addr = block.get("reference")
+        ref_hex: Optional[str] = None
         if isinstance(reference_addr, (int, float)):
-            body["referenceAddress"] = f"0x{int(reference_addr) & 0xFFFFFFFF:08X}"
-        view_value = block.get("view")
-        if isinstance(view_value, str):
-            body["view"] = view_value
+            ref_hex = f"0x{int(reference_addr) & 0xFFFFFFFF:08X}"
+        self.logger.info(
+            "disassemble: view=%s count=%d reference=%s",
+            view_mode,
+            len(instructions),
+            ref_hex or "n/a",
+        )
+        body: JsonDict = {"instructions": instructions, "view": view_mode}
+        if ref_hex:
+            body["referenceAddress"] = ref_hex
         return body
 
     # Internal helpers -------------------------------------------------

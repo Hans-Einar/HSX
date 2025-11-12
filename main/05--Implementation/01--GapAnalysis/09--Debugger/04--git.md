@@ -24,6 +24,7 @@
 | 2025-11-11 | (pending) | Phase 5.4 error handling improvements | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_executive_session_helpers.py python/tests/test_hsx_dbg_commands.py python/tests/test_hsx_dbg_history.py python/tests/test_hsx_dbg_scripts.py python/tests/test_hsx_dbg_completion.py` |
 | 2025-11-12 | fc1bee5 | Phase 7.1 – Disassembly pipeline fixes | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_executive_sessions.py::test_disasm_read_basic python/tests/test_executive_sessions.py::test_disasm_read_falls_back_when_code_rpc_missing python/tests/test_hsx_dap_harness.py::test_disassembly_formatting_accepts_operand_strings` |
 | 2025-11-12 | 806d2e5 | Phase 7.2/7.3 – around_pc RPC + adapter prep | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_executive_sessions.py::test_disasm_read_basic python/tests/test_executive_sessions.py::test_disasm_read_falls_back_when_code_rpc_missing python/tests/test_executive_sessions.py::test_disasm_read_around_pc_mode python/tests/test_hsx_dap_harness.py::test_disassembly_formatting_accepts_operand_strings` |
+| 2025-11-12 | 3cd80ce | Phase 7 completion (docs + telemetry) | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_executive_sessions.py::test_disasm_read_basic python/tests/test_executive_sessions.py::test_disasm_read_falls_back_when_code_rpc_missing python/tests/test_executive_sessions.py::test_disasm_read_around_pc_mode python/tests/test_hsx_dap_harness.py::test_disassembly_formatting_accepts_operand_strings` |
 
 ## Pull Request
 - PR URL / ID: `<link or ID>`
