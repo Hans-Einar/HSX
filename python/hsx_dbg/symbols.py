@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Set
+from typing import Any, Dict, List, Optional, Sequence, Set
 
 
 def _canonical_path(value: str) -> str:
@@ -21,6 +21,9 @@ class SymbolIndex:
         self.path = path
         self._line_map: Dict[str, Dict[int, List[int]]] = {}
         self._symbol_map: Dict[str, List[int]] = {}
+        self._pc_map: Dict[int, Dict[str, Any]] = {}
+        self._locals_by_function: Dict[str, List[Dict[str, Any]]] = {}
+        self._globals: List[Dict[str, Any]] = []
         self._load()
 
     def _load(self) -> None:
@@ -43,17 +46,39 @@ class SymbolIndex:
                     keys.add(_canonical_path(full))
                 except Exception:
                     pass
+            pc_masked = int(pc) & 0xFFFF
             for key in keys:
                 lines = self._line_map.setdefault(key, {})
-                lines.setdefault(int(line), []).append(int(pc) & 0xFFFF)
+                lines.setdefault(int(line), []).append(pc_masked)
+            meta: Dict[str, Any] = {"file": file_value, "line": line}
+            if directory:
+                meta["directory"] = directory
+            if inst.get("column") is not None:
+                meta["column"] = inst.get("column")
+            if inst.get("function"):
+                meta["function"] = inst.get("function")
+            self._pc_map[pc_masked] = meta
 
         symbols_block = data.get("symbols") or {}
+        globals_source: Optional[Sequence[dict]] = None
         if isinstance(symbols_block, dict):
             self._load_functions(symbols_block.get("functions") or [])
             self._load_labels(symbols_block.get("labels") or {})
             self._load_variables(symbols_block.get("variables") or [])
+            locals_block = symbols_block.get("locals") or []
+            if isinstance(locals_block, list):
+                for entry in locals_block:
+                    if not isinstance(entry, dict):
+                        continue
+                    func = entry.get("function")
+                    if isinstance(func, str):
+                        self._locals_by_function.setdefault(func, []).append(dict(entry))
+            globals_source = symbols_block.get("globals") or symbols_block.get("variables")
         elif isinstance(symbols_block, list):
             self._load_variables(symbols_block)
+            globals_source = symbols_block
+        if isinstance(globals_source, list):
+            self._globals = [entry for entry in globals_source if isinstance(entry, dict)]
 
     def _load_functions(self, entries: Sequence[dict]) -> None:
         for entry in entries:
@@ -115,3 +140,22 @@ class SymbolIndex:
             return sorted(self._symbol_map.keys())
         needle = prefix.lower()
         return sorted(name for name in self._symbol_map if name.lower().startswith(needle))
+
+    # ------------------------------------------------------------------
+    # Compatibility helpers used by hsx-dap
+    # ------------------------------------------------------------------
+    def lookup(self, source_path: str, line: int) -> List[int]:
+        """Alias for lookup_line to retain backwards compatibility."""
+        return self.lookup_line(source_path, line)
+
+    def lookup_pc(self, pc: int) -> Optional[Dict[str, Any]]:
+        return self._pc_map.get(int(pc) & 0xFFFF)
+
+    def locals_for_function(self, func_name: Optional[str]) -> List[Dict[str, Any]]:
+        if not func_name:
+            return []
+        entries = self._locals_by_function.get(func_name, [])
+        return [dict(entry) for entry in entries]
+
+    def globals_list(self) -> List[Dict[str, Any]]:
+        return [dict(entry) for entry in self._globals]

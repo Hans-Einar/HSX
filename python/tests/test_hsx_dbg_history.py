@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+PYTHON_SRC = REPO_ROOT / "python"
+for entry in (REPO_ROOT, PYTHON_SRC):
+    if str(entry) not in sys.path:
+        sys.path.append(str(entry))
 
 from hsx_dbg.history import HistoryStore
 

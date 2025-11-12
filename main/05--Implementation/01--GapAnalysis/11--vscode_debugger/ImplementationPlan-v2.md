@@ -42,14 +42,21 @@ symbol caches, watch support) land in one place.
 
 ## Phase 0 – Inventory & Alignment
 
-**Goal:** Identify gaps between the existing adapter implementation and the new
-debugger interface.
+**Goal:** Capture the current shape of the adapter, document drifts from the CLI
+debugger, and ground the plan in the latest study/design notes.
 
-- [ ] Audit current adapter entry point (`python/hsx_dap/__init__.py`) and note
-      where it diverges from `hsx_dbg` context/helpers.
-- [ ] Document missing CLI features (observer mode, watch, stack cache, etc.)
-      in `11--vscode_debugger/03--ImplementationNotes.md`.
-- [ ] Define adapter/CLI API boundary (e.g., shared `SessionManager` module).
+- [ ] Review the existing adapter stack (`vscode-hsx/src/extension.ts`,
+      `debugAdapter/hsx-dap.py`, `python/hsx_dap/*`, legacy `python/hsxdbg/*`)
+      and document findings in `11--vscode_debugger/03--ImplementationNotes.md`.
+- [ ] Cross-reference design expectations from
+      [04.11--vscode_debugger.md](../../../04--Design/04.11--vscode_debugger.md)
+      and debugger protocol details from
+      [04.09--Debugger.md](../../../04--Design/04.09--Debugger.md); record mismatches.
+- [ ] Use `01--Study-v2.md` + the original study to enumerate which CLI features
+      (auto-reconnect, observer mode, symbol handling) must be reused and ensure
+      the notes explicitly map the adapter gaps back to those requirements.
+- [ ] Define the adapter/CLI API boundary (shared backend module, event bridge,
+      breakpoint/store reuse) and log decisions in ImplementationNotes.
 
 ---
 
@@ -179,4 +186,3 @@ Deliverable: Automated coverage preventing regressions between CLI and adapter.
    abstractions.
 3. Track progress using this v2 plan alongside the legacy plan until migration
    completes; retire 02--ImplementationPlan.md once all phases here are complete.
-

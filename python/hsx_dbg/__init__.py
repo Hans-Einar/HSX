@@ -9,6 +9,14 @@ main/04--Design/04.09--Debugger.md.  Use ``python -m hsx_dbg`` or
 from __future__ import annotations
 
 from .cli import main
+from .backend import DebuggerBackend, DebuggerBackendError, RegisterState, StackFrame, WatchValue
 
-__all__ = ["main"]
+__all__ = [
+    "main",
+    "DebuggerBackend",
+    "DebuggerBackendError",
+    "RegisterState",
+    "StackFrame",
+    "WatchValue",
+]
 __version__ = "0.1.0"

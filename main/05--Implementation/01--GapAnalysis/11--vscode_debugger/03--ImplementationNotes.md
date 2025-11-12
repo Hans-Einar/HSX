@@ -198,3 +198,54 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 
 ### Next Steps
 - Once Node is available locally, run `npm install`, `npm run compile`, and `npm run test` inside `vscode-hsx` to regenerate `dist/` and validate the provider. Future work: add branding assets (icons) and lifecycle/E2E tests per Phase 6.
+
+## 2025-11-11 - Codex (Session 11)
+
+### Scope
+- Plan item / phase addressed: Phase 0 (ImplementationPlan-v2 alignment ahead of the shared-backend refactor)
+- Design sections reviewed: 04.11--vscode_debugger.md, 04.09--Debugger.md, `01--Study-v2.md`
+
+### Work Summary
+- Recorded a fresh study (01--Study-v2.md) highlighting current adapter vs. CLI debugger gaps (legacy hsxdbg transport, missing backend reuse, lack of DAP parity).
+- Updated ImplementationPlan-v2 Phase 0 tasks to explicitly reference the new study, design docs, and ImplementationNotes so the refactor remains anchored to the latest requirements.
+- Logged the cleanup commit (legacy test removal + full-suite pytest run) in `11--vscode_debugger/04--git.md`, ensuring traceability before starting Phase 1 backend work.
+
+### Testing
+- `python -m pytest python/tests/`
+
+### Next Steps
+- Move into ImplementationPlan-v2 Phase 1: extract a shared `hsx_dbg` backend module, update CLI consumers, and plan adapter integration points before removing legacy hsxdbg modules.
+
+## 2025-11-11 - Codex (Session 12)
+
+### Scope
+- Plan item / phase addressed: Phase 1 (kickoff) – reuse CLI symbol infrastructure inside the adapter
+- Design sections reviewed: 04.11--vscode_debugger §5.2 (source mapping), 04.09--Debugger §5.3 (symbol files)
+
+### Work Summary
+- Extended `hsx_dbg.symbols.SymbolIndex` with PC metadata, locals/globals tables, and completion helpers so both CLI and adapter can share a single symbol loader.
+- Wired hsx-dap to import `SymbolIndex` (dropping the bespoke `SymbolMapper`) and created a focused test suite (`python/tests/test_hsx_dbg_symbols.py`) plus sys.path fixes across hsx_dbg tests so they run via `python -m pytest`.
+- Updated `test_hsx_dbg_commands.py` to resolve the real `.sym` file via `REPO_ROOT`, ensuring symbol lookups stay stable regardless of pytest’s temp cwd.
+
+### Testing
+- `python -m pytest python/tests/test_hsx_dbg_symbols.py python/tests/test_hsx_dbg_commands.py python/tests/test_hsx_dbg_history.py python/tests/test_hsx_dbg_scripts.py`
+
+### Next Steps
+- Continue Phase 1 by introducing a shared `hsx_dbg.backend` module that wraps `DebuggerContext`/`ExecutiveSession`, then replace the adapter’s `SessionManager`/`CommandClient` usage with the new backend.
+
+## 2025-11-11 - Codex (Session 13)
+
+### Scope
+- Plan item / phase addressed: Phase 1 (shared backend extraction)
+- Design sections reviewed: 04.09--Debugger §5 (symbol/memory RPCs), 04.11--vscode_debugger §5.2 (DAP execution control)
+
+### Work Summary
+- Added `python/hsx_dbg/backend.py` exposing a `DebuggerBackend` built directly on `ExecutiveSession`, plus lightweight dataclasses (`RegisterState`, `StackFrame`, `WatchValue`) so IDE/automation clients can share the same RPC helpers.
+- Exported the backend via `hsx_dbg.__init__` and created targeted tests (`python/tests/test_hsx_dbg_backend.py`) verifying pause/stack/register/memory helpers using a stub session factory. Expanded the hsx_dbg test suite (symbols/commands/history/scripts) to run under `python -m pytest …` without PYTHONPATH tweaks.
+- Reused the new `SymbolIndex` inside hsx-dap (previous session) and documented the backend progress so the adapter refactor can now target this shared surface.
+
+### Testing
+- `python -m pytest python/tests/test_hsx_dbg_backend.py python/tests/test_hsx_dbg_symbols.py python/tests/test_hsx_dbg_commands.py python/tests/test_hsx_dbg_history.py python/tests/test_hsx_dbg_scripts.py`
+
+### Next Steps
+- Wire `python/hsx_dap` to instantiate `DebuggerBackend` instead of the legacy `SessionManager`/`CommandClient`, then start removing the obsolete `python/hsxdbg` modules once the adapter uses the new helpers.

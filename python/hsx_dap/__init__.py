@@ -10,7 +10,6 @@ import logging
 import os
 import sys
 import threading
-from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -34,6 +33,7 @@ from python.hsxdbg import (
     WatchUpdateEvent,
 )
 from python.hsxdbg.transport import TransportConfig
+from hsx_dbg.symbols import SymbolIndex as SymbolMapper
 
 
 JsonDict = Dict[str, Any]
@@ -123,83 +123,6 @@ class DAPProtocol:
 
 def _canonical_path(value: str) -> str:
     return str(value).replace("\\", "/").lower()
-
-
-class SymbolMapper:
-    """Helper to map source lines to PCs using .sym metadata."""
-
-    def __init__(self, path: Path) -> None:
-        self.path = path
-        self._line_map: Dict[str, Dict[int, List[int]]] = defaultdict(lambda: defaultdict(list))
-        self._pc_map: Dict[int, Dict[str, Any]] = {}
-        self._locals_by_function: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
-        self._globals: List[Dict[str, Any]] = []
-        self._load()
-
-    def _load(self) -> None:
-        try:
-            data = json.loads(self.path.read_text(encoding="utf-8"))
-        except FileNotFoundError:
-            return
-        instructions = data.get("instructions") or []
-        for inst in instructions:
-            line = inst.get("line")
-            pc = inst.get("pc")
-            file_value = inst.get("file")
-            if line is None or pc is None or not file_value:
-                continue
-            directory = inst.get("directory")
-            keys = {_canonical_path(file_value), _canonical_path(Path(file_value).name)}
-            if directory:
-                try:
-                    full = Path(directory) / file_value
-                    keys.add(_canonical_path(full))
-                    keys.add(_canonical_path(str(full.resolve())))
-                except Exception:
-                    pass
-            for key in keys:
-                lines = self._line_map[key]
-                # Mask PC to 16-bit to match executive's breakpoint storage
-                pc_masked = int(pc) & 0xFFFF
-                lines.setdefault(int(line), []).append(pc_masked)
-            # Store with 16-bit masking for consistency with lookup_pc
-            self._pc_map[int(pc) & 0xFFFF] = {
-                "file": file_value,
-                "directory": directory,
-                "line": line,
-                "column": inst.get("column"),
-            }
-        symbols_block = data.get("symbols") or {}
-        if isinstance(symbols_block, dict):
-            locals_block = symbols_block.get("locals") or []
-            if isinstance(locals_block, list):
-                for loc in locals_block:
-                    func = loc.get("function")
-                    if isinstance(func, str):
-                        self._locals_by_function[func].append(loc)
-            globals_block = symbols_block.get("variables") or []
-            if isinstance(globals_block, list):
-                self._globals = [entry for entry in globals_block if isinstance(entry, dict)]
-        elif isinstance(symbols_block, list):
-            self._globals = [entry for entry in symbols_block if isinstance(entry, dict)]
-
-    def lookup(self, source_path: str, line: int) -> List[int]:
-        key = _canonical_path(source_path)
-        if key in self._line_map:
-            return self._line_map[key].get(int(line), [])
-        filename_key = _canonical_path(Path(source_path).name)
-        return self._line_map.get(filename_key, {}).get(int(line), [])
-
-    def lookup_pc(self, pc: int) -> Optional[Dict[str, Any]]:
-        return self._pc_map.get(int(pc) & 0xFFFF)
-
-    def locals_for_function(self, func_name: Optional[str]) -> List[Dict[str, Any]]:
-        if not func_name:
-            return []
-        return list(self._locals_by_function.get(func_name, []))
-
-    def globals_list(self) -> List[Dict[str, Any]]:
-        return list(self._globals)
 
 
 @dataclass
