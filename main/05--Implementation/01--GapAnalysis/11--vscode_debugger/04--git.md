@@ -16,6 +16,7 @@
 | 2025-11-11 | `36ed765` | `Cleanup Legacy hsxdbg/hsx_dap tests; Phase 5 foundations` | Codex | Tests: `python -m pytest python/tests/` |
 | 2025-11-11 | `77cf0b1` | `Phase 1 kickoff: shared backend + symbol reuse` | Codex | Tests: `python -m pytest python/tests/test_hsx_dbg_backend.py python/tests/test_hsx_dbg_symbols.py python/tests/test_hsx_dbg_commands.py python/tests/test_hsx_dbg_history.py python/tests/test_hsx_dbg_scripts.py` |
 | 2025-11-11 | `907405f` | `Backend + Adapter` | Codex | Tests: `python -m pytest python/tests/test_hsx_dbg_backend.py python/tests/test_hsx_dbg_symbols.py python/tests/test_hsx_dbg_commands.py python/tests/test_hsx_dbg_history.py python/tests/test_hsx_dbg_scripts.py` |
+| 2025-11-11 | `3fce2af` | `Session lifecyle + DAP harness` | Codex | Tests: `python -m pytest python/tests/test_hsx_dap_harness.py python/tests/test_hsx_dbg_backend.py python/tests/test_executive_session_helpers.py` |
 
 ## Pull Request
 - PR URL / ID: `<link or ID>`
@@ -27,6 +28,7 @@
 ## Additional Notes
 - Update this file whenever new commits land or PR state changes.
 - Link CI runs, code reviews, or related issues as the implementation progresses.
-- Pending: Lightweight DAP harness tests (`python -m pytest python/tests/test_hsx_dap_harness.py`) now cover both the
-  initial adapter wiring and the reconnection path that reapplies breakpoints after a dropped session; include alongside
-  the backend/executive session pytest targets before landing the commit.
+- Pending: Lightweight DAP harness tests (`python -m pytest python/tests/test_hsx_dap_harness.py`) now cover launch,
+  stackTrace/scopes, source/function breakpoints (using golden fixtures), and the reconnection path that reapplies
+  breakpoints/watches; include these plus backend/executive session pytest targets before landing the status bar +
+  breakpoint parity commit.

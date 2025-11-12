@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 from typing import Any, Dict, List, Optional
 
 import sys
@@ -17,6 +18,7 @@ if str(PYTHON_SRC) not in sys.path:
     sys.path.append(str(PYTHON_SRC))
 
 from hsx_dbg import DebuggerBackendError, RegisterState, StackFrame, WatchValue
+from hsx_dbg.symbols import SymbolIndex
 from python import hsx_dap
 
 
@@ -212,3 +214,83 @@ def test_stacktrace_and_scopes(monkeypatch: pytest.MonkeyPatch) -> None:
     watches_scope = next(scope for scope in scopes if scope["name"] == "Watches")
     watch_vars = adapter._handle_variables({"variablesReference": watches_scope["variablesReference"]})["variables"]
     assert watch_vars[0]["memoryReference"] == "0x00003000"
+
+
+def test_function_breakpoints_use_symbol_mapper() -> None:
+    class FunctionBackend:
+        def __init__(self) -> None:
+            self.set_calls: List[int] = []
+
+        def set_breakpoint(self, pid: int, address: int) -> None:
+            self.set_calls.append(address)
+
+    class SymbolStub:
+        def lookup_symbol(self, name: str) -> List[int]:
+            if name == "main":
+                return [0x4000, 0x4002]
+            return []
+
+    adapter = hsx_dap.HSXDebugAdapter(StubProtocol())
+    adapter.client = FunctionBackend()
+    adapter.current_pid = 1
+    adapter._symbol_mapper = SymbolStub()
+
+    response = adapter._handle_setFunctionBreakpoints({"breakpoints": [{"name": "main"}]})
+    assert response["breakpoints"][0]["verified"] is True
+    assert adapter.client.set_calls == [0x4000, 0x4002]
+
+
+def test_breakpoints_match_golden_fixture(tmp_path: Path) -> None:
+    fixtures = Path(__file__).resolve().parent / "fixtures"
+    sym_path = fixtures / "sample_debug.sym"
+    golden_path = fixtures / "breakpoints_golden.json"
+    golden = json.loads(golden_path.read_text(encoding="utf-8"))
+
+    class GoldenBackend:
+        def __init__(self) -> None:
+            self.addresses: List[int] = []
+
+        def configure(self, **_: Any) -> None:
+            pass
+
+        def attach(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        def start_event_stream(self, **_: Any) -> bool:
+            return True
+
+        def set_breakpoint(self, pid: int, address: int) -> None:
+            self.addresses.append(address)
+
+        def clear_breakpoint(self, pid: int, address: int) -> None:
+            pass
+
+        def list_breakpoints(self, pid: int) -> List[int]:
+            return []
+
+    backend = GoldenBackend()
+    adapter = hsx_dap.HSXDebugAdapter(StubProtocol())
+    adapter.client = backend
+    adapter.current_pid = 5
+    adapter._sym_hint = sym_path
+    adapter._symbol_mapper = SymbolIndex(sym_path)
+
+    source_request = {
+        "source": {"path": "sample.c"},
+        "breakpoints": [{"line": 10}, {"line": 15}],
+    }
+    response = adapter._handle_setBreakpoints(source_request)
+    seen = [
+        {"line": entry.get("line"), "address": f"0x{entry.get('address', 0):04X}"}
+        for entry in response["breakpoints"]
+        if entry.get("verified")
+    ]
+    assert seen == golden["source"]
+
+    func_response = adapter._handle_setFunctionBreakpoints({"breakpoints": [{"name": "main"}]})
+    func_seen = [
+        {"name": entry.get("name"), "address": f"0x{entry.get('address', 0):04X}"}
+        for entry in func_response["breakpoints"]
+        if entry.get("verified")
+    ]
+    assert func_seen == golden["functions"]

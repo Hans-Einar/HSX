@@ -1,0 +1,9 @@
+{
+  "source": [
+    {"line": 10, "address": "0x1000"},
+    {"line": 15, "address": "0x1004"}
+  ],
+  "functions": [
+    {"name": "main", "address": "0x1000"}
+  ]
+}

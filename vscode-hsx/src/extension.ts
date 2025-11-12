@@ -171,8 +171,89 @@ export function activate(context: vscode.ExtensionContext): void {
   const factory = new HSXAdapterFactory(context);
   context.subscriptions.push(factory);
   context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory("hsx", factory));
+
+  const trackerFactory = new HSXStatusTrackerFactory();
+  context.subscriptions.push(vscode.debug.registerDebugAdapterTrackerFactory("hsx", trackerFactory));
 }
 
 export function deactivate(): void {
   // VS Code disposes registered subscriptions for us.
+}
+
+class HSXStatusTracker implements vscode.DebugAdapterTracker {
+  private disposed = false;
+
+  constructor(private readonly item: vscode.StatusBarItem) {
+    this.render("HSX: Starting...", "Waiting for adapter");
+  }
+
+  onDidSendMessage(message: vscode.DebugProtocolMessage): void {
+    if (message.type !== "event") {
+      return;
+    }
+    const eventMessage = message as vscode.DebugProtocolEvent;
+    if (eventMessage.event !== "telemetry") {
+      return;
+    }
+    const body = eventMessage.body ?? {};
+    if (body.subsystem !== "hsx-connection") {
+      return;
+    }
+    const state = String(body.state || "").toLowerCase();
+    const details = body.details ?? {};
+    switch (state) {
+      case "connected":
+        this.render(`HSX: Connected (${details.pid ?? "pid ?"})`, `Host ${details.host ?? ""}:${details.port ?? ""}`);
+        break;
+      case "reconnecting":
+        this.render("HSX: Reconnecting…", body.message ?? "");
+        break;
+      case "error":
+        this.render("HSX: Error", body.message ?? "connection error");
+        vscode.window.showWarningMessage(`HSX debugger connection issue: ${body.message ?? "unknown error"}`);
+        break;
+      case "disconnected":
+        this.render("HSX: Disconnected", undefined, false);
+        break;
+      default:
+        this.render(`HSX: ${state}`, body.message);
+    }
+  }
+
+  onWillStopSession(): void {
+    this.dispose();
+  }
+
+  onError(): void {
+    this.dispose();
+  }
+
+  private render(text: string, tooltip?: string, show: boolean = true): void {
+    if (this.disposed) {
+      return;
+    }
+    this.item.text = text;
+    this.item.tooltip = tooltip;
+    if (show) {
+      this.item.show();
+    } else {
+      this.item.hide();
+    }
+  }
+
+  private dispose(): void {
+    if (this.disposed) {
+      return;
+    }
+    this.disposed = true;
+    this.item.hide();
+    this.item.dispose();
+  }
+}
+
+class HSXStatusTrackerFactory implements vscode.DebugAdapterTrackerFactory {
+  createDebugAdapterTracker(): vscode.DebugAdapterTracker {
+    const item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
+    return new HSXStatusTracker(item);
+  }
 }

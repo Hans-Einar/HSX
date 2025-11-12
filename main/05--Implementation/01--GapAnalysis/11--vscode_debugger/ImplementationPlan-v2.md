@@ -167,6 +167,16 @@ VS Code, with shared caches and logging.
      Update `vscode-hsx` configuration snippets so users can opt into observer
      mode, keepalive overrides, and custom symbol search paths.
 
+### Phase 2 – In-flight Updates (2025-11-11)
+
+- Function breakpoints now resolve via `SymbolIndex`, hit the shared
+  `DebuggerBackend` for installation, and persist their specs so reconnects
+  reapply them alongside source breakpoints/watch expressions.
+- The new lightweight DAP harness exercises launch/observer plumbing,
+  reconnect behavior, stackTrace/scopes/variables, and both source/function
+  breakpoints without requiring a live executive, giving us fast regression
+  coverage as Phase 2 continues.
+
 ---
 
 ## Phase 3 – Event, Stack, and Watch Integration

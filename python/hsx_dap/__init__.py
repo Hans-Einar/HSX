@@ -13,7 +13,7 @@ import threading
 from dataclasses import dataclass, field
 import copy
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
@@ -200,6 +200,7 @@ class HSXDebugAdapter:
         self._connection_config: Dict[str, Any] = {}
         self._reconnecting = False
         self._has_session = False
+        self._connection_state = "idle"
         self._observer_mode: bool = False
         self._keepalive_override: Optional[int] = None
 
@@ -286,6 +287,15 @@ class HSXDebugAdapter:
         self._update_project_root(args)
         self._observer_mode = observer_mode
         self._keepalive_override = keepalive_interval
+        self._emit_status_event(
+            "connecting",
+            details={
+                "host": host,
+                "port": port,
+                "pid": self.current_pid,
+                "observer": observer_mode,
+            },
+        )
         self._connect(
             host,
             port,
@@ -500,9 +510,9 @@ class HSXDebugAdapter:
         self._ensure_symbol_mapper()
         if not self.client:
             self.logger.warning("setBreakpoints: no client connected, storing as pending")
-            self._pending_breakpoints[source_key] = {"source": source, "breakpoints": breakpoints}
+            self._pending_breakpoints[source_key] = {"source": source, "breakpoints": breakpoints, "kind": "source"}
             if breakpoints:
-                self._record_breakpoint_spec(source_key, source, breakpoints)
+                self._record_breakpoint_spec(source_key, source, breakpoints, kind="source")
             else:
                 self._breakpoint_specs.pop(source_key, None)
             results = []
@@ -518,7 +528,7 @@ class HSXDebugAdapter:
         results, entries = self._apply_breakpoints_for_source(source_key, source_path, source, breakpoints)
         self._breakpoints[source_key] = entries
         if breakpoints:
-            self._record_breakpoint_spec(source_key, source, breakpoints)
+            self._record_breakpoint_spec(source_key, source, breakpoints, kind="source")
         else:
             self._breakpoint_specs.pop(source_key, None)
         self.logger.info("setBreakpoints: set %d breakpoints for %s", len(results), source_path)
@@ -526,6 +536,45 @@ class HSXDebugAdapter:
 
     def _handle_threadsRequest(self, args: JsonDict) -> JsonDict:  # pragma: no cover - compatibility alias
         return self._handle_threads(args)
+
+    def _handle_setFunctionBreakpoints(self, args: JsonDict) -> JsonDict:  # noqa: N802
+        breakpoints = args.get("breakpoints") or []
+        self._ensure_symbol_mapper()
+        requested_keys: List[str] = []
+        results: List[JsonDict] = []
+        if not self.client:
+            self.logger.warning("setFunctionBreakpoints: no client connected, storing as pending")
+            for bp in breakpoints:
+                name = bp.get("name")
+                if not name:
+                    results.append({"verified": False, "message": "name required"})
+                    continue
+                source_key = self._function_source_key(name)
+                requested_keys.append(source_key)
+                payload = {"source": {"name": name}, "breakpoints": [bp], "kind": "function"}
+                self._pending_breakpoints[source_key] = payload
+                self._record_breakpoint_spec(source_key, payload["source"], payload["breakpoints"], kind="function")
+                results.append({"verified": False, "name": name, "message": "pending connection"})
+            self._cleanup_obsolete_function_breakpoints(set(requested_keys))
+            return {"breakpoints": results}
+
+        for bp in breakpoints:
+            name = bp.get("name")
+            if not name:
+                results.append({"verified": False, "message": "name required"})
+                continue
+            source_key = self._function_source_key(name)
+            requested_keys.append(source_key)
+            result, entries = self._apply_function_breakpoint(source_key, name, bp)
+            if entries:
+                self._breakpoints[source_key] = entries
+                self._record_breakpoint_spec(source_key, {"name": name}, [bp], kind="function")
+            else:
+                self._breakpoints.pop(source_key, None)
+                self._breakpoint_specs.pop(source_key, None)
+            results.append(result)
+        self._cleanup_obsolete_function_breakpoints(set(requested_keys))
+        return {"breakpoints": results}
 
     def _handle_evaluate(self, args: JsonDict) -> JsonDict:
         expression = str(args.get("expression") or "").strip()
@@ -706,6 +755,7 @@ class HSXDebugAdapter:
             backend.attach(pid, observer=observer_mode, heartbeat_s=heartbeat_override)
         except DebuggerBackendError as exc:
             self.logger.error("Failed to establish debugger session: %s", exc)
+            self._emit_status_event("error", message=str(exc))
             raise
         self.backend = backend
         self.client = backend
@@ -729,6 +779,15 @@ class HSXDebugAdapter:
         except DebuggerBackendError as exc:
             self.logger.warning("Unable to start event stream: %s", exc)
             self._event_stream_active = False
+        self._emit_status_event(
+            "connected",
+            details={
+                "host": host,
+                "port": port,
+                "pid": pid,
+                "observer": observer_mode,
+            },
+        )
         self._purge_remote_breakpoints()
         self._watch_expr_to_id.clear()
         self._watch_id_to_expr.clear()
@@ -795,6 +854,21 @@ class HSXDebugAdapter:
                 func = getattr(backend, method)
                 return func(*args, **kwargs)
             raise
+
+    def _emit_status_event(self, state: str, *, message: Optional[str] = None, details: Optional[Dict[str, Any]] = None) -> None:
+        self._connection_state = state
+        body: JsonDict = {
+            "subsystem": "hsx-connection",
+            "state": state,
+        }
+        if message:
+            body["message"] = message
+        if details:
+            body["details"] = details
+        try:
+            self.protocol.send_event("telemetry", body)
+        except Exception:
+            self.logger.debug("failed to emit connection status event", exc_info=True)
 
     def _read_current_pc(self) -> Optional[int]:
         if not self.client or not self.current_pid:
@@ -930,6 +1004,9 @@ class HSXDebugAdapter:
         name = source.get("name")
         return str(name).lower() if name else "<global>"
 
+    def _function_source_key(self, name: str) -> str:
+        return f"function::{name}"
+
     def _coerce_optional_int(self, value: Any) -> Optional[int]:
         if value is None:
             return None
@@ -1058,6 +1135,14 @@ class HSXDebugAdapter:
                 continue
         return None
 
+    def _lookup_symbol_addresses(self, name: str) -> List[int]:
+        if not self._symbol_mapper:
+            return []
+        try:
+            return [int(value) & 0xFFFF for value in self._symbol_mapper.lookup_symbol(str(name))]
+        except Exception:
+            return []
+
     def _ensure_symbol_mapper(self, force: bool = False) -> None:
         if not self.client or self.current_pid is None:
             return
@@ -1160,10 +1245,53 @@ class HSXDebugAdapter:
             results.append(entry)
         return results, new_entries
 
-    def _record_breakpoint_spec(self, source_key: str, source: JsonDict, breakpoints: List[JsonDict]) -> None:
+    def _apply_function_breakpoint(
+        self,
+        source_key: str,
+        function_name: str,
+        breakpoint_spec: JsonDict,
+    ) -> tuple[JsonDict, List[JsonDict]]:
+        self._clear_breakpoints(source_key)
+        addresses = self._lookup_symbol_addresses(function_name)
+        verified = False
+        message: Optional[str] = None
+        entry: JsonDict = {
+            "name": function_name,
+            "verified": False,
+        }
+        new_entries: List[JsonDict] = []
+        if not addresses:
+            message = "symbol not found"
+        else:
+            for addr in addresses:
+                try:
+                    self._call_backend("set_breakpoint", self.current_pid, addr)
+                    verified = True
+                    self.logger.info("Function breakpoint %s -> 0x%04X", function_name, addr)
+                except Exception as exc:
+                    message = str(exc)
+                    self.logger.warning("Function breakpoint failed for %s at 0x%04X: %s", function_name, addr, exc)
+            if verified:
+                entry["instructionReference"] = f"{addresses[0]:#x}"
+                entry["address"] = addresses[0]
+                entry["line"] = None
+                new_entries.append({"addresses": addresses})
+        entry["verified"] = verified
+        if message:
+            entry["message"] = message
+        return entry, new_entries
+
+    def _record_breakpoint_spec(
+        self,
+        source_key: str,
+        source: JsonDict,
+        breakpoints: List[JsonDict],
+        *,
+        kind: str = "source",
+    ) -> None:
         cloned_source = copy.deepcopy(source)
         cloned_bps = copy.deepcopy(breakpoints)
-        self._breakpoint_specs[source_key] = {"source": cloned_source, "breakpoints": cloned_bps}
+        self._breakpoint_specs[source_key] = {"source": cloned_source, "breakpoints": cloned_bps, "kind": kind}
 
     def _reapply_pending_breakpoints(self) -> None:
         if not self.client or not self._pending_breakpoints:
@@ -1174,18 +1302,51 @@ class HSXDebugAdapter:
         for source_key, entry in pending.items():
             source = entry.get("source") or {}
             bps = entry.get("breakpoints") or []
+            kind = entry.get("kind") or "source"
+            if kind == "function":
+                self._reapply_function_breakpoints(source_key, source, bps)
+                continue
             source_path = source.get("path") or source.get("name")
             self.logger.info("Reapplying breakpoints for source: %s (%d breakpoints)", source_path, len(bps))
             results, new_entries = self._apply_breakpoints_for_source(source_key, source_path, source, bps)
             self._breakpoints[source_key] = new_entries
             for bp in results:
                 if bp.get("verified"):
-                    self.logger.info("Breakpoint verified after connection: %s:%s -> 0x%04X", 
-                                   source_path, bp.get("line"), bp.get("address", 0))
+                    self.logger.info(
+                        "Breakpoint verified after connection: %s:%s -> 0x%04X",
+                        source_path,
+                        bp.get("line"),
+                        bp.get("address", 0),
+                    )
                     self.protocol.send_event("breakpoint", {"reason": "changed", "breakpoint": bp})
                 else:
-                    self.logger.warning("Breakpoint not verified after connection: %s:%s - %s",
-                                      source_path, bp.get("line"), bp.get("message", "unknown reason"))
+                    self.logger.warning(
+                        "Breakpoint not verified after connection: %s:%s - %s",
+                        source_path,
+                        bp.get("line"),
+                        bp.get("message", "unknown reason"),
+                    )
+
+    def _reapply_function_breakpoints(self, source_key: str, source: JsonDict, breakpoints: List[JsonDict]) -> None:
+        name = source.get("name")
+        if not name:
+            return
+        result, new_entries = self._apply_function_breakpoint(source_key, name, breakpoints[0] if breakpoints else {})
+        self._breakpoints[source_key] = new_entries
+        if result.get("verified"):
+            self.protocol.send_event("breakpoint", {"reason": "changed", "breakpoint": result})
+        else:
+            self.logger.warning("Function breakpoint %s not verified after reconnect: %s", name, result.get("message", "unknown"))
+
+    def _cleanup_obsolete_function_breakpoints(self, active_keys: Set[str]) -> None:
+        all_keys = [key for key in list(self._breakpoints.keys()) if key.startswith("function::")]
+        for key in all_keys:
+            if key in active_keys:
+                continue
+            self._clear_breakpoints(key)
+            self._breakpoints.pop(key, None)
+            self._breakpoint_specs.pop(key, None)
+            self._pending_breakpoints.pop(key, None)
 
     def _ensure_watch_entry(self, expression: str):
         expr = expression.strip()
@@ -1277,6 +1438,7 @@ class HSXDebugAdapter:
         stored_specs = copy.deepcopy(self._breakpoint_specs)
         watch_exprs = list(self._watch_expr_to_id.keys())
         self.logger.warning("Debugger backend error (%s); attempting reconnect", exc)
+        self._emit_status_event("reconnecting", message=str(exc))
         try:
             self._connect(**self._connection_config)
             if stored_specs:
@@ -1284,9 +1446,11 @@ class HSXDebugAdapter:
                 self._reapply_pending_breakpoints()
             if watch_exprs:
                 self._restore_watches(watch_exprs)
+            self._emit_status_event("connected", message="Reconnected")
             return True
         except DebuggerBackendError as reconnect_exc:
             self.logger.error("Reconnect failed: %s", reconnect_exc)
+            self._emit_status_event("error", message=str(reconnect_exc))
             return False
         finally:
             self._reconnecting = False
@@ -1318,6 +1482,7 @@ class HSXDebugAdapter:
         self.backend = None
         self.client = None
         self._connection_config.clear()
+        self._emit_status_event("disconnected")
         self._source_ref_to_path.clear()
         self._source_path_to_ref.clear()
         self._next_source_id = 1

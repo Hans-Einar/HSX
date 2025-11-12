@@ -1,0 +1,28 @@
+{
+  "instructions": [
+    {
+      "pc": 4096,
+      "file": "sample.c",
+      "directory": ".",
+      "line": 10,
+      "function": "main"
+    },
+    {
+      "pc": 4100,
+      "file": "sample.c",
+      "directory": ".",
+      "line": 15,
+      "function": "helper"
+    }
+  ],
+  "symbols": {
+    "functions": [
+      {"name": "main", "address": 4096},
+      {"name": "helper", "address": 4100}
+    ],
+    "locals": [],
+    "globals": [
+      {"name": "global_counter", "address": "0x2000"}
+    ]
+  }
+}
