@@ -9,6 +9,7 @@
 5. Phase 5 - C integration and packaging (deferred).
 6. Phase 6 - Extended distribution targets (deferred).
 7. Phase 7 - Disassembly remediation and VS Code parity.
+8. Phase 8 - Breakpoint & connection resiliency.
 
 ## Sprint Scope
 
@@ -555,6 +556,38 @@ Design §5.5.7 in [04.09--Debugger.md](../../../04--Design/04.09--Debugger.md#L4
 - [x] Add troubleshooting notes to `main/04--Design/04.11--vscode_debugger.md` describing how the adapter surfaces disassembly errors in the Run/Debug view.
 - [x] Instrument the adapter with debug logs summarizing opcode/operand counts (sampling) so regressions surface quickly in `hsx-dap-debug.log`.
 - [x] Capture verification steps (CLI disasm, VS Code panel screenshot references) in Implementation Notes for traceability.
+
+---
+
+## Phase 8: Breakpoint & Connection Resiliency
+
+**Priority:** HIGH  
+**Dependencies:** Phase 3 (breakpoint/variable plumbing), Phase 7 (disassembly parity), vscode-hsx extension  
+**Estimated Effort:** 5 days
+
+**Rationale:**  
+Evaluation/pause commands currently wedge when the tracked PID disappears (`unknown pid` loops), the VS Code UI doesn’t show breakpoints added via the CLI/executive, and instruction breakpoints can’t be set from the disassembly view. This phase hardens the adapter/backend so breakpoint state stays in sync regardless of where breakpoints originate, disassembly always refreshes on stops, and PID loss produces clear UX instead of endless reconnects.
+
+### 8.1 PID Loss & Reconnect UX
+
+**Todo:**
+- [ ] Detect `unknown pid` errors after reconnect, re-run `ps`, and either update `current_pid` or surface a fatal “target exited” message.
+- [ ] Emit telemetry + VS Code notifications when a PID disappears so users know to relaunch.
+- [ ] Extend the hsx_dap harness with a backend stub that simulates PID loss mid-session to cover the new logic.
+
+### 8.2 Instruction Breakpoints & Disassembly Refresh
+
+**Todo:**
+- [ ] Implement `setInstructionBreakpoints` to allow breakpoints directly from the disassembly tree (reusing `DebuggerBackend` APIs).
+- [ ] Auto-refresh disassembly on every `stopped` event (breakpoint hits included) and ensure requests always send a non-zero `instructionCount`.
+- [ ] Add harness tests verifying instruction breakpoints hit and the disassembly panel populates after breakpoint stops.
+
+### 8.3 Breakpoint Synchronization
+
+**Todo:**
+- [ ] Subscribe to executive breakpoint events (or poll) so VS Code reflects breakpoints created outside the adapter (CLI/executive UI).
+- [ ] Reconcile local vs remote breakpoint sets after reconnect, removing stale entries and surfacing newly added ones.
+- [ ] Document mixed breakpoint workflows and add telemetry when external breakpoints are synced.
 
 ---
 

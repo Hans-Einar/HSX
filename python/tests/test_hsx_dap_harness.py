@@ -140,6 +140,9 @@ def test_reconnect_reapplies_breakpoints(monkeypatch: pytest.MonkeyPatch) -> Non
         def disconnect(self) -> None:  # pragma: no cover - not used in test
             pass
 
+        def list_tasks(self) -> Dict[str, Any]:
+            return {"tasks": [{"pid": 2}], "current_pid": 2}
+
     def backend_factory(**kwargs: Any) -> ReconnectBackend:
         backend = ReconnectBackend(**kwargs)
         # Only the first backend should fail resume; subsequent ones succeed.
@@ -228,6 +231,65 @@ def test_disassembly_formatting_accepts_operand_strings() -> None:
     lines = adapter._format_disassembly(block, resolve_symbols=False)
     assert lines[0]["instruction"] == "LDI R1 <- 0x5"
     assert lines[1]["instruction"] == "ADD R0, R1"
+
+
+def test_instruction_breakpoints_round_trip() -> None:
+    class InstructionBackend:
+        def __init__(self) -> None:
+            self.set_calls: List[int] = []
+            self.clear_calls: List[int] = []
+
+        def configure(self, **_: Any) -> None:
+            pass
+
+        def attach(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        def start_event_stream(self, **_: Any) -> bool:
+            return True
+
+        def set_breakpoint(self, pid: int, address: int) -> None:
+            self.set_calls.append(address)
+
+        def clear_breakpoint(self, pid: int, address: int) -> None:
+            self.clear_calls.append(address)
+
+        def list_breakpoints(self, pid: int) -> List[int]:
+            return []
+
+        def list_tasks(self) -> Dict[str, Any]:
+            return {"tasks": [{"pid": 1}], "current_pid": 1}
+
+    backend = InstructionBackend()
+    adapter = hsx_dap.HSXDebugAdapter(StubProtocol())
+    adapter.client = backend
+    adapter.current_pid = 1
+
+    resp = adapter._handle_setInstructionBreakpoints({"breakpoints": [{"instructionReference": "0x100"}]})
+    assert resp["breakpoints"][0]["verified"] is True
+    assert backend.set_calls == [0x100]
+    assert backend.clear_calls == []
+
+    resp = adapter._handle_setInstructionBreakpoints(
+        {"breakpoints": [{"instructionReference": "0x104"}, {"instructionReference": "0x108"}]}
+    )
+    assert len(resp["breakpoints"]) == 2
+    assert backend.set_calls == [0x100, 0x104, 0x108]
+    assert backend.clear_calls == [0x100]
+
+
+def test_pid_exists_queries_task_list() -> None:
+    class TaskBackend:
+        def __init__(self) -> None:
+            pass
+
+        def list_tasks(self) -> Dict[str, Any]:
+            return {"tasks": [{"pid": 2}, {"pid": 3}], "current_pid": 2}
+
+    adapter = hsx_dap.HSXDebugAdapter(StubProtocol())
+    adapter.client = TaskBackend()
+    assert adapter._pid_exists(3) is True
+    assert adapter._pid_exists(7) is False
 
 
 def test_function_breakpoints_use_symbol_mapper() -> None:

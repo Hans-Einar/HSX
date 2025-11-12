@@ -592,6 +592,58 @@ class HSXDebugAdapter:
         self._cleanup_obsolete_function_breakpoints(set(requested_keys))
         return {"breakpoints": results}
 
+    def _handle_setInstructionBreakpoints(self, args: JsonDict) -> JsonDict:  # noqa: N802
+        breakpoints = args.get("breakpoints") or []
+        self.logger.info("setInstructionBreakpoints: count=%d", len(breakpoints))
+        source_key = self._instruction_breakpoint_key()
+        parsed_addresses: List[int] = []
+        results: List[JsonDict] = []
+        for bp in breakpoints:
+            address = self._parse_instruction_breakpoint(bp)
+            if address is None:
+                results.append({"verified": False, "message": "instructionReference required"})
+                continue
+            parsed_addresses.append(address)
+        if not self.client:
+            self.logger.warning("setInstructionBreakpoints: no client connected, storing as pending")
+            payload = {
+                "source": {},
+                "breakpoints": [{"address": addr} for addr in parsed_addresses],
+                "kind": "instruction",
+            }
+            self._pending_breakpoints[source_key] = payload
+            if parsed_addresses:
+                self._record_breakpoint_spec(
+                    source_key,
+                    payload["source"],
+                    payload["breakpoints"],
+                    kind="instruction",
+                )
+            else:
+                self._breakpoint_specs.pop(source_key, None)
+            for addr in parsed_addresses:
+                results.append(
+                    {
+                        "verified": False,
+                        "instructionReference": f"{addr:#x}",
+                        "address": addr,
+                        "message": "pending connection",
+                    }
+                )
+            return {"breakpoints": results}
+
+        results = self._apply_instruction_breakpoints(source_key, parsed_addresses)
+        if parsed_addresses:
+            self._record_breakpoint_spec(
+                source_key,
+                {},
+                [{"address": addr} for addr in parsed_addresses],
+                kind="instruction",
+            )
+        else:
+            self._breakpoint_specs.pop(source_key, None)
+        return {"breakpoints": results}
+
     def _handle_evaluate(self, args: JsonDict) -> JsonDict:
         expression = str(args.get("expression") or "").strip()
         context = str(args.get("context") or "")
@@ -934,6 +986,9 @@ class HSXDebugAdapter:
         try:
             return func(*args, **kwargs)
         except DebuggerBackendError as exc:
+            if self._is_unknown_pid_error(exc):
+                self._handle_missing_pid(str(exc))
+                raise
             if self._attempt_reconnect(exc):
                 backend = self.client
                 func = getattr(backend, method)
@@ -1255,6 +1310,60 @@ class HSXDebugAdapter:
                 return False
         return False
 
+    def _parse_instruction_breakpoint(self, bp: JsonDict) -> Optional[int]:
+        base = self._coerce_address(bp.get("instructionReference") or bp.get("address"))
+        offset = self._coerce_optional_int(bp.get("offset")) or 0
+        if base is None:
+            return None
+        return (int(base) + int(offset)) & 0xFFFFFFFF
+
+    def _emit_console_message(self, text: str) -> None:
+        output = text if text.endswith("\n") else f"{text}\n"
+        try:
+            self.protocol.send_event("output", {"category": "console", "output": output})
+        except Exception:
+            self.logger.debug("failed to emit console output: %s", text, exc_info=True)
+
+    def _fetch_task_list(self) -> Optional[Dict[str, Any]]:
+        if not self.client:
+            return None
+        try:
+            listing = self._call_backend("list_tasks")
+        except DebuggerBackendError as exc:
+            self.logger.debug("list_tasks failed: %s", exc)
+            return None
+        return listing if isinstance(listing, dict) else None
+
+    def _pid_exists(self, pid: Optional[int]) -> bool:
+        if pid is None or not self.client:
+            return False
+        listing = self._fetch_task_list()
+        if not listing:
+            # Unable to confirm; assume PID might exist to avoid false negatives.
+            return True
+        tasks = listing.get("tasks")
+        if isinstance(tasks, list):
+            for entry in tasks:
+                if isinstance(entry, dict) and int(entry.get("pid", -1)) == int(pid):
+                    return True
+        return False
+
+    def _handle_missing_pid(self, message: str) -> None:
+        pid = self.current_pid
+        if pid is not None:
+            warning = f"Target PID {pid} is no longer running ({message})"
+        else:
+            warning = f"Target PID unavailable ({message})"
+        self.logger.error(warning)
+        self._emit_status_event("error", message=warning)
+        self._emit_console_message(warning)
+        self.current_pid = None
+
+    @staticmethod
+    def _is_unknown_pid_error(error: Exception) -> bool:
+        text = str(error).lower()
+        return "unknown pid" in text or "pid not found" in text
+
     def _clear_breakpoints(self, source_key: str) -> None:
         entries = self._breakpoints.get(source_key, [])
         if not entries or not self.client:
@@ -1289,26 +1398,20 @@ class HSXDebugAdapter:
             return
         if not isinstance(entries, list):
             return
-        stale: List[int] = []
+        remote: List[int] = []
         for entry in entries:
             try:
                 address = int(entry)
             except (TypeError, ValueError):
                 self.logger.debug("Skipping invalid breakpoint entry from executive: %r", entry)
                 continue
-            stale.append(address & 0xFFFF)
-        if not stale:
+            remote.append(address & 0xFFFF)
+        if not remote:
             return
-        cleared = 0
-        for address in stale:
-            try:
-                self._call_backend("clear_breakpoint", self.current_pid, address)
-                cleared += 1
-            except Exception as exc:
-                self.logger.warning("Failed to clear stale breakpoint 0x%04X: %s", address, exc)
-        if cleared:
-            plural = "s" if cleared != 1 else ""
-            self.logger.info("Cleared %d stale breakpoint%s left behind by previous sessions", cleared, plural)
+        self.logger.info(
+            "Executive reports %d existing breakpoint(s); leaving them active for this session",
+            len(remote),
+        )
 
     def _resolve_breakpoint_addresses(self, source_path: Optional[str], line: Optional[int], bp: JsonDict) -> List[int]:
         addresses: List[int] = []
@@ -1531,6 +1634,9 @@ class HSXDebugAdapter:
             if kind == "function":
                 self._reapply_function_breakpoints(source_key, source, bps)
                 continue
+            if kind == "instruction":
+                self._reapply_instruction_breakpoints(source_key, bps)
+                continue
             source_path = source.get("path") or source.get("name")
             self.logger.info("Reapplying breakpoints for source: %s (%d breakpoints)", source_path, len(bps))
             results, new_entries = self._apply_breakpoints_for_source(source_key, source_path, source, bps)
@@ -1562,6 +1668,48 @@ class HSXDebugAdapter:
             self.protocol.send_event("breakpoint", {"reason": "changed", "breakpoint": result})
         else:
             self.logger.warning("Function breakpoint %s not verified after reconnect: %s", name, result.get("message", "unknown"))
+
+    def _reapply_instruction_breakpoints(self, source_key: str, breakpoints: List[JsonDict]) -> None:
+        addresses: List[int] = []
+        for bp in breakpoints:
+            address = bp.get("address")
+            if isinstance(address, (int, float)):
+                addresses.append(int(address) & 0xFFFFFFFF)
+                continue
+            parsed = self._parse_instruction_breakpoint(bp)
+            if parsed is not None:
+                addresses.append(parsed)
+        results = self._apply_instruction_breakpoints(source_key, addresses)
+        for entry in results:
+            self.protocol.send_event("breakpoint", {"reason": "changed", "breakpoint": entry})
+
+    def _apply_instruction_breakpoints(self, source_key: str, addresses: List[int]) -> List[JsonDict]:
+        self._clear_breakpoints(source_key)
+        results: List[JsonDict] = []
+        if not addresses:
+            self._breakpoints[source_key] = []
+            return results
+        errors: Dict[int, str] = {}
+        for addr in addresses:
+            try:
+                self._call_backend("set_breakpoint", self.current_pid, addr)
+                self.logger.info("Instruction breakpoint set at 0x%04X", addr)
+            except Exception as exc:
+                errors[addr] = str(exc)
+                self.logger.warning("Instruction breakpoint failed at 0x%04X: %s", addr, exc)
+        entry = {"addresses": addresses}
+        self._breakpoints[source_key] = [entry]
+        for addr in addresses:
+            result: JsonDict = {
+                "instructionReference": f"{addr:#x}",
+                "address": addr,
+                "id": addr,
+                "verified": addr not in errors,
+            }
+            if addr in errors:
+                result["message"] = errors[addr]
+            results.append(result)
+        return results
 
     def _cleanup_obsolete_function_breakpoints(self, active_keys: Set[str]) -> None:
         all_keys = [key for key in list(self._breakpoints.keys()) if key.startswith("function::")]
@@ -1693,6 +1841,13 @@ class HSXDebugAdapter:
         self._emit_status_event("reconnecting", message=str(exc))
         try:
             self._connect(**self._connection_config)
+            if self.current_pid and not self._pid_exists(self.current_pid):
+                message = f"Target PID {self.current_pid} is no longer available"
+                self.logger.error(message)
+                self._emit_status_event("error", message=message)
+                self._emit_console_message(message)
+                self.current_pid = None
+                return False
             if stored_specs:
                 self._pending_breakpoints.update(stored_specs)
                 self._reapply_pending_breakpoints()
@@ -1707,6 +1862,10 @@ class HSXDebugAdapter:
         finally:
             self._reconnecting = False
         return False
+
+    def _instruction_breakpoint_key(self) -> str:
+        pid = self.current_pid if self.current_pid is not None else 0
+        return f"instruction::{pid}"
 
     def _stop_event_stream(self) -> None:
         if self.backend:

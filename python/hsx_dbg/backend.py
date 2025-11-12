@@ -248,6 +248,26 @@ class DebuggerBackend:
         return []
 
     # ------------------------------------------------------------------
+    # Task listing
+    # ------------------------------------------------------------------
+    def list_tasks(self) -> Dict[str, Any]:
+        resp = self.request({"cmd": "ps"})
+        self._expect_ok(resp, "ps")
+        payload = resp.get("tasks")
+        if isinstance(payload, dict):
+            tasks = payload.get("tasks")
+            current = payload.get("current_pid")
+        else:
+            tasks = []
+            current = None
+        task_list = []
+        if isinstance(tasks, list):
+            for entry in tasks:
+                if isinstance(entry, dict):
+                    task_list.append(dict(entry))
+        return {"tasks": task_list, "current_pid": current}
+
+    # ------------------------------------------------------------------
     # Stack & registers
     # ------------------------------------------------------------------
     def get_call_stack(self, pid: int, *, max_frames: Optional[int] = None) -> List[StackFrame]:

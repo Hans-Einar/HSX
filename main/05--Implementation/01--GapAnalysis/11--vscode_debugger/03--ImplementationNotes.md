@@ -268,3 +268,38 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 ### Next Steps
 - Monitor telemetry for any residual fallback to legacy `disasm`; if seen frequently, coordinate an executive upgrade.
 - With Phase 7 closed, shift attention to deferred backlog items (Phase 5 packaging) once QA signs off.
+
+## 2025-11-12 - Codex (Session 15)
+
+### Scope
+- Plan item / phase addressed: Phase 8 scoping (breakpoint/connection resiliency) + field feedback triage
+- Design sections reviewed: 04.11--vscode_debugger §§5.2/5.4, Implementation Plan §7, hsx-dap-debug telemetry
+
+### Work Summary
+- Captured the “unknown pid” reconnect loop and disassembly/breakpoint UX gaps reported during manual testing; confirmed the adapter currently reuses stale PIDs when the target exits.
+- Queued Phase 8 in the Implementation Plan: PID-loss handling, instruction breakpoint support, disassembly refresh on breakpoint stops, and breakpoint synchronization with the executive/CLI. Added detailed todos for each subphase.
+- Logged follow-up actions (telemetry, DAP `setInstructionBreakpoints`, breakpoint event sync) so we can work them next without losing context.
+
+### Testing
+- None (planning/triage only).
+
+### Next Steps
+- Implement Phase 8.1 reconnection logic + telemetry, then tackle instruction breakpoint support and breakpoint synchronization.
+
+## 2025-11-12 - Codex (Session 16)
+
+### Scope
+- Plan item / phase addressed: Phase 8 (PID resiliency + instruction breakpoints)
+- Design sections reviewed: 04.11--vscode_debugger §5.2, Implementation Plan §8
+
+### Work Summary
+- Added `DebuggerBackend.list_tasks()` and taught the adapter to detect `unknown pid` failures: `_call_backend` now surfaces a console/telemetry message instead of looping, and `_attempt_reconnect` reruns `ps` after reconnect to ensure the tracked PID still exists.
+- Implemented DAP `setInstructionBreakpoints`, including pending/reapply support and instruction breakpoint storage so the disassembly view can set/clear breakpoints directly.
+- Relaxed the previous “purge remote breakpoints” behavior so breakpoints created via the CLI/executive stay active when VS Code connects.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_hsx_dap_harness.py`
+- `PYTHONPATH=. pytest python/tests/test_executive_sessions.py::test_disasm_read_basic`
+
+### Next Steps
+- Address Phase 8.3 by syncing external breakpoints into the VS Code UI and continue improving disassembly refresh on breakpoint stops.
