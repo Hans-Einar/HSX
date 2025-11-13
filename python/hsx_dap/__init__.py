@@ -390,13 +390,11 @@ class HSXDebugAdapter:
         self._ensure_client()
         self.logger.info("Pause requested for PID %s", self.current_pid)
         self._pending_pause = True
+        self._schedule_pause_fallback()
         self._cancel_step_fallback()
         self._pending_step = False
         self._step_description = None
         self._call_backend("pause", self.current_pid)
-        # Emit the stopped event immediately using a register snapshot so VS Code
-        # reflects the paused state even if the executive never publishes an event.
-        self._emit_pause_snapshot(description="pause")
         return {}
 
     def _schedule_pause_fallback(self) -> None:
@@ -1043,6 +1041,36 @@ class HSXDebugAdapter:
         event_type = str(event.get("type") or "")
         data = event.get("data") or {}
         pid = event.get("pid")
+        if event_type == "mailbox_wait":
+            details = dict(data) if isinstance(data, dict) else {}
+            self._handle_task_state_event(
+                {"pid": pid, "data": {"new_state": "waiting_mbx", "reason": "mailbox_wait", "details": details}}
+            )
+            return
+        if event_type == "mailbox_wake":
+            details = dict(data) if isinstance(data, dict) else {}
+            self._handle_task_state_event(
+                {"pid": pid, "data": {"new_state": "running", "reason": "mailbox_wake", "details": details}}
+            )
+            return
+        if event_type == "mailbox_timeout":
+            details = dict(data) if isinstance(data, dict) else {}
+            self._handle_task_state_event(
+                {"pid": pid, "data": {"new_state": "running", "reason": "mailbox_timeout", "details": details}}
+            )
+            return
+        if event_type == "sleep_request":
+            details = dict(data) if isinstance(data, dict) else {}
+            self._handle_task_state_event(
+                {"pid": pid, "data": {"new_state": "sleeping", "reason": "sleep", "details": details}}
+            )
+            return
+        if event_type == "sleep_complete":
+            details = dict(data) if isinstance(data, dict) else {}
+            self._handle_task_state_event(
+                {"pid": pid, "data": {"new_state": "running", "reason": "sleep_wake", "details": details}}
+            )
+            return
         if event_type == "task_state":
             self._handle_task_state_event(event)
             return
@@ -2381,6 +2409,7 @@ class HSXDebugAdapter:
             "allThreadsStopped": False,
         }
         self._ensure_symbol_mapper()
+        pc_int: Optional[int] = None
         if pc is not None:
             pc_int = int(pc) & 0xFFFFFFFF
             body["instructionPointerReference"] = f"{pc_int:#x}"
@@ -2434,9 +2463,11 @@ class HSXDebugAdapter:
             if previous_state != "running":
                 self.protocol.send_event("continued", {"threadId": pid})
             return
-        if state in {"paused", "stopped"} or reason in {"user_pause"}:
+        stoppable_states = {"paused", "stopped", "waiting_mbx", "sleeping"}
+        stoppable_reasons = {"user_pause", "debug_break", "mailbox_wait", "sleep", "sleep_request"}
+        if state in stoppable_states or reason in stoppable_reasons:
             pc = self._extract_task_state_pc(data)
-            description = f"Task {state}" if state else (data.get("reason") or "stopped")
+            description = self._describe_stop_reason(state, reason, data)
             if reason == "user_pause":
                 if self._pending_pause:
                     self._pending_pause = False
@@ -2455,6 +2486,7 @@ class HSXDebugAdapter:
                 pc=pc,
             )
             self._complete_pending_step()
+            return
 
     def _ensure_thread_entry(self, pid: Optional[int], *, name: Optional[str] = None) -> bool:
         if pid is None:
@@ -2543,6 +2575,43 @@ class HSXDebugAdapter:
                     except ValueError:
                         continue
         return None
+
+    def _describe_stop_reason(self, state: Optional[str], reason: Optional[str], payload: JsonDict) -> str:
+        details = payload.get("details")
+        if not isinstance(details, dict):
+            details = {}
+        descriptor = details.get("descriptor") or payload.get("descriptor")
+        handle = details.get("handle") or payload.get("handle")
+        deadline = details.get("deadline") or payload.get("deadline")
+        timeout = details.get("timeout") or details.get("sleep_ms") or payload.get("sleep_pending_ms")
+        base = reason or state or "stopped"
+        normalized_state = (state or "").lower()
+        normalized_reason = (reason or "").lower()
+        if normalized_reason == "user_pause":
+            return "Paused by user"
+        if normalized_state == "waiting_mbx" or normalized_reason == "mailbox_wait":
+            target = descriptor if descriptor is not None else handle
+            if target is not None:
+                return f"Waiting on mailbox {target}"
+            return "Waiting on mailbox"
+        if normalized_state == "sleeping" or normalized_reason in {"sleep", "sleep_request"}:
+            if timeout:
+                return f"Sleeping ({timeout} ms)"
+            return "Sleeping"
+        if normalized_reason == "debug_break":
+            symbol = details.get("symbol") or payload.get("symbol")
+            if symbol:
+                return f"Breakpoint hit ({symbol})"
+            return "Breakpoint hit"
+        if normalized_reason == "step":
+            return "Step complete"
+        if normalized_reason == "instruction step":
+            return "Instruction step complete"
+        if normalized_reason == "mailbox_timeout":
+            return "Mailbox wait timed out"
+        if normalized_state:
+            return f"Task {normalized_state}"
+        return base
 
     def _synchronize_execution_state(self, *, source: str, refresh_breakpoints: bool = False) -> None:
         pid = self.current_pid

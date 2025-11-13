@@ -24,3 +24,9 @@
 - Added a bounded fallback timer (`_schedule_step_fallback`) so VS Code still updates if the executive fails to emit a pause event. The fallback emits telemetry and reuses `_synchronize_execution_state` for accuracy.
 - Instruction stepping retains breakpoint suppression but now also funnels through the new `_after_step_request` flow to stay consistent with the other step types (`python/hsx_dap/__init__.py:441-474`).
 - Updated the DAP harness test `test_step_instruction_request` to assert the deferred notification pathway (`python/tests/test_hsx_dap_harness.py:418-451`).
+
+## Phase 2 – Pause & Task-State Synchronization
+- Pause requests now schedule `_schedule_pause_fallback` instead of emitting an immediate synthetic stop, so VS Code only transitions to “paused” when the executive confirms (or when the fallback fires) (`python/hsx_dap/__init__.py:379-414`).
+- `_emit_stopped_event` accepts missing PC data safely, preventing crashes when the runtime reports mailbox waits or sleep states without an address (`python/hsx_dap/__init__.py:2310-2350`).
+- New `_describe_stop_reason` messaging plus expanded `_handle_task_state_event` logic surface mailbox wait/sleep reasons directly in the stopped description, and `_handle_exec_event` now converts `mailbox_*` / `sleep_*` events into task-state updates (`python/hsx_dap/__init__.py:1029-1080`, `2405-2488`).
+- `pytest python/tests/test_hsx_dap_harness.py` continues to pass (19 tests), validating that the deferred pause/step flows still satisfy the DAP harness expectations.

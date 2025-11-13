@@ -20,10 +20,10 @@
 ## Phase 2 – Pause & Task-State Synchronization
 **Goal:** Ensure VS Code mirrors the executive when pausing, sleeping, or waiting on IPC.
 
-- [ ] Invoke `_schedule_pause_fallback` before issuing `pause`, emit DAP `stopped` when the executive confirms or when the fallback timer fires (`python/hsx_dap/__init__.py:379-425`).
-- [ ] Stop calling `_synchronize_execution_state` immediately after `pause`; rely on streamed events and trigger resync only on reconnect.
-- [ ] Initialize `pc_int = None` in `_emit_stopped_event` so PC-less states (wait/sleep) do not crash the adapter (`python/hsx_dap/__init__.py:2207-2246`).
-- [ ] Treat `waiting_mbx`, `sleeping`, scheduler transitions, etc., as stoppable reasons and surface descriptor/deadline details in the DAP event.
+- [x] Invoke `_schedule_pause_fallback` before issuing `pause`, emit DAP `stopped` when the executive confirms or when the fallback timer fires (`python/hsx_dap/__init__.py:379-425`).
+- [x] Stop calling `_synchronize_execution_state` immediately after `pause`; rely on streamed events and trigger resync only on reconnect.
+- [x] Initialize `pc_int = None` in `_emit_stopped_event` so PC-less states (wait/sleep) do not crash the adapter (`python/hsx_dap/__init__.py:2207-2246`).
+- [x] Treat `waiting_mbx`, `sleeping`, scheduler transitions, etc., as stoppable reasons and surface descriptor/deadline details in the DAP event.
 
 ## Phase 3 – Event & Telemetry Coverage
 **Goal:** Expose the runtime information promised by the architecture/design docs.
