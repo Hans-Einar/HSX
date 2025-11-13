@@ -380,7 +380,7 @@ References: Review Finding “supportsTerminateRequest advertised without handle
 References: Review Finding “instruction breakpoint capability hidden” (feature implemented in `_handle_setInstructionBreakpoints`, `python/hsx_dap/__init__.py:613-662`, but not advertised in `initialize`).
 
 - [x] Set `supportsInstructionBreakpoints: true` in `_handle_initialize` and ensure capabilities mirror the adapter’s real surface.
-- [ ] Confirm VS Code surfaces the native instruction breakpoint UX (gutter + palette command) without relying on custom tree view commands.
+- [x] Confirm VS Code surfaces the native instruction breakpoint UX (gutter + palette command) without relying on custom tree view commands.
 - [x] Extend existing capability tests to cover the new flag so regressions surface if the handler is removed.
 
 ### 9.4 Fail writes When Executive Rejects Them

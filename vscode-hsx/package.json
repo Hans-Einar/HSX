@@ -3,7 +3,7 @@
   "displayName": "HSX Debugger",
   "publisher": "hsx",
   "description": "Debug Adapter Protocol integration for HSX firmware targets.",
-  "version": "0.0.7",
+  "version": "0.0.15",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -209,8 +209,13 @@
       },
       {
         "command": "hsx.views.stepInstruction",
-        "title": "Step Over",
-        "icon": "$(debug-step-over)"
+        "title": "Step Instruction",
+        "icon": "$(debug-step-into)"
+      },
+      {
+        "command": "hsx.breakpoints.clearAll",
+        "title": "Clear All HSX Breakpoints",
+        "icon": "$(trash)"
       },
       {
         "command": "hsx.trace.toggle",
@@ -244,7 +249,7 @@
       },
       {
         "command": "hsx.views.writeMemory",
-        "title": "Write Memory\u2026",
+        "title": "Write Memory…",
         "icon": "$(pencil)"
       }
     ],
@@ -331,6 +336,11 @@
           "group": "navigation@10"
         },
         {
+          "command": "hsx.breakpoints.clearAll",
+          "when": "view == hsxDisassemblyView",
+          "group": "navigation@11"
+        },
+        {
           "command": "hsx.views.writeMemory",
           "when": "view == hsxMemoryView",
           "group": "navigation@3"
@@ -349,6 +359,21 @@
           "command": "hsx.trace.copy",
           "when": "view == hsxTraceView && hsxTrace.enabled",
           "group": "navigation@3"
+        },
+        {
+          "command": "hsx.views.stepInstruction",
+          "when": "view == hsxTraceView",
+          "group": "navigation@4"
+        },
+        {
+          "command": "hsx.breakpoints.clearAll",
+          "when": "view == hsxTraceView",
+          "group": "navigation@5"
+        },
+        {
+          "command": "hsx.breakpoints.clearAll",
+          "when": "view == workbench.debug.breakpointView",
+          "group": "navigation@10"
         }
       ],
       "view/item/context": [

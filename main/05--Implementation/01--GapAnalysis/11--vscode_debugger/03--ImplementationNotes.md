@@ -392,17 +392,20 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 ## 2025-11-14 - Codex (Session 22)
 
 ### Scope
-- Plan items: Phase 9.2 (stop UX) & 9.4 (writeMemory UX/error surfacing).
+- Plan items: Phase 9.2 (stop UX), 9.3 (instruction breakpoint UX verification), & 9.4 (writeMemory UX/error surfacing).
 - Design refs: 04.11--vscode_debugger §5.2/5.4 (view commands + memory operations).
 
 ### Work Summary
 - Added `hsx.views.stopSession` so the disassembly view can stop the target directly; the command calls the new DAP `terminate` handler, ensuring VS Code’s stop control now exercises the graceful pause/shutdown path. Menu contributions expose the action in the HSX panels.
 - Introduced a simple memory writer (`hsx.views.writeMemory`) that prompts for an address + byte sequence, issues the `writeMemory` DAP request, and surfaces success/failure via VS Code notifications. Failures now show the executive error string directly to the user.
 - Extended the remote breakpoint telemetry harness to cover high addresses and reruns, confirming the phantom add/remove regression is gone after the 32-bit masking fix.
+- Verified that VS Code’s built-in “Debug: Add Instruction Breakpoint…” palette command appears for HSX sessions (thanks to `supportsInstructionBreakpoints`) and toggles breakpoints via the new handler—no custom tree command is required for standard instruction breakpoint workflows.
+- Added an “HSX Breakpoints: Clear All” command and surfaced it in the Breakpoints/Disassembly/Trace views so stale entries can be removed with one click (propagates to the executive via DAP events).
+- Hooked `hsx.views.stepInstruction` up to a new `stepInstruction` DAP request so HSX panels have a true instruction-level step button; the trace view now exposes the same action.
 
 ### Testing
 - `npm --prefix vscode-hsx run compile`
 - `python -m pytest python/tests/test_hsx_dap_harness.py`
 
 ### Next Steps
-- Finish the remaining Phase 9.3 work (native instruction breakpoint UX verification/documentation) and update the design/docs with the new stop + memory workflow guidance.
+- Update docs with guidance on the new stop/memory workflows and keep monitoring for additional UX gaps before closing Phase 9 entirely.

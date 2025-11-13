@@ -402,6 +402,96 @@ def test_write_memory_failure_propagates_error() -> None:
         adapter._handle_writeMemory({"memoryReference": "0x1000", "data": "AQI="})
 
 
+def test_step_instruction_request(monkeypatch: pytest.MonkeyPatch) -> None:
+    class StepBackend:
+        def __init__(self) -> None:
+            self.calls: List[Dict[str, Any]] = []
+            self.cleared: List[int] = []
+            self.restored: List[int] = []
+
+        def step(self, pid: int, *, source_only: bool = False) -> None:
+            self.calls.append({"pid": pid, "source_only": source_only})
+        def clear_breakpoint(self, pid: int, address: int) -> None:
+            self.cleared.append(address)
+
+        def set_breakpoint(self, pid: int, address: int) -> None:
+            self.restored.append(address)
+
+        def list_breakpoints(self, pid: int) -> List[int]:
+            return [0x4000]
+
+    protocol = StubProtocol()
+    adapter = hsx_dap.HSXDebugAdapter(protocol)
+    backend = StepBackend()
+    adapter.client = backend
+    adapter.current_pid = 3
+    key = adapter._instruction_breakpoint_key()
+    adapter._breakpoints[key] = [{"addresses": [0x4000]}]
+
+    monkeypatch.setattr(adapter, "_read_current_pc", lambda: 0x4000)
+
+    captured: List[Dict[str, Any]] = []
+
+    def fake_emit(**kwargs: Any) -> None:
+        captured.append(kwargs)
+
+    monkeypatch.setattr(adapter, "_emit_stopped_event", fake_emit)
+    monkeypatch.setattr(adapter, "_synchronize_execution_state", lambda *args, **kwargs: None)
+
+    adapter._handle_stepInstruction({})
+    assert backend.calls == [{"pid": 3, "source_only": False}]
+    assert backend.cleared == [0x4000]
+    assert backend.restored == [0x4000]
+    assert not captured
+    adapter._cancel_step_fallback()
+    adapter._step_fallback_check()
+    assert captured and captured[-1]["reason"] == "step"
+
+
+def test_clear_all_breakpoints_request(monkeypatch: pytest.MonkeyPatch) -> None:
+    class ClearBackend:
+        def __init__(self) -> None:
+            self.cleared: List[int] = []
+
+        def clear_breakpoint(self, pid: int, address: int) -> None:
+            self.cleared.append(address)
+
+        def list_breakpoints(self, pid: int) -> List[int]:
+            return []
+
+    adapter = hsx_dap.HSXDebugAdapter(StubProtocol())
+    backend = ClearBackend()
+    adapter.client = backend
+    adapter.current_pid = 5
+    instr_key = adapter._instruction_breakpoint_key()
+    remote_key = adapter._remote_breakpoint_key()
+    adapter._breakpoints[instr_key] = [{"addresses": [0x100, 0x104]}]
+    adapter._breakpoints[remote_key] = [{"addresses": [0x200], "readonly": True}]
+
+    result = adapter._handle_clearAllBreakpoints({})
+    assert result["cleared"] == 3
+    assert sorted(backend.cleared) == [0x100, 0x104, 0x200]
+    assert adapter._breakpoints == {}
+
+
+def test_task_state_debug_break_falls_back_to_stopped() -> None:
+    protocol = StubProtocol()
+    adapter = hsx_dap.HSXDebugAdapter(protocol)
+    adapter.current_pid = 1
+    adapter._thread_states[1] = {"name": "PID 1", "state": None}
+    adapter._handle_task_state_event({"pid": 1, "data": {"new_state": "paused", "reason": "debug_break", "details": {"pc": "0x20"}}})
+    stopped_events = [event for event in protocol.events if event["event"] == "stopped"]
+    assert len(stopped_events) == 1
+    last = stopped_events[-1]["body"]
+    assert last["reason"] == "debug_break"
+    assert last["instructionPointerReference"] == "0x20"
+
+    # Duplicate event in quick succession should be suppressed.
+    protocol.events.clear()
+    adapter._handle_task_state_event({"pid": 1, "data": {"new_state": "paused", "reason": "debug_break", "details": {"pc": "0x20"}}})
+    assert not [event for event in protocol.events if event["event"] == "stopped"]
+
+
 def test_trace_requests(monkeypatch: pytest.MonkeyPatch) -> None:
     class TraceBackend:
         def __init__(self) -> None:

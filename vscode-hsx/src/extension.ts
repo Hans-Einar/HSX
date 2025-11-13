@@ -448,7 +448,12 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   context.subscriptions.push(
     vscode.commands.registerCommand("hsx.views.stepInstruction", async () => {
-      await stepActiveDebugSession();
+      await stepHSXInstruction();
+    }),
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand("hsx.breakpoints.clearAll", async () => {
+      await clearAllHSXBreakpoints();
     }),
   );
   context.subscriptions.push(
@@ -2147,19 +2152,6 @@ async function controlPlayPauseButton(coordinator: HSXDebugViewCoordinator): Pro
   }
 }
 
-async function stepActiveDebugSession(): Promise<void> {
-  const session = getActiveHSXSession();
-  if (!session) {
-    void vscode.window.showWarningMessage("Start an HSX debug session to step instructions.");
-    return;
-  }
-  try {
-    await vscode.commands.executeCommand("workbench.action.debug.stepOver");
-  } catch (error) {
-    void vscode.window.showErrorMessage(`Unable to step HSX target: ${getErrorMessage(error)}`);
-  }
-}
-
 async function stopActiveHSXSession(): Promise<void> {
   const session = getActiveHSXSession();
   if (!session) {
@@ -2170,6 +2162,44 @@ async function stopActiveHSXSession(): Promise<void> {
     await session.customRequest("terminate", { restart: false });
   } catch (error) {
     void vscode.window.showErrorMessage(`Unable to stop HSX target: ${getErrorMessage(error)}`);
+  }
+  }
+
+async function stepHSXInstruction(): Promise<void> {
+  const session = getActiveHSXSession();
+  if (!session) {
+    void vscode.window.showWarningMessage("Start an HSX debug session to step instructions.");
+    return;
+  }
+  try {
+    await session.customRequest("stepInstruction", {});
+    void vscode.commands.executeCommand("hsx.views.refreshDisassembly");
+  } catch (error) {
+    void vscode.window.showErrorMessage(`Unable to step HSX instruction: ${getErrorMessage(error)}`);
+  }
+}
+
+async function clearAllHSXBreakpoints(): Promise<void> {
+  const targets = vscode.debug.breakpoints;
+  if (targets.length) {
+    try {
+      vscode.debug.removeBreakpoints(targets);
+    } catch (error) {
+      void vscode.window.showErrorMessage(`Unable to remove VS Code breakpoints: ${getErrorMessage(error)}`);
+    }
+  }
+  const session = getActiveHSXSession();
+  if (!session) {
+    void vscode.window.showInformationMessage("Cleared VS Code breakpoints.");
+    return;
+  }
+  try {
+    const response = await session.customRequest("clearAllBreakpoints", {});
+    const cleared = typeof response?.cleared === "number" ? response.cleared : 0;
+    const plural = cleared === 1 ? "" : "s";
+    void vscode.window.showInformationMessage(`Cleared ${cleared} breakpoint${plural} from the HSX executive.`);
+  } catch (error) {
+    void vscode.window.showErrorMessage(`Unable to clear HSX breakpoints: ${getErrorMessage(error)}`);
   }
 }
 

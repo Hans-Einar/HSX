@@ -11,10 +11,11 @@ import os
 import importlib
 import sys
 import threading
+import time
 from dataclasses import dataclass, field
 import copy
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
@@ -220,6 +221,14 @@ class HSXDebugAdapter:
         self._keepalive_override: Optional[int] = None
         self._remote_breakpoint_timer: Optional[threading.Timer] = None
         self._remote_breakpoint_interval: float = 5.0
+        self._last_stop_event: Dict[int, Tuple[str, Optional[int], float]] = {}
+        self._remote_bp_backoff_until: float = 0.0
+        self._remote_bp_backoff_attempts: int = 0
+        self._state_sync_backoff_until: float = 0.0
+        self._state_sync_backoff_attempts: int = 0
+        self._pending_step: bool = False
+        self._step_description: Optional[str] = None
+        self._step_fallback_timer: Optional[threading.Timer] = None
 
     def serve(self) -> None:
         while True:
@@ -364,6 +373,9 @@ class HSXDebugAdapter:
         self._cancel_pause_fallback()
         self._pending_pause = False  # Clear any pending pause state
         self._synthetic_pause_pending = False
+        self._cancel_step_fallback()
+        self._pending_step = False
+        self._step_description = None
         self._call_backend("resume", self.current_pid)
         try:
             self._call_backend("clock_start")
@@ -378,6 +390,9 @@ class HSXDebugAdapter:
         self._ensure_client()
         self.logger.info("Pause requested for PID %s", self.current_pid)
         self._pending_pause = True
+        self._cancel_step_fallback()
+        self._pending_step = False
+        self._step_description = None
         self._call_backend("pause", self.current_pid)
         # Emit the stopped event immediately using a register snapshot so VS Code
         # reflects the paused state even if the executive never publishes an event.
@@ -424,21 +439,52 @@ class HSXDebugAdapter:
 
     def _handle_next(self, args: JsonDict) -> JsonDict:
         self._ensure_client()
-        self._call_backend("step", self.current_pid, source_only=False)
-        pc = self._read_current_pc()
-        self._emit_stopped_event(
-            pid=self.current_pid,
-            reason="step",
-            description="step complete",
-            pc=pc,
-        )
+        if self.current_pid is None:
+            raise RuntimeError("No HSX PID attached.")
+        self._call_backend("step", self.current_pid, source_only=True)
+        self._after_step_request("step over")
         return {}
 
     def _handle_stepIn(self, args: JsonDict) -> JsonDict:  # noqa: N802
-        return self._handle_next(args)
+        self._ensure_client()
+        if self.current_pid is None:
+            raise RuntimeError("No HSX PID attached.")
+        self._call_backend("step", self.current_pid, source_only=True)
+        self._after_step_request("step in")
+        return {}
 
     def _handle_stepOut(self, args: JsonDict) -> JsonDict:  # noqa: N802
-        return self._handle_next(args)
+        self._ensure_client()
+        if self.current_pid is None:
+            raise RuntimeError("No HSX PID attached.")
+        self._call_backend("step", self.current_pid, source_only=True)
+        self._after_step_request("step out")
+        return {}
+
+    def _handle_stepInstruction(self, args: JsonDict) -> JsonDict:
+        self._ensure_client()
+        if self.current_pid is None:
+            raise RuntimeError("No HSX PID attached.")
+        pc_before = self._read_current_pc()
+        disabled_breakpoints: List[int] = []
+        if pc_before is not None:
+            disabled_breakpoints = self._temporarily_disable_breakpoint(pc_before)
+        try:
+            self._call_backend("step", self.current_pid, source_only=False)
+        finally:
+            if disabled_breakpoints:
+                self._restore_temporarily_disabled_breakpoints(disabled_breakpoints)
+        self._after_step_request("instruction step")
+        return {}
+
+    def _handle_clearAllBreakpoints(self, args: JsonDict) -> JsonDict:
+        self._ensure_client()
+        if self.current_pid is None:
+            raise RuntimeError("clearAllBreakpoints requires an attached PID")
+        addresses = self._collect_breakpoint_addresses(include_remote=True)
+        self._clear_all_breakpoints(force_backend=True)
+        self._sync_remote_breakpoints()
+        return {"cleared": len(addresses)}
 
     def _handle_stackTrace(self, args: JsonDict) -> JsonDict:  # noqa: N802
         self._ensure_client()
@@ -1010,6 +1056,7 @@ class HSXDebugAdapter:
                 description=data.get("symbol") or reason,
                 pc=pc,
             )
+            self._complete_pending_step()
             self._sync_remote_breakpoints()
             return
         if event_type in {"stdout", "stderr"}:
@@ -1101,6 +1148,103 @@ class HSXDebugAdapter:
             self.protocol.send_event("telemetry", body)
         except Exception:
             self.logger.debug("failed to emit breakpoint telemetry", exc_info=True)
+
+    def _schedule_step_fallback(self) -> None:
+        if not self.current_pid:
+            return
+        self._cancel_step_fallback()
+        timer = threading.Timer(0.35, self._step_fallback_check)
+        timer.daemon = True
+        self._step_fallback_timer = timer
+        timer.start()
+
+    def _cancel_step_fallback(self) -> None:
+        timer = self._step_fallback_timer
+        if timer is not None:
+            timer.cancel()
+        self._step_fallback_timer = None
+
+    def _step_fallback_check(self) -> None:
+        self._step_fallback_timer = None
+        if not self._pending_step or not self.client or not self.current_pid:
+            return
+        description = self._step_description or "step"
+        self.logger.warning("Step completion event missing; emitting fallback stopped event")
+        self._complete_pending_step()
+        pc = self._read_current_pc()
+        self._emit_stopped_event(
+            pid=self.current_pid,
+            reason="step",
+            description=f"{description} (fallback)",
+            pc=pc,
+        )
+        self._set_thread_state(self.current_pid, "paused")
+        self._synchronize_execution_state(source="step-fallback", refresh_breakpoints=False)
+
+    def _after_step_request(self, description: str) -> None:
+        self._pending_step = True
+        self._step_description = description
+        self._schedule_step_fallback()
+
+    def _complete_pending_step(self) -> None:
+        if not self._pending_step:
+            return
+        self._pending_step = False
+        self._step_description = None
+        self._cancel_step_fallback()
+
+    def _remaining_backoff(self, kind: str) -> float:
+        now = time.monotonic()
+        if kind == "breakpoint":
+            return max(0.0, self._remote_bp_backoff_until - now)
+        if kind == "state":
+            return max(0.0, self._state_sync_backoff_until - now)
+        return 0.0
+
+    def _reset_backoff(self, kind: str) -> None:
+        if kind == "breakpoint":
+            self._remote_bp_backoff_attempts = 0
+            self._remote_bp_backoff_until = 0.0
+        elif kind == "state":
+            self._state_sync_backoff_attempts = 0
+            self._state_sync_backoff_until = 0.0
+
+    def _enter_backoff(self, kind: str, exc: Exception) -> None:
+        prev_remaining = self._remaining_backoff(kind)
+        attempts_attr: Optional[str] = None
+        until_attr: Optional[str] = None
+        label = kind
+        if kind == "breakpoint":
+            attempts_attr = "_remote_bp_backoff_attempts"
+            until_attr = "_remote_bp_backoff_until"
+            label = "breakpoint-sync"
+        elif kind == "state":
+            attempts_attr = "_state_sync_backoff_attempts"
+            until_attr = "_state_sync_backoff_until"
+            label = "state-sync"
+        if not attempts_attr or not until_attr:
+            return
+        attempts = getattr(self, attempts_attr, 0) + 1
+        attempts = min(attempts, 6)
+        setattr(self, attempts_attr, attempts)
+        delay = min(30.0, 1.0 * (2 ** (attempts - 1)))
+        until_value = time.monotonic() + delay
+        setattr(self, until_attr, until_value)
+        if prev_remaining <= 0.0:
+            message = f"{label} temporarily disabled after transport error: {exc}"
+            self._emit_transport_warning(label, message, delay=delay)
+
+    def _emit_transport_warning(self, subsystem: str, message: str, *, delay: float) -> None:
+        body: JsonDict = {
+            "subsystem": f"hsx-{subsystem}",
+            "state": "degraded",
+            "message": message,
+            "details": {"retryDelay": round(delay, 2)},
+        }
+        try:
+            self.protocol.send_event("telemetry", body)
+        except Exception:
+            self.logger.debug("failed to emit transport warning", exc_info=True)
 
     def _read_current_pc(self) -> Optional[int]:
         if not self.client or not self.current_pid:
@@ -1457,17 +1601,18 @@ class HSXDebugAdapter:
         text = str(error).lower()
         return "unknown pid" in text or "pid not found" in text
 
-    def _clear_breakpoints(self, source_key: str) -> None:
+    def _clear_breakpoints(self, source_key: str, *, force_backend: bool = False) -> None:
         entries = self._breakpoints.get(source_key, [])
         if not entries:
             self._breakpoints[source_key] = []
             return
-        skip_backend = source_key == self._remote_breakpoint_key()
         for entry in entries:
             addresses = entry.get("addresses") or []
             if isinstance(addresses, int):
                 addresses = [addresses]
-            if entry.get("readonly") or skip_backend or not self.client:
+            if entry.get("readonly") and not force_backend:
+                continue
+            if not self.client:
                 continue
             for address in addresses:
                 try:
@@ -1476,22 +1621,28 @@ class HSXDebugAdapter:
                     self.logger.debug("failed to clear breakpoint 0x%X", address)
         self._breakpoints[source_key] = []
 
-    def _clear_all_breakpoints(self) -> None:
+    def _clear_all_breakpoints(self, *, force_backend: bool = False) -> None:
         if not self._breakpoints:
             return
         keys = list(self._breakpoints.keys())
         for source_key in keys:
-            self._clear_breakpoints(source_key)
+            self._clear_breakpoints(source_key, force_backend=force_backend)
         self._breakpoints.clear()
 
     def _sync_remote_breakpoints(self) -> None:
         if not self.client or self.current_pid is None:
             return
+        remaining = self._remaining_backoff("breakpoint")
+        if remaining > 0:
+            self.logger.debug("Skipping remote breakpoint sync (backoff %.2fs remaining)", remaining)
+            return
         try:
             entries = self._call_backend("list_breakpoints", self.current_pid)
         except DebuggerBackendError as exc:
             self.logger.debug("list_breakpoints sync failed: %s", exc)
+            self._enter_backoff("breakpoint", exc)
             return
+        self._reset_backoff("breakpoint")
         if not isinstance(entries, list):
             return
         remote_addresses: Set[int] = set()
@@ -1675,6 +1826,8 @@ class HSXDebugAdapter:
                     self._call_backend("set_breakpoint", self.current_pid, addr)
                     verified_any = True
                     self.logger.info("Breakpoint set at %s:%s -> 0x%04X", source_path, line, addr)
+                except DebuggerBackendError:
+                    raise
                 except Exception as exc:
                     failed_error = str(exc)
                     self.logger.warning("Breakpoint set failed for 0x%04X at %s:%s: %s", addr, source_path, line, exc)
@@ -1715,6 +1868,8 @@ class HSXDebugAdapter:
                     self._call_backend("set_breakpoint", self.current_pid, addr)
                     verified = True
                     self.logger.info("Function breakpoint %s -> 0x%04X", function_name, addr)
+                except DebuggerBackendError:
+                    raise
                 except Exception as exc:
                     message = str(exc)
                     self.logger.warning("Function breakpoint failed for %s at 0x%04X: %s", function_name, addr, exc)
@@ -1743,22 +1898,44 @@ class HSXDebugAdapter:
     def _reapply_pending_breakpoints(self) -> None:
         if not self.client or not self._pending_breakpoints:
             return
+        remaining = self._remaining_backoff("breakpoint")
+        if remaining > 0:
+            self.logger.debug("Skipping breakpoint reapply (backoff %.2fs remaining)", remaining)
+            return
         self.logger.info("Reapplying %d pending breakpoint sources", len(self._pending_breakpoints))
-        pending = dict(self._pending_breakpoints)
+        pending_items = list(self._pending_breakpoints.items())
         self._pending_breakpoints.clear()
-        for source_key, entry in pending.items():
+        for index, (source_key, entry) in enumerate(pending_items):
             source = entry.get("source") or {}
             bps = entry.get("breakpoints") or []
             kind = entry.get("kind") or "source"
             if kind == "function":
-                self._reapply_function_breakpoints(source_key, source, bps)
+                try:
+                    self._reapply_function_breakpoints(source_key, source, bps)
+                except DebuggerBackendError as exc:
+                    self.logger.warning("Deferring function breakpoint reapply for %s: %s", source.get("name"), exc)
+                    self._requeue_pending_breakpoints(source_key, entry, pending_items[index + 1 :])
+                    self._enter_backoff("breakpoint", exc)
+                    break
                 continue
             if kind == "instruction":
-                self._reapply_instruction_breakpoints(source_key, bps)
+                try:
+                    self._reapply_instruction_breakpoints(source_key, bps)
+                except DebuggerBackendError as exc:
+                    self.logger.warning("Deferring instruction breakpoint reapply for %s: %s", source_key, exc)
+                    self._requeue_pending_breakpoints(source_key, entry, pending_items[index + 1 :])
+                    self._enter_backoff("breakpoint", exc)
+                    break
                 continue
             source_path = source.get("path") or source.get("name")
             self.logger.info("Reapplying breakpoints for source: %s (%d breakpoints)", source_path, len(bps))
-            results, new_entries = self._apply_breakpoints_for_source(source_key, source_path, source, bps)
+            try:
+                results, new_entries = self._apply_breakpoints_for_source(source_key, source_path, source, bps)
+            except DebuggerBackendError as exc:
+                self.logger.warning("Deferring breakpoint reapply for %s: %s", source_path, exc)
+                self._requeue_pending_breakpoints(source_key, entry, pending_items[index + 1 :])
+                self._enter_backoff("breakpoint", exc)
+                break
             self._breakpoints[source_key] = new_entries
             for bp in results:
                 if bp.get("verified"):
@@ -1776,6 +1953,18 @@ class HSXDebugAdapter:
                         bp.get("line"),
                         bp.get("message", "unknown reason"),
                     )
+        else:
+            self._reset_backoff("breakpoint")
+
+    def _requeue_pending_breakpoints(
+        self,
+        source_key: str,
+        entry: Dict[str, Any],
+        remaining: List[Tuple[str, Dict[str, Any]]],
+    ) -> None:
+        self._pending_breakpoints[source_key] = entry
+        for key, payload in remaining:
+            self._pending_breakpoints[key] = payload
 
     def _reapply_function_breakpoints(self, source_key: str, source: JsonDict, breakpoints: List[JsonDict]) -> None:
         name = source.get("name")
@@ -1813,6 +2002,8 @@ class HSXDebugAdapter:
             try:
                 self._call_backend("set_breakpoint", self.current_pid, addr)
                 self.logger.info("Instruction breakpoint set at 0x%04X", addr)
+            except DebuggerBackendError:
+                raise
             except Exception as exc:
                 errors[addr] = str(exc)
                 self.logger.warning("Instruction breakpoint failed at 0x%04X: %s", addr, exc)
@@ -2026,6 +2217,7 @@ class HSXDebugAdapter:
     def _schedule_remote_breakpoint_poll(self, delay: Optional[float] = None) -> None:
         if delay is None:
             delay = self._remote_breakpoint_interval
+        delay = max(delay, self._remaining_backoff("breakpoint"))
         self._cancel_remote_breakpoint_poll()
         if not self.client or self.current_pid is None:
             return
@@ -2048,8 +2240,7 @@ class HSXDebugAdapter:
             self._sync_remote_breakpoints()
         except Exception:
             self.logger.debug("Remote breakpoint poll failed", exc_info=True)
-        else:
-            self._schedule_remote_breakpoint_poll()
+        self._schedule_remote_breakpoint_poll()
 
     def _stop_event_stream(self) -> None:
         if self.backend:
@@ -2063,6 +2254,7 @@ class HSXDebugAdapter:
         self._cleanup_watches()
         self._clear_all_breakpoints()
         self._cancel_remote_breakpoint_poll()
+        self._cancel_step_fallback()
         self._symbol_mapper = None
         self._symbol_path = None
         self._symbol_mtime = None
@@ -2205,6 +2397,10 @@ class HSXDebugAdapter:
                 self.logger.info("Stopped event: reason=%s, pc=0x%04X (no source mapping)", reason_value, pc_int)
         else:
             self.logger.info("Stopped event: reason=%s (no PC available)", reason_value)
+        thread_id_int = int(thread_id)
+        if self._suppress_duplicate_stop(thread_id_int, reason_value, pc_int):
+            self.logger.debug("Suppressing duplicate stopped event for pid=%s reason=%s pc=%s", thread_id_int, reason_value, pc_int)
+            return
         self.protocol.send_event("stopped", body)
         self._emit_disassembly_refresh_event(pc)
 
@@ -2238,9 +2434,6 @@ class HSXDebugAdapter:
             if previous_state != "running":
                 self.protocol.send_event("continued", {"threadId": pid})
             return
-        if reason == "debug_break":
-            self.logger.debug("Ignoring task_state debug_break (DAP event will follow)")
-            return
         if state in {"paused", "stopped"} or reason in {"user_pause"}:
             pc = self._extract_task_state_pc(data)
             description = f"Task {state}" if state else (data.get("reason") or "stopped")
@@ -2252,6 +2445,7 @@ class HSXDebugAdapter:
                 if self._synthetic_pause_pending:
                     self.logger.debug("Suppressing duplicate user_pause event (snapshot already emitted)")
                     self._synthetic_pause_pending = False
+                    self._complete_pending_step()
                     return
                 self._synthetic_pause_pending = False
             self._emit_stopped_event(
@@ -2260,6 +2454,7 @@ class HSXDebugAdapter:
                 description=description,
                 pc=pc,
             )
+            self._complete_pending_step()
 
     def _ensure_thread_entry(self, pid: Optional[int], *, name: Optional[str] = None) -> bool:
         if pid is None:
@@ -2295,7 +2490,9 @@ class HSXDebugAdapter:
     def _fetch_task_snapshot(self, pid: int) -> Optional[Dict[str, Any]]:
         try:
             listing = self._call_backend("list_tasks")
-        except DebuggerBackendError as exc:
+        except DebuggerBackendError:
+            raise
+        except Exception as exc:
             self.logger.debug("State sync list_tasks failed: %s", exc)
             return None
         tasks = listing.get("tasks")
@@ -2351,12 +2548,22 @@ class HSXDebugAdapter:
         pid = self.current_pid
         if pid is None or not self.client:
             return
+        remaining = self._remaining_backoff("state")
+        if remaining > 0:
+            self.logger.debug("Skipping execution state sync (backoff %.2fs remaining)", remaining)
+            return
         if refresh_breakpoints:
             try:
                 self._sync_remote_breakpoints()
             except Exception:
                 self.logger.debug("Breakpoint sync (%s) failed", source, exc_info=True)
-        snapshot = self._fetch_task_snapshot(pid)
+        try:
+            snapshot = self._fetch_task_snapshot(pid)
+        except DebuggerBackendError as exc:
+            self.logger.debug("State sync list_tasks failed: %s", exc)
+            self._enter_backoff("state", exc)
+            return
+        self._reset_backoff("state")
         if not snapshot:
             return
         state_raw = snapshot.get("state")
@@ -2690,6 +2897,53 @@ class HSXDebugAdapter:
         if isinstance(addr_field, (int, float)):
             return int(addr_field)
         return None
+
+
+    def _suppress_duplicate_stop(self, pid: int, reason: str, pc: Optional[int]) -> bool:
+        now = time.monotonic()
+        last = self._last_stop_event.get(pid)
+        if last:
+            last_reason, last_pc, last_time = last
+            if last_reason == reason and last_pc == pc and now - last_time < 0.2:
+                return True
+        self._last_stop_event[pid] = (reason, pc, now)
+        return False
+
+    def _temporarily_disable_breakpoint(self, address: int) -> List[int]:
+        if not self.client or self.current_pid is None:
+            return []
+        normalized = address & 0xFFFFFFFF
+        candidates: List[int] = []
+        try:
+            entries = self._call_backend("list_breakpoints", self.current_pid)
+        except Exception as exc:
+            self.logger.debug("list_breakpoints failed during step: %s", exc)
+            entries = []
+        if isinstance(entries, list):
+            for item in entries:
+                try:
+                    value = int(item, 0) if isinstance(item, str) else int(item)
+                except (TypeError, ValueError):
+                    continue
+                if (value & 0xFFFFFFFF) == normalized:
+                    candidates.append(value & 0xFFFFFFFF)
+        disabled: List[int] = []
+        for addr in candidates:
+            try:
+                self._call_backend("clear_breakpoint", self.current_pid, addr)
+                disabled.append(addr)
+            except Exception:
+                self.logger.debug("temporary breakpoint clear failed at 0x%X", addr, exc_info=True)
+        return disabled
+
+    def _restore_temporarily_disabled_breakpoints(self, addresses: List[int]) -> None:
+        if not self.client or self.current_pid is None:
+            return
+        for addr in addresses:
+            try:
+                self._call_backend("set_breakpoint", self.current_pid, addr)
+            except Exception:
+                self.logger.debug("failed to restore breakpoint at 0x%X", addr, exc_info=True)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
