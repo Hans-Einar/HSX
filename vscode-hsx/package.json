@@ -3,7 +3,7 @@
   "displayName": "HSX Debugger",
   "publisher": "hsx",
   "description": "Debug Adapter Protocol integration for HSX firmware targets.",
-  "version": "0.0.5",
+  "version": "0.0.7",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -123,24 +123,24 @@
           "id": "hsxMemoryView",
           "name": "HSX Memory"
         },
-      {
-        "id": "hsxStackView",
-        "name": "HSX Stack"
-      },
-      {
-        "id": "hsxRegistersView",
-        "name": "HSX Registers"
-      },
-      {
-        "id": "hsxDisassemblyView",
-        "name": "HSX Disassembly"
-      },
-      {
-        "id": "hsxTraceView",
-        "name": "HSX Trace"
-      }
-    ]
-  },
+        {
+          "id": "hsxStackView",
+          "name": "HSX Stack"
+        },
+        {
+          "id": "hsxRegistersView",
+          "name": "HSX Registers"
+        },
+        {
+          "id": "hsxDisassemblyView",
+          "name": "HSX Disassembly"
+        },
+        {
+          "id": "hsxTraceView",
+          "name": "HSX Trace"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "hsx.views.refreshMemory",

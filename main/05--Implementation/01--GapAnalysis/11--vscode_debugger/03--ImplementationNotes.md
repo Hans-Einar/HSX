@@ -372,3 +372,18 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 
 ### Next Steps
 - Encourage packaging/reinstall (vsce) so the new command/version plumbing reaches the editor; continue with Phase 4/5 work afterward.
+
+## 2025-11-14 - Codex (Session 21)
+
+### Scope
+- Plan items: Phase 9 (DAP ↔ executive fixes) – Sections 9.1–9.4.
+- Design refs: 04.09--Debugger §5.3 (breakpoints), 04.11--vscode_debugger §5.2/5.4 (DAP capabilities & memory ops).
+
+### Work Summary
+- Fixed `DebuggerBackend.list_breakpoints` to keep full 32-bit addresses and added `test_list_breakpoints_preserves_full_width` to guard against future truncation (`python/hsx_dbg/backend.py`, `python/tests/test_hsx_dbg_backend.py`).
+- Implemented `_handle_terminate` with graceful pause/shutdown semantics, advertised native `supportsInstructionBreakpoints` during initialize, and added harness tests for both behaviors plus the new capability flag (`python/hsx_dap/__init__.py`, `python/tests/test_hsx_dap_harness.py`).
+- Taught `_handle_writeMemory` to propagate backend errors instead of silently returning zero bytes, with a regression test that forces a backend failure.
+- Exercised the DAP harness + backend tests via `python -m pytest python/tests/test_hsx_dbg_backend.py python/tests/test_hsx_dap_harness.py`.
+
+### Next Steps
+- Follow up on the remaining unchecked items in Phase 9 (VS Code UX wiring for terminate + instruction breakpoints, remote breakpoint telemetry validation) and document UX guidance once the extension consumes the new capabilities.

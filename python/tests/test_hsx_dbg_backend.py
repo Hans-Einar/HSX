@@ -104,3 +104,11 @@ def test_backend_attach_configures_session_options():
     assert backend.attached_pid() == 4
     backend.attach(pid=None, observer=True)
     assert stub.session_options[-1]["pid_lock"] is None
+
+
+def test_list_breakpoints_preserves_full_width() -> None:
+    response = {"status": "ok", "breakpoints": ["0x12345678", 0xDEADBEEF]}
+    stub = StubSession("127.0.0.1", 9998, responses=[response])
+    backend = DebuggerBackend(session_factory=lambda *args, **kwargs: stub)
+    values = backend.list_breakpoints(pid=1)
+    assert values == [0x12345678, 0xDEADBEEF & 0xFFFFFFFF]

@@ -243,7 +243,7 @@ class DebuggerBackend:
                     value = int(entry, 0) if isinstance(entry, str) else int(entry)
                 except (TypeError, ValueError):
                     continue
-                result.append(value & 0xFFFF)
+                result.append(value & 0xFFFFFFFF)
             return result
         return []
 

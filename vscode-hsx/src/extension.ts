@@ -557,6 +557,7 @@ type RefreshReason = "manual" | "auto";
 interface HSXRefreshableView extends vscode.Disposable {
   refresh(reason?: RefreshReason): Promise<void>;
   handleBreakpointEvent?(payload: Record<string, unknown>): void;
+  handleSessionInitialized?(session: vscode.DebugSession): void | Promise<void>;
 }
 
 interface DisassembledInstruction {
@@ -702,6 +703,7 @@ class HSXDebugViewCoordinator {
     }
     if (eventName === "initialized") {
       this.setSessionState(session, "stopped");
+      this.notifySessionInitialized(session);
       void this.refreshAll("auto");
       return;
     }
@@ -719,6 +721,24 @@ class HSXDebugViewCoordinator {
         view.handleBreakpointEvent(body);
       } catch (error) {
         console.warn("[hsx-debug] breakpoint event propagation failed", error);
+      }
+    }
+  }
+
+  private notifySessionInitialized(session: vscode.DebugSession): void {
+    for (const view of this.views) {
+      if (typeof view.handleSessionInitialized !== "function") {
+        continue;
+      }
+      try {
+        const maybePromise = view.handleSessionInitialized(session);
+        if (maybePromise) {
+          void Promise.resolve(maybePromise).catch((error) => {
+            console.warn("[hsx-debug] session initialization handler failed", error);
+          });
+        }
+      } catch (error) {
+        console.warn("[hsx-debug] session initialization handler failed", error);
       }
     }
   }
@@ -1099,6 +1119,17 @@ class HSXDisassemblyViewProvider implements vscode.TreeDataProvider<vscode.TreeI
     this.followPc = false;
     this.manualBase = metadata.address >>> 0;
     void this.refresh("auto");
+  }
+
+  async handleSessionInitialized(session: vscode.DebugSession): Promise<void> {
+    if (session.type !== "hsx" || !this.instructionBreakpoints.size) {
+      return;
+    }
+    try {
+      await this.sendInstructionBreakpoints(session, new Set(this.instructionBreakpoints));
+    } catch (error) {
+      void vscode.window.showErrorMessage(`Unable to restore disassembly breakpoints: ${getErrorMessage(error)}`);
+    }
   }
 
   async handleBreakpointManagerChange(change: HSXDisassemblyBreakpointChange): Promise<void> {

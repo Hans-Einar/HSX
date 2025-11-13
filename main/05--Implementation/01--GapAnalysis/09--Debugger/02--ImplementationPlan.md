@@ -8,8 +8,7 @@
 4. Phase 4 - Documentation, UX polish, and regression coverage.
 5. Phase 5 - C integration and packaging (deferred).
 6. Phase 6 - Extended distribution targets (deferred).
-7. Phase 7 - Disassembly remediation and VS Code parity.
-8. Phase 8 - Breakpoint & connection resiliency.
+7. Phase 7 & 8 moved to [11--vscode_debugger/ImplementationPlan.md](../11--vscode_debugger/ImplementationPlan.md) because the remaining disassembly and VS Code parity work lives in that stack.
 
 ## Sprint Scope
 
@@ -499,92 +498,6 @@ Sample JSON scripts for CI/CD integration. Shows automation capabilities.
 
 ---
 
-## Phase 7: Disassembly Remediation & VS Code Parity
-
-**Priority:** HIGH  
-**Dependencies:** Phase 4 (disassembly CLI), Executive Phase 1.6 (Disassembly API), Toolchain Phase 3 (.sym metadata), VS Code adapter Phase 2.6  
-**Estimated Effort:** 5-7 days
-
-**Rationale:**  
-Design §5.5.7 in [04.09--Debugger.md](../../../04--Design/04.09--Debugger.md#L459) and the HXE format spec (`docs/hxe_format.md`) require the executive to return real MVASM instructions with symbol/source annotations. Current output shows all-zero words in the VS Code disassembly panel (`hsx-dap-debug.log` sample), meaning the adapter cannot render mnemonics or operands. Root causes: the executive decodes from the task RAM mirror instead of the immutable code image (`python/execd.py:2099-2199`), `_format_disassembly` drops operand strings, and the RPC surface still exposes the legacy `cmd:"disasm"`/`mode:"cached"` contract rather than the documented `disasm.read` around-PC behavior. This phase restores spec compliance and keeps the VS Code extension in lockstep with the CLI tooling.
-
-### 7.1 Executive Instruction Source & Annotation
-
-**Priority:** HIGH  
-**Dependencies:** Executive VM controller (`platforms/python/host_vm.py`), symbol loader  
-**Estimated Effort:** 2 days
-
-**Todo:**
-- [x] Document the current mismatch (code lives in `MiniVM.code`, `disasm_read` reads `vm.read_mem`) and capture reproduction steps in `main/05--Implementation/01--GapAnalysis/09--Debugger/03--ImplementationNotes.md`.
-- [x] Introduce a safe way to fetch instruction bytes (e.g., `MiniVM.read_code` or copying the HXE code section into the task snapshot) so `disasm_read` always decodes from the executable image, not mutable RAM.
-- [x] Ensure symbol and source annotations are preserved when switching buffers (`symbol_lookup_addr/line` already provide metadata; keep offsets so labels render only at function entries).
-- [x] Update caching/invalidation so cached disassembly is keyed on code bytes + pid; expire caches automatically on reload/unload.
-- [x] Extend `python/tests/test_executive_sessions.py::test_disasm_read_basic` (and add new tests) to assert the byte stream mirrors the .sym metadata and that BRK/JMP opcodes round-trip.
-
-### 7.2 VS Code Adapter & Tree View Formatting
-
-**Priority:** HIGH  
-**Dependencies:** Phase 2.6 (DAP backend reuse)  
-**Estimated Effort:** 1-2 days
-
-**Todo:**
-- [x] Update `HSXDebugAdapter._format_disassembly` to consume operand *strings* as emitted by `disasm_util.format_operands` (fallback to list join when structured operands are added later) so mnemonics render as `LDI R1 <- 0x5`.
-- [x] Ensure location metadata uses the canonical `{directory, file}` pairs coming from the executive rather than only `line.file` strings.
-- [x] Expand adapter unit tests to cover operand rendering, symbol labels, and source click-through (e.g., add fixtures under `python/tests/test_hsx_dap_disassembly.py`).
-- [x] Refresh the VS Code tree view copy/highlight logic so the PC-highlight icon only appears when the decoded address matches `referenceAddress`, and ensure copy-to-clipboard paths include operands and `; file:line` annotations.
-
-### 7.3 Protocol Alignment & Client UX
-
-**Priority:** MEDIUM  
-**Dependencies:** Executive RPC layer, DAP transport  
-**Estimated Effort:** 1-2 days
-
-**Todo:**
-- [x] Add the documented `cmd:"disasm.read"` entry point alongside the legacy `disasm` command; honor `mode:"around_pc"` (split `count` before/after the PC) and `mode:"from_addr"` semantics from the design.
-- [x] Have the adapter request `mode:"around_pc"` + `addr: current_pc` by default to reduce bespoke window math in the extension, but keep backward-compatible behavior when running against older executives.
-- [x] Update CLI (`hsx-dbg`) and VS Code docs to mention the new capability negotiation flag so other clients can detect when disassembly is unavailable.
-- [x] Extend RPC tests (e.g., `python/tests/test_executive_sessions.py`) to cover the new request shape, cached/on-demand paths, and error handling when code bytes cannot be read.
-
-### 7.4 Documentation & Telemetry
-
-**Priority:** MEDIUM  
-**Dependencies:** Completion of 7.1-7.3  
-**Estimated Effort:** 1 day
-
-**Todo:**
-- [x] Update `docs/hsx_dbg_usage.md` (disassembly section) and `docs/hxe_format.md` (code/rodata handling) to reflect the fixed pipeline and any new flags.
-- [x] Add troubleshooting notes to `main/04--Design/04.11--vscode_debugger.md` describing how the adapter surfaces disassembly errors in the Run/Debug view.
-- [x] Instrument the adapter with debug logs summarizing opcode/operand counts (sampling) so regressions surface quickly in `hsx-dap-debug.log`.
-- [x] Capture verification steps (CLI disasm, VS Code panel screenshot references) in Implementation Notes for traceability.
-
----
-
-## Phase 8: Breakpoint & Connection Resiliency
-
-**Priority:** HIGH  
-**Dependencies:** Phase 3 (breakpoint/variable plumbing), Phase 7 (disassembly parity), vscode-hsx extension  
-**Estimated Effort:** 5 days
-
-**Rationale:**  
-Phase 8 covers the shared breakpoint/disassembly resiliency work that primarily lives inside the VS Code adapter. To keep the ownership clear, all detailed todos now reside in `11--vscode_debugger/ImplementationPlan.md` (see Phase 6). This document keeps a summary for traceability; no additional CLI-specific work is tracked here beyond ensuring the CLI exposes the data the adapter consumes.
-
-### 8.1 PID Loss & Reconnect UX
-
-- **Status:** ✅ Completed in VS Code Implementation Plan v2 §6.1. The adapter now detects stale PIDs, emits telemetry/status notifications, and the `python/tests/test_hsx_dap_harness.py` suite exercises PID-loss scenarios.
-- **CLI impact:** None. CLI `ps`/`status` already surface exited tasks; no extra work required.
-
-### 8.2 Instruction Breakpoints & Disassembly Refresh
-
-- **Status:** ◻ In progress under VS Code Implementation Plan v2 §6.2. `setInstructionBreakpoints` support and harness coverage are complete, while the auto-refresh-on-stop behavior remains open in that plan.
-- **CLI impact:** The CLI disassembly commands already request non-zero instruction counts; no duplicate tracking is needed here.
-
-### 8.3 Breakpoint Synchronization
-
-- **Status:** ◻ In progress under VS Code Implementation Plan v2 §6.3. Remote breakpoint reconciliation/telemetry is owned by the adapter and is no longer duplicated in this CLI plan.
-- **CLI impact:** Continue exposing accurate `break list` output so adapter telemetry has a single source of truth.
-
----
-
 ## Definition of Done (DoD)
 
 This implementation is considered complete when all of the following criteria are met:
@@ -627,13 +540,6 @@ This implementation is considered complete when all of the following criteria ar
 - [ ] User guide complete and reviewed
 - [ ] Automation examples provided
 - [ ] All Phase 6 tests pass
-
-### Phase 7 Completion
-- [ ] Executive disassembly decodes from the immutable code image and matches `.sym` metadata
-- [ ] `disasm.read`/`around_pc` RPC exposed and covered by regression tests
-- [ ] VS Code adapter renders mnemonics + operands with correct source hyperlinks
-- [ ] CLI/VS Code docs updated with new troubleshooting notes
-- [ ] `hsx-dap-debug.log` shows decoded instructions (no all-zero fallbacks)
 
 ### Overall Quality Criteria
 - [ ] CLI debugger functional for all common workflows

@@ -260,6 +260,7 @@ class HSXDebugAdapter:
             "supportsWriteMemoryRequest": True,
             "supportsDisassembleRequest": True,
             "supportsTerminateRequest": True,
+            "supportsInstructionBreakpoints": True,
         }
         self._initialized = True
         self.protocol.send_event("initialized", {})
@@ -333,6 +334,17 @@ class HSXDebugAdapter:
 
     def _handle_disconnect(self, args: JsonDict) -> JsonDict:
         self.protocol.send_event("terminated", {})
+        self._shutdown()
+        return {}
+
+    def _handle_terminate(self, args: JsonDict) -> JsonDict:
+        restart = bool(args.get("restart"))
+        if self.current_pid is not None and self.client:
+            try:
+                self._call_backend("pause", self.current_pid)
+            except Exception:
+                self.logger.debug("terminate pause failed", exc_info=True)
+        self.protocol.send_event("terminated", {"restart": restart})
         self._shutdown()
         return {}
 
@@ -688,7 +700,8 @@ class HSXDebugAdapter:
         return info or {}
 
     def _handle_readRegisters(self, args: JsonDict) -> JsonDict:  # noqa: N802
-        self._ensure_client()
+        if not self.client or self.current_pid is None:
+            return {"registers": []}
         registers = self._format_registers()
         return {"registers": registers}
 
@@ -816,17 +829,16 @@ class HSXDebugAdapter:
             raise ValueError(f"Invalid data length: {len(data)} (must be 1-65536)")
         
         self.logger.info("writeMemory: address=0x%08X, count=%d", address, len(data))
-        
+
         # Write memory to executive
         try:
             self._call_backend("write_memory", address, data, pid=self.current_pid)
-            bytes_written = len(data)
         except Exception as exc:
             self.logger.warning("writeMemory failed: %s", exc)
-            bytes_written = 0
-        
+            raise
+
         return {
-            "bytesWritten": bytes_written,
+            "bytesWritten": len(data),
         }
 
     def _handle_disassemble(self, args: JsonDict) -> JsonDict:
@@ -933,6 +945,7 @@ class HSXDebugAdapter:
             "keepalive_interval": keepalive_interval,
             "heartbeat_override": heartbeat_override,
         }
+        self.current_pid = pid
         try:
             started = backend.start_event_stream(
                 filters={"pid": [pid], "categories": self._EVENT_CATEGORIES},
@@ -1102,7 +1115,7 @@ class HSXDebugAdapter:
         return None
 
     def _format_registers(self) -> List[JsonDict]:
-        if not self.client:
+        if not self.client or self.current_pid is None:
             return []
         state = self._call_backend("get_register_state", self.current_pid)
         if not state:
@@ -2393,7 +2406,7 @@ class HSXDebugAdapter:
     def _evaluate_register_expression(self, expression: str) -> Optional[str]:
         token = expression.strip().upper()
         normalized = REGISTER_NAMES.get(token)
-        if not normalized or not self.client:
+        if not normalized or not self.client or self.current_pid is None:
             return None
         state = self._call_backend("get_register_state", self.current_pid)
         if not state:

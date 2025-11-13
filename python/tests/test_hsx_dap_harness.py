@@ -33,6 +33,47 @@ class StubProtocol:
         pass
 
 
+def test_initialize_advertises_instruction_breakpoints() -> None:
+    adapter = hsx_dap.HSXDebugAdapter(StubProtocol())
+    response = adapter._handle_initialize({})
+    capabilities = response["capabilities"]
+    assert capabilities["supportsInstructionBreakpoints"] is True
+
+
+def test_terminate_request_pauses_and_shuts_down() -> None:
+    protocol = StubProtocol()
+
+    class TermBackend:
+        def __init__(self) -> None:
+            self.paused_pid: Optional[int] = None
+            self.disconnected = False
+            self.stream_stopped = False
+
+        def pause(self, pid: int) -> None:
+            self.paused_pid = pid
+
+        def stop_event_stream(self) -> None:
+            self.stream_stopped = True
+
+        def disconnect(self) -> None:
+            self.disconnected = True
+
+    backend = TermBackend()
+    adapter = hsx_dap.HSXDebugAdapter(protocol)
+    adapter.client = backend
+    adapter.backend = backend
+    adapter.current_pid = 9
+
+    result = adapter._handle_terminate({"restart": False})
+    assert result == {}
+    assert backend.paused_pid == 9
+    assert backend.disconnected is True
+    assert backend.stream_stopped is True
+    terminated_events = [event for event in protocol.events if event["event"] == "terminated"]
+    assert terminated_events and terminated_events[-1]["body"] == {"restart": False}
+    assert adapter.client is None and adapter.backend is None
+
+
 def test_launch_uses_backend_attach(monkeypatch: pytest.MonkeyPatch) -> None:
     created: List["StubBackend"] = []
 
@@ -337,6 +378,19 @@ def test_remote_breakpoint_sync_emits_telemetry() -> None:
     latest = telemetry_events[-1]["body"]
     assert latest["addedCount"] == 0
     assert latest["removedCount"] == 2
+
+
+def test_write_memory_failure_propagates_error() -> None:
+    class WriteBackend:
+        def write_memory(self, addr: int, data: bytes, *, pid: int) -> None:
+            raise DebuggerBackendError("denied")
+
+    adapter = hsx_dap.HSXDebugAdapter(StubProtocol())
+    adapter.client = WriteBackend()
+    adapter.current_pid = 1
+
+    with pytest.raises(DebuggerBackendError):
+        adapter._handle_writeMemory({"memoryReference": "0x1000", "data": "AQI="})
 
 
 def test_trace_requests(monkeypatch: pytest.MonkeyPatch) -> None:
