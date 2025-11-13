@@ -383,7 +383,26 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 - Fixed `DebuggerBackend.list_breakpoints` to keep full 32-bit addresses and added `test_list_breakpoints_preserves_full_width` to guard against future truncation (`python/hsx_dbg/backend.py`, `python/tests/test_hsx_dbg_backend.py`).
 - Implemented `_handle_terminate` with graceful pause/shutdown semantics, advertised native `supportsInstructionBreakpoints` during initialize, and added harness tests for both behaviors plus the new capability flag (`python/hsx_dap/__init__.py`, `python/tests/test_hsx_dap_harness.py`).
 - Taught `_handle_writeMemory` to propagate backend errors instead of silently returning zero bytes, with a regression test that forces a backend failure.
+- Expanded the remote breakpoint telemetry harness to use >64 KiB addresses and proved `_sync_remote_breakpoints` no longer emits phantom add/remove events once the 32-bit masking fix is in place.
 - Exercised the DAP harness + backend tests via `python -m pytest python/tests/test_hsx_dbg_backend.py python/tests/test_hsx_dap_harness.py`.
 
 ### Next Steps
 - Follow up on the remaining unchecked items in Phase 9 (VS Code UX wiring for terminate + instruction breakpoints, remote breakpoint telemetry validation) and document UX guidance once the extension consumes the new capabilities.
+
+## 2025-11-14 - Codex (Session 22)
+
+### Scope
+- Plan items: Phase 9.2 (stop UX) & 9.4 (writeMemory UX/error surfacing).
+- Design refs: 04.11--vscode_debugger §5.2/5.4 (view commands + memory operations).
+
+### Work Summary
+- Added `hsx.views.stopSession` so the disassembly view can stop the target directly; the command calls the new DAP `terminate` handler, ensuring VS Code’s stop control now exercises the graceful pause/shutdown path. Menu contributions expose the action in the HSX panels.
+- Introduced a simple memory writer (`hsx.views.writeMemory`) that prompts for an address + byte sequence, issues the `writeMemory` DAP request, and surfaces success/failure via VS Code notifications. Failures now show the executive error string directly to the user.
+- Extended the remote breakpoint telemetry harness to cover high addresses and reruns, confirming the phantom add/remove regression is gone after the 32-bit masking fix.
+
+### Testing
+- `npm --prefix vscode-hsx run compile`
+- `python -m pytest python/tests/test_hsx_dap_harness.py`
+
+### Next Steps
+- Finish the remaining Phase 9.3 work (native instruction breakpoint UX verification/documentation) and update the design/docs with the new stop + memory workflow guidance.

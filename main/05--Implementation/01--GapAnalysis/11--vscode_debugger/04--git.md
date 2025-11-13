@@ -18,6 +18,7 @@
 | 2025-11-11 | `907405f` | `Backend + Adapter` | Codex | Tests: `python -m pytest python/tests/test_hsx_dbg_backend.py python/tests/test_hsx_dbg_symbols.py python/tests/test_hsx_dbg_commands.py python/tests/test_hsx_dbg_history.py python/tests/test_hsx_dbg_scripts.py` |
 | 2025-11-11 | `3fce2af` | `Session lifecyle + DAP harness` | Codex | Tests: `python -m pytest python/tests/test_hsx_dap_harness.py python/tests/test_hsx_dbg_backend.py python/tests/test_executive_session_helpers.py` |
 | 2025-11-12 | `c8c9671` | `Phase 6: remote breakpoint telemetry + disassembly refresh` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dap_harness.py::test_remote_breakpoint_sync_emits_telemetry python/tests/test_hsx_dap_harness.py::test_stopped_event_emits_disassembly_telemetry` |
+| 2025-11-14 | `5e33630` | `Phase 9: DAP capability + writeMemory fixes` | Codex | Tests: `python -m pytest python/tests/test_hsx_dbg_backend.py python/tests/test_hsx_dap_harness.py` |
 
 ## Pull Request
 - PR URL / ID: `<link or ID>`

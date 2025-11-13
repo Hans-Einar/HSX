@@ -248,6 +248,53 @@ export function activate(context: vscode.ExtensionContext): void {
       memoryProvider.setBaseAddress(resolved);
     }),
   );
+  context.subscriptions.push(
+    vscode.commands.registerCommand("hsx.views.writeMemory", async () => {
+      const session = getActiveHSXSession();
+      if (!session) {
+        void vscode.window.showWarningMessage("Start an HSX debug session to write memory.");
+        return;
+      }
+      const addressInput = await vscode.window.showInputBox({
+        prompt: "Enter the memory address to update.",
+        placeHolder: memoryProvider.baseLabel,
+        value: memoryProvider.baseLabel,
+      });
+      if (!addressInput) {
+        return;
+      }
+      const resolved = await resolveAddressExpression(addressInput);
+      if (resolved === "session-required") {
+        void vscode.window.showWarningMessage("Start an HSX debug session to resolve addresses.");
+        return;
+      }
+      if (resolved === "unresolved") {
+        void vscode.window.showErrorMessage(`Unable to resolve '${addressInput}' to an address.`);
+        return;
+      }
+      const bytesInput = await vscode.window.showInputBox({
+        prompt: "Enter one or more bytes (hex). Example: DE AD BE EF",
+        placeHolder: "DE AD BE EF",
+      });
+      if (!bytesInput) {
+        return;
+      }
+      const bytes = parseByteSequence(bytesInput);
+      if (!bytes) {
+        void vscode.window.showErrorMessage("Provide between 1 and 16 bytes using hex (e.g. DE AD BE EF).");
+        return;
+      }
+      try {
+        await writeTargetMemory(session, resolved, bytes);
+        void vscode.window.showInformationMessage(
+          `Wrote ${bytes.length} byte${bytes.length === 1 ? "" : "s"} at ${formatAddress(resolved)}.`,
+        );
+        void memoryProvider.refresh("manual");
+      } catch (error) {
+        void vscode.window.showErrorMessage(`Unable to write HSX memory: ${getErrorMessage(error)}`);
+      }
+    }),
+  );
 
   const registersProvider = new HSXRegistersViewProvider(coordinator);
   const registersView = vscode.window.createTreeView("hsxRegistersView", {
@@ -402,6 +449,11 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand("hsx.views.stepInstruction", async () => {
       await stepActiveDebugSession();
+    }),
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand("hsx.views.stopSession", async () => {
+      await stopActiveHSXSession();
     }),
   );
 
@@ -2007,6 +2059,14 @@ async function readTargetMemory(session: vscode.DebugSession, address: number, l
   return undefined;
 }
 
+async function writeTargetMemory(session: vscode.DebugSession, address: number, data: Uint8Array): Promise<void> {
+  await session.customRequest("writeMemory", {
+    memoryReference: formatAddress(address),
+    offset: 0,
+    data: Buffer.from(data).toString("base64"),
+  });
+}
+
 async function readRegisterValue(register: string): Promise<number | undefined> {
   const session = getActiveHSXSession();
   if (!session) {
@@ -2100,6 +2160,19 @@ async function stepActiveDebugSession(): Promise<void> {
   }
 }
 
+async function stopActiveHSXSession(): Promise<void> {
+  const session = getActiveHSXSession();
+  if (!session) {
+    void vscode.window.showWarningMessage("Start an HSX debug session to stop the target.");
+    return;
+  }
+  try {
+    await session.customRequest("terminate", { restart: false });
+  } catch (error) {
+    void vscode.window.showErrorMessage(`Unable to stop HSX target: ${getErrorMessage(error)}`);
+  }
+}
+
 type ResolveResult = number | "session-required" | "unresolved";
 
 async function resolveAddressExpression(input: string): Promise<ResolveResult> {
@@ -2153,6 +2226,42 @@ function parseNumericLiteral(raw?: string | number): number | undefined {
     return undefined;
   }
   return value >>> 0;
+}
+
+function parseByteSequence(input: string): Uint8Array | undefined {
+  const sanitized = input.replace(/[,]/g, " ").trim();
+  if (!sanitized) {
+    return undefined;
+  }
+  const tokens = sanitized.split(/\s+/);
+  if (!tokens.length || tokens.length > 16) {
+    return undefined;
+  }
+  const values: number[] = [];
+  for (const token of tokens) {
+    let slice = token.trim();
+    if (!slice) {
+      continue;
+    }
+    if (/^0x/i.test(slice)) {
+      slice = slice.slice(2);
+    }
+    if (slice.length === 1) {
+      slice = `0${slice}`;
+    }
+    if (!/^[0-9a-fA-F]{2}$/.test(slice)) {
+      return undefined;
+    }
+    const parsed = Number.parseInt(slice, 16);
+    if (Number.isNaN(parsed)) {
+      return undefined;
+    }
+    values.push(parsed & 0xff);
+  }
+  if (!values.length) {
+    return undefined;
+  }
+  return new Uint8Array(values);
 }
 
 function getErrorMessage(error: unknown): string {

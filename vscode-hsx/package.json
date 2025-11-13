@@ -236,6 +236,16 @@
         "command": "hsx.disassembly.toggleBreakpoint",
         "title": "Toggle Disassembly Breakpoint",
         "icon": "$(debug-breakpoint)"
+      },
+      {
+        "command": "hsx.views.stopSession",
+        "title": "Stop HSX Target",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "hsx.views.writeMemory",
+        "title": "Write Memory\u2026",
+        "icon": "$(pencil)"
       }
     ],
     "menus": {
@@ -311,9 +321,19 @@
           "group": "navigation@8"
         },
         {
-          "command": "hsx.disassembly.clearBreakpoints",
+          "command": "hsx.views.stopSession",
           "when": "view == hsxDisassemblyView",
           "group": "navigation@9"
+        },
+        {
+          "command": "hsx.disassembly.clearBreakpoints",
+          "when": "view == hsxDisassemblyView",
+          "group": "navigation@10"
+        },
+        {
+          "command": "hsx.views.writeMemory",
+          "when": "view == hsxMemoryView",
+          "group": "navigation@3"
         },
         {
           "command": "hsx.trace.toggle",

@@ -359,7 +359,7 @@ def test_remote_breakpoint_sync_emits_telemetry() -> None:
     adapter.client = backend
     adapter.current_pid = 1
 
-    backend.entries = [0x100, 0x104]
+    backend.entries = [0x12345678, 0xABCDEF01]
     adapter._sync_remote_breakpoints()
 
     telemetry_events = [
@@ -369,12 +369,21 @@ def test_remote_breakpoint_sync_emits_telemetry() -> None:
     first = telemetry_events[-1]["body"]
     assert first["addedCount"] == 2
     assert first["removedCount"] == 0
+    initial_count = len(telemetry_events)
+
+    # Re-run sync with the same high addresses to ensure no phantom add/remove events occur.
+    adapter._sync_remote_breakpoints()
+    telemetry_events = [
+        event for event in protocol.events if event["event"] == "telemetry" and event["body"].get("subsystem") == "hsx-breakpoints"
+    ]
+    assert len(telemetry_events) == initial_count
 
     backend.entries = []
     adapter._sync_remote_breakpoints()
     telemetry_events = [
         event for event in protocol.events if event["event"] == "telemetry" and event["body"].get("subsystem") == "hsx-breakpoints"
     ]
+    assert len(telemetry_events) == initial_count + 1
     latest = telemetry_events[-1]["body"]
     assert latest["addedCount"] == 0
     assert latest["removedCount"] == 2

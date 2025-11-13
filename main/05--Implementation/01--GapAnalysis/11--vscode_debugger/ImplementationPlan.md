@@ -365,14 +365,14 @@ References: Review Finding “list_breakpoints truncates addresses to 16 bits”
 
 - [x] Update `DebuggerBackend.list_breakpoints` to mask addresses to `0xFFFFFFFF` (not `0xFFFF`) so high-memory breakpoints round-trip correctly.
 - [x] Add regression coverage (unit test or harness fixture) that injects a breakpoint > `0x0001FFFF` and asserts the adapter receives the full address.
-- [ ] Verify `_sync_remote_breakpoints` no longer reports phantom add/remove events when executive breakpoints live above 64 KiB.
+- [x] Verify `_sync_remote_breakpoints` no longer reports phantom add/remove events when executive breakpoints live above 64 KiB.
 
 ### 9.2 Honor terminate Requests
 
 References: Review Finding “supportsTerminateRequest advertised without handler” (`python/hsx_dap/__init__.py:251-266`).
 
 - [x] Implement `_handle_terminate` to perform a graceful pause/detach/cleanup (reuse `_handle_disconnect` logic where possible) before emitting `terminated`.
-- [ ] Wire VS Code’s stop button to call the new handler and document expected executive behavior (process exits vs detach).
+- [x] Wire VS Code’s stop button to call the new handler and document expected executive behavior (process exits vs detach).
 - [x] Add a DAP harness test ensuring `terminate` succeeds and leaves the executive in a known state.
 
 ### 9.3 Advertise Instruction Breakpoints
@@ -388,7 +388,7 @@ References: Review Finding “instruction breakpoint capability hidden” (featu
 References: Review Finding “writeMemory swallows backend errors” (`python/hsx_dap/__init__.py:785-831`).
 
 - [x] Let `_handle_writeMemory` rethrow `DebuggerBackendError` (or convert it into a `success=false` response) instead of returning `bytesWritten: 0`.
-- [ ] Surface the executive error message in VS Code so users know the write failed (notification + DAP response).
+- [x] Surface the executive error message in VS Code so users know the write failed (notification + DAP response).
 - [x] Add a harness test that forces a backend write failure and asserts the adapter reports the error to the client.
 
 ---
