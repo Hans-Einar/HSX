@@ -42,12 +42,14 @@ def test_launch_uses_backend_attach(monkeypatch: pytest.MonkeyPatch) -> None:
             self.configure_intervals: List[Optional[int]] = []
             self.attach_calls: List[Dict[str, Any]] = []
             self.event_stream_calls: List[Dict[str, Any]] = []
+            self.last_pid: Optional[int] = None
             created.append(self)
 
         def configure(self, *, keepalive_interval: Optional[int] = None, **_: Any) -> None:
             self.configure_intervals.append(keepalive_interval)
 
         def attach(self, pid: Optional[int], *, observer: bool = False, heartbeat_s: Optional[int] = None) -> None:
+            self.last_pid = pid
             self.attach_calls.append({"pid": pid, "observer": observer, "heartbeat": heartbeat_s})
 
         def start_event_stream(self, *, filters: Dict[str, Any], callback, ack_interval: int) -> bool:
@@ -65,6 +67,10 @@ def test_launch_uses_backend_attach(monkeypatch: pytest.MonkeyPatch) -> None:
 
         def disconnect(self) -> None:  # pragma: no cover - not used in this test
             pass
+
+        def list_tasks(self) -> Dict[str, Any]:
+            pid = self.last_pid or 0
+            return {"tasks": [{"pid": pid, "state": "running"}], "current_pid": pid}
 
     monkeypatch.setattr(hsx_dap, "DebuggerBackend", StubBackend)
     adapter = hsx_dap.HSXDebugAdapter(StubProtocol())
@@ -99,12 +105,14 @@ def test_reconnect_reapplies_breakpoints(monkeypatch: pytest.MonkeyPatch) -> Non
             self.event_stream_calls: List[Dict[str, Any]] = []
             self.breakpoints: List[int] = []
             self._resume_failures = 1
+            self.last_pid: Optional[int] = None
             created.append(self)
 
         def configure(self, *, keepalive_interval: Optional[int] = None, **_: Any) -> None:
             pass
 
         def attach(self, pid: Optional[int], *, observer: bool = False, heartbeat_s: Optional[int] = None) -> None:
+            self.last_pid = pid
             self.attach_calls.append({"pid": pid, "observer": observer, "heartbeat": heartbeat_s})
 
         def start_event_stream(self, *, filters: Dict[str, Any], callback, ack_interval: int) -> bool:
@@ -141,7 +149,8 @@ def test_reconnect_reapplies_breakpoints(monkeypatch: pytest.MonkeyPatch) -> Non
             pass
 
         def list_tasks(self) -> Dict[str, Any]:
-            return {"tasks": [{"pid": 2}], "current_pid": 2}
+            pid = self.last_pid or 2
+            return {"tasks": [{"pid": pid, "state": "running"}], "current_pid": pid}
 
     def backend_factory(**kwargs: Any) -> ReconnectBackend:
         backend = ReconnectBackend(**kwargs)
@@ -278,6 +287,22 @@ def test_instruction_breakpoints_round_trip() -> None:
     assert backend.clear_calls == [0x100]
 
 
+def test_set_breakpoints_ignores_disassembly_sources(monkeypatch: pytest.MonkeyPatch) -> None:
+    adapter = hsx_dap.HSXDebugAdapter(StubProtocol())
+    adapter.client = object()
+    adapter.current_pid = 1
+    monkeypatch.setattr(adapter, "_ensure_symbol_mapper", lambda *args, **kwargs: None)
+
+    response = adapter._handle_setBreakpoints(
+        {
+            "source": {"path": "hsx-disassembly:/pid-1/0x0000003C"},
+            "breakpoints": [{"line": 1}, {"line": 2}],
+        }
+    )
+    assert len(response["breakpoints"]) == 2
+    assert all(entry.get("verified") for entry in response["breakpoints"])
+
+
 def test_remote_breakpoint_sync_emits_telemetry() -> None:
     class RemoteBackend:
         def __init__(self) -> None:
@@ -312,6 +337,50 @@ def test_remote_breakpoint_sync_emits_telemetry() -> None:
     latest = telemetry_events[-1]["body"]
     assert latest["addedCount"] == 0
     assert latest["removedCount"] == 2
+
+
+def test_trace_requests(monkeypatch: pytest.MonkeyPatch) -> None:
+    class TraceBackend:
+        def __init__(self) -> None:
+            self.mode_changes: List[Optional[bool]] = []
+
+        def trace_records(self, pid: int, *, limit: Optional[int] = None, export: bool = False) -> Dict[str, Any]:
+            assert pid == 1
+            assert limit == 5
+            return {
+                "pid": pid,
+                "records": [
+                    {"seq": 1, "pc": 0x10, "opcode": 0x20},
+                    {"seq": 2, "pc": 0x14, "opcode": 0x24},
+                ],
+            }
+
+        def trace_control(self, pid: int, enable: Optional[bool]) -> Dict[str, Any]:
+            assert pid == 1
+            self.mode_changes.append(enable)
+            return {"enabled": enable}
+
+    backend = TraceBackend()
+    adapter = hsx_dap.HSXDebugAdapter(StubProtocol())
+    adapter.client = backend
+    adapter.current_pid = 1
+
+    records = adapter._handle_traceRecords({"limit": 5})
+    assert isinstance(records["records"], list)
+    assert records["records"][0]["pc"] == 0x10
+
+    state = adapter._handle_traceControl({"enabled": True})
+    assert state["enabled"] is True
+    assert backend.mode_changes == [True]
+
+
+def test_read_registers_custom_request(monkeypatch: pytest.MonkeyPatch) -> None:
+    adapter = hsx_dap.HSXDebugAdapter(StubProtocol())
+    adapter.client = object()
+    adapter.current_pid = 1
+    monkeypatch.setattr(adapter, "_format_registers", lambda: [{"name": "R00", "value": "0x0"}])
+    response = adapter._handle_readRegisters({})
+    assert response["registers"][0]["name"] == "R00"
 
 
 def test_stopped_event_emits_disassembly_telemetry(monkeypatch: pytest.MonkeyPatch) -> None:

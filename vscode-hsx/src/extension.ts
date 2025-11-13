@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
+import * as crypto from "crypto";
 import { Buffer } from "buffer";
 
 const DEFAULT_HOST = "127.0.0.1";
@@ -82,7 +83,9 @@ export class HSXAdapterFactory implements vscode.DebugAdapterDescriptorFactory, 
   constructor(private readonly context: vscode.ExtensionContext) {
     this.adapterScript = context.asAbsolutePath(path.join("debugAdapter", "hsx-dap.py"));
     const pkg = context.extension.packageJSON as { version?: string } | undefined;
-    this.adapterVersion = typeof pkg?.version === "string" ? pkg.version : "dev";
+    const baseVersion = typeof pkg?.version === "string" ? pkg.version : "dev";
+    const fingerprint = computeExtensionFingerprint(context.extensionPath);
+    this.adapterVersion = fingerprint ? `${baseVersion}+${fingerprint}` : baseVersion;
   }
 
   createDebugAdapterDescriptor(session: vscode.DebugSession): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
@@ -193,6 +196,7 @@ export class HSXAdapterFactory implements vscode.DebugAdapterDescriptorFactory, 
         result.PYTHONUNBUFFERED = "1";
       }
     }
+    result.HSX_EXTENSION_VERSION = this.adapterVersion;
     return Object.keys(result).length ? result : undefined;
   }
 }
@@ -245,6 +249,23 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
   );
 
+  const registersProvider = new HSXRegistersViewProvider(coordinator);
+  const registersView = vscode.window.createTreeView("hsxRegistersView", {
+    treeDataProvider: registersProvider,
+    showCollapseAll: false,
+  });
+  context.subscriptions.push(registersProvider, registersView);
+  context.subscriptions.push(
+    vscode.commands.registerCommand("hsx.views.refreshRegisters", () => {
+      void registersProvider.refresh("manual");
+    }),
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand("hsx.views.copyRegisters", () => {
+      void registersProvider.copyRegisters();
+    }),
+  );
+
   const stackProvider = new HSXStackViewProvider(coordinator);
   const stackView = vscode.window.createTreeView("hsxStackView", {
     treeDataProvider: stackProvider,
@@ -256,13 +277,45 @@ export function activate(context: vscode.ExtensionContext): void {
       void stackProvider.refresh("manual");
     }),
   );
+  context.subscriptions.push(
+    vscode.commands.registerCommand("hsx.views.copyStack", () => {
+      void stackProvider.copyRows();
+    }),
+  );
 
-  const disassemblyProvider = new HSXDisassemblyViewProvider(coordinator);
-  const disassemblyView = vscode.window.createTreeView("hsxDisassemblyView", {
+  const disassemblyDocumentProvider = new HSXDisassemblyBreakpointDocumentProvider();
+  context.subscriptions.push(
+    vscode.workspace.registerTextDocumentContentProvider(
+      HSXDisassemblyBreakpointDocumentProvider.scheme,
+      disassemblyDocumentProvider,
+    ),
+  );
+  let disassemblyProvider: HSXDisassemblyViewProvider;
+  let traceProvider: HSXTraceViewProvider | undefined;
+  const disassemblyBreakpointManager = new HSXDisassemblyBreakpointManager(
+    disassemblyDocumentProvider,
+    (change) => {
+      if (disassemblyProvider) {
+        void disassemblyProvider.handleBreakpointManagerChange(change);
+      }
+      if (traceProvider) {
+        void traceProvider.handleBreakpointManagerChange(change);
+      }
+    },
+  );
+  context.subscriptions.push(disassemblyBreakpointManager);
+  disassemblyProvider = new HSXDisassemblyViewProvider(coordinator, disassemblyBreakpointManager);
+  const disassemblyView = vscode.window.createTreeView<HSXDisassemblyTreeItem>("hsxDisassemblyView", {
     treeDataProvider: disassemblyProvider,
     showCollapseAll: false,
   });
-  context.subscriptions.push(disassemblyProvider, disassemblyView);
+  context.subscriptions.push(
+    disassemblyProvider,
+    disassemblyView,
+    disassemblyView.onDidChangeSelection((event) => {
+      disassemblyProvider.handleSelectionChange(event.selection);
+    }),
+  );
   context.subscriptions.push(
     vscode.commands.registerCommand("hsx.views.refreshDisassembly", () => {
       void disassemblyProvider.refresh("manual");
@@ -307,6 +360,48 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand("hsx.disassembly.toggleBreakpoint", async (item?: HSXDisassemblyTreeItem) => {
       await disassemblyProvider.toggleBreakpoint(item);
+    }),
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand("hsx.disassembly.clearBreakpoints", () => {
+      void disassemblyProvider.clearAllBreakpoints();
+    }),
+  );
+
+  traceProvider = new HSXTraceViewProvider(context, coordinator, disassemblyBreakpointManager);
+  const traceView = vscode.window.createTreeView("hsxTraceView", {
+    treeDataProvider: traceProvider,
+    showCollapseAll: false,
+  });
+  context.subscriptions.push(traceProvider, traceView);
+  context.subscriptions.push(
+    vscode.commands.registerCommand("hsx.trace.toggle", () => {
+      void traceProvider?.toggleTrace();
+    }),
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand("hsx.trace.copy", () => {
+      void traceProvider?.copyTrace();
+    }),
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand("hsx.trace.refresh", () => {
+      void traceProvider?.refresh("manual");
+    }),
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand("hsx.views.addDisassemblyBreakpoint", async () => {
+      await disassemblyProvider.addBreakpointAtSelection();
+    }),
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand("hsx.views.playPause", async () => {
+      await controlPlayPauseButton(coordinator);
+    }),
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand("hsx.views.stepInstruction", async () => {
+      await stepActiveDebugSession();
     }),
   );
 
@@ -491,10 +586,42 @@ interface HSXDisassemblyTreeItem extends vscode.TreeItem {
   instructionData?: DisassembledInstruction;
 }
 
+interface StackRowData {
+  address: number;
+  value: number;
+  ascii: string;
+  relative: string;
+}
+
+interface RegisterRowData {
+  name: string;
+  value: string;
+  rawValue?: number;
+}
+
+interface TraceRecordEntry {
+  seq: number;
+  address: number;
+  instruction?: DisassembledInstruction;
+  symbol?: string;
+  sourcePath?: string;
+  sourceLine?: number;
+  breakpoint?: boolean;
+}
+
+interface HSXDisassemblyBreakpointChange {
+  type: "remove" | "toggle";
+  addresses: number[];
+  enabled?: boolean;
+}
+
+type DebugRunState = "running" | "stopped";
+
 class HSXDebugViewCoordinator {
   private static singleton: HSXDebugViewCoordinator | undefined;
   private readonly views = new Set<HSXRefreshableView>();
   private readonly frameMetadata = new Map<string, Map<number, FrameMetadata>>();
+  private readonly sessionStates = new Map<string, DebugRunState>();
 
   static get instance(): HSXDebugViewCoordinator {
     if (!HSXDebugViewCoordinator.singleton) {
@@ -520,6 +647,20 @@ class HSXDebugViewCoordinator {
           console.warn("[hsx-debug] view refresh failed", error);
         }
       }),
+    );
+  }
+
+  private async refreshNonDisassembly(reason: RefreshReason): Promise<void> {
+    await Promise.all(
+      Array.from(this.views)
+        .filter((view) => !(view instanceof HSXDisassemblyViewProvider))
+        .map(async (view) => {
+          try {
+            await view.refresh(reason);
+          } catch (error) {
+            console.warn("[hsx-debug] view refresh failed", error);
+          }
+        }),
     );
   }
 
@@ -549,8 +690,20 @@ class HSXDebugViewCoordinator {
       this.notifyBreakpointEvent(body);
       return;
     }
-    if (eventName === "stopped" || eventName === "continued" || eventName === "initialized") {
+    if (eventName === "stopped") {
+      this.setSessionState(session, "stopped");
+      void this.refreshNonDisassembly("auto");
+      return;
+    }
+    if (eventName === "continued") {
+      this.setSessionState(session, "running");
+      void this.refreshNonDisassembly("auto");
+      return;
+    }
+    if (eventName === "initialized") {
+      this.setSessionState(session, "stopped");
       void this.refreshAll("auto");
+      return;
     }
     if (eventName === "terminated") {
       this.clearSession(session);
@@ -576,6 +729,7 @@ class HSXDebugViewCoordinator {
 
   clearSession(session: vscode.DebugSession): void {
     this.frameMetadata.delete(session.id);
+    this.sessionStates.delete(session.id);
   }
 
   private captureStackMetadata(session: vscode.DebugSession, responseBody: unknown): void {
@@ -608,6 +762,17 @@ class HSXDebugViewCoordinator {
       perSession.set(frameId, { address, order: index, name });
     });
     this.frameMetadata.set(session.id, perSession);
+  }
+
+  getSessionState(session?: vscode.DebugSession): DebugRunState | undefined {
+    if (!session) {
+      return undefined;
+    }
+    return this.sessionStates.get(session.id);
+  }
+
+  private setSessionState(session: vscode.DebugSession, state: DebugRunState): void {
+    this.sessionStates.set(session.id, state);
   }
 
   private async refreshDisassembly(reason: RefreshReason): Promise<void> {
@@ -693,9 +858,10 @@ class HSXMemoryViewProvider implements vscode.TreeDataProvider<vscode.TreeItem>,
   }
 }
 
-class HSXStackViewProvider implements vscode.TreeDataProvider<vscode.TreeItem>, HSXRefreshableView {
+class HSXRegistersViewProvider implements vscode.TreeDataProvider<vscode.TreeItem>, HSXRefreshableView {
   private readonly emitter = new vscode.EventEmitter<vscode.TreeItem | undefined | void>();
-  private rows: vscode.TreeItem[] = [createMessageItem("No stack data")];
+  private rows: vscode.TreeItem[] = [createMessageItem("No register data")];
+  private data: RegisterRowData[] = [];
 
   constructor(private readonly coordinator: HSXDebugViewCoordinator) {
     this.coordinator.register(this);
@@ -721,6 +887,85 @@ class HSXStackViewProvider implements vscode.TreeDataProvider<vscode.TreeItem>, 
     this.emitter.dispose();
   }
 
+  async copyRegisters(): Promise<void> {
+    if (!this.data.length) {
+      void vscode.window.showInformationMessage("No HSX registers to copy.");
+      return;
+    }
+    const lines = this.data.map((row) => formatRegisterRowForCopy(row));
+    await vscode.env.clipboard.writeText(lines.join(os.EOL));
+    void vscode.window.showInformationMessage(`Copied ${this.data.length} register${this.data.length === 1 ? "" : "s"} to the clipboard.`);
+  }
+
+  private async loadRows(): Promise<void> {
+    const session = getActiveHSXSession();
+    this.data = [];
+    if (!session) {
+      this.rows = [createMessageItem("Start an HSX debug session to inspect registers.")];
+      return;
+    }
+    try {
+      const response = await session.customRequest("readRegisters", {});
+      const registers = Array.isArray(response?.registers) ? (response.registers as RegisterRowData[]) : [];
+      if (!registers.length) {
+        this.rows = [createMessageItem("No registers reported by HSX adapter.")];
+        return;
+      }
+      this.data = registers.map((entry) => ({
+        name: entry.name,
+        value: entry.value,
+        rawValue: parseNumericLiteral(entry.value ?? ""),
+      }));
+      const items = this.data.map((entry) => {
+        const label = `${entry.name.padEnd(4, " ")} ${entry.value}`;
+        return new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
+      });
+      this.rows = items;
+    } catch (error) {
+      this.rows = [createMessageItem(`Unable to read registers: ${getErrorMessage(error)}`)];
+    }
+  }
+}
+
+class HSXStackViewProvider implements vscode.TreeDataProvider<vscode.TreeItem>, HSXRefreshableView {
+  private readonly emitter = new vscode.EventEmitter<vscode.TreeItem | undefined | void>();
+  private rows: vscode.TreeItem[] = [createMessageItem("No stack data")];
+  private data: StackRowData[] = [];
+
+  constructor(private readonly coordinator: HSXDebugViewCoordinator) {
+    this.coordinator.register(this);
+  }
+
+  getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
+    return element;
+  }
+
+  getChildren(): vscode.ProviderResult<vscode.TreeItem[]> {
+    return this.rows;
+  }
+
+  readonly onDidChangeTreeData: vscode.Event<vscode.TreeItem | undefined | void> = this.emitter.event;
+
+  async refresh(_reason: RefreshReason = "manual"): Promise<void> {
+    await this.loadRows();
+    this.emitter.fire(undefined);
+  }
+
+  async copyRows(): Promise<void> {
+    if (!this.data.length) {
+      void vscode.window.showInformationMessage("No HSX stack rows to copy.");
+      return;
+    }
+    const lines = this.data.map((row, index) => formatStackRowForCopy(row, index === 0));
+    await vscode.env.clipboard.writeText(lines.join(os.EOL));
+    void vscode.window.showInformationMessage(`Copied ${this.data.length} stack row${this.data.length === 1 ? "" : "s"} to the clipboard.`);
+  }
+
+  dispose(): void {
+    this.coordinator.unregister(this);
+    this.emitter.dispose();
+  }
+
   private async loadRows(): Promise<void> {
     const session = getActiveHSXSession();
     if (!session) {
@@ -738,6 +983,7 @@ class HSXStackViewProvider implements vscode.TreeDataProvider<vscode.TreeItem>, 
       return;
     }
     const entries: vscode.TreeItem[] = [];
+    const rowData: StackRowData[] = [];
     for (let offset = 0; offset < data.length; offset += 4) {
       const wordBytes = data.slice(offset, Math.min(offset + 4, data.length));
       const addr = (sp + offset) >>> 0;
@@ -749,8 +995,10 @@ class HSXStackViewProvider implements vscode.TreeDataProvider<vscode.TreeItem>, 
       item.description = ascii ? `${ascii}  ${relative}` : relative;
       item.tooltip = `${label}\n${relative}`;
       entries.push(item);
+      rowData.push({ address: addr, value, ascii, relative });
     }
     this.rows = entries;
+    this.data = rowData;
   }
 }
 
@@ -758,6 +1006,7 @@ class HSXDisassemblyViewProvider implements vscode.TreeDataProvider<vscode.TreeI
   private static readonly WINDOW_BEFORE = 12;
   private static readonly WINDOW_AFTER = 20;
   private static readonly MAX_INSTRUCTION_BYTES = 8;
+  private static readonly SELECTION_CONTEXT_KEY = "hsxDisassembly.selectionAvailable";
 
   private readonly emitter = new vscode.EventEmitter<vscode.TreeItem | undefined | void>();
   private rows: HSXDisassemblyTreeItem[] = [createMessageItem("No disassembly data")];
@@ -766,9 +1015,16 @@ class HSXDisassemblyViewProvider implements vscode.TreeDataProvider<vscode.TreeI
   private manualBase: number | undefined;
   private referenceAddress: number | undefined;
   private instructionBreakpoints: Set<number> = new Set<number>();
+  private selectedItem: HSXDisassemblyTreeItem | undefined;
+  private readonly breakpointMetadata = new Map<number, DisassembledInstruction | undefined>();
 
-  constructor(private readonly coordinator: HSXDebugViewCoordinator) {
+  constructor(
+    private readonly coordinator: HSXDebugViewCoordinator,
+    private readonly breakpointManager: HSXDisassemblyBreakpointManager,
+  ) {
     this.coordinator.register(this);
+    this.refreshBreakpointCacheFromVSCode();
+    void vscode.commands.executeCommand("setContext", HSXDisassemblyViewProvider.SELECTION_CONTEXT_KEY, false);
   }
 
   setManualBase(address: number): void {
@@ -799,10 +1055,30 @@ class HSXDisassemblyViewProvider implements vscode.TreeDataProvider<vscode.TreeI
       void vscode.window.showInformationMessage("No HSX disassembly rows to copy.");
       return;
     }
-    const lines = this.instructions.map((inst) => formatDisassemblyForCopy(inst));
+    const lines = this.instructions.map((inst) =>
+      formatDisassemblyForCopy(inst, this.referenceAddress, this.instructionBreakpoints),
+    );
     await vscode.env.clipboard.writeText(lines.join(os.EOL));
     const plural = this.instructions.length === 1 ? "" : "s";
     void vscode.window.showInformationMessage(`Copied ${this.instructions.length} disassembly row${plural} to the clipboard.`);
+  }
+
+  async clearAllBreakpoints(): Promise<void> {
+    if (!this.instructionBreakpoints.size) {
+      this.breakpointManager.clear();
+      return;
+    }
+    const session = getActiveHSXSession();
+    if (!session) {
+      this.instructionBreakpoints.clear();
+      this.breakpointManager.clear();
+      return;
+    }
+    try {
+      await this.sendInstructionBreakpoints(session, new Set<number>());
+    } catch (error) {
+      void vscode.window.showErrorMessage(`Unable to clear disassembly breakpoints: ${getErrorMessage(error)}`);
+    }
   }
 
   handleStackItemChange(item: vscode.DebugThread | vscode.DebugStackFrame | undefined): void {
@@ -825,6 +1101,51 @@ class HSXDisassemblyViewProvider implements vscode.TreeDataProvider<vscode.TreeI
     void this.refresh("auto");
   }
 
+  async handleBreakpointManagerChange(change: HSXDisassemblyBreakpointChange): Promise<void> {
+    if (change.type === "remove") {
+      const next = new Set(this.instructionBreakpoints);
+      let mutated = false;
+      for (const address of change.addresses) {
+        mutated = next.delete(address >>> 0) || mutated;
+      }
+      if (!mutated) {
+        return;
+      }
+      const session = getActiveHSXSession();
+      if (session) {
+        try {
+          await this.sendInstructionBreakpoints(session, next);
+        } catch (error) {
+          void vscode.window.showErrorMessage(`Unable to update disassembly breakpoints: ${getErrorMessage(error)}`);
+        }
+      } else {
+        this.instructionBreakpoints = next;
+        this.syncBreakpointDisplay(undefined);
+      }
+      return;
+    }
+    if (change.type === "toggle" && change.addresses.length) {
+      const next = new Set(this.instructionBreakpoints);
+      const normalized = change.addresses[0] >>> 0;
+      if (change.enabled) {
+        next.add(normalized);
+      } else {
+        next.delete(normalized);
+      }
+      const session = getActiveHSXSession();
+      if (session) {
+        try {
+          await this.sendInstructionBreakpoints(session, next);
+        } catch (error) {
+          void vscode.window.showErrorMessage(`Unable to update disassembly breakpoints: ${getErrorMessage(error)}`);
+        }
+      } else {
+        this.instructionBreakpoints = next;
+        this.syncBreakpointDisplay(undefined);
+      }
+    }
+  }
+
   getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
     return element;
   }
@@ -843,6 +1164,8 @@ class HSXDisassemblyViewProvider implements vscode.TreeDataProvider<vscode.TreeI
   dispose(): void {
     this.coordinator.unregister(this);
     this.emitter.dispose();
+    this.selectedItem = undefined;
+    void vscode.commands.executeCommand("setContext", HSXDisassemblyViewProvider.SELECTION_CONTEXT_KEY, false);
   }
 
   private async loadRows(): Promise<void> {
@@ -895,9 +1218,17 @@ class HSXDisassemblyViewProvider implements vscode.TreeDataProvider<vscode.TreeI
       this.referenceAddress = highlightAddress;
       this.instructions = instructions;
       this.rows = instructions.map((inst) => createDisassemblyRow(inst, this.referenceAddress, this.instructionBreakpoints));
+      this.updateBreakpointMetadataFromInstructions(instructions);
+      this.syncBreakpointDisplay(session);
     } catch (error) {
       this.rows = [createMessageItem(`Disassembly failed: ${getErrorMessage(error)}`)];
     }
+  }
+
+  handleSelectionChange(selection: readonly HSXDisassemblyTreeItem[]): void {
+    this.selectedItem = selection.length ? selection[0] : undefined;
+    const hasAddress = Boolean(this.selectedItem?.addressValue !== undefined);
+    void vscode.commands.executeCommand("setContext", HSXDisassemblyViewProvider.SELECTION_CONTEXT_KEY, hasAddress);
   }
 
   async toggleBreakpoint(item?: HSXDisassemblyTreeItem): Promise<void> {
@@ -918,15 +1249,33 @@ class HSXDisassemblyViewProvider implements vscode.TreeDataProvider<vscode.TreeI
       next.add(address);
     }
     try {
-      await session.customRequest("setInstructionBreakpoints", {
-        breakpoints: Array.from(next).map((value) => ({
-          instructionReference: formatAddress(value),
-        })),
-      });
-      this.instructionBreakpoints = next;
-      await this.refresh("auto");
+      await this.sendInstructionBreakpoints(session, next);
     } catch (error) {
       void vscode.window.showErrorMessage(`Unable to toggle breakpoint: ${getErrorMessage(error)}`);
+    }
+  }
+
+  async addBreakpointAtSelection(): Promise<void> {
+    if (!this.selectedItem || this.selectedItem.addressValue === undefined) {
+      void vscode.window.showInformationMessage("Select an instruction row to add a breakpoint.");
+      return;
+    }
+    const session = getActiveHSXSession();
+    if (!session) {
+      void vscode.window.showWarningMessage("Start an HSX debug session to manage instruction breakpoints.");
+      return;
+    }
+    const address = this.selectedItem.addressValue >>> 0;
+    if (this.instructionBreakpoints.has(address)) {
+      void vscode.window.showInformationMessage(`Breakpoint already exists at ${formatAddress(address)}.`);
+      return;
+    }
+    const next = new Set(this.instructionBreakpoints);
+    next.add(address);
+    try {
+      await this.sendInstructionBreakpoints(session, next);
+    } catch (error) {
+      void vscode.window.showErrorMessage(`Unable to add breakpoint: ${getErrorMessage(error)}`);
     }
   }
 
@@ -944,7 +1293,46 @@ class HSXDisassemblyViewProvider implements vscode.TreeDataProvider<vscode.TreeI
     } else {
       this.instructionBreakpoints.add(normalized);
     }
+    this.syncBreakpointDisplay(getActiveHSXSession());
     void this.refresh("auto");
+  }
+
+  private refreshBreakpointCacheFromVSCode(): void {
+    const next = new Set<number>();
+    for (const bp of vscode.debug.breakpoints) {
+      const reference = optionalString((bp as { instructionReference?: unknown }).instructionReference);
+      const value = parseNumericLiteral(reference);
+      if (value !== undefined) {
+        next.add(value >>> 0);
+      }
+    }
+    this.instructionBreakpoints = next;
+  }
+
+  private async sendInstructionBreakpoints(session: vscode.DebugSession, next: Set<number>): Promise<void> {
+    await session.customRequest("setInstructionBreakpoints", {
+      breakpoints: Array.from(next).map((value) => ({
+        instructionReference: formatAddress(value),
+      })),
+    });
+    this.instructionBreakpoints = next;
+    this.syncBreakpointDisplay(session);
+    await this.refresh("auto");
+  }
+
+  private syncBreakpointDisplay(session?: vscode.DebugSession): void {
+    this.breakpointManager.syncBreakpoints(this.instructionBreakpoints, this.breakpointMetadata, session);
+  }
+
+  private updateBreakpointMetadataFromInstructions(instructions: DisassembledInstruction[]): void {
+    for (const inst of instructions) {
+      const address =
+        parseNumericLiteral(inst.address ?? inst.memoryReference ?? inst.instructionPointerReference) ?? undefined;
+      if (address === undefined) {
+        continue;
+      }
+      this.breakpointMetadata.set(address >>> 0, inst);
+    }
   }
 
   private computeWindowStart(center: number): number {
@@ -956,6 +1344,195 @@ class HSXDisassemblyViewProvider implements vscode.TreeDataProvider<vscode.TreeI
 
   private get instructionWindowSize(): number {
     return HSXDisassemblyViewProvider.WINDOW_BEFORE + HSXDisassemblyViewProvider.WINDOW_AFTER + 1;
+  }
+}
+
+class HSXTraceViewProvider implements vscode.TreeDataProvider<vscode.TreeItem>, HSXRefreshableView {
+  private static readonly CONTEXT_KEY = "hsxTrace.enabled";
+  private readonly emitter = new vscode.EventEmitter<vscode.TreeItem | undefined | void>();
+  private rows: vscode.TreeItem[] = [createMessageItem("Trace disabled. Enable tracing to capture instructions.")];
+  private entries: TraceRecordEntry[] = [];
+  private traceEnabled: boolean;
+  private readonly disasmCache = new Map<number, DisassembledInstruction>();
+  private readonly traceLimit = 30;
+
+  constructor(
+    private readonly context: vscode.ExtensionContext,
+    private readonly coordinator: HSXDebugViewCoordinator,
+    private readonly breakpointManager: HSXDisassemblyBreakpointManager,
+  ) {
+    this.traceEnabled = context.workspaceState.get<boolean>("hsx.trace.enabled", false) ?? false;
+    void vscode.commands.executeCommand("setContext", HSXTraceViewProvider.CONTEXT_KEY, this.traceEnabled);
+    this.coordinator.register(this);
+  }
+
+  getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
+    return element;
+  }
+
+  getChildren(): vscode.ProviderResult<vscode.TreeItem[]> {
+    return this.rows;
+  }
+
+  readonly onDidChangeTreeData: vscode.Event<vscode.TreeItem | undefined | void> = this.emitter.event;
+
+  async refresh(_reason: RefreshReason = "manual"): Promise<void> {
+    await this.loadRows();
+    this.emitter.fire(undefined);
+  }
+
+  dispose(): void {
+    this.coordinator.unregister(this);
+    this.emitter.dispose();
+  }
+
+  async toggleTrace(): Promise<void> {
+    this.traceEnabled = !this.traceEnabled;
+    await this.context.workspaceState.update("hsx.trace.enabled", this.traceEnabled);
+    void vscode.commands.executeCommand("setContext", HSXTraceViewProvider.CONTEXT_KEY, this.traceEnabled);
+    const session = getActiveHSXSession();
+    if (session) {
+      try {
+        await session.customRequest("traceControl", { enabled: this.traceEnabled });
+      } catch (error) {
+        void vscode.window.showErrorMessage(`Unable to update trace state: ${getErrorMessage(error)}`);
+      }
+    }
+    await this.refresh("manual");
+  }
+
+  async copyTrace(): Promise<void> {
+    if (!this.entries.length) {
+      void vscode.window.showInformationMessage("No HSX trace records to copy.");
+      return;
+    }
+    const highlightAddress = this.entries[this.entries.length - 1]?.address;
+    const lines = this.entries.map((entry) => {
+      const inst = entry.instruction ?? this.createFallbackInstruction(entry.address);
+      return formatDisassemblyForCopy(inst, highlightAddress, this.breakpointManager.getAddresses());
+    });
+    await vscode.env.clipboard.writeText(lines.join(os.EOL));
+    void vscode.window.showInformationMessage(`Copied ${this.entries.length} trace record${this.entries.length === 1 ? "" : "s"} to the clipboard.`);
+  }
+
+  async handleBreakpointManagerChange(_change: HSXDisassemblyBreakpointChange): Promise<void> {
+    if (this.traceEnabled && this.entries.length) {
+      await this.refresh("auto");
+    }
+  }
+
+  private async loadRows(): Promise<void> {
+    if (!this.traceEnabled) {
+      this.rows = [createMessageItem("Trace disabled. Use the trace toolbar button to enable capturing instructions.")];
+      return;
+    }
+    const session = getActiveHSXSession();
+    if (!session) {
+      this.rows = [createMessageItem("Start an HSX debug session to view trace output.")];
+      return;
+    }
+    const state = this.coordinator.getSessionState(session);
+    if (state !== "stopped") {
+      this.rows =
+        this.entries.length > 0
+          ? this.createTraceRows(this.entries, this.breakpointManager.getAddresses())
+          : [createMessageItem("Trace records update when the target is paused.")];
+      return;
+    }
+    try {
+      const response = await session.customRequest("traceRecords", { limit: this.traceLimit });
+      const block = isRecord(response?.trace) ? (response.trace as Record<string, unknown>) : isRecord(response) ? (response as Record<string, unknown>) : {};
+      const rawRecords = Array.isArray(block.records) ? (block.records as Array<Record<string, unknown>>) : [];
+      const records = await this.resolveTraceRecords(session, rawRecords);
+      this.entries = records;
+      this.rows =
+        records.length > 0
+          ? this.createTraceRows(records, this.breakpointManager.getAddresses())
+          : [createMessageItem("Trace buffer empty.")];
+    } catch (error) {
+      this.rows = [createMessageItem(`Unable to read trace records: ${getErrorMessage(error)}`)];
+    }
+  }
+
+  private async resolveTraceRecords(
+    session: vscode.DebugSession,
+    rawRecords: Array<Record<string, unknown>>,
+  ): Promise<TraceRecordEntry[]> {
+    const results: TraceRecordEntry[] = [];
+    const uniqueAddresses = new Set<number>();
+    for (const entry of rawRecords) {
+      const address = parseNumericLiteral(entry.pc as string | number | undefined);
+      if (address !== undefined) {
+        uniqueAddresses.add(address >>> 0);
+      }
+    }
+    for (const address of uniqueAddresses) {
+      if (!this.disasmCache.has(address)) {
+        await this.populateInstructionCache(session, address);
+      }
+    }
+    for (const entry of rawRecords.slice(-this.traceLimit)) {
+      const address = parseNumericLiteral(entry.pc as string | number | undefined);
+      if (address === undefined) {
+        continue;
+      }
+      const normalized = address >>> 0;
+      const seq =
+        typeof entry.seq === "number"
+          ? entry.seq
+          : typeof entry.seq === "string"
+            ? Number.parseInt(entry.seq, 10) || normalized
+            : normalized;
+      const instruction = this.disasmCache.get(normalized) ?? this.createFallbackInstruction(normalized);
+      results.push({
+        seq,
+        address: normalized,
+        instruction,
+      });
+    }
+    return results.slice(-this.traceLimit);
+  }
+
+  private async populateInstructionCache(session: vscode.DebugSession, address: number): Promise<void> {
+    try {
+      const response = await session.customRequest("disassemble", {
+        instructionCount: 1,
+        memoryReference: formatAddress(address),
+        resolveSymbols: true,
+      });
+      const instructions = Array.isArray(response?.instructions) ? (response.instructions as DisassembledInstruction[]) : [];
+      if (instructions.length) {
+          this.disasmCache.set(address, instructions[0]);
+          return;
+      }
+    } catch {
+      // ignore
+    }
+    this.disasmCache.set(address, this.createFallbackInstruction(address));
+  }
+
+  private createFallbackInstruction(address: number): DisassembledInstruction {
+    return {
+      address: formatAddress(address),
+      instruction: "<trace>",
+      instructionBytes: "",
+      instructionPointerReference: formatAddress(address),
+    };
+  }
+
+  private createTraceRows(entries: TraceRecordEntry[], breakpoints: Set<number>): vscode.TreeItem[] {
+    const highlight = entries.length ? entries[entries.length - 1].address : undefined;
+    return entries.map((entry) => {
+      const inst = entry.instruction ?? this.createFallbackInstruction(entry.address);
+      const item = createDisassemblyRow(inst, highlight, breakpoints);
+      const seqLabel = `#${entry.seq}`;
+      if (item.description) {
+        item.description = `${seqLabel}  ${item.description}`;
+      } else {
+        item.description = seqLabel;
+      }
+      return item;
+    });
   }
 }
 
@@ -1029,6 +1606,254 @@ function createDisassemblyRow(
   return item;
 }
 
+interface DisassemblyBreakpointDocument {
+  address: number;
+  pid?: number;
+  symbol?: string;
+  sourcePath?: string;
+  sourceLine?: number;
+}
+
+class HSXDisassemblyBreakpointDocumentProvider implements vscode.TextDocumentContentProvider {
+  static readonly scheme = "hsx-disassembly";
+
+  private readonly emitter = new vscode.EventEmitter<vscode.Uri>();
+  private readonly documents = new Map<string, DisassemblyBreakpointDocument>();
+
+  readonly onDidChange?: vscode.Event<vscode.Uri> = this.emitter.event;
+
+  provideTextDocumentContent(uri: vscode.Uri): string {
+    const key = uri.toString();
+    const doc = this.documents.get(key);
+    if (!doc) {
+      return "HSX Disassembly breakpoint metadata unavailable.";
+    }
+    const parts = [
+      "HSX Disassembly Breakpoint",
+      `PC: ${formatAddress(doc.address)}`,
+      typeof doc.pid === "number" ? `PID: ${doc.pid}` : undefined,
+      doc.symbol ? `Symbol: ${doc.symbol}` : undefined,
+      doc.sourcePath ? `Source: ${doc.sourcePath}${doc.sourceLine ? `:${doc.sourceLine}` : ""}` : undefined,
+      "",
+      "These breakpoints are managed by the HSX disassembly view.",
+    ].filter(Boolean);
+    return parts.join("\n");
+  }
+
+  update(uri: vscode.Uri, doc: DisassemblyBreakpointDocument): void {
+    const key = uri.toString();
+    this.documents.set(key, doc);
+    this.emitter.fire(uri);
+  }
+
+  remove(uri: vscode.Uri): void {
+    const key = uri.toString();
+    if (this.documents.delete(key)) {
+      this.emitter.fire(uri);
+    }
+  }
+
+  clear(): void {
+    if (!this.documents.size) {
+      return;
+    }
+    const uris = Array.from(this.documents.keys()).map((value) => vscode.Uri.parse(value));
+    this.documents.clear();
+    uris.forEach((uri) => this.emitter.fire(uri));
+  }
+
+  dispose(): void {
+    this.documents.clear();
+    this.emitter.dispose();
+  }
+}
+
+class HSXDisassemblyBreakpointManager implements vscode.Disposable {
+  private readonly breakpoints = new Map<number, vscode.SourceBreakpoint>();
+  private readonly uriByAddress = new Map<number, vscode.Uri>();
+  private readonly metadataByAddress = new Map<number, DisassemblyBreakpointDocument>();
+  private readonly enabledState = new Map<number, boolean>();
+  private readonly breakpointToAddress = new Map<vscode.Breakpoint, number>();
+  private syncing = false;
+  private disposed = false;
+  private readonly changeSubscription: vscode.Disposable;
+
+  constructor(
+    private readonly provider: HSXDisassemblyBreakpointDocumentProvider,
+    private readonly onUserChange: (change: HSXDisassemblyBreakpointChange) => void | Promise<void>,
+  ) {
+    this.changeSubscription = vscode.debug.onDidChangeBreakpoints((event) => {
+      void this.handleBreakpointChanges(event);
+    });
+  }
+
+  dispose(): void {
+    if (this.disposed) {
+      return;
+    }
+    this.disposed = true;
+    this.changeSubscription.dispose();
+    this.clear();
+  }
+
+  clear(): void {
+    this.syncing = true;
+    try {
+      if (this.breakpoints.size) {
+        vscode.debug.removeBreakpoints(Array.from(this.breakpoints.values()));
+      }
+      this.breakpoints.clear();
+      this.uriByAddress.clear();
+      this.metadataByAddress.clear();
+      this.enabledState.clear();
+      this.breakpointToAddress.clear();
+      this.provider.clear();
+    } finally {
+      this.syncing = false;
+    }
+  }
+
+  getAddresses(): Set<number> {
+    return new Set(this.breakpoints.keys());
+  }
+
+  syncBreakpoints(
+    addresses: Set<number>,
+    instructionMetadata: Map<number, DisassembledInstruction | undefined>,
+    session?: vscode.DebugSession,
+  ): void {
+    if (this.disposed) {
+      return;
+    }
+    const pid = (session?.configuration as HSXDebugConfiguration | undefined)?.pid;
+    this.syncing = true;
+    try {
+      for (const [address, breakpoint] of Array.from(this.breakpoints.entries())) {
+        if (!addresses.has(address)) {
+          vscode.debug.removeBreakpoints([breakpoint]);
+          const uri = this.uriByAddress.get(address);
+          if (uri) {
+            this.provider.remove(uri);
+            this.uriByAddress.delete(address);
+          }
+          this.breakpoints.delete(address);
+          this.metadataByAddress.delete(address);
+          this.enabledState.delete(address);
+          this.breakpointToAddress.delete(breakpoint);
+        }
+      }
+      for (const address of addresses) {
+        const normalized = address >>> 0;
+        const metadata = this.createDocumentData(normalized, pid, instructionMetadata.get(normalized));
+        const existing = this.breakpoints.get(normalized);
+        const previous = this.metadataByAddress.get(normalized);
+        const needsUpdate = !existing || !previous || !this.metadataEquals(previous, metadata);
+        if (!needsUpdate) {
+          continue;
+        }
+        if (existing) {
+          vscode.debug.removeBreakpoints([existing]);
+          this.breakpointToAddress.delete(existing);
+        }
+        const uri = this.createUri(normalized, pid);
+        this.provider.update(uri, metadata);
+        const position =
+          metadata.sourceLine && metadata.sourceLine > 0
+            ? new vscode.Position(Math.max(0, metadata.sourceLine - 1), 0)
+            : new vscode.Position(0, 0);
+        const breakpoint = new vscode.SourceBreakpoint(new vscode.Location(uri, position), true);
+        this.breakpoints.set(normalized, breakpoint);
+        this.uriByAddress.set(normalized, uri);
+        this.metadataByAddress.set(normalized, metadata);
+        this.enabledState.set(normalized, true);
+        this.breakpointToAddress.set(breakpoint, normalized);
+        vscode.debug.addBreakpoints([breakpoint]);
+      }
+    } finally {
+      this.syncing = false;
+    }
+  }
+
+  private createDocumentData(
+    address: number,
+    pid: number | undefined,
+    inst?: DisassembledInstruction,
+  ): DisassemblyBreakpointDocument {
+    const locationInfo = inst ? describeDisassemblyLocation(inst) : undefined;
+    const sourcePath = inst?.location?.path ?? locationInfo?.tooltip;
+    const sourceLine =
+      typeof inst?.line === "number"
+        ? inst.line
+        : typeof (inst?.location as { line?: number } | undefined)?.line === "number"
+          ? (inst?.location as { line?: number }).line
+          : undefined;
+    return {
+      address,
+      pid,
+      symbol: inst?.symbol,
+      sourcePath,
+      sourceLine,
+    };
+  }
+
+  private metadataEquals(a: DisassemblyBreakpointDocument, b: DisassemblyBreakpointDocument): boolean {
+    return (
+      a.address === b.address &&
+      a.pid === b.pid &&
+      a.symbol === b.symbol &&
+      a.sourcePath === b.sourcePath &&
+      a.sourceLine === b.sourceLine
+    );
+  }
+
+  private createUri(address: number, pid?: number): vscode.Uri {
+    const pidLabel = pid === undefined ? "pid-unknown" : `pid-${pid}`;
+    return vscode.Uri.parse(`${HSXDisassemblyBreakpointDocumentProvider.scheme}:/${pidLabel}/${formatAddress(address)}`);
+  }
+
+  private async handleBreakpointChanges(event: vscode.BreakpointsChangeEvent): Promise<void> {
+    if (this.syncing || this.disposed) {
+      return;
+    }
+    const removed: number[] = [];
+    for (const breakpoint of event.removed) {
+      const address = this.breakpointToAddress.get(breakpoint);
+      if (address === undefined) {
+        continue;
+      }
+      removed.push(address);
+      this.breakpoints.delete(address);
+      this.breakpointToAddress.delete(breakpoint);
+      const uri = this.uriByAddress.get(address);
+      if (uri) {
+        this.provider.remove(uri);
+        this.uriByAddress.delete(address);
+      }
+      this.metadataByAddress.delete(address);
+      this.enabledState.delete(address);
+    }
+    for (const change of event.changed) {
+      const address = this.breakpointToAddress.get(change);
+      if (address === undefined) {
+        continue;
+      }
+      const previous = this.enabledState.get(address) ?? true;
+      if (previous === change.enabled) {
+        continue;
+      }
+      this.enabledState.set(address, change.enabled);
+      await this.onUserChange({
+        type: "toggle",
+        addresses: [address],
+        enabled: change.enabled,
+      });
+    }
+    if (removed.length) {
+      await this.onUserChange({ type: "remove", addresses: removed });
+    }
+  }
+}
+
 function createMessageItem(message: string): HSXDisassemblyTreeItem {
   const item = new vscode.TreeItem(message, vscode.TreeItemCollapsibleState.None) as HSXDisassemblyTreeItem;
   item.iconPath = new vscode.ThemeIcon("info");
@@ -1088,11 +1913,25 @@ function describeDisassemblyLocation(inst: DisassembledInstruction): Disassembly
   };
 }
 
-function formatDisassemblyForCopy(inst: DisassembledInstruction): string {
+function formatDisassemblyForCopy(
+  inst: DisassembledInstruction,
+  referenceAddress?: number,
+  breakpoints?: Set<number>,
+): string {
   const address = inst.address ?? inst.memoryReference ?? "";
   const opcode = formatInstructionBytesDisplay(inst.instructionBytes);
   const instruction = inst.instruction ? inst.instruction.trim() : "";
-  const left = [address, opcode, instruction].filter(Boolean).join("  ") || instruction || address || "<instruction>";
+  const normalizedAddress = parseNumericLiteral(
+    typeof address === "string" ? address : typeof inst.instructionPointerReference === "string" ? inst.instructionPointerReference : undefined,
+  );
+  const isReference =
+    referenceAddress !== undefined && normalizedAddress !== undefined && normalizedAddress === (referenceAddress >>> 0);
+  const hasBreakpoint =
+    normalizedAddress !== undefined && breakpoints?.has(normalizedAddress >>> 0) ? true : false;
+  const marker = hasBreakpoint ? "0" : " ";
+  const margin = isReference ? "|-> " : "|   ";
+  const core = [address, opcode, instruction].filter(Boolean).join("  ") || instruction || address || "<instruction>";
+  const decoratedLeft = `${marker} ${margin}${core}`;
   const locationInfo = describeDisassemblyLocation(inst);
   const metaParts: string[] = [];
   if (inst.symbol) {
@@ -1101,7 +1940,22 @@ function formatDisassemblyForCopy(inst: DisassembledInstruction): string {
   if (locationInfo.label) {
     metaParts.push(locationInfo.label);
   }
-  return metaParts.length ? `${left}    ; ${metaParts.join("  ")}` : left;
+  return metaParts.length ? `${decoratedLeft}    ; ${metaParts.join("  ")}` : decoratedLeft;
+}
+
+function formatStackRowForCopy(row: StackRowData, isTop: boolean): string {
+  const marker = " ";
+  const margin = isTop ? "|-> " : "|   ";
+  const asciiPart = row.ascii ? `  ${row.ascii}` : "";
+  const left = `${formatAddress(row.address)}  ${formatWord(row.value)}${asciiPart}`;
+  return `${marker} ${margin}${left}    ; ${row.relative}`;
+}
+
+function formatRegisterRowForCopy(row: RegisterRowData): string {
+  const marker = " ";
+  const margin = "|   ";
+  const label = `${row.name.padEnd(4, " ")} ${row.value}`;
+  return `${marker} ${margin}${label}`;
 }
 
 async function readTargetMemory(session: vscode.DebugSession, address: number, length: number): Promise<Uint8Array | undefined> {
@@ -1185,6 +2039,36 @@ function getActiveHSXSession(): vscode.DebugSession | undefined {
   return undefined;
 }
 
+async function controlPlayPauseButton(coordinator: HSXDebugViewCoordinator): Promise<void> {
+  const session = getActiveHSXSession();
+  if (!session) {
+    void vscode.window.showWarningMessage("Start an HSX debug session to control execution.");
+    return;
+  }
+  const state = coordinator.getSessionState(session);
+  const shouldPause = state === "running";
+  const commandId = shouldPause ? "workbench.action.debug.pause" : "workbench.action.debug.continue";
+  const actionLabel = shouldPause ? "pause" : "continue";
+  try {
+    await vscode.commands.executeCommand(commandId);
+  } catch (error) {
+    void vscode.window.showErrorMessage(`Unable to ${actionLabel} HSX target: ${getErrorMessage(error)}`);
+  }
+}
+
+async function stepActiveDebugSession(): Promise<void> {
+  const session = getActiveHSXSession();
+  if (!session) {
+    void vscode.window.showWarningMessage("Start an HSX debug session to step instructions.");
+    return;
+  }
+  try {
+    await vscode.commands.executeCommand("workbench.action.debug.stepOver");
+  } catch (error) {
+    void vscode.window.showErrorMessage(`Unable to step HSX target: ${getErrorMessage(error)}`);
+  }
+}
+
 type ResolveResult = number | "session-required" | "unresolved";
 
 async function resolveAddressExpression(input: string): Promise<ResolveResult> {
@@ -1207,9 +2091,12 @@ async function resolveAddressExpression(input: string): Promise<ResolveResult> {
   }
 }
 
-function parseNumericLiteral(raw?: string): number | undefined {
+function parseNumericLiteral(raw?: string | number): number | undefined {
   if (!raw) {
     return undefined;
+  }
+  if (typeof raw === "number") {
+    return raw >>> 0;
   }
   const text = raw.trim();
   if (!text) {
@@ -1242,4 +2129,19 @@ function getErrorMessage(error: unknown): string {
     return error.message;
   }
   return String(error);
+}
+
+function computeExtensionFingerprint(extensionPath: string): string | undefined {
+  try {
+    const packageData = fs.readFileSync(path.join(extensionPath, "package.json"));
+    const bundlePath = path.join(extensionPath, "dist", "extension.js");
+    const bundleData = fs.readFileSync(bundlePath);
+    const hash = crypto.createHash("sha1");
+    hash.update(packageData);
+    hash.update(bundleData);
+    return hash.digest("hex").slice(0, 8);
+  } catch (error) {
+    console.warn("[hsx-debug] Unable to compute build fingerprint", error);
+    return undefined;
+  }
 }

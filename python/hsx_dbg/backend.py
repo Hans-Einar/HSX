@@ -391,6 +391,31 @@ class DebuggerBackend:
         self._expect_ok(resp, "watch remove")
 
     # ------------------------------------------------------------------
+    # Trace helpers
+    # ------------------------------------------------------------------
+    def trace_control(self, pid: int, enable: Optional[bool]) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {"cmd": "trace", "pid": int(pid)}
+        if enable is not None:
+            payload["mode"] = bool(enable)
+        resp = self.request(payload)
+        self._expect_ok(resp, "trace control")
+        return resp.get("trace") or {}
+
+    def trace_records(self, pid: int, *, limit: Optional[int] = None, export: bool = False) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {"cmd": "trace", "pid": int(pid), "op": "export" if export else "records"}
+        if limit is not None:
+            payload["limit"] = int(limit)
+        resp = self.request(payload)
+        self._expect_ok(resp, "trace records")
+        trace_info = resp.get("trace") or {}
+        records = trace_info.get("records")
+        if isinstance(records, list):
+            trace_info["records"] = [dict(record) for record in records if isinstance(record, dict)]
+        else:
+            trace_info["records"] = []
+        return trace_info
+
+    # ------------------------------------------------------------------
     # Symbols
     # ------------------------------------------------------------------
     def symbol_info(self, pid: int) -> Dict[str, Any]:

@@ -8,6 +8,9 @@ registers, and watches from within the IDE.
 
 - Supports launch/attach, pause/continue, single-step, stack traces, registers,
   watch display, and console output.
+- Includes dedicated HSX Memory, Stack, Registers, Disassembly, and Trace
+  views. The trace view captures the last 30 instructions when tracing is
+  enabled and exposes copy buttons for trace/stack/register data.
 - Relies on the Python `hsx_dap` module that lives in this repository. The
   packaged adapter automatically points `HSX_REPO_ROOT`/`PYTHONPATH` at your
   workspace so it can import the module even when the VSIX is installed
@@ -26,8 +29,8 @@ registers, and watches from within the IDE.
 3. Use `npm run compile` to build `dist/extension.js` or `npm run watch` to
    rebuild automatically while developing the extension.
 4. Press <kbd>F5</kbd> to launch an “Extension Development Host” session or run
-   `npm run package` (requires `vsce`) to produce a `.vsix` you can install
-   elsewhere. The contributed debug type is `hsx`.
+   `npm run package` (requires `vsce`) to produce `hsx-debug.vsix`, which you can
+   install elsewhere. The contributed debug type is `hsx`.
 5. Add a debug configuration similar to:
 
 ```jsonc

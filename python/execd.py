@@ -2136,7 +2136,12 @@ class ExecutiveState:
             else:
                 center_addr = int(pc) & 0xFFFFFFFF if isinstance(pc, int) else 0
             offset_instrs = max(0, count_value // 2)
-            start_addr = (center_addr - (offset_instrs * 4)) & 0xFFFFFFFF
+            # Prevent unsigned underflow when the PC is close to the start of memory.
+            offset_bytes = offset_instrs * 4
+            if center_addr < offset_bytes:
+                start_addr = 0
+            else:
+                start_addr = center_addr - offset_bytes
         else:
             if address is None:
                 start_addr = int(pc) & 0xFFFFFFFF if isinstance(pc, int) else 0
@@ -2184,6 +2189,26 @@ class ExecutiveState:
             count_value,
             reg_values=reg_values,
         )
+        if not instructions and view_mode == "around_pc" and center_addr is not None and start_addr != center_addr:
+            # Retry using the PC as the base when the pre-PC window is outside executable memory.
+            start_addr = center_addr
+            raw = self._read_instruction_bytes(pid, start_addr, max_bytes)
+            if isinstance(raw, str):
+                try:
+                    raw_bytes = bytes.fromhex(raw)
+                except ValueError:
+                    raw_bytes = raw.encode("utf-8", errors="ignore")
+            elif isinstance(raw, (bytes, bytearray)):
+                raw_bytes = bytes(raw)
+            else:
+                raw_bytes = b""
+            instructions, truncated, consumed = self._disassemble_bytes(
+                pid,
+                raw_bytes,
+                start_addr,
+                count_value,
+                reg_values=reg_values,
+            )
 
         for entry in instructions:
             symbol = self.symbol_lookup_addr(pid, entry["pc"])

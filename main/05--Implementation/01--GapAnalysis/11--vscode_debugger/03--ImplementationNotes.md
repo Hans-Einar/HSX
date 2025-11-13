@@ -355,3 +355,20 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 
 ### Next Steps
 - Start Phase 5 (adapter test automation/CI wiring) or iterate on Phase 4 UX polish per backlog priorities now that Phase 6 is complete.
+
+## 2025-11-13 - Codex (Session 20)
+
+### Scope
+- Plan area touched: Phase 6 follow-up (UX parity) + packaging/version sync.
+- Design sections reviewed: 04.11--vscode_debugger §5.2 (disassembly), extension packaging scripts.
+
+### Work Summary
+- Added an inline “Toggle Disassembly Breakpoint” command so instruction rows act as breakpoint targets; tree items now show breakpoint icons and react to adapter `breakpoint` events. The view seeds its cache from VS Code’s global breakpoint list so CLI-created instruction breakpoints appear immediately.
+- Synced version numbering between the VS Code extension and the adapter: `npm run package` bumps the extension patch version automatically, the adapter factory passes that version via `--adapter-version` and `HSX_EXTENSION_VERSION`, and the DAP now logs `HSX DAP adapter starting (pid=…, version=…)` with the actual value even if an older extension build is running.
+
+### Testing
+- `npm run compile` (TypeScript build)
+- `PYTHONPATH=. pytest python/tests/test_hsx_dap_harness.py::test_remote_breakpoint_sync_emits_telemetry python/tests/test_hsx_dap_harness.py::test_stopped_event_emits_disassembly_telemetry`
+
+### Next Steps
+- Encourage packaging/reinstall (vsce) so the new command/version plumbing reaches the editor; continue with Phase 4/5 work afterward.

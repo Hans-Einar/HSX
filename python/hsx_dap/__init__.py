@@ -358,6 +358,8 @@ class HSXDebugAdapter:
         except Exception:
             self.logger.debug("clock_start failed (continuing anyway)", exc_info=True)
         self.protocol.send_event("continued", {"threadId": self.current_pid})
+        self._set_thread_state(self.current_pid, "running")
+        self._synchronize_execution_state(source="continue", refresh_breakpoints=True)
         return {"allThreadsContinued": True}
 
     def _handle_pause(self, args: JsonDict) -> JsonDict:
@@ -405,6 +407,8 @@ class HSXDebugAdapter:
             description=description,
             pc=pc,
         )
+        self._set_thread_state(self.current_pid, "paused")
+        self._synchronize_execution_state(source="pause", refresh_breakpoints=True)
 
     def _handle_next(self, args: JsonDict) -> JsonDict:
         self._ensure_client()
@@ -524,6 +528,18 @@ class HSXDebugAdapter:
         source_path = source.get("path") or source.get("name")
         source_key = self._canonical_source_key(source)
         breakpoints = args.get("breakpoints") or []
+        if isinstance(source_path, str) and source_path.startswith("hsx-disassembly:"):
+            self.logger.info("setBreakpoints: ignoring HSX disassembly pseudo-source %s", source_path)
+            results: List[JsonDict] = []
+            for bp in breakpoints:
+                results.append(
+                    {
+                        "verified": True,
+                        "line": bp.get("line"),
+                        "message": "Managed by HSX disassembly view.",
+                    }
+                )
+            return {"breakpoints": results}
         self.logger.info("setBreakpoints: source=%s, count=%d", source_path, len(breakpoints))
         self._ensure_symbol_mapper()
         if not self.client:
@@ -645,6 +661,36 @@ class HSXDebugAdapter:
         else:
             self._breakpoint_specs.pop(source_key, None)
         return {"breakpoints": results}
+
+    def _handle_traceRecords(self, args: JsonDict) -> JsonDict:  # noqa: N802
+        self._ensure_client()
+        if self.current_pid is None:
+            raise RuntimeError("traceRecords requires an attached PID")
+        limit = self._coerce_optional_int(args.get("limit"))
+        export = self._coerce_bool(args.get("export"))
+        info = self._call_backend("trace_records", self.current_pid, limit=limit, export=export)
+        if not isinstance(info, dict):
+            return {"records": []}
+        return info
+
+    def _handle_traceControl(self, args: JsonDict) -> JsonDict:  # noqa: N802
+        self._ensure_client()
+        if self.current_pid is None:
+            raise RuntimeError("traceControl requires an attached PID")
+        enabled_value = args.get("enabled")
+        if enabled_value is None:
+            mode = None
+        elif isinstance(enabled_value, bool):
+            mode = enabled_value
+        else:
+            mode = str(enabled_value).strip().lower() in {"1", "true", "on"}
+        info = self._call_backend("trace_control", self.current_pid, enable=mode)
+        return info or {}
+
+    def _handle_readRegisters(self, args: JsonDict) -> JsonDict:  # noqa: N802
+        self._ensure_client()
+        registers = self._format_registers()
+        return {"registers": registers}
 
     def _handle_evaluate(self, args: JsonDict) -> JsonDict:
         expression = str(args.get("expression") or "").strip()
@@ -913,6 +959,7 @@ class HSXDebugAdapter:
         self._watch_expr_to_id.clear()
         self._watch_id_to_expr.clear()
         self._ensure_symbol_mapper(force=True)
+        self._synchronize_execution_state(source="connect", refresh_breakpoints=False)
 
     def _create_backend(self, host: str, port: int) -> DebuggerBackend:
         factory_path = os.environ.get(BACKEND_FACTORY_ENV)
@@ -2178,7 +2225,10 @@ class HSXDebugAdapter:
             if previous_state != "running":
                 self.protocol.send_event("continued", {"threadId": pid})
             return
-        if state in {"paused", "stopped"} or reason in {"debug_break", "user_pause"}:
+        if reason == "debug_break":
+            self.logger.debug("Ignoring task_state debug_break (DAP event will follow)")
+            return
+        if state in {"paused", "stopped"} or reason in {"user_pause"}:
             pc = self._extract_task_state_pc(data)
             description = f"Task {state}" if state else (data.get("reason") or "stopped")
             if reason == "user_pause":
@@ -2208,6 +2258,12 @@ class HSXDebugAdapter:
             self._thread_states[pid]["name"] = name
         return False
 
+    def _set_thread_state(self, pid: Optional[int], state: Optional[str]) -> None:
+        if pid is None:
+            return
+        entry = self._thread_states.setdefault(pid, {"name": f"PID {pid}", "state": None})
+        entry["state"] = state
+
     def _extract_task_state_pc(self, task_data: JsonDict) -> Optional[int]:
         details = None
         if isinstance(task_data, dict):
@@ -2222,6 +2278,100 @@ class HSXDebugAdapter:
             if isinstance(pc, (int, float)):
                 return int(pc)
         return None
+
+    def _fetch_task_snapshot(self, pid: int) -> Optional[Dict[str, Any]]:
+        try:
+            listing = self._call_backend("list_tasks")
+        except DebuggerBackendError as exc:
+            self.logger.debug("State sync list_tasks failed: %s", exc)
+            return None
+        tasks = listing.get("tasks")
+        if not isinstance(tasks, list):
+            return None
+        for entry in tasks:
+            if not isinstance(entry, dict):
+                continue
+            raw_pid = entry.get("pid")
+            try:
+                entry_pid = int(raw_pid)
+            except (TypeError, ValueError):
+                continue
+            if entry_pid == pid:
+                return dict(entry)
+        return None
+
+    def _extract_snapshot_pc(self, snapshot: Dict[str, Any]) -> Optional[int]:
+        for key in ("pc", "PC"):
+            value = snapshot.get(key)
+            if isinstance(value, (int, float)):
+                return int(value)
+            if isinstance(value, str):
+                try:
+                    return int(value, 0)
+                except ValueError:
+                    continue
+        context = snapshot.get("context")
+        if isinstance(context, dict):
+            for key in ("pc", "PC"):
+                value = context.get(key)
+                if isinstance(value, (int, float)):
+                    return int(value)
+                if isinstance(value, str):
+                    try:
+                        return int(value, 0)
+                    except ValueError:
+                        continue
+        details = snapshot.get("details")
+        if isinstance(details, dict):
+            for key in ("pc", "PC"):
+                value = details.get(key)
+                if isinstance(value, (int, float)):
+                    return int(value)
+                if isinstance(value, str):
+                    try:
+                        return int(value, 0)
+                    except ValueError:
+                        continue
+        return None
+
+    def _synchronize_execution_state(self, *, source: str, refresh_breakpoints: bool = False) -> None:
+        pid = self.current_pid
+        if pid is None or not self.client:
+            return
+        if refresh_breakpoints:
+            try:
+                self._sync_remote_breakpoints()
+            except Exception:
+                self.logger.debug("Breakpoint sync (%s) failed", source, exc_info=True)
+        snapshot = self._fetch_task_snapshot(pid)
+        if not snapshot:
+            return
+        state_raw = snapshot.get("state")
+        if not state_raw:
+            return
+        state = str(state_raw).lower()
+        reason_raw = snapshot.get("last_reason") or snapshot.get("reason")
+        reason = str(reason_raw).lower() if isinstance(reason_raw, str) else None
+        details_payload = snapshot.get("details")
+        details = dict(details_payload) if isinstance(details_payload, dict) else {}
+        pc_value = self._extract_snapshot_pc(snapshot)
+        if pc_value is None and state in {"paused", "stopped"}:
+            pc_value = self._read_current_pc()
+        if pc_value is not None and "pc" not in details:
+            details["pc"] = f"0x{pc_value & 0xFFFFFFFF:08X}"
+        cached_state = self._thread_states.get(pid, {}).get("state")
+        if cached_state == state:
+            return
+        event_data: JsonDict = {"new_state": state}
+        if reason:
+            event_data["reason"] = reason
+        if details:
+            event_data["details"] = details
+        name_value = snapshot.get("name")
+        if isinstance(name_value, str):
+            event_data["name"] = name_value
+        self.logger.info("State sync (%s): pid=%s state=%s reason=%s", source, pid, state, reason or "n/a")
+        self._handle_task_state_event({"pid": pid, "data": event_data})
 
     def _resolve_frame(self, raw_frame_id) -> Optional[_FrameRecord]:
         if isinstance(raw_frame_id, _FrameRecord):
@@ -2536,7 +2686,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--port", type=int, default=9998)
     parser.add_argument("--log-file")
     parser.add_argument("--log-level", default="INFO")
-    parser.add_argument("--adapter-version", default="unknown")
+    parser.add_argument("--adapter-version", default=os.environ.get("HSX_EXTENSION_VERSION", "unknown"))
     args, _ = parser.parse_known_args(argv)
     print(f"[hsx-dap] CLI args: pid={args.pid} host={args.host} port={args.port} log={args.log_file}", flush=True)
     if args.log_file:
@@ -2551,8 +2701,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     protocol = DAPProtocol(sys.stdin.buffer, sys.stdout.buffer)
     adapter = HSXDebugAdapter(protocol)
     adapter.current_pid = args.pid
+    adapter_version = args.adapter_version or "unknown"
+    if adapter_version == "unknown":
+        adapter_version = _detect_extension_version()
     logger = logging.getLogger("hsx-dap")
-    logger.info("HSX DAP adapter starting (pid=%s, version=%s)", os.getpid(), args.adapter_version)
+    logger.info("HSX DAP adapter starting (pid=%s, version=%s)", os.getpid(), adapter_version)
     try:
         adapter.serve()
         logger.info("HSX DAP adapter exiting normally")
