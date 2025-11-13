@@ -77,9 +77,12 @@ export class HSXConfigurationProvider implements vscode.DebugConfigurationProvid
 
 export class HSXAdapterFactory implements vscode.DebugAdapterDescriptorFactory, vscode.Disposable {
   private readonly adapterScript: string;
+  private readonly adapterVersion: string;
 
   constructor(private readonly context: vscode.ExtensionContext) {
     this.adapterScript = context.asAbsolutePath(path.join("debugAdapter", "hsx-dap.py"));
+    const pkg = context.extension.packageJSON as { version?: string } | undefined;
+    this.adapterVersion = typeof pkg?.version === "string" ? pkg.version : "dev";
   }
 
   createDebugAdapterDescriptor(session: vscode.DebugSession): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
@@ -133,6 +136,8 @@ export class HSXAdapterFactory implements vscode.DebugAdapterDescriptorFactory, 
       this.createLogFile(),
       "--log-level",
       String(config.logLevel ?? DEFAULT_LOG_LEVEL).toUpperCase(),
+      "--adapter-version",
+      this.adapterVersion,
     ];
     if (Array.isArray(config.adapterArgs)) {
       for (const value of config.adapterArgs) {
@@ -299,6 +304,11 @@ export function activate(context: vscode.ExtensionContext): void {
       void disassemblyProvider.copyVisibleInstructions();
     }),
   );
+  context.subscriptions.push(
+    vscode.commands.registerCommand("hsx.disassembly.toggleBreakpoint", async (item?: HSXDisassemblyTreeItem) => {
+      await disassemblyProvider.toggleBreakpoint(item);
+    }),
+  );
 
   context.subscriptions.push(
     vscode.debug.onDidChangeActiveDebugSession(() => {
@@ -451,6 +461,7 @@ type RefreshReason = "manual" | "auto";
 
 interface HSXRefreshableView extends vscode.Disposable {
   refresh(reason?: RefreshReason): Promise<void>;
+  handleBreakpointEvent?(payload: Record<string, unknown>): void;
 }
 
 interface DisassembledInstruction {
@@ -473,6 +484,11 @@ interface FrameMetadata {
   address?: number;
   order: number;
   name?: string;
+}
+
+interface HSXDisassemblyTreeItem extends vscode.TreeItem {
+  addressValue?: number;
+  instructionData?: DisassembledInstruction;
 }
 
 class HSXDebugViewCoordinator {
@@ -519,12 +535,18 @@ class HSXDebugViewCoordinator {
       return;
     }
     const eventName = (message as DebugEventMessage).event;
+    const eventMessage = message as DebugEventMessage;
     if (eventName === "telemetry") {
-      const body = isRecord((message as DebugEventMessage).body) ? ((message as DebugEventMessage).body as Record<string, unknown>) : undefined;
+      const body = isRecord(eventMessage.body) ? (eventMessage.body as Record<string, unknown>) : undefined;
       const subsystem = optionalString(body?.subsystem);
       if (subsystem === "hsx-disassembly") {
         void this.refreshDisassembly("auto");
       }
+      return;
+    }
+    if (eventName === "breakpoint") {
+      const body = isRecord(eventMessage.body) ? (eventMessage.body as Record<string, unknown>) : {};
+      this.notifyBreakpointEvent(body);
       return;
     }
     if (eventName === "stopped" || eventName === "continued" || eventName === "initialized") {
@@ -532,6 +554,19 @@ class HSXDebugViewCoordinator {
     }
     if (eventName === "terminated") {
       this.clearSession(session);
+    }
+  }
+
+  private notifyBreakpointEvent(body: Record<string, unknown>): void {
+    for (const view of this.views) {
+      if (typeof view.handleBreakpointEvent !== "function") {
+        continue;
+      }
+      try {
+        view.handleBreakpointEvent(body);
+      } catch (error) {
+        console.warn("[hsx-debug] breakpoint event propagation failed", error);
+      }
     }
   }
 
@@ -725,11 +760,12 @@ class HSXDisassemblyViewProvider implements vscode.TreeDataProvider<vscode.TreeI
   private static readonly MAX_INSTRUCTION_BYTES = 8;
 
   private readonly emitter = new vscode.EventEmitter<vscode.TreeItem | undefined | void>();
-  private rows: vscode.TreeItem[] = [createMessageItem("No disassembly data")];
+  private rows: HSXDisassemblyTreeItem[] = [createMessageItem("No disassembly data")];
   private instructions: DisassembledInstruction[] = [];
   private followPc = true;
   private manualBase: number | undefined;
   private referenceAddress: number | undefined;
+  private instructionBreakpoints: Set<number> = new Set<number>();
 
   constructor(private readonly coordinator: HSXDebugViewCoordinator) {
     this.coordinator.register(this);
@@ -858,10 +894,57 @@ class HSXDisassemblyViewProvider implements vscode.TreeDataProvider<vscode.TreeI
       }
       this.referenceAddress = highlightAddress;
       this.instructions = instructions;
-      this.rows = instructions.map((inst) => createDisassemblyRow(inst, this.referenceAddress));
+      this.rows = instructions.map((inst) => createDisassemblyRow(inst, this.referenceAddress, this.instructionBreakpoints));
     } catch (error) {
       this.rows = [createMessageItem(`Disassembly failed: ${getErrorMessage(error)}`)];
     }
+  }
+
+  async toggleBreakpoint(item?: HSXDisassemblyTreeItem): Promise<void> {
+    if (!item || item.addressValue === undefined) {
+      void vscode.window.showInformationMessage("Select an instruction row to toggle a breakpoint.");
+      return;
+    }
+    const session = getActiveHSXSession();
+    if (!session) {
+      void vscode.window.showWarningMessage("Start an HSX debug session to toggle instruction breakpoints.");
+      return;
+    }
+    const address = item.addressValue >>> 0;
+    const next = new Set(this.instructionBreakpoints);
+    if (next.has(address)) {
+      next.delete(address);
+    } else {
+      next.add(address);
+    }
+    try {
+      await session.customRequest("setInstructionBreakpoints", {
+        breakpoints: Array.from(next).map((value) => ({
+          instructionReference: formatAddress(value),
+        })),
+      });
+      this.instructionBreakpoints = next;
+      await this.refresh("auto");
+    } catch (error) {
+      void vscode.window.showErrorMessage(`Unable to toggle breakpoint: ${getErrorMessage(error)}`);
+    }
+  }
+
+  handleBreakpointEvent(payload: Record<string, unknown>): void {
+    const reason = optionalString(payload.reason)?.toLowerCase();
+    const breakpointPayload = isRecord(payload.breakpoint) ? (payload.breakpoint as Record<string, unknown>) : undefined;
+    const addressString = optionalString(breakpointPayload?.instructionReference) ?? optionalString(breakpointPayload?.address);
+    const address = parseNumericLiteral(addressString);
+    if (address === undefined) {
+      return;
+    }
+    const normalized = address >>> 0;
+    if (reason === "removed") {
+      this.instructionBreakpoints.delete(normalized);
+    } else {
+      this.instructionBreakpoints.add(normalized);
+    }
+    void this.refresh("auto");
   }
 
   private computeWindowStart(center: number): number {
@@ -886,14 +969,17 @@ function createMemoryRow(address: number, data: Uint8Array): vscode.TreeItem {
   return item;
 }
 
-function createDisassemblyRow(inst: DisassembledInstruction, highlightAddress?: number): vscode.TreeItem {
+function createDisassemblyRow(
+  inst: DisassembledInstruction,
+  highlightAddress?: number,
+  breakpoints?: Set<number>,
+): HSXDisassemblyTreeItem {
   const address = inst.address ?? inst.memoryReference ?? "";
   const opcode = formatInstructionBytesDisplay(inst.instructionBytes);
   const instruction = inst.instruction ? inst.instruction.trim() : "";
   const leftParts = [address, opcode, instruction].filter(Boolean);
   const label = leftParts.length ? leftParts.join("  ") : address || "<instruction>";
-  const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
-  item.contextValue = "hsxDisassemblyInstruction";
+  const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None) as HSXDisassemblyTreeItem;
 
   const locationInfo = describeDisassemblyLocation(inst);
   const descriptionParts: string[] = [];
@@ -924,14 +1010,27 @@ function createDisassemblyRow(inst: DisassembledInstruction, highlightAddress?: 
     };
   }
   const instAddress = parseNumericLiteral(address || inst.instructionPointerReference);
+  item.addressValue = instAddress;
+  item.instructionData = inst;
+  const hasBreakpoint = typeof instAddress === "number" && breakpoints?.has(instAddress >>> 0);
   if (highlightAddress !== undefined && instAddress !== undefined && instAddress === highlightAddress) {
     item.iconPath = new vscode.ThemeIcon("debug-stackframe");
+  } else if (hasBreakpoint) {
+    item.iconPath = new vscode.ThemeIcon("debug-breakpoint");
   }
+  const contextParts = ["hsxDisassemblyInstruction"];
+  if (instAddress !== undefined) {
+    contextParts.push("address");
+  }
+  if (hasBreakpoint) {
+    contextParts.push("breakpoint");
+  }
+  item.contextValue = contextParts.join(".");
   return item;
 }
 
-function createMessageItem(message: string): vscode.TreeItem {
-  const item = new vscode.TreeItem(message, vscode.TreeItemCollapsibleState.None);
+function createMessageItem(message: string): HSXDisassemblyTreeItem {
+  const item = new vscode.TreeItem(message, vscode.TreeItemCollapsibleState.None) as HSXDisassemblyTreeItem;
   item.iconPath = new vscode.ThemeIcon("info");
   item.contextValue = "hsxViewMessage";
   return item;

@@ -347,6 +347,7 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 ### Work Summary
 - Extended `HSXDebugAdapter` to emit a dedicated `hsx-disassembly` telemetry event every time `_emit_stopped_event` fires, and taught the VS Code coordinator to refresh only the disassembly view when that telemetry arrives, guaranteeing the panel updates immediately after breakpoint hits (instruction or source) without redundant refreshes.
 - Clamped disassembly requests from the view so `instructionCount` is always ≥1 (even if window tuning changes) and updated the TypeScript tree to auto-refresh when telemetry arrives, fulfilling the “auto-refresh on stopped” requirement.
+- Added `hsx.disassembly.toggleBreakpoint` so rows in the disassembly view can add/remove instruction breakpoints inline; tree items now reflect active breakpoints via icons/context menus.
 - Added harness coverage for the new telemetry path (`python/tests/test_hsx_dap_harness.py::test_stopped_event_emits_disassembly_telemetry`) alongside the existing remote-breakpoint sync test to guard against regressions.
 
 ### Testing

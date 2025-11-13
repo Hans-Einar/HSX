@@ -2536,6 +2536,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--port", type=int, default=9998)
     parser.add_argument("--log-file")
     parser.add_argument("--log-level", default="INFO")
+    parser.add_argument("--adapter-version", default="unknown")
     args, _ = parser.parse_known_args(argv)
     print(f"[hsx-dap] CLI args: pid={args.pid} host={args.host} port={args.port} log={args.log_file}", flush=True)
     if args.log_file:
@@ -2551,7 +2552,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     adapter = HSXDebugAdapter(protocol)
     adapter.current_pid = args.pid
     logger = logging.getLogger("hsx-dap")
-    logger.info("HSX DAP adapter starting (pid=%s)", os.getpid())
+    logger.info("HSX DAP adapter starting (pid=%s, version=%s)", os.getpid(), args.adapter_version)
     try:
         adapter.serve()
         logger.info("HSX DAP adapter exiting normally")

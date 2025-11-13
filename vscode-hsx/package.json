@@ -22,7 +22,8 @@
     "onCommand:hsx.views.setDisassemblyBase",
     "onCommand:hsx.views.followProgramCounter",
     "onCommand:hsx.views.goToProgramCounter",
-    "onCommand:hsx.views.copyDisassembly"
+    "onCommand:hsx.views.copyDisassembly",
+    "onCommand:hsx.disassembly.toggleBreakpoint"
   ],
   "contributes": {
     "debuggers": [
@@ -158,6 +159,11 @@
         "command": "hsx.views.copyDisassembly",
         "title": "Copy Disassembly Rows",
         "icon": "$(copy)"
+      },
+      {
+        "command": "hsx.disassembly.toggleBreakpoint",
+        "title": "Toggle Disassembly Breakpoint",
+        "icon": "$(debug-breakpoint)"
       }
     ],
     "menus": {
@@ -202,6 +208,13 @@
           "when": "view == hsxDisassemblyView",
           "group": "navigation@9"
         }
+      ],
+      "view/item/context": [
+        {
+          "command": "hsx.disassembly.toggleBreakpoint",
+          "when": "view == hsxDisassemblyView && viewItem =~ /hsxDisassemblyInstruction\\.address/",
+          "group": "inline"
+        }
       ]
     }
   },
@@ -209,6 +222,7 @@
     "compile": "tsc -p ./",
     "watch": "tsc -w -p ./",
     "test": "npm run compile && node ./dist/test/configProvider.test.js",
+    "prepackage": "node ./scripts/bump-version.js",
     "package": "npm run compile && vsce package"
   },
   "devDependencies": {
