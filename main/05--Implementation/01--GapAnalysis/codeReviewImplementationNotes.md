@@ -30,3 +30,9 @@
 - `_emit_stopped_event` accepts missing PC data safely, preventing crashes when the runtime reports mailbox waits or sleep states without an address (`python/hsx_dap/__init__.py:2310-2350`).
 - New `_describe_stop_reason` messaging plus expanded `_handle_task_state_event` logic surface mailbox wait/sleep reasons directly in the stopped description, and `_handle_exec_event` now converts `mailbox_*` / `sleep_*` events into task-state updates (`python/hsx_dap/__init__.py:1029-1080`, `2405-2488`).
 - `pytest python/tests/test_hsx_dap_harness.py` continues to pass (19 tests), validating that the deferred pause/step flows still satisfy the DAP harness expectations.
+
+## Phase 3 – Event & Telemetry Coverage
+- `_EVENT_CATEGORIES` now includes `trace_step`, `sleep_request`, and `sleep_complete`, and `_handle_exec_event` forwards these events to the state machine while calling `_emit_disassembly_refresh_event` so the disassembly view tracks streamed PCs (`python/hsx_dap/__init__.py:174-190`, `1029-1080`).
+- Mailbox and sleep events now yield descriptive `stopped` messages (“Waiting on mailbox …”, “Sleeping (XX ms)”), thanks to the new `_describe_stop_reason` helper and richer state snapshots cached per PID (`python/hsx_dap/__init__.py:2405-2488`).
+- Added `_task_snapshot_cache` so `_synchronize_execution_state` can reuse recent task-state data instead of issuing a synchronous `list_tasks` after every stop (`python/hsx_dap/__init__.py:225-252`, `2490-2537`).
+- Cache entries are refreshed on every event or backend snapshot and cleared on shutdown/reconnect, keeping phase progress consistent without spamming the executive.

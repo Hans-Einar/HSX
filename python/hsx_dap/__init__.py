@@ -181,6 +181,9 @@ class HSXDebugAdapter:
         "mailbox_wait",
         "mailbox_wake",
         "mailbox_timeout",
+        "trace_step",
+        "sleep_request",
+        "sleep_complete",
     ]
 
     def __init__(self, protocol: DAPProtocol) -> None:
@@ -229,6 +232,7 @@ class HSXDebugAdapter:
         self._pending_step: bool = False
         self._step_description: Optional[str] = None
         self._step_fallback_timer: Optional[threading.Timer] = None
+        self._task_snapshot_cache: Dict[int, Tuple[float, Dict[str, Any]]] = {}
 
     def serve(self) -> None:
         while True:
@@ -1041,6 +1045,15 @@ class HSXDebugAdapter:
         event_type = str(event.get("type") or "")
         data = event.get("data") or {}
         pid = event.get("pid")
+        if event_type == "trace_step":
+            pc = _to_int(data.get("pc"))
+            target_pid = pid or self.current_pid
+            if target_pid is not None and pc is not None:
+                meta = self._thread_states.setdefault(target_pid, {"name": f"PID {target_pid}", "state": None})
+                meta["last_pc"] = pc
+            if pc is not None:
+                self._emit_disassembly_refresh_event(pc)
+            return
         if event_type == "mailbox_wait":
             details = dict(data) if isinstance(data, dict) else {}
             self._handle_task_state_event(
@@ -1273,6 +1286,22 @@ class HSXDebugAdapter:
             self.protocol.send_event("telemetry", body)
         except Exception:
             self.logger.debug("failed to emit transport warning", exc_info=True)
+
+    def _cache_task_snapshot(self, pid: int, snapshot: Dict[str, Any]) -> None:
+        if pid is None:
+            return
+        self._task_snapshot_cache[int(pid)] = (time.monotonic(), dict(snapshot))
+
+    def _get_cached_snapshot(self, pid: int, *, max_age: float = 1.0) -> Optional[Dict[str, Any]]:
+        if pid is None:
+            return None
+        entry = self._task_snapshot_cache.get(int(pid))
+        if not entry:
+            return None
+        ts, snapshot = entry
+        if time.monotonic() - ts > max_age:
+            return None
+        return dict(snapshot)
 
     def _read_current_pc(self) -> Optional[int]:
         if not self.client or not self.current_pid:
@@ -2304,6 +2333,7 @@ class HSXDebugAdapter:
         self._next_source_id = 1
         self.project_root = REPO_ROOT
         self._source_base_dirs = [REPO_ROOT]
+        self._task_snapshot_cache.clear()
 
     def _update_project_root(self, args: JsonDict) -> None:
         workspace_hint = args.get("workspaceFolder") or args.get("workspaceRoot") or args.get("workspace")
@@ -2451,6 +2481,14 @@ class HSXDebugAdapter:
                 meta["state"] = state
             if name:
                 meta["name"] = name
+        details = data.get("details") if isinstance(data, dict) else None
+        snapshot_record: Dict[str, Any] = {
+            "pid": pid,
+            "state": state or previous_state,
+            "name": (meta or {}).get("name"),
+            "details": details,
+            "reason": reason,
+        }
         if created:
             self.protocol.send_event("thread", {"reason": "started", "threadId": pid})
         if state == "terminated":
@@ -2458,10 +2496,14 @@ class HSXDebugAdapter:
             self._thread_states.pop(pid, None)
             if self.current_pid == pid:
                 self.current_pid = None
+            snapshot_record["state"] = "terminated"
+            self._cache_task_snapshot(pid, snapshot_record)
             return
         if state == "running":
             if previous_state != "running":
                 self.protocol.send_event("continued", {"threadId": pid})
+            snapshot_record["state"] = "running"
+            self._cache_task_snapshot(pid, snapshot_record)
             return
         stoppable_states = {"paused", "stopped", "waiting_mbx", "sleeping"}
         stoppable_reasons = {"user_pause", "debug_break", "mailbox_wait", "sleep", "sleep_request"}
@@ -2477,6 +2519,8 @@ class HSXDebugAdapter:
                     self.logger.debug("Suppressing duplicate user_pause event (snapshot already emitted)")
                     self._synthetic_pause_pending = False
                     self._complete_pending_step()
+                    snapshot_record["state"] = state or previous_state
+                    self._cache_task_snapshot(pid, snapshot_record)
                     return
                 self._synthetic_pause_pending = False
             self._emit_stopped_event(
@@ -2486,7 +2530,10 @@ class HSXDebugAdapter:
                 pc=pc,
             )
             self._complete_pending_step()
+            snapshot_record["state"] = state or previous_state or reason or "stopped"
+            self._cache_task_snapshot(pid, snapshot_record)
             return
+        self._cache_task_snapshot(pid, snapshot_record)
 
     def _ensure_thread_entry(self, pid: Optional[int], *, name: Optional[str] = None) -> bool:
         if pid is None:
@@ -2539,7 +2586,9 @@ class HSXDebugAdapter:
             except (TypeError, ValueError):
                 continue
             if entry_pid == pid:
-                return dict(entry)
+                snapshot = dict(entry)
+                self._cache_task_snapshot(pid, snapshot)
+                return snapshot
         return None
 
     def _extract_snapshot_pc(self, snapshot: Dict[str, Any]) -> Optional[int]:
@@ -2626,15 +2675,19 @@ class HSXDebugAdapter:
                 self._sync_remote_breakpoints()
             except Exception:
                 self.logger.debug("Breakpoint sync (%s) failed", source, exc_info=True)
-        try:
-            snapshot = self._fetch_task_snapshot(pid)
-        except DebuggerBackendError as exc:
-            self.logger.debug("State sync list_tasks failed: %s", exc)
-            self._enter_backoff("state", exc)
-            return
-        self._reset_backoff("state")
-        if not snapshot:
-            return
+        snapshot = self._get_cached_snapshot(pid)
+        if snapshot is None:
+            try:
+                snapshot = self._fetch_task_snapshot(pid)
+            except DebuggerBackendError as exc:
+                self.logger.debug("State sync list_tasks failed: %s", exc)
+                self._enter_backoff("state", exc)
+                return
+            self._reset_backoff("state")
+            if not snapshot:
+                return
+        else:
+            self.logger.debug("Using cached task snapshot for pid %s", pid)
         state_raw = snapshot.get("state")
         if not state_raw:
             return

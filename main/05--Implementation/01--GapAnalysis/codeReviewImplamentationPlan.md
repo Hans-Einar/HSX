@@ -28,9 +28,9 @@
 ## Phase 3 – Event & Telemetry Coverage
 **Goal:** Expose the runtime information promised by the architecture/design docs.
 
-- [ ] Handle `mailbox_wait/wake/timeout`/`sleep_*` events in `_handle_exec_event`, updating thread state and stop descriptions with descriptor/timeout metadata.
-- [ ] Add `trace_step` to `_EVENT_CATEGORIES` and drive disassembly/PC follow logic from streamed trace events instead of polling.
-- [ ] Use backend/session caches (e.g., `DebuggerBackend.list_tasks`, `ExecutiveSession.stack_info`) instead of synchronous `ps` after every stop.
+- [x] Handle `mailbox_wait/wake/timeout`/`sleep_*` events in `_handle_exec_event`, updating thread state and stop descriptions with descriptor/timeout metadata.
+- [x] Add `trace_step` to `_EVENT_CATEGORIES` and drive disassembly/PC follow logic from streamed trace events instead of polling.
+- [x] Use backend/session caches (e.g., `DebuggerBackend.list_tasks`, `ExecutiveSession.stack_info`) instead of synchronous `ps` after every stop.
 
 ## Phase 4 – Regression Tests & Tooling
 **Goal:** Prevent recurrence and document guarantees for IDE users.
