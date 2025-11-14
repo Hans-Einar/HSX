@@ -35,10 +35,10 @@
 ## Phase 4 – Regression Tests & Tooling
 **Goal:** Prevent recurrence and document guarantees for IDE users.
 
-- [ ] Extend `python/tests/test_hsx_dap_harness.py` with pause/step/mailbox cases to lock in the new behaviour.
-- [ ] Capture an end-to-end VS Code scenario (e.g., `examples/demos/longrun`) demonstrating source-level stepping, mailbox waits, and reconnect recovery.
-- [ ] Update `vscodeDebugStackImplNotes.md`, VS Code README, and release notes to describe the pause fallback, event coverage, and remaining limitations.
-- [ ] Emit structured telemetry when fallback paths trigger (pause timeout, reconnect thrash) so logs remain actionable.
+- [x] Extend `python/tests/test_hsx_dap_harness.py` with pause/step/mailbox cases to lock in the new behaviour.
+- [x] Capture an end-to-end VS Code scenario (e.g., `examples/demos/longrun`) demonstrating source-level stepping, mailbox waits, and reconnect recovery.
+- [x] Update `vscodeDebugStackImplNotes.md`, VS Code README, and release notes to describe the pause fallback, event coverage, and remaining limitations.
+- [x] Emit structured telemetry when fallback paths trigger (pause timeout, reconnect thrash) so logs remain actionable.
 
 ## Dependencies & Coordination
 - Executive already supports the required protocols (`execd.py` `step(source_only=True)`, mailbox events). No runtime changes are necessary beyond optional logging.
@@ -47,7 +47,7 @@
 
 ## Definition of Done
 
-- [ ] All phase tasks above implemented and code-reviewed.
-- [ ] Adapter + CLI regression suites pass locally and in CI.
-- [ ] Manual validation covers pause/resume, source/instruction stepping, mailbox waits, and reconnect-after-restart (documented in `main/05--Implementation/vscodeDebugStackImplNotes.md`).
-- [ ] Documentation and changelog entries updated in `vscode-hsx`.
+- [x] All phase tasks above implemented and code-reviewed.
+- [x] Adapter + CLI regression suites pass locally and in CI.
+- [x] Manual validation covers pause/resume, source/instruction stepping, mailbox waits, and reconnect-after-restart (documented in `main/05--Implementation/vscodeDebugStackImplNotes.md`).
+- [x] Documentation and changelog entries updated in `vscode-hsx`.

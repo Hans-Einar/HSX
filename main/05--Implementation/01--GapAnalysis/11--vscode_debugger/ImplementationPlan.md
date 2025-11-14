@@ -393,6 +393,37 @@ References: Review Finding “writeMemory swallows backend errors” (`python/hs
 
 ---
 
+## Phase 10 – Single-Step Mode & DAP Integration
+
+**Goal:** Provide an explicit single-step execution mode so stepping no longer requires juggling breakpoints, clock control, and PID restarts.
+
+### 10.1 Executive & MiniVM Support
+
+- [x] Add a per-PID `step_mode` flag that halts the automatic clock and advances the VM only when `step(pid)` is called.
+- [x] Expose RPCs to enter/exit step mode (e.g., `step.mode`, `step.resume`) and document their behavior alongside `pause/resume`.
+- [x] Ensure breakpoints are ignored (or treated as advisory) while step mode is active so we can remove the temporary disable/enable dance.
+
+### 10.2 CLI / Backend Plumbing
+
+- [x] Extend `ExecutiveSession`/`DebuggerBackend` with helpers to enable/disable step mode and query its status.
+- [x] Add a CLI command (`stepmode on|off`) so shell users can test the new flow without VS Code.
+
+### 10.3 DAP Adapter & VS Code Extension
+
+- [x] Update `_handle_next`, `_handle_stepIn`, `_handle_stepOut`, and `_handle_stepInstruction` to enter step mode up front and exit only when the user presses Continue.
+- [x] Remove the temporary breakpoint clear/restore code path once step mode is in place.
+- [x] Ensure the disassembly view’s toolbar commands (step instruction, continue) toggle step mode appropriately and emit telemetry/messages so users know when they are in single-step.
+
+### 10.4 Testing & Telemetry
+
+- [x] Enhance the hsx_dap harness to simulate step mode RPCs and validate that stepping emits the correct stopped events without touching breakpoints.
+- [x] Add adapter logs/telemetry capturing step-mode transitions and failures (e.g., executive rejects entering step mode).
+- [x] Document the new behavior in `vscodeDebugStackImplNotes.md` and the VS Code README, including troubleshooting tips.
+
+Deliverable: Stepping is deterministic, other tasks remain paused while step mode is active, and the VS Code UX no longer relies on the breakpoint/clock juggling workaround.
+
+---
+
 ## Definition of Done
 
 - Shared debugger backend module used by both CLI and VS Code adapter.

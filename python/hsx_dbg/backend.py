@@ -390,6 +390,11 @@ class DebuggerBackend:
         resp = self.request({"cmd": "watch", "op": "remove", "pid": pid, "watch_id": int(watch_id)})
         self._expect_ok(resp, "watch remove")
 
+    def set_step_mode(self, pid: int, enable: bool) -> None:
+        payload: Dict[str, Any] = {"cmd": "step.mode", "pid": int(pid), "mode": bool(enable)}
+        resp = self.request(payload)
+        self._expect_ok(resp, "step mode")
+
     # ------------------------------------------------------------------
     # Trace helpers
     # ------------------------------------------------------------------

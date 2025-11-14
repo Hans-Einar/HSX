@@ -112,3 +112,12 @@ def test_list_breakpoints_preserves_full_width() -> None:
     backend = DebuggerBackend(session_factory=lambda *args, **kwargs: stub)
     values = backend.list_breakpoints(pid=1)
     assert values == [0x12345678, 0xDEADBEEF & 0xFFFFFFFF]
+
+
+def test_set_step_mode_invokes_rpc() -> None:
+    stub = StubSession("127.0.0.1", 9998)
+    backend = DebuggerBackend(session_factory=lambda *args, **kwargs: stub)
+    backend.set_step_mode(pid=2, enable=True)
+    backend.set_step_mode(pid=2, enable=False)
+    assert stub.requests[-2] == {"cmd": "step.mode", "pid": 2, "mode": True}
+    assert stub.requests[-1] == {"cmd": "step.mode", "pid": 2, "mode": False}

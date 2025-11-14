@@ -408,9 +408,14 @@ def test_step_instruction_request(monkeypatch: pytest.MonkeyPatch) -> None:
             self.calls: List[Dict[str, Any]] = []
             self.cleared: List[int] = []
             self.restored: List[int] = []
+            self.modes: List[Dict[str, Any]] = []
 
         def step(self, pid: int, *, source_only: bool = False) -> None:
             self.calls.append({"pid": pid, "source_only": source_only})
+
+        def set_step_mode(self, pid: int, enable: bool) -> None:
+            self.modes.append({"pid": pid, "enable": enable})
+
         def clear_breakpoint(self, pid: int, address: int) -> None:
             self.cleared.append(address)
 
@@ -440,12 +445,88 @@ def test_step_instruction_request(monkeypatch: pytest.MonkeyPatch) -> None:
 
     adapter._handle_stepInstruction({})
     assert backend.calls == [{"pid": 3, "source_only": False}]
-    assert backend.cleared == [0x4000]
-    assert backend.restored == [0x4000]
+    assert backend.modes == [{"pid": 3, "enable": True}]
+    assert backend.cleared == []
+    assert backend.restored == []
     assert not captured
     adapter._cancel_step_fallback()
     adapter._step_fallback_check()
     assert captured and captured[-1]["reason"] == "step"
+
+
+def test_step_instruction_fallback_without_step_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    class LegacyBackend:
+        def __init__(self) -> None:
+            self.calls: List[Dict[str, Any]] = []
+            self.cleared: List[int] = []
+            self.restored: List[int] = []
+
+        def step(self, pid: int, *, source_only: bool = False) -> None:
+            self.calls.append({"pid": pid, "source_only": source_only})
+
+        def clear_breakpoint(self, pid: int, address: int) -> None:
+            self.cleared.append(address)
+
+        def set_breakpoint(self, pid: int, address: int) -> None:
+            self.restored.append(address)
+
+        def list_breakpoints(self, pid: int) -> List[int]:
+            return [0x5000]
+
+    adapter = hsx_dap.HSXDebugAdapter(StubProtocol())
+    backend = LegacyBackend()
+    adapter.client = backend
+    adapter.current_pid = 9
+    key = adapter._instruction_breakpoint_key()
+    adapter._breakpoints[key] = [{"addresses": [0x5000]}]
+    monkeypatch.setattr(adapter, "_read_current_pc", lambda: 0x5000)
+    monkeypatch.setattr(adapter, "_synchronize_execution_state", lambda *args, **kwargs: None)
+
+    adapter._handle_stepInstruction({})
+    assert backend.calls == [{"pid": 9, "source_only": False}]
+    assert backend.cleared == [0x5000]
+    assert backend.restored == [0x5000]
+
+
+def test_step_requests_enable_and_disable_step_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    class ModeBackend:
+        def __init__(self) -> None:
+            self.step_calls: List[Dict[str, Any]] = []
+            self.mode_calls: List[Dict[str, Any]] = []
+            self.resume_calls: int = 0
+            self.clock_calls: int = 0
+
+        def step(self, pid: int, *, source_only: bool = False) -> None:
+            self.step_calls.append({"pid": pid, "source_only": source_only})
+
+        def set_step_mode(self, pid: int, enable: bool) -> None:
+            self.mode_calls.append({"pid": pid, "enable": enable})
+
+        def resume(self, pid: int) -> None:
+            self.resume_calls += 1
+
+        def clock_start(self) -> None:
+            self.clock_calls += 1
+
+    protocol = StubProtocol()
+    adapter = hsx_dap.HSXDebugAdapter(protocol)
+    backend = ModeBackend()
+    adapter.client = backend
+    adapter.current_pid = 4
+    monkeypatch.setattr(adapter, "_synchronize_execution_state", lambda *args, **kwargs: None)
+
+    adapter._handle_next({})
+    adapter._handle_next({})
+    assert backend.step_calls == [
+        {"pid": 4, "source_only": True},
+        {"pid": 4, "source_only": True},
+    ]
+    assert backend.mode_calls == [{"pid": 4, "enable": True}]
+
+    adapter._handle_continue({})
+    assert {"pid": 4, "enable": False} in backend.mode_calls
+    assert backend.resume_calls == 1
+    assert backend.clock_calls == 1
 
 
 def test_clear_all_breakpoints_request(monkeypatch: pytest.MonkeyPatch) -> None:

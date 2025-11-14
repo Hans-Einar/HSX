@@ -150,6 +150,16 @@ def _to_int(value: Any) -> Optional[int]:
     return None
 
 
+def _detect_extension_version() -> str:
+    package_json = REPO_ROOT / "vscode-hsx" / "package.json"
+    try:
+        data = json.loads(package_json.read_text(encoding="utf-8"))
+    except Exception:
+        return "unknown"
+    version = data.get("version")
+    return str(version) if isinstance(version, (str, int, float)) else "unknown"
+
+
 @dataclass
 class _FrameRecord:
     pid: int
@@ -233,6 +243,7 @@ class HSXDebugAdapter:
         self._step_description: Optional[str] = None
         self._step_fallback_timer: Optional[threading.Timer] = None
         self._task_snapshot_cache: Dict[int, Tuple[float, Dict[str, Any]]] = {}
+        self._step_mode_pids: Set[int] = set()
 
     def serve(self) -> None:
         while True:
@@ -286,6 +297,7 @@ class HSXDebugAdapter:
         if pid_value is None:
             raise ValueError("launch request missing 'pid'")
         self.current_pid = int(pid_value)
+        self._step_mode_pids.clear()
         observer_mode = self._coerce_bool(args.get("observerMode") or args.get("observer_mode"))
         keepalive_interval = self._coerce_optional_int(args.get("keepaliveInterval") or args.get("keepalive_interval"))
         heartbeat_override = self._coerce_optional_int(
@@ -346,12 +358,14 @@ class HSXDebugAdapter:
         return {}
 
     def _handle_disconnect(self, args: JsonDict) -> JsonDict:
+        self._disable_step_mode(reason="disconnect")
         self.protocol.send_event("terminated", {})
         self._shutdown()
         return {}
 
     def _handle_terminate(self, args: JsonDict) -> JsonDict:
         restart = bool(args.get("restart"))
+        self._disable_step_mode(reason="terminate")
         if self.current_pid is not None and self.client:
             try:
                 self._call_backend("pause", self.current_pid)
@@ -374,6 +388,7 @@ class HSXDebugAdapter:
     def _handle_continue(self, args: JsonDict) -> JsonDict:
         self._ensure_client()
         self.logger.info("Continue: resuming PID %s", self.current_pid)
+        self._disable_step_mode(reason="continue")
         self._cancel_pause_fallback()
         self._pending_pause = False  # Clear any pending pause state
         self._synthetic_pause_pending = False
@@ -443,6 +458,7 @@ class HSXDebugAdapter:
         self._ensure_client()
         if self.current_pid is None:
             raise RuntimeError("No HSX PID attached.")
+        self._ensure_step_mode_enabled()
         self._call_backend("step", self.current_pid, source_only=True)
         self._after_step_request("step over")
         return {}
@@ -451,6 +467,7 @@ class HSXDebugAdapter:
         self._ensure_client()
         if self.current_pid is None:
             raise RuntimeError("No HSX PID attached.")
+        self._ensure_step_mode_enabled()
         self._call_backend("step", self.current_pid, source_only=True)
         self._after_step_request("step in")
         return {}
@@ -459,6 +476,7 @@ class HSXDebugAdapter:
         self._ensure_client()
         if self.current_pid is None:
             raise RuntimeError("No HSX PID attached.")
+        self._ensure_step_mode_enabled()
         self._call_backend("step", self.current_pid, source_only=True)
         self._after_step_request("step out")
         return {}
@@ -468,15 +486,16 @@ class HSXDebugAdapter:
         if self.current_pid is None:
             raise RuntimeError("No HSX PID attached.")
         pc_before = self._read_current_pc()
+        step_mode_active = self._ensure_step_mode_enabled()
         disabled_breakpoints: List[int] = []
-        if pc_before is not None:
+        if not step_mode_active and pc_before is not None:
             disabled_breakpoints = self._temporarily_disable_breakpoint(pc_before)
         try:
             self._call_backend("step", self.current_pid, source_only=False)
         finally:
             if disabled_breakpoints:
                 self._restore_temporarily_disabled_breakpoints(disabled_breakpoints)
-        self._after_step_request("instruction step")
+        self._after_step_request("instruction step", fallback_delay=0.05)
         return {}
 
     def _handle_clearAllBreakpoints(self, args: JsonDict) -> JsonDict:
@@ -725,7 +744,8 @@ class HSXDebugAdapter:
     def _handle_traceRecords(self, args: JsonDict) -> JsonDict:  # noqa: N802
         self._ensure_client()
         if self.current_pid is None:
-            raise RuntimeError("traceRecords requires an attached PID")
+            self._emit_console_message("Trace records require an attached HSX PID.")
+            return {"records": []}
         limit = self._coerce_optional_int(args.get("limit"))
         export = self._coerce_bool(args.get("export"))
         info = self._call_backend("trace_records", self.current_pid, limit=limit, export=export)
@@ -1162,6 +1182,13 @@ class HSXDebugAdapter:
         except Exception:
             self.logger.debug("failed to emit connection status event", exc_info=True)
 
+    def _emit_step_mode_event(self, pid: int, state: str) -> None:
+        body = {"subsystem": "hsx-step-mode", "pid": pid, "state": state}
+        try:
+            self.protocol.send_event("telemetry", body)
+        except Exception:
+            self.logger.debug("failed to emit step mode telemetry", exc_info=True)
+
     def _emit_disassembly_refresh_event(self, pc: Optional[int]) -> None:
         body: JsonDict = {
             "subsystem": "hsx-disassembly",
@@ -1190,11 +1217,11 @@ class HSXDebugAdapter:
         except Exception:
             self.logger.debug("failed to emit breakpoint telemetry", exc_info=True)
 
-    def _schedule_step_fallback(self) -> None:
+    def _schedule_step_fallback(self, delay: float = 0.35) -> None:
         if not self.current_pid:
             return
         self._cancel_step_fallback()
-        timer = threading.Timer(0.35, self._step_fallback_check)
+        timer = threading.Timer(delay, self._step_fallback_check)
         timer.daemon = True
         self._step_fallback_timer = timer
         timer.start()
@@ -1210,7 +1237,7 @@ class HSXDebugAdapter:
         if not self._pending_step or not self.client or not self.current_pid:
             return
         description = self._step_description or "step"
-        self.logger.warning("Step completion event missing; emitting fallback stopped event")
+        self.logger.debug("Step completion event missing; emitting fallback stopped event")
         self._complete_pending_step()
         pc = self._read_current_pc()
         self._emit_stopped_event(
@@ -1222,10 +1249,10 @@ class HSXDebugAdapter:
         self._set_thread_state(self.current_pid, "paused")
         self._synchronize_execution_state(source="step-fallback", refresh_breakpoints=False)
 
-    def _after_step_request(self, description: str) -> None:
+    def _after_step_request(self, description: str, *, fallback_delay: float = 0.35) -> None:
         self._pending_step = True
         self._step_description = description
-        self._schedule_step_fallback()
+        self._schedule_step_fallback(delay=fallback_delay)
 
     def _complete_pending_step(self) -> None:
         if not self._pending_step:
@@ -1233,6 +1260,40 @@ class HSXDebugAdapter:
         self._pending_step = False
         self._step_description = None
         self._cancel_step_fallback()
+
+    def _ensure_step_mode_enabled(self) -> bool:
+        pid = self.current_pid
+        if pid is None or not self.client:
+            return False
+        if pid in self._step_mode_pids:
+            return True
+        if not hasattr(self.client, "set_step_mode"):
+            return False
+        try:
+            self._call_backend("set_step_mode", pid, True)
+        except Exception:
+            self.logger.debug("Failed to enable step mode for PID %s", pid, exc_info=True)
+            return False
+        self.logger.debug("Enabled step mode for PID %s", pid)
+        self._emit_step_mode_event(pid, "enabled")
+        self._step_mode_pids.add(pid)
+        return True
+
+    def _disable_step_mode(self, *, pid: Optional[int] = None, reason: str = "manual") -> None:
+        target = pid or self.current_pid
+        if target is None or target not in self._step_mode_pids:
+            return
+        if not self.client or not hasattr(self.client, "set_step_mode"):
+            self._step_mode_pids.discard(target)
+            return
+        try:
+            self._call_backend("set_step_mode", target, False)
+        except Exception:
+            self.logger.debug("Failed to disable step mode for PID %s", target, exc_info=True)
+        else:
+            self.logger.debug("Disabled step mode for PID %s (%s)", target, reason)
+            self._emit_step_mode_event(target, "disabled")
+        self._step_mode_pids.discard(target)
 
     def _remaining_backoff(self, kind: str) -> float:
         now = time.monotonic()
@@ -1632,7 +1693,8 @@ class HSXDebugAdapter:
             return False
         listing = self._fetch_task_list()
         if not listing:
-            # Unable to confirm; assume PID might exist to avoid false negatives.
+            self.logger.debug("PID existence check failed (no task snapshot)")
+            # Unable to confirm; assume it might still exist to avoid dropping the PID prematurely.
             return True
         tasks = listing.get("tasks")
         if isinstance(tasks, list):
@@ -1651,6 +1713,8 @@ class HSXDebugAdapter:
         self._emit_status_event("error", message=warning)
         self._emit_console_message(warning)
         self.current_pid = None
+        if pid is not None:
+            self._step_mode_pids.discard(pid)
         self._cancel_remote_breakpoint_poll()
 
     @staticmethod
@@ -2334,6 +2398,7 @@ class HSXDebugAdapter:
         self.project_root = REPO_ROOT
         self._source_base_dirs = [REPO_ROOT]
         self._task_snapshot_cache.clear()
+        self._step_mode_pids.clear()
 
     def _update_project_root(self, args: JsonDict) -> None:
         workspace_hint = args.get("workspaceFolder") or args.get("workspaceRoot") or args.get("workspace")
@@ -2550,6 +2615,8 @@ class HSXDebugAdapter:
             return
         entry = self._thread_states.setdefault(pid, {"name": f"PID {pid}", "state": None})
         entry["state"] = state
+        if state in {"terminated", "exited"}:
+            self._step_mode_pids.discard(pid)
 
     def _extract_task_state_pc(self, task_data: JsonDict) -> Optional[int]:
         details = None

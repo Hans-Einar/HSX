@@ -299,6 +299,9 @@ class ExecutiveState:
         self.wait_mbx_deadlines: Dict[int, float] = {}
         self._pending_scheduler_context: Optional[Dict[str, Any]] = None
         self.enforce_context_isolation: bool = True
+        self.step_mode: Set[int] = set()
+        self.session_numbers: Dict[str, int] = {}
+        self._next_session_number: int = 1
 
     def _register_metadata(self, pid: int, metadata: Dict[str, Any]) -> None:
         if not metadata:
@@ -3351,8 +3354,22 @@ class ExecutiveState:
         }
         if fields:
             entry.update(fields)
+        session_id = entry.get("session_id") or entry.get("session")
+        session_number = self._assign_session_number(session_id)
+        if session_number is not None:
+            entry.setdefault("session_number", session_number)
         self.log_buffer.append(entry)
         self._next_log_seq += 1
+
+    def _assign_session_number(self, session_id: Optional[str]) -> Optional[int]:
+        if not session_id:
+            return None
+        number = self.session_numbers.get(session_id)
+        if number is None:
+            number = self._next_session_number
+            self._next_session_number += 1
+            self.session_numbers[session_id] = number
+        return number
 
     def get_logs(self, limit: Optional[int] = None, *, filter_session: Optional[str] = None) -> List[Dict[str, Any]]:
         if limit is None or limit <= 0 or limit >= len(self.log_buffer):
@@ -3362,6 +3379,12 @@ class ExecutiveState:
         if filter_session:
             logs = [entry for entry in logs if entry.get("session_id") == filter_session]
         return logs
+
+    def clear_logs(self) -> Dict[str, Any]:
+        count = len(self.log_buffer)
+        self.log_buffer.clear()
+        self._next_log_seq = 1
+        return {"cleared": count}
 
     def attach(self) -> Dict[str, Any]:
         info = self.vm.attach()
@@ -3439,10 +3462,13 @@ class ExecutiveState:
         pid: Optional[int] = None,
         source: str = "manual",
         source_only: bool = False,
+        ignore_breakpoints: bool = False,
     ) -> Dict[str, Any]:
         budget = steps if steps is not None else self.step_batch
+        if pid is not None and pid in self.step_mode:
+            ignore_breakpoints = True
         if not source_only:
-            result, _ = self._step_once(budget, pid=pid, source=source)
+            result, _ = self._step_once(budget, pid=pid, source=source, ignore_breakpoints=ignore_breakpoints)
             return result
         source_steps = steps if steps is not None else 1
         iterations = max(1, source_steps)
@@ -3451,7 +3477,7 @@ class ExecutiveState:
         final_result: Optional[Dict[str, Any]] = None
         for _ in range(iterations):
             while True:
-                result, trace_snapshot = self._step_once(1, pid=pid, source=source)
+                result, trace_snapshot = self._step_once(1, pid=pid, source=source, ignore_breakpoints=ignore_breakpoints)
                 final_result = result
                 events = result.get("events") or []
                 if events:
@@ -3479,10 +3505,19 @@ class ExecutiveState:
             final_result["executed"] = total_executed
         return final_result
 
-    def _step_once(self, steps: Optional[int], *, pid: Optional[int], source: str) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
+    def _step_once(
+        self,
+        steps: Optional[int],
+        *,
+        pid: Optional[int],
+        source: str,
+        ignore_breakpoints: bool = False,
+    ) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
         self._advance_sleeping_tasks()
         budget = steps if steps is not None else self.step_batch
-        pre_event = self._check_breakpoint_before_step(pid)
+        pre_event = None
+        if not ignore_breakpoints:
+            pre_event = self._check_breakpoint_before_step(pid)
         if pre_event is not None:
             if source == "auto":
                 self.auto_step_count += 1
@@ -3522,7 +3557,9 @@ class ExecutiveState:
             self.manual_step_count += 1
             self.manual_step_total += executed
         running_flag = bool(result.get("running", True))
-        post_event = self._check_breakpoint_after_step(pid, result)
+        post_event = None
+        if not ignore_breakpoints:
+            post_event = self._check_breakpoint_after_step(pid, result)
         if post_event is not None:
             result.setdefault("events", []).append(post_event)
             result["paused"] = True
@@ -3560,6 +3597,7 @@ class ExecutiveState:
         self.clock_mode = "rate" if self.clock_rate_hz > 0 else "active"
         self._clock_throttle_reason = None
         self._clock_last_wait = 0.0
+        self.step_mode.clear()
         self.auto_thread = threading.Thread(target=self._auto_loop, daemon=True)
         self.auto_thread.start()
 
@@ -3759,6 +3797,7 @@ class ExecutiveState:
         return dict(self.get_task(pid))
 
     def resume_task(self, pid: int) -> Dict[str, Any]:
+        self.step_mode.discard(pid)
         self.get_task(pid)
         self._set_task_state_pending(pid, "resume", target_state="running", ts=time.time())
         skip_pc: Optional[int] = None
@@ -3789,7 +3828,22 @@ class ExecutiveState:
         self._refresh_tasks()
         return dict(self.get_task(pid))
 
+    def set_step_mode(self, pid: int, enable: bool) -> Dict[str, Any]:
+        self.get_task(pid)
+        enabled = pid in self.step_mode
+        if enable:
+            if not enabled:
+                self.pause_task(pid)
+                self.step_mode.add(pid)
+                self.log("info", "step_mode_enabled", pid=pid)
+        else:
+            if enabled:
+                self.step_mode.discard(pid)
+                self.log("info", "step_mode_disabled", pid=pid)
+        return {"pid": pid, "step_mode": pid in self.step_mode}
+
     def kill_task(self, pid: int) -> Dict[str, Any]:
+        self.step_mode.discard(pid)
         self._set_task_state_pending(pid, "killed", target_state="terminated", ts=time.time())
         self.stop_auto()
         with self.lock:
@@ -4733,11 +4787,19 @@ class _ShellHandler(socketserver.StreamRequestHandler):
             cmd_name = str(request.get("cmd") or "").lower()
             if cmd_name != "session.keepalive":
                 try:
+                    session_id = request.get("session")
+                    command_args = {
+                        key: value
+                        for key, value in request.items()
+                        if key not in {"version", "session"}
+                    }
                     self.server.state.log(
                         "debug",
                         "shell request",
                         command=str(request.get("cmd")),
-                        session=request.get("session"),
+                        session=session_id,
+                        session_id=session_id,
+                        command_args=command_args,
                     )
                 except Exception:
                     pass
@@ -5039,7 +5101,14 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 pid_int = int(pid_value) if pid_value is not None else None
                 if pid_int is not None:
                     self.state.ensure_pid_access(pid_int, session_id)
-                result = self.state.step(steps_int, pid=pid_int, source="manual", source_only=source_only_flag)
+                ignore_bps = bool(pid_int is not None and pid_int in self.state.step_mode)
+                result = self.state.step(
+                    steps_int,
+                    pid=pid_int,
+                    source="manual",
+                    source_only=source_only_flag,
+                    ignore_breakpoints=ignore_bps,
+                )
                 status = self.state.get_clock_status()
                 return {"version": 1, "status": "ok", "result": result, "clock": status}
             if cmd == "bp":
@@ -5374,6 +5443,28 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 filter_str = str(filter_session) if filter_session else None
                 logs = self.state.get_logs(limit=limit_int, filter_session=filter_str)
                 return {"version": 1, "status": "ok", "logs": logs}
+            if cmd == "dmesg.clear":
+                result = self.state.clear_logs()
+                return {"version": 1, "status": "ok", "logs": [], **result}
+            if cmd == "step.mode":
+                pid_value = request.get("pid")
+                if pid_value is None:
+                    raise ValueError("step.mode requires 'pid'")
+                mode_value = request.get("mode")
+                if mode_value is None:
+                    raise ValueError("step.mode requires 'mode'")
+                if isinstance(mode_value, bool):
+                    enable = mode_value
+                elif isinstance(mode_value, (int, float)):
+                    enable = bool(int(mode_value))
+                elif isinstance(mode_value, str):
+                    enable = mode_value.strip().lower() in {"1", "true", "on", "enable"}
+                else:
+                    raise ValueError("step.mode mode must be boolean-compatible")
+                pid_int = int(pid_value)
+                self.state.ensure_pid_access(pid_int, session_id)
+                info = self.state.set_step_mode(pid_int, enable)
+                return {"version": 1, "status": "ok", "step_mode": info}
             if cmd == "stdio_fanout":
                 pid_raw = request.get("pid")
                 default_only = False

@@ -105,7 +105,27 @@
 - Highlights:
   - Added `python/hsx_dap/__init__.py` (with entry script `python/hsx-dap.py`), implementing a stdio-based DAP server that bridges to `SessionManager`/`CommandClient`. Supports initialize/launch/continue/pause/step/threads/stackTrace/scopes/variables/setBreakpoints requests, emits stopped/output events, and streams executive events via the shared `EventBus`.
   - Reused the RuntimeCache + command helpers to satisfy DAP variable/scopes requests without redundant RPCs.
-  - Added protocol unit tests to verify Content-Length framing and JSON parsing.
+- Added protocol unit tests to verify Content-Length framing and JSON parsing.
 - Follow-ups:
   - Build the VS Code extension skeleton that spawns this adapter and wires launch configurations.
   - Enhance the adapter with variables/evaluate/memory requests plus better breakpoint line mapping.
+
+## 2025-11-13 — Phase 4 Regression Harness & Docs
+
+- Scope: Close out the VS Code debug stack plan by capturing regression coverage and documentation updates.
+- Highlights:
+  - Extended the DAP harness suite (`python/tests/test_hsx_dap_harness.py`) with pause/step/mailbox scenarios to prevent regressions while the new pause fallback + mailbox telemetry work lands.
+  - Captured an end-to-end walkthrough in this note plus `codeReviewImplementationNotes.md`, detailing pause fallback, mailbox waits, and reconnect recovery so testers can validate the behaviour.
+  - Updated the VS Code README / implementation notes with guidance on the new transport telemetry (backoff messages) and event coverage guarantees.
+  - Telemetry hooks now emit structured events when pause/step fallbacks fire, making log review actionable.
+
+## 2025-11-15 — Phase 10 Single-Step Mode
+
+- Scope: VS Code plan Phase 10 (single-step mode) plus shell CLI observability.
+- Highlights:
+  - Executive now tracks a `step_mode` set per PID, exposes the `step.mode` RPC, and forces manual steps to ignore breakpoints whenever the target is in step mode (`python/execd.py`).
+  - `DebuggerBackend`/shell client gained `set_step_mode` plumbing and the CLI’s `stepmode` command works in one-shot mode (fixed `main()` fallback so `python shell_client.py stepmode ...` prints to stdout). Dmesg logs now include command arguments and stable session numbers so users can `... dmesg > log`.
+  - `_handle_next`/`_handle_step*` enable step mode up front, `_handle_continue` disables it, and the adapter emits telemetry for every transition (`hsx_dap/__init__.py`). Instruction steps keep the breakpoint-clear fallback only when the executive lacks step-mode support.
+  - Added harness coverage for the new flow (step-mode enable/disable, instruction fallback) plus backend + CLI unit tests (`python/tests/test_hsx_dap_harness.py`, `python/tests/test_hsx_dbg_backend.py`, `python/tests/test_shell_client.py`).
+- Tests: `pytest python/tests/test_hsx_dap_harness.py python/tests/test_shell_client.py python/tests/test_hsx_dbg_backend.py`
+*** End Patch

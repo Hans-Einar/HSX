@@ -22,6 +22,7 @@
 | 2025-11-14 | `52623c1` | `VS Code stop + memory UX` | Codex | Tests: `npm --prefix vscode-hsx run compile && python -m pytest python/tests/test_hsx_dap_harness.py` |
 | 2025-11-13 | `b818e52` | `Phase 0/1 gap-analysis worklog` | Codex | Tests: `pytest python/tests/test_hsx_dap_harness.py` |
 | 2025-11-13 | `60fd930` | `Phase 2: pause + task-state sync` | Codex | Tests: `pytest python/tests/test_hsx_dap_harness.py` |
+| 2025-11-13 | `bc2f749` | `Phase 3: event + cache coverage` | Codex | Tests: `pytest python/tests/test_hsx_dap_harness.py` |
 
 ## Pull Request
 - PR URL / ID: `<link or ID>`

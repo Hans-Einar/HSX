@@ -1,3 +1,4 @@
+import itertools
 import json
 import sys
 from pathlib import Path
@@ -442,3 +443,45 @@ def test_pretty_trace_records_with_format(capsys: pytest.CaptureFixture[str]) ->
     assert "seq=1" in output and "pc=0x1020" in output
     assert "changed=R0,R2" in output
     assert "seq=2" in output
+
+
+def test_pretty_dmesg_assigns_session_numbers(capsys: pytest.CaptureFixture[str]) -> None:
+    shell_client._SESSION_INDEX_CACHE.clear()
+    shell_client._SESSION_REVERSE_CACHE.clear()
+    shell_client._SESSION_NUMBER_TO_ID.clear()
+    shell_client._SESSION_NUMBER_COUNTER = itertools.count(1)
+    payload = {
+        "status": "ok",
+        "logs": [
+            {
+                "seq": 1,
+                "ts": 0,
+                "level": "debug",
+                "message": "shell request",
+                "session": "abc-123",
+            },
+        ],
+    }
+    shell_client._pretty_dmesg(payload)
+    output = capsys.readouterr().out
+    assert "session=1" in output
+    assert "cmd_args=" in output
+
+
+def test_dmesg_clear_payloads_and_output(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
+    payload = shell_client._build_dmesg_payload(["clear"], host="host", port=1)
+    assert payload == {"cmd": "dmesg.clear"}
+    direct = shell_client._build_payload("dmesg.clear", [], tmp_path)
+    assert direct == {"cmd": "dmesg.clear"}
+    shell_client._pretty_dmesg_clear({"status": "ok", "cleared": 5})
+    output = capsys.readouterr().out
+    assert "5" in output and "cleared" in output
+
+
+def test_stepmode_payload_builder() -> None:
+    payload = shell_client._build_stepmode_payload(["7", "on"])
+    assert payload == {"cmd": "step.mode", "pid": 7, "mode": True}
+    payload = shell_client._build_stepmode_payload(["0xFF", "off"])
+    assert payload == {"cmd": "step.mode", "pid": 255, "mode": False}
+    with pytest.raises(ValueError):
+        shell_client._build_stepmode_payload(["7"])

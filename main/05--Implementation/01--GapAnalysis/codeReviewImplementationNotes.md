@@ -36,3 +36,15 @@
 - Mailbox and sleep events now yield descriptive `stopped` messages (“Waiting on mailbox …”, “Sleeping (XX ms)”), thanks to the new `_describe_stop_reason` helper and richer state snapshots cached per PID (`python/hsx_dap/__init__.py:2405-2488`).
 - Added `_task_snapshot_cache` so `_synchronize_execution_state` can reuse recent task-state data instead of issuing a synchronous `list_tasks` after every stop (`python/hsx_dap/__init__.py:225-252`, `2490-2537`).
 - Cache entries are refreshed on every event or backend snapshot and cleared on shutdown/reconnect, keeping phase progress consistent without spamming the executive.
+
+## Phase 4 – Regression Tests & Tooling
+- DAP harness now includes explicit pause/step/mailbox cases (see `python/tests/test_hsx_dap_harness.py`) to lock in the new behaviour before users rely on it.
+- Documented the pause fallback, telemetry, and reconnect flow inside `main/05--Implementation/vscodeDebugStackImplNotes.md` so QA has a canonical reference scenario.
+- Telemetry hooks emit structured warnings whenever fallback paths trigger, giving VS Code users actionable diagnostics when the executive misbehaves.
+- README / release notes updated alongside the implementation notes so extension consumers know about the new guarantees and limitations.
+
+## Phase 10 – Single-Step Mode & DAP Integration
+- Executive keeps a `step_mode` set per PID, adds the `step.mode` RPC, and automatically ignores breakpoints whenever the VM is being advanced under single-step control (`python/execd.py`).
+- `DebuggerBackend` exposes a typed `set_step_mode` helper and the CLI’s `stepmode` command works in one-shot invocations (fixed `shell_client.main` fallback and added tests). Dmesg output now carries session numbers plus command arguments so `python shell_client.py ... dmesg > dmesg.log` behaves predictably (`python/shell_client.py`, `python/tests/test_shell_client.py`).
+- The adapter enables step mode for all StepOver/In/Out/Instruction requests, disables it on Continue/Disconnect, and emits telemetry whenever the state flips. Instruction stepping still falls back to the legacy breakpoint clear/restore path if the executive lacks step-mode support (`python/hsx_dap/__init__.py`, `python/tests/test_hsx_dap_harness.py`).
+- Regression coverage expanded to include backend RPC expectations and the new harness scenarios; executed `pytest python/tests/test_hsx_dap_harness.py python/tests/test_shell_client.py python/tests/test_hsx_dbg_backend.py`.

@@ -53,6 +53,8 @@ COMMAND_NAMES = sorted(
         "dbg",
         "dumpregs",
         "dmesg",
+        "stepmode",
+        "dmesg.clear",
         "events",
         "exec",
         "exit",
@@ -1733,13 +1735,22 @@ def _pretty_dmesg(payload: dict) -> None:
             event_type = _format_addr_text(event_type)
             message = _format_addr_text(message)
             session_id = entry.get("session_id")
+            if not isinstance(session_id, str) or not session_id:
+                legacy_session = entry.get("session")
+                if isinstance(legacy_session, str) and legacy_session:
+                    session_id = legacy_session
             session_number = _session_number_for(session_id)
-            if session_number is not None:
+            explicit_number = entry.get("session_number")
+            if isinstance(explicit_number, int) and explicit_number > 0:
+                session_text = str(explicit_number)
+            elif session_number is not None:
                 session_text = str(session_number)
             elif isinstance(session_id, str) and session_id:
                 session_text = session_id
             else:
                 session_text = "-"
+            cmd_args = entry.get("command_args") if isinstance(entry.get("command_args"), dict) else None
+            args_text = json.dumps(cmd_args, sort_keys=True) if cmd_args else "-"
             parts = [
                 f"[{seq}]",
                 timestamp,
@@ -1749,6 +1760,7 @@ def _pretty_dmesg(payload: dict) -> None:
                 f"clock={clock_text}",
                 f"event={event_type}",
                 f"msg={message}",
+                f"cmd_args={args_text}",
             ]
             extra = {
                 k: v
@@ -1763,6 +1775,10 @@ def _pretty_dmesg(payload: dict) -> None:
                     "clock_cycles",
                     "event",
                     "pid",
+                    "current_pid",
+                    "session",
+                    "session_id",
+                    "command_args",
                 }
             }
             if extra:
@@ -1803,8 +1819,15 @@ def _pretty_dmesg(payload: dict) -> None:
         event_type = _format_addr_text(event_type)
         message = _format_addr_text(message)
         session_id = entry.get("session_id")
+        if not isinstance(session_id, str) or not session_id:
+            legacy_session = entry.get("session")
+            if isinstance(legacy_session, str) and legacy_session:
+                session_id = legacy_session
         session_number = _session_number_for(session_id)
-        if session_number is not None:
+        explicit_number = entry.get("session_number")
+        if isinstance(explicit_number, int) and explicit_number > 0:
+            session_text = str(explicit_number)
+        elif session_number is not None:
             session_text = str(session_number)
         elif isinstance(session_id, str) and session_id:
             session_text = session_id
@@ -1826,6 +1849,10 @@ def _pretty_dmesg(payload: dict) -> None:
                 "clock_cycles",
                 "event",
                 "pid",
+                "current_pid",
+                "session",
+                "session_id",
+                "command_args",
             }
         }
         if extra:
@@ -1856,6 +1883,15 @@ def _pretty_dmesg(payload: dict) -> None:
             print(line)
         else:
             print(" " + line)
+
+
+def _pretty_dmesg_clear(payload: dict) -> None:
+    if payload.get("status") != "ok":
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    cleared = payload.get("cleared")
+    cleared_text = str(cleared) if isinstance(cleared, int) else "0"
+    print(f"dmesg cleared {cleared_text} entr{'y' if cleared == 1 else 'ies'}.")
 
 
 _MAILBOX_NAMESPACE_NAMES = {
@@ -2227,6 +2263,7 @@ PRETTY_HANDLERS = {
     'list': _pretty_list,
     'reload': _pretty_reload,
     'dmesg': _pretty_dmesg,
+    'dmesg.clear': _pretty_dmesg_clear,
     'stdio': _pretty_stdio,
     'mbox': _pretty_mbox,
     'clock': _pretty_clock,
@@ -2733,6 +2770,10 @@ def _build_payload(
 
     if cmd == "dmesg":
         return _build_dmesg_payload(args, host, port)
+    if cmd == "dmesg.clear":
+        return _build_dmesg_clear_payload(args)
+    if cmd == "stepmode":
+        return _build_stepmode_payload(args)
 
     if cmd == "stdio":
         payload["cmd"] = "stdio_fanout"
@@ -3006,6 +3047,10 @@ def _build_dmesg_payload(args: list[str], host: str | None, port: int | None) ->
     while idx < len(tokens):
         token = tokens[idx]
         lowered = token.lower()
+        if idx == 0 and lowered in {"clear", "--clear"}:
+            if len(tokens) > 1:
+                raise ValueError("dmesg clear does not accept additional arguments")
+            return {"cmd": "dmesg.clear"}
         if lowered in {"session", "sess", "sid"}:
             idx += 1
             if idx >= len(tokens):
@@ -3028,6 +3073,21 @@ def _build_dmesg_payload(args: list[str], host: str | None, port: int | None) ->
             raise ValueError(f"unknown session reference '{session_token}'")
         payload["filter_session"] = session_id
     return payload
+
+
+def _build_dmesg_clear_payload(args: list[str]) -> dict:
+    if args:  # no extra args allowed
+        raise ValueError("dmesg.clear does not accept arguments")
+    return {"cmd": "dmesg.clear"}
+
+
+def _build_stepmode_payload(args: list[str]) -> dict:
+    if len(args) < 2:
+        raise ValueError("stepmode requires <pid> <on|off>")
+    pid = int(args[0], 0)
+    mode = args[1].strip().lower()
+    enable = mode in {"1", "on", "true", "enable"}
+    return {"cmd": "step.mode", "pid": pid, "mode": enable}
 
 
 def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: bool = False) -> None:
@@ -3407,88 +3467,30 @@ def main() -> None:
         else:
             print(json.dumps(resp, indent=2, sort_keys=True))
         return
-
-def _assign_session_number_locked(session_id: str) -> int:
-    number = _SESSION_REVERSE_CACHE.get(session_id)
-    if number is None:
-        number = next(_SESSION_NUMBER_COUNTER)
-        _SESSION_REVERSE_CACHE[session_id] = number
-    _SESSION_NUMBER_TO_ID[number] = session_id
-    return number
-
-
-def _remember_session_list(entries: Sequence[Dict[str, Any]]) -> None:
-    with _SESSION_INDEX_LOCK:
-        _SESSION_INDEX_CACHE.clear()
-        for idx, entry in enumerate(entries, 1):
-            session_id = entry.get("id")
-            if isinstance(session_id, str) and session_id:
-                _SESSION_INDEX_CACHE[idx] = session_id
-                _assign_session_number_locked(session_id)
-
-
-def _lookup_session_by_index(index: int) -> Optional[str]:
-    with _SESSION_INDEX_LOCK:
-        session_id = _SESSION_INDEX_CACHE.get(index)
-        if session_id:
-            return session_id
-        return _SESSION_NUMBER_TO_ID.get(index)
-
-
-def _fetch_sessions(host: str, port: int) -> List[Dict[str, Any]]:
-    response = send_request(host, port, {"cmd": "session.list"})
-    if response.get("status") != "ok":
-        raise RuntimeError(f"session.list failed: {response.get('error')}")
-    sessions = response.get("sessions") or []
-    if isinstance(sessions, list):
-        entries = [entry for entry in sessions if isinstance(entry, dict)]
-    else:
-        entries = []
-    _remember_session_list(entries)
-    return entries
-
-
-def _resolve_session_identifier(token: str, host: str, port: int) -> Optional[str]:
-    raw = token.strip()
-    if not raw:
-        return None
-    lowered = raw.lower()
-    if lowered.startswith("id:"):
-        value = raw.split(":", 1)[1].strip()
-        return value or None
-    try:
-        index = int(raw, 0)
-    except ValueError:
-        return raw
-    cached = _lookup_session_by_index(index)
-    if cached:
-        return cached
-    entries = _fetch_sessions(host, port)
-    cached = _lookup_session_by_index(index)
-    if cached:
-        return cached
-    if 1 <= index <= len(entries):
-        session_id = entries[index - 1].get("id")
-        if isinstance(session_id, str) and session_id:
-            return session_id
-    return None
-
-
-def _session_number_for(session_id: Optional[str]) -> Optional[int]:
-    if not session_id:
-        return None
-    with _SESSION_INDEX_LOCK:
-        return _assign_session_number_locked(session_id)
-
-
-def _format_duration(seconds: float) -> str:
-    if seconds < 1:
-        return f"{seconds * 1000:.0f}ms"
-    if seconds < 60:
-        return f"{seconds:.1f}s"
-    minutes = int(seconds // 60)
-    secs = seconds % 60
-    return f"{minutes}m{secs:04.1f}s"
+    if cmd == 'dmesg':
+        try:
+            payload = _build_dmesg_payload(args, host=args_ns.host, port=args_ns.port)
+        except ValueError as exc:
+            parser.error(str(exc))
+        resp = send_request(args_ns.host, args_ns.port, payload)
+        handler = PRETTY_HANDLERS.get('dmesg')
+        if handler and not force_json:
+            handler(resp)
+        else:
+            print(json.dumps(resp, indent=2, sort_keys=True))
+        return
+    if cmd == 'dmesg.clear':
+        try:
+            payload = _build_dmesg_clear_payload(args)
+        except ValueError as exc:
+            parser.error(str(exc))
+        resp = send_request(args_ns.host, args_ns.port, payload)
+        handler = PRETTY_HANDLERS.get('dmesg.clear')
+        if handler and not force_json:
+            handler(resp)
+        else:
+            print(json.dumps(resp, indent=2, sort_keys=True))
+        return
 
     if cmd in {'load', 'exec'}:
         tokens = list(args)
@@ -3589,6 +3591,89 @@ def _format_duration(seconds: float) -> str:
         handler(resp)
     else:
         print(json.dumps(resp, indent=2, sort_keys=True))
+    return
+
+def _assign_session_number_locked(session_id: str) -> int:
+    number = _SESSION_REVERSE_CACHE.get(session_id)
+    if number is None:
+        number = next(_SESSION_NUMBER_COUNTER)
+        _SESSION_REVERSE_CACHE[session_id] = number
+    _SESSION_NUMBER_TO_ID[number] = session_id
+    return number
+
+
+def _remember_session_list(entries: Sequence[Dict[str, Any]]) -> None:
+    with _SESSION_INDEX_LOCK:
+        _SESSION_INDEX_CACHE.clear()
+        for idx, entry in enumerate(entries, 1):
+            session_id = entry.get("id")
+            if isinstance(session_id, str) and session_id:
+                _SESSION_INDEX_CACHE[idx] = session_id
+                _assign_session_number_locked(session_id)
+
+
+def _lookup_session_by_index(index: int) -> Optional[str]:
+    with _SESSION_INDEX_LOCK:
+        session_id = _SESSION_INDEX_CACHE.get(index)
+        if session_id:
+            return session_id
+        return _SESSION_NUMBER_TO_ID.get(index)
+
+
+def _fetch_sessions(host: str, port: int) -> List[Dict[str, Any]]:
+    response = send_request(host, port, {"cmd": "session.list"})
+    if response.get("status") != "ok":
+        raise RuntimeError(f"session.list failed: {response.get('error')}")
+    sessions = response.get("sessions") or []
+    if isinstance(sessions, list):
+        entries = [entry for entry in sessions if isinstance(entry, dict)]
+    else:
+        entries = []
+    _remember_session_list(entries)
+    return entries
+
+
+def _resolve_session_identifier(token: str, host: str, port: int) -> Optional[str]:
+    raw = token.strip()
+    if not raw:
+        return None
+    lowered = raw.lower()
+    if lowered.startswith("id:"):
+        value = raw.split(":", 1)[1].strip()
+        return value or None
+    try:
+        index = int(raw, 0)
+    except ValueError:
+        return raw
+    cached = _lookup_session_by_index(index)
+    if cached:
+        return cached
+    entries = _fetch_sessions(host, port)
+    cached = _lookup_session_by_index(index)
+    if cached:
+        return cached
+    if 1 <= index <= len(entries):
+        session_id = entries[index - 1].get("id")
+        if isinstance(session_id, str) and session_id:
+            return session_id
+    return None
+
+
+def _session_number_for(session_id: Optional[str]) -> Optional[int]:
+    if not session_id:
+        return None
+    with _SESSION_INDEX_LOCK:
+        return _assign_session_number_locked(session_id)
+
+
+def _format_duration(seconds: float) -> str:
+    if seconds < 1:
+        return f"{seconds * 1000:.0f}ms"
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    minutes = int(seconds // 60)
+    secs = seconds % 60
+    return f"{minutes}m{secs:04.1f}s"
 
 
 if __name__ == "__main__":

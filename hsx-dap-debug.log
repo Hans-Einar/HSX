@@ -1,0 +1,443 @@
+[2025-11-14 09:43:44,551] INFO: HSX DAP adapter starting (pid=1844466, version=0.0.19+4b9b1c04)
+[2025-11-14 09:43:44,554] INFO: setBreakpoints: ignoring HSX disassembly pseudo-source hsx-disassembly:/pid-1/0x0000003C
+[2025-11-14 09:43:44,554] INFO: setBreakpoints: source=/home/warloc/git/HSX/examples/demos/longrun/main.c, count=1
+[2025-11-14 09:43:44,554] WARNING: setBreakpoints: no client connected, storing as pending
+[2025-11-14 09:43:44,559] INFO: Connecting to executive at 127.0.0.1:9998 (PID 1, observer=False)
+[2025-11-14 09:43:44,565] INFO: Loaded symbol map for pid 1 from /home/warloc/git/HSX/examples/demos/build/debug/longrun/main.sym
+[2025-11-14 09:43:44,566] INFO: State sync (connect): pid=1 state=ready reason=n/a
+[2025-11-14 09:43:44,566] INFO: Reapplying 1 pending breakpoint sources
+[2025-11-14 09:43:44,566] INFO: Reapplying breakpoints for source: /home/warloc/git/HSX/examples/demos/longrun/main.c (1 breakpoints)
+[2025-11-14 09:43:44,567] DEBUG: Resolved /home/warloc/git/HSX/examples/demos/longrun/main.c:6 to addresses: ['0x003C', '0x0040', '0x0044', '0x0048', '0x004C']
+[2025-11-14 09:43:44,567] INFO: Breakpoint set at /home/warloc/git/HSX/examples/demos/longrun/main.c:6 -> 0x003C
+[2025-11-14 09:43:44,567] INFO: Breakpoint verified after connection: /home/warloc/git/HSX/examples/demos/longrun/main.c:6 -> 0x003C
+[2025-11-14 09:43:44,573] INFO: Stopped event: reason=debug_break, pc=0x003C, source=longrun/main.c:6
+[2025-11-14 09:43:44,573] INFO: DebugBreakEvent: pid=1, pc=0x003C, reason=breakpoint
+[2025-11-14 09:43:44,574] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,574] INFO: Stopped event: reason=breakpoint, pc=0x003C, source=longrun/main.c:6
+[2025-11-14 09:43:44,580] INFO: setBreakpoints: ignoring HSX disassembly pseudo-source hsx-disassembly:/pid-unknown/0x0000003C
+[2025-11-14 09:43:44,649] INFO: readMemory: address=0x00000000, count=128
+[2025-11-14 09:43:44,653] INFO: readMemory: address=0x00000000, count=128
+[2025-11-14 09:43:44,735] INFO: readMemory: address=0x0000FFF0, count=64
+[2025-11-14 09:43:44,737] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,738] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,738] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,738] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,738] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,739] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,739] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,739] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,740] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,740] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,740] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,741] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,741] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,741] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,742] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,742] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,742] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,743] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,743] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,743] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,743] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,743] INFO: disassemble: view=around_pc count=33 reference=0x0000003C
+[2025-11-14 09:43:44,744] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,745] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:44,745] INFO: readMemory: address=0x0000FFF0, count=64
+[2025-11-14 09:43:44,747] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,747] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,747] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,748] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,748] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,748] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,749] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,749] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,749] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,750] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,750] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,750] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,751] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,751] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,751] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,752] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,752] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,752] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,753] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,753] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,753] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,753] INFO: disassemble: view=around_pc count=33 reference=0x0000003C
+[2025-11-14 09:43:44,755] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,755] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:44,755] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,756] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,766] INFO: setBreakpoints: ignoring HSX disassembly pseudo-source hsx-disassembly:/pid-unknown/0x0000003C
+[2025-11-14 09:43:44,771] INFO: setBreakpoints: ignoring HSX disassembly pseudo-source hsx-disassembly:/pid-1/0x0000003C
+[2025-11-14 09:43:44,773] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,773] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:44,788] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,788] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:44,857] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,857] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:44,871] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:44,871] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,036] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,036] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,097] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,097] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,133] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,133] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,141] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,141] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,143] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,143] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,144] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,144] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,255] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,255] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,256] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,256] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,258] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,258] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,259] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,259] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,260] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,260] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,261] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,261] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,267] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,267] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,269] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,269] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,270] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,270] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,303] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,303] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,309] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,309] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,310] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,311] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,318] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,318] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,325] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,325] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,326] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,326] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,328] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,328] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,329] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,329] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,330] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,330] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,336] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,336] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,338] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,338] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,339] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,339] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,340] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,340] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,351] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,351] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:43:45,352] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:43:45,352] INFO: disassemble: view=from_addr count=1 reference=n/a
+[2025-11-14 09:44:02,847] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,849] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,850] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,852] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,853] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,854] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,855] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,856] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,857] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,858] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,859] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,860] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,860] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,861] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,863] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,864] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,865] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,866] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,867] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,868] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,868] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,868] INFO: disassemble: view=around_pc count=33 reference=0x0000003C
+[2025-11-14 09:44:02,881] DEBUG: Step completion event missing; emitting fallback stopped event
+[2025-11-14 09:44:02,884] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,884] INFO: Stopped event: reason=step, pc=0x003C, source=longrun/main.c:6
+[2025-11-14 09:44:02,904] INFO: readMemory: address=0x00000000, count=128
+[2025-11-14 09:44:02,908] INFO: readMemory: address=0x0000FFF0, count=64
+[2025-11-14 09:44:02,910] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,914] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,914] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,914] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,915] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,915] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,915] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,916] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,916] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,916] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,917] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,917] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,917] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,917] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,918] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,918] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,918] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,918] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,919] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,919] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,919] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,919] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:02,919] INFO: disassemble: view=around_pc count=33 reference=0x0000003C
+[2025-11-14 09:44:10,204] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,205] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,207] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,208] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,209] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,210] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,211] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,213] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,214] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,216] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,218] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,218] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,219] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,220] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,221] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,222] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,222] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,223] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,224] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,224] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,225] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,225] INFO: disassemble: view=around_pc count=33 reference=0x0000003C
+[2025-11-14 09:44:10,236] DEBUG: Step completion event missing; emitting fallback stopped event
+[2025-11-14 09:44:10,238] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,238] INFO: Stopped event: reason=step, pc=0x003C, source=longrun/main.c:6
+[2025-11-14 09:44:10,268] INFO: readMemory: address=0x00000000, count=128
+[2025-11-14 09:44:10,272] INFO: readMemory: address=0x0000FFF0, count=64
+[2025-11-14 09:44:10,274] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,276] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,276] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,276] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,277] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,277] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,277] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,277] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,278] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,278] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,278] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,278] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,279] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,279] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,279] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,280] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,280] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,280] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,281] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,281] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,281] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,282] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,282] INFO: disassemble: view=around_pc count=33 reference=0x0000003C
+[2025-11-14 09:44:10,765] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,765] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,766] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,767] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,767] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,768] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,768] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,769] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,769] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,770] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,770] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,771] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,771] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,772] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,772] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,772] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,773] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,773] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,773] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,774] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,774] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,774] INFO: disassemble: view=around_pc count=33 reference=0x0000003C
+[2025-11-14 09:44:10,808] DEBUG: Step completion event missing; emitting fallback stopped event
+[2025-11-14 09:44:10,809] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,809] INFO: Stopped event: reason=step, pc=0x003C, source=longrun/main.c:6
+[2025-11-14 09:44:10,809] DEBUG: Using cached task snapshot for pid 1
+[2025-11-14 09:44:10,810] INFO: readMemory: address=0x00000000, count=128
+[2025-11-14 09:44:10,815] INFO: readMemory: address=0x0000FFF0, count=64
+[2025-11-14 09:44:10,817] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,826] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,826] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,827] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,827] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,827] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,828] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,828] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,828] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,828] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,829] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,829] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,829] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,830] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,830] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,830] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,830] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,831] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,831] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,831] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,832] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,832] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:10,832] INFO: disassemble: view=around_pc count=33 reference=0x0000003C
+[2025-11-14 09:44:11,430] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,431] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,432] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,432] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,433] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,433] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,434] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,434] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,435] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,435] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,436] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,436] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,437] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,437] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,437] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,438] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,438] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,439] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,439] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,439] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,440] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,440] INFO: disassemble: view=around_pc count=33 reference=0x0000003C
+[2025-11-14 09:44:11,466] DEBUG: Step completion event missing; emitting fallback stopped event
+[2025-11-14 09:44:11,467] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,467] INFO: Stopped event: reason=step, pc=0x003C, source=longrun/main.c:6
+[2025-11-14 09:44:11,468] INFO: readMemory: address=0x00000000, count=128
+[2025-11-14 09:44:11,471] INFO: readMemory: address=0x0000FFF0, count=64
+[2025-11-14 09:44:11,473] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,482] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,482] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,482] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,483] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,483] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,483] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,484] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,484] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,485] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,485] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,485] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,486] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,486] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,486] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,487] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,487] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,487] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,488] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,488] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,488] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,489] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,489] INFO: disassemble: view=around_pc count=33 reference=0x0000003C
+[2025-11-14 09:44:11,941] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,942] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,942] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,943] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,944] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,944] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,945] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,945] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,946] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,947] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,947] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,948] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,948] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,949] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,949] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,950] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,950] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,950] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,951] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,951] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,951] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,951] INFO: disassemble: view=around_pc count=33 reference=0x0000003C
+[2025-11-14 09:44:11,981] DEBUG: Step completion event missing; emitting fallback stopped event
+[2025-11-14 09:44:11,982] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,982] INFO: Stopped event: reason=step, pc=0x003C, source=longrun/main.c:6
+[2025-11-14 09:44:11,983] DEBUG: Using cached task snapshot for pid 1
+[2025-11-14 09:44:11,983] INFO: readMemory: address=0x00000000, count=128
+[2025-11-14 09:44:11,987] INFO: readMemory: address=0x0000FFF0, count=64
+[2025-11-14 09:44:11,988] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,990] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,990] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,991] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,991] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,991] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,992] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,992] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,992] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,993] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,993] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,993] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,994] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,994] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,994] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,994] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,995] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,995] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,995] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,996] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,996] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,996] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:11,996] INFO: disassemble: view=around_pc count=33 reference=0x0000003C
+[2025-11-14 09:44:49,433] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,434] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,434] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,435] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,435] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,435] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,436] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,436] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,436] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,437] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,437] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,437] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,438] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,438] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,438] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,439] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,439] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,439] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,440] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,440] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,440] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,440] INFO: disassemble: view=around_pc count=33 reference=0x0000003C
+[2025-11-14 09:44:49,480] DEBUG: Step completion event missing; emitting fallback stopped event
+[2025-11-14 09:44:49,481] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,481] INFO: Stopped event: reason=step, pc=0x003C, source=longrun/main.c:6
+[2025-11-14 09:44:49,482] INFO: readMemory: address=0x00000000, count=128
+[2025-11-14 09:44:49,485] INFO: readMemory: address=0x0000FFF0, count=64
+[2025-11-14 09:44:49,487] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,490] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,490] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,491] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,491] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,491] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,492] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,492] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,493] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,493] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,493] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,494] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,494] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,494] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,495] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,495] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,496] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,496] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,496] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,497] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,497] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,497] DEBUG: Resolved source longrun/main.c -> /home/warloc/git/HSX/examples/demos/longrun/main.c (ref=1)
+[2025-11-14 09:44:49,497] INFO: disassemble: view=around_pc count=33 reference=0x0000003C

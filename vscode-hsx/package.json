@@ -3,7 +3,7 @@
   "displayName": "HSX Debugger",
   "publisher": "hsx",
   "description": "Debug Adapter Protocol integration for HSX firmware targets.",
-  "version": "0.0.15",
+  "version": "0.0.19",
   "engines": {
     "vscode": "^1.85.0"
   },
