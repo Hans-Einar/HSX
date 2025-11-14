@@ -15,20 +15,14 @@ import time
 from dataclasses import dataclass, field
 import copy
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
     print(f"[hsx-dap] Added repo root to sys.path: {REPO_ROOT}", flush=True)
 
-from hsx_dbg import (
-    DebuggerBackend,
-    DebuggerBackendError,
-    RegisterState,
-    StackFrame,
-    WatchValue,
-)
+from hsx_dbg import DebuggerBackend, DebuggerBackendError, DebuggerSession, RegisterState, StackFrame, WatchValue
 from hsx_dbg.symbols import SymbolIndex
 
 
@@ -270,6 +264,8 @@ class HSXDebugAdapter:
         self._step_fallback_timer: Optional[threading.Timer] = None
         self._task_snapshot_cache: Dict[int, Tuple[float, Dict[str, Any]]] = {}
         self._debug_state_pids: Set[int] = set()
+        self._debugger_session: Optional[DebuggerSession] = None
+        self._backend_factory: Optional[Callable[..., DebuggerBackend]] = None
 
     def serve(self) -> None:
         while True:
@@ -1023,23 +1019,23 @@ class HSXDebugAdapter:
         self._synthetic_pause_pending = False
         self._cancel_pause_fallback()
         self._stop_event_stream()
-        if self.backend:
-            try:
-                self.backend.disconnect()
-            except Exception:
-                pass
-        backend = self._create_backend(host, port)
-        if keepalive_interval is not None:
-            backend.configure(keepalive_interval=int(keepalive_interval))
+        session = self._get_debugger_session()
         try:
-            backend.attach(pid, observer=observer_mode, heartbeat_s=heartbeat_override)
+            backend = session.connect(
+                host,
+                port,
+                pid,
+                observer_mode=observer_mode,
+                keepalive_interval=keepalive_interval,
+                heartbeat_override=heartbeat_override,
+            )
         except DebuggerBackendError as exc:
             self.logger.error("Failed to establish debugger session: %s", exc)
             self._emit_status_event("error", message=str(exc))
             raise
         self.backend = backend
         self.client = backend
-        self._connection_config = {
+        self._connection_config = session.connection_config or {
             "host": host,
             "port": port,
             "pid": pid,
@@ -1076,7 +1072,10 @@ class HSXDebugAdapter:
         self._ensure_symbol_mapper(force=True)
         self._synchronize_execution_state(source="connect", refresh_breakpoints=False)
 
-    def _create_backend(self, host: str, port: int) -> DebuggerBackend:
+    def _resolve_backend_factory(self) -> Callable[..., DebuggerBackend]:
+        cached = self._backend_factory
+        if cached:
+            return cached
         factory_path = os.environ.get(BACKEND_FACTORY_ENV)
         if factory_path:
             module_name, _, attr = factory_path.partition(":")
@@ -1084,16 +1083,30 @@ class HSXDebugAdapter:
                 raise RuntimeError(f"Invalid {BACKEND_FACTORY_ENV} value: {factory_path}")
             module = importlib.import_module(module_name)
             factory = getattr(module, attr)
-            backend = factory(host=host, port=port, features=self._SESSION_FEATURES)
-            return backend
-        return DebuggerBackend(
-            host=host,
-            port=port,
-            client_name="hsx-dap",
-            features=self._SESSION_FEATURES,
-            keepalive_enabled=True,
-            keepalive_interval=10,
-        )
+
+            def custom_factory(**kwargs: Any) -> DebuggerBackend:
+                return factory(**kwargs)
+
+            self._backend_factory = custom_factory
+            return custom_factory
+
+        def default_factory(**kwargs: Any) -> DebuggerBackend:
+            return DebuggerBackend(**kwargs)
+
+        self._backend_factory = default_factory
+        return default_factory
+
+    def _get_debugger_session(self) -> DebuggerSession:
+        session = self._debugger_session
+        if session is None:
+            session = DebuggerSession(
+                client_name="hsx-dap",
+                features=self._SESSION_FEATURES,
+                keepalive_interval=10,
+                backend_factory=self._resolve_backend_factory(),
+            )
+            self._debugger_session = session
+        return session
 
     def _handle_exec_event(self, event: JsonDict) -> None:
         event_type = str(event.get("type") or "")
@@ -2438,7 +2451,13 @@ class HSXDebugAdapter:
         self._cancel_pause_fallback()
         self._synthetic_pause_pending = False
         self._stop_event_stream()
-        if self.backend:
+        if self._debugger_session:
+            try:
+                self._debugger_session.disconnect()
+            except Exception:
+                pass
+            self._debugger_session = None
+        elif self.backend:
             try:
                 self.backend.disconnect()
             except Exception:

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from .cli import main
 from .backend import DebuggerBackend, DebuggerBackendError, RegisterState, StackFrame, WatchValue
+from .session import DebuggerSession
 
 __all__ = [
     "main",
@@ -18,5 +19,6 @@ __all__ = [
     "RegisterState",
     "StackFrame",
     "WatchValue",
+    "DebuggerSession",
 ]
 __version__ = "0.1.0"

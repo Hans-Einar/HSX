@@ -442,3 +442,21 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 
 ### Next Steps
 - Continue Phase 11 with the shared `DebuggerSession` façade + adapter refactor, then teach the VS Code extension/TUI to surface debug-state indicators instead of generic pause text.
+
+## 2025-11-14 - Codex (Session 25)
+
+### Scope
+- Plan items: Phase 11 §§11.2–11.3 (shared debugger session façade + DAP plumbing) and CLI alignment.
+- Design refs: 04.09--Debugger.md (session ownership), 04.11--vscode_debugger.md (DAP transport expectations).
+
+### Work Summary
+- Added `python/hsx_dbg/session.py` providing a reusable `DebuggerSession` wrapper around `DebuggerBackend`, including configurable backend factories for the adapter’s env override. Exported it via `hsx_dbg.__init__`.
+- Refactored `hsx_dap` to instantiate/use the shared session (`self._debugger_session`), removing the bespoke `_create_backend` logic. Connection/reconnect/shutdown paths now go through the session manager while preserving event-stream handling; shutdown disconnects via the new class.
+- Extended the CLI to surface the renamed `debugstate` command (aliasing the legacy `stepmode`), updated info/ps table labels to “Debug”, and ensured alias payloads hit the new `debug.state` RPC. Tests (`python/tests/test_shell_client.py`) cover the new payload helper.
+- Added regression tests for `DebuggerSession` (connect/disconnect/config propagation) and updated existing backend/DAP/executive tests to reflect the debug-state terminology.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_hsx_dbg_backend.py python/tests/test_hsx_dap_harness.py python/tests/test_shell_client.py python/tests/test_executive_sessions.py`
+
+### Next Steps
+- Continue Phase 11 by routing more DAP logic through the session façade (event subscriptions, reconnect) and begin surfacing debug-state status in the VS Code extension/TUI.

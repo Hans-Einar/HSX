@@ -20,6 +20,7 @@
 | 2025-11-12 | `c8c9671` | `Phase 6: remote breakpoint telemetry + disassembly refresh` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dap_harness.py::test_remote_breakpoint_sync_emits_telemetry python/tests/test_hsx_dap_harness.py::test_stopped_event_emits_disassembly_telemetry` |
 | 2025-11-14 | `5e33630` | `Phase 9: DAP capability + writeMemory fixes` | Codex | Tests: `python -m pytest python/tests/test_hsx_dbg_backend.py python/tests/test_hsx_dap_harness.py` |
 | 2025-11-14 | `52623c1` | `VS Code stop + memory UX` | Codex | Tests: `npm --prefix vscode-hsx run compile && python -m pytest python/tests/test_hsx_dap_harness.py` |
+| 2025-11-14 | `pending` | `Phase 11: debug-state rename + session scaffold` | Codex | Tests: `PYTHONPATH=. pytest python/tests/test_hsx_dbg_backend.py python/tests/test_hsx_dap_harness.py python/tests/test_shell_client.py python/tests/test_executive_sessions.py` |
 | 2025-11-13 | `b818e52` | `Phase 0/1 gap-analysis worklog` | Codex | Tests: `pytest python/tests/test_hsx_dap_harness.py` |
 | 2025-11-13 | `60fd930` | `Phase 2: pause + task-state sync` | Codex | Tests: `pytest python/tests/test_hsx_dap_harness.py` |
 | 2025-11-13 | `bc2f749` | `Phase 3: event + cache coverage` | Codex | Tests: `pytest python/tests/test_hsx_dap_harness.py` |

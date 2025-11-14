@@ -15,6 +15,7 @@ for entry in (REPO_ROOT, PYTHON_SRC):
         sys.path.append(str(entry))
 
 from hsx_dbg.backend import DebuggerBackend, DebuggerBackendError, StackFrame
+from hsx_dbg.session import DebuggerSession
 
 
 class StubSession:
@@ -121,3 +122,45 @@ def test_set_debug_state_invokes_rpc() -> None:
     backend.set_debug_state(pid=2, enable=False)
     assert stub.requests[-2] == {"cmd": "debug.state", "pid": 2, "mode": True}
     assert stub.requests[-1] == {"cmd": "debug.state", "pid": 2, "mode": False}
+
+
+def test_debugger_session_connect_and_disconnect() -> None:
+    class FakeBackend:
+        def __init__(self, **kwargs: Any) -> None:
+            self.kwargs = kwargs
+            self.attached: Dict[str, Any] = {}
+            self.disconnected = False
+            self.stopped = False
+
+        def configure(self, **_kwargs: Any) -> None:
+            pass
+
+        def attach(self, pid: int, *, observer: bool = False, heartbeat_s: Optional[int] = None) -> None:
+            self.attached = {"pid": pid, "observer": observer, "heartbeat": heartbeat_s}
+
+        def stop_event_stream(self) -> None:
+            self.stopped = True
+
+        def disconnect(self) -> None:
+            self.disconnected = True
+
+    created: list[FakeBackend] = []
+
+    def factory(**kwargs: Any) -> FakeBackend:
+        backend = FakeBackend(**kwargs)
+        created.append(backend)
+        return backend
+
+    session = DebuggerSession(client_name="tester", features=["events"], keepalive_interval=5, backend_factory=factory)
+    backend = session.connect("127.0.0.1", 9998, 5, observer_mode=True, keepalive_interval=7, heartbeat_override=15)
+    assert backend.attached == {"pid": 5, "observer": True, "heartbeat": 15}
+    assert session.connection_config == {
+        "host": "127.0.0.1",
+        "port": 9998,
+        "pid": 5,
+        "observer_mode": True,
+        "keepalive_interval": 7,
+        "heartbeat_override": 15,
+    }
+    session.disconnect()
+    assert backend.disconnected is True
