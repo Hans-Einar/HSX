@@ -413,7 +413,7 @@ def test_step_instruction_request(monkeypatch: pytest.MonkeyPatch) -> None:
         def step(self, pid: int, *, source_only: bool = False) -> None:
             self.calls.append({"pid": pid, "source_only": source_only})
 
-        def set_step_mode(self, pid: int, enable: bool) -> None:
+        def set_debug_state(self, pid: int, enable: bool) -> None:
             self.modes.append({"pid": pid, "enable": enable})
 
         def clear_breakpoint(self, pid: int, address: int) -> None:
@@ -454,7 +454,7 @@ def test_step_instruction_request(monkeypatch: pytest.MonkeyPatch) -> None:
     assert captured and captured[-1]["reason"] == "step"
 
 
-def test_step_instruction_fallback_without_step_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_step_instruction_fallback_without_debug_state(monkeypatch: pytest.MonkeyPatch) -> None:
     class LegacyBackend:
         def __init__(self) -> None:
             self.calls: List[Dict[str, Any]] = []
@@ -488,7 +488,7 @@ def test_step_instruction_fallback_without_step_mode(monkeypatch: pytest.MonkeyP
     assert backend.restored == [0x5000]
 
 
-def test_step_requests_enable_and_disable_step_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_step_requests_enable_and_disable_debug_state(monkeypatch: pytest.MonkeyPatch) -> None:
     class ModeBackend:
         def __init__(self) -> None:
             self.step_calls: List[Dict[str, Any]] = []
@@ -499,7 +499,7 @@ def test_step_requests_enable_and_disable_step_mode(monkeypatch: pytest.MonkeyPa
         def step(self, pid: int, *, source_only: bool = False) -> None:
             self.step_calls.append({"pid": pid, "source_only": source_only})
 
-        def set_step_mode(self, pid: int, enable: bool) -> None:
+        def set_debug_state(self, pid: int, enable: bool) -> None:
             self.mode_calls.append({"pid": pid, "enable": enable})
 
         def resume(self, pid: int) -> None:
@@ -527,6 +527,33 @@ def test_step_requests_enable_and_disable_step_mode(monkeypatch: pytest.MonkeyPa
     assert {"pid": 4, "enable": False} in backend.mode_calls
     assert backend.resume_calls == 1
     assert backend.clock_calls == 1
+
+
+def test_disable_debug_state_failure_is_logged(monkeypatch: pytest.MonkeyPatch) -> None:
+    adapter = hsx_dap.HSXDebugAdapter(StubProtocol())
+    adapter.client = object()  # attribute check handled by monkeypatch below
+    adapter._debug_state_pids.add(7)
+
+    def failing_call_backend(*_args: Any, **_kwargs: Any) -> None:
+        raise DebuggerBackendError("pid locked elsewhere")
+
+    messages: List[str] = []
+    monkeypatch.setattr(adapter, "_call_backend", failing_call_backend)
+    monkeypatch.setattr(adapter, "_emit_console_message", lambda text: messages.append(text))
+    # pretend client exposes set_debug_state so _disable_debug_state attempts RPC
+    monkeypatch.setattr(adapter, "client", type("C", (), {"set_debug_state": lambda *_: None})())
+
+    adapter._disable_debug_state(pid=7, reason="teardown")
+    assert 7 not in adapter._debug_state_pids
+    assert any("pid locked elsewhere" in entry for entry in messages)
+
+
+def test_disassemble_requires_pid() -> None:
+    adapter = hsx_dap.HSXDebugAdapter(StubProtocol())
+    adapter.client = object()
+    adapter.current_pid = None
+    with pytest.raises(hsx_dap.AdapterCommandError):
+        adapter._handle_disassemble({"instructionCount": 4})
 
 
 def test_clear_all_breakpoints_request(monkeypatch: pytest.MonkeyPatch) -> None:

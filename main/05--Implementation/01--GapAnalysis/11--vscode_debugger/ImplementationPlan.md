@@ -399,14 +399,14 @@ References: Review Finding “writeMemory swallows backend errors” (`python/hs
 
 ### 10.1 Executive & MiniVM Support
 
-- [x] Add a per-PID `step_mode` flag that halts the automatic clock and advances the VM only when `step(pid)` is called.
+- [x] Add a per-PID debug-state flag (formerly `step_mode`) that halts the automatic clock and advances the VM only when `step(pid)` is called.
 - [x] Expose RPCs to enter/exit step mode (e.g., `step.mode`, `step.resume`) and document their behavior alongside `pause/resume`.
 - [x] Ensure breakpoints are ignored (or treated as advisory) while step mode is active so we can remove the temporary disable/enable dance.
 
 ### 10.2 CLI / Backend Plumbing
 
-- [x] Extend `ExecutiveSession`/`DebuggerBackend` with helpers to enable/disable step mode and query its status.
-- [x] Add a CLI command (`stepmode on|off`) so shell users can test the new flow without VS Code.
+- [x] Extend `ExecutiveSession`/`DebuggerBackend` with helpers to enable/disable debug state and query its status.
+- [x] Add a CLI command (`debugstate on|off`, with legacy `stepmode` alias) so shell users can test the new flow without VS Code.
 
 ### 10.3 DAP Adapter & VS Code Extension
 
@@ -421,6 +421,46 @@ References: Review Finding “writeMemory swallows backend errors” (`python/hs
 - [x] Document the new behavior in `vscodeDebugStackImplNotes.md` and the VS Code README, including troubleshooting tips.
 
 Deliverable: Stepping is deterministic, other tasks remain paused while step mode is active, and the VS Code UX no longer relies on the breakpoint/clock juggling workaround.
+
+---
+
+## Phase 11 – Debug-State Lifecycle & hsxdbg-Centric Adapter
+
+**Goal:** Realign the stack with the original debugger design by making the CLI debugger the single owner of executive sessions and formalizing the new *debug state* semantics (renamed from *single-step*). The VS Code adapter becomes a thin DAP façade over `hsx-dbg`, and the executive exposes first-class APIs for entering/exiting debug state while other tasks keep running.
+
+-### 11.1 Executive / VM
+
+- [x] Rename `step_mode` → `debug_state` across `python/execd.py`, `platforms/python/host_vm.py`, and telemetry so UX matches the design docs.
+- [ ] Introduce explicit RPCs (`debug.state`, `debug.resume`) that (a) enter debug state whenever a breakpoint/pause fires, (b) suppress automatic clock advances for that PID, and (c) ignore breakpoints while manually stepping.
+- [ ] Ensure the state machine transitions to debug state on breakpoint hits and back to running when the executive receives a resume request; document these transitions in `docs/executive_protocol.md`.
+
+### 11.2 hsx-dbg / Shared Debugger Backend
+
+- [ ] Add a `DebuggerSession` facade that encapsulates executive attachment, debug-state toggling, and event streaming so both CLI and DAP consumers call the same methods.
+- [ ] Update CLI commands (`step`, `continue`, breakpoint handlers) to use the new debug-state APIs and surface the current state in `ps`, `info`, and TUI panels.
+- [ ] Export a status channel (event or callback) so front-ends know when the backend transitioned between running/debugging/paused without polling.
+
+### 11.3 DAP Adapter (`python/hsx_dap`)
+
+- [ ] Remove direct `ExecutiveSession` usage; instantiate the shared `DebuggerSession` facade and funnel all requests through it.
+- [ ] Update `_handle_next/stepIn/stepOut/stepInstruction` to request entry into debug state via the backend, log transitions, and never send raw RPCs.
+- [ ] Collapse reconnect logic into the backend façade so the adapter simply reacts to “session lost” events (no more manual `_attempt_reconnect`).
+
+### 11.4 VS Code Extension (`vscode-hsx`)
+
+- [ ] Ensure the play/pause buttons only emit DAP `continue`/`pause`; let the adapter/backend manage debug-state toggles.
+- [ ] Teach the disassembly + trace panels to display the new debug-state indicators (e.g., badge, status text) and refresh only when DAP confirms success.
+- [ ] Update activation events/commands so every HSX-specific action routes through the DAP adapter (no direct executive helpers remain).
+
+### 11.5 Documentation & Tests
+
+- [ ] Update 04.09 (Debugger), 04.10 (TUI Debugger), and 04.11 (VS Code debugger) to describe debug state semantics and the hsxdbg-centered flow diagram.
+- [ ] Extend ImplementationNotes + docs with migration guidance (rename of `step.mode` → `debug.state`, new RPCs, CLI flag changes).
+- [ ] Add harness/CLI tests verifying that debug state is entered on breakpoint hits, ignores breakpoints during manual stepping, and resumes cleanly when `continue` runs.
+
+**Dependencies:** Completion of Phase 10 (current single-step plumbing) plus Executive RPC updates.
+
+Deliverable: VS Code, CLI, and future TUI all share the same debugger core, and the debug/running distinction is explicit end-to-end.
 
 ---
 

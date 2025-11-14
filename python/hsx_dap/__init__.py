@@ -177,6 +177,10 @@ class _ScopeRecord:
     variables: List[JsonDict] = field(default_factory=list)
 
 
+class AdapterCommandError(RuntimeError):
+    """Raised when a DAP request fails for expected/user-level reasons."""
+
+
 class HSXDebugAdapter:
     """DAP request dispatcher bridging VS Code to hsxdbg."""
 
@@ -195,6 +199,28 @@ class HSXDebugAdapter:
         "sleep_request",
         "sleep_complete",
     ]
+    _RECONNECT_FATAL_TOKENS = {
+        "requires 'pid'",
+        'requires "pid"',
+        "watch requires",
+        "disasm requires",
+        "missing pid",
+        "unknown_cmd",
+        "unsupported",
+        "invalid argument",
+        "invalid request",
+        "bad request",
+    }
+    _RECONNECT_TRANSIENT_TOKENS = {
+        "transport",
+        "connection",
+        "session_required",
+        "keepalive",
+        "timeout",
+        "timed out",
+        "broken pipe",
+        "reset by peer",
+    }
 
     def __init__(self, protocol: DAPProtocol) -> None:
         self.protocol = protocol
@@ -243,7 +269,7 @@ class HSXDebugAdapter:
         self._step_description: Optional[str] = None
         self._step_fallback_timer: Optional[threading.Timer] = None
         self._task_snapshot_cache: Dict[int, Tuple[float, Dict[str, Any]]] = {}
-        self._step_mode_pids: Set[int] = set()
+        self._debug_state_pids: Set[int] = set()
 
     def serve(self) -> None:
         while True:
@@ -268,6 +294,9 @@ class HSXDebugAdapter:
         try:
             body = handler(arguments) or {}
             self.protocol.send_response(seq, command or "", body=body)
+        except AdapterCommandError as exc:
+            self.logger.info("DAP command failed: %s (%s)", command, exc)
+            self.protocol.send_response(seq, command or "", success=False, message=str(exc))
         except Exception as exc:  # pragma: no cover - protective
             self.logger.exception("DAP command failed: %s", command)
             self.protocol.send_response(seq, command or "", success=False, message=str(exc))
@@ -297,7 +326,7 @@ class HSXDebugAdapter:
         if pid_value is None:
             raise ValueError("launch request missing 'pid'")
         self.current_pid = int(pid_value)
-        self._step_mode_pids.clear()
+        self._debug_state_pids.clear()
         observer_mode = self._coerce_bool(args.get("observerMode") or args.get("observer_mode"))
         keepalive_interval = self._coerce_optional_int(args.get("keepaliveInterval") or args.get("keepalive_interval"))
         heartbeat_override = self._coerce_optional_int(
@@ -358,14 +387,14 @@ class HSXDebugAdapter:
         return {}
 
     def _handle_disconnect(self, args: JsonDict) -> JsonDict:
-        self._disable_step_mode(reason="disconnect")
+        self._disable_debug_state(reason="disconnect")
         self.protocol.send_event("terminated", {})
         self._shutdown()
         return {}
 
     def _handle_terminate(self, args: JsonDict) -> JsonDict:
         restart = bool(args.get("restart"))
-        self._disable_step_mode(reason="terminate")
+        self._disable_debug_state(reason="terminate")
         if self.current_pid is not None and self.client:
             try:
                 self._call_backend("pause", self.current_pid)
@@ -388,7 +417,7 @@ class HSXDebugAdapter:
     def _handle_continue(self, args: JsonDict) -> JsonDict:
         self._ensure_client()
         self.logger.info("Continue: resuming PID %s", self.current_pid)
-        self._disable_step_mode(reason="continue")
+        self._disable_debug_state(reason="continue")
         self._cancel_pause_fallback()
         self._pending_pause = False  # Clear any pending pause state
         self._synthetic_pause_pending = False
@@ -458,7 +487,7 @@ class HSXDebugAdapter:
         self._ensure_client()
         if self.current_pid is None:
             raise RuntimeError("No HSX PID attached.")
-        self._ensure_step_mode_enabled()
+        self._ensure_debug_state_enabled()
         self._call_backend("step", self.current_pid, source_only=True)
         self._after_step_request("step over")
         return {}
@@ -467,7 +496,7 @@ class HSXDebugAdapter:
         self._ensure_client()
         if self.current_pid is None:
             raise RuntimeError("No HSX PID attached.")
-        self._ensure_step_mode_enabled()
+        self._ensure_debug_state_enabled()
         self._call_backend("step", self.current_pid, source_only=True)
         self._after_step_request("step in")
         return {}
@@ -476,7 +505,7 @@ class HSXDebugAdapter:
         self._ensure_client()
         if self.current_pid is None:
             raise RuntimeError("No HSX PID attached.")
-        self._ensure_step_mode_enabled()
+        self._ensure_debug_state_enabled()
         self._call_backend("step", self.current_pid, source_only=True)
         self._after_step_request("step out")
         return {}
@@ -485,10 +514,13 @@ class HSXDebugAdapter:
         self._ensure_client()
         if self.current_pid is None:
             raise RuntimeError("No HSX PID attached.")
+        origin = str(args.get("origin") or "").strip()
+        if origin:
+            self.logger.info("Instruction step requested via %s", origin)
         pc_before = self._read_current_pc()
-        step_mode_active = self._ensure_step_mode_enabled()
+        debug_state_active = self._ensure_debug_state_enabled()
         disabled_breakpoints: List[int] = []
-        if not step_mode_active and pc_before is not None:
+        if not debug_state_active and pc_before is not None:
             disabled_breakpoints = self._temporarily_disable_breakpoint(pc_before)
         try:
             self._call_backend("step", self.current_pid, source_only=False)
@@ -911,6 +943,8 @@ class HSXDebugAdapter:
 
     def _handle_disassemble(self, args: JsonDict) -> JsonDict:
         self._ensure_client()
+        if self.current_pid is None:
+            raise AdapterCommandError("Cannot disassemble because no HSX PID is attached.")
         count = self._coerce_positive_int(args.get("instructionCount"), default=32, limit=128)
         offset = self._coerce_optional_int(args.get("instructionOffset")) or 0
         around_pc = self._coerce_bool(args.get("aroundPc"))
@@ -1161,7 +1195,7 @@ class HSXDebugAdapter:
             if self._is_unknown_pid_error(exc):
                 self._handle_missing_pid(str(exc))
                 raise
-            if self._attempt_reconnect(exc):
+            if self._should_attempt_reconnect(exc) and self._attempt_reconnect(exc):
                 backend = self.client
                 func = getattr(backend, method)
                 return func(*args, **kwargs)
@@ -1182,12 +1216,12 @@ class HSXDebugAdapter:
         except Exception:
             self.logger.debug("failed to emit connection status event", exc_info=True)
 
-    def _emit_step_mode_event(self, pid: int, state: str) -> None:
-        body = {"subsystem": "hsx-step-mode", "pid": pid, "state": state}
+    def _emit_debug_state_event(self, pid: int, state: str) -> None:
+        body = {"subsystem": "hsx-step-mode", "pid": pid, "state": state, "label": "debug-state"}
         try:
             self.protocol.send_event("telemetry", body)
         except Exception:
-            self.logger.debug("failed to emit step mode telemetry", exc_info=True)
+            self.logger.debug("failed to emit debug state telemetry", exc_info=True)
 
     def _emit_disassembly_refresh_event(self, pc: Optional[int]) -> None:
         body: JsonDict = {
@@ -1261,39 +1295,41 @@ class HSXDebugAdapter:
         self._step_description = None
         self._cancel_step_fallback()
 
-    def _ensure_step_mode_enabled(self) -> bool:
+    def _ensure_debug_state_enabled(self) -> bool:
         pid = self.current_pid
         if pid is None or not self.client:
             return False
-        if pid in self._step_mode_pids:
+        if pid in self._debug_state_pids:
             return True
-        if not hasattr(self.client, "set_step_mode"):
+        if not hasattr(self.client, "set_debug_state"):
             return False
         try:
-            self._call_backend("set_step_mode", pid, True)
+            self._call_backend("set_debug_state", pid, True)
         except Exception:
-            self.logger.debug("Failed to enable step mode for PID %s", pid, exc_info=True)
+            self.logger.debug("Failed to enable debug state for PID %s", pid, exc_info=True)
             return False
-        self.logger.debug("Enabled step mode for PID %s", pid)
-        self._emit_step_mode_event(pid, "enabled")
-        self._step_mode_pids.add(pid)
+        self.logger.debug("Enabled debug state for PID %s", pid)
+        self._emit_debug_state_event(pid, "enabled")
+        self._debug_state_pids.add(pid)
         return True
 
-    def _disable_step_mode(self, *, pid: Optional[int] = None, reason: str = "manual") -> None:
+    def _disable_debug_state(self, *, pid: Optional[int] = None, reason: str = "manual") -> None:
         target = pid or self.current_pid
-        if target is None or target not in self._step_mode_pids:
+        if target is None or target not in self._debug_state_pids:
             return
-        if not self.client or not hasattr(self.client, "set_step_mode"):
-            self._step_mode_pids.discard(target)
+        if not self.client or not hasattr(self.client, "set_debug_state"):
+            self._debug_state_pids.discard(target)
             return
         try:
-            self._call_backend("set_step_mode", target, False)
-        except Exception:
-            self.logger.debug("Failed to disable step mode for PID %s", target, exc_info=True)
+            self._call_backend("set_debug_state", target, False)
+        except Exception as exc:
+            message = f"Failed to disable debug state for PID {target}: {exc}"
+            self.logger.warning(message, exc_info=True)
+            self._emit_console_message(message)
         else:
-            self.logger.debug("Disabled step mode for PID %s (%s)", target, reason)
-            self._emit_step_mode_event(target, "disabled")
-        self._step_mode_pids.discard(target)
+            self.logger.debug("Disabled debug state for PID %s (%s)", target, reason)
+            self._emit_debug_state_event(target, "disabled")
+        self._debug_state_pids.discard(target)
 
     def _remaining_backoff(self, kind: str) -> float:
         now = time.monotonic()
@@ -1714,7 +1750,7 @@ class HSXDebugAdapter:
         self._emit_console_message(warning)
         self.current_pid = None
         if pid is not None:
-            self._step_mode_pids.discard(pid)
+            self._debug_state_pids.discard(pid)
         self._cancel_remote_breakpoint_poll()
 
     @staticmethod
@@ -2262,6 +2298,25 @@ class HSXDebugAdapter:
             self._watch_expr_to_id[expr] = watch_id
             self._watch_id_to_expr[watch_id] = expr
 
+    def _should_attempt_reconnect(self, exc: Exception) -> bool:
+        message = str(exc).lower()
+        if any(token in message for token in self._RECONNECT_FATAL_TOKENS):
+            return False
+        cause = getattr(exc, "__cause__", None)
+        if cause and self._is_transient_exception(cause):
+            return True
+        return any(token in message for token in self._RECONNECT_TRANSIENT_TOKENS)
+
+    def _is_transient_exception(self, error: Exception) -> bool:
+        if isinstance(error, (TimeoutError, ConnectionError, OSError)):
+            return True
+        name = error.__class__.__name__.lower()
+        if "connection" in name or "timeout" in name:
+            return True
+        text = " ".join(str(arg) for arg in getattr(error, "args", ()))
+        text = text.lower()
+        return any(token in text for token in self._RECONNECT_TRANSIENT_TOKENS)
+
     def _attempt_reconnect(self, exc: Exception) -> bool:
         if self._reconnecting or not self._connection_config:
             return False
@@ -2398,7 +2453,7 @@ class HSXDebugAdapter:
         self.project_root = REPO_ROOT
         self._source_base_dirs = [REPO_ROOT]
         self._task_snapshot_cache.clear()
-        self._step_mode_pids.clear()
+        self._debug_state_pids.clear()
 
     def _update_project_root(self, args: JsonDict) -> None:
         workspace_hint = args.get("workspaceFolder") or args.get("workspaceRoot") or args.get("workspace")
@@ -2616,7 +2671,7 @@ class HSXDebugAdapter:
         entry = self._thread_states.setdefault(pid, {"name": f"PID {pid}", "state": None})
         entry["state"] = state
         if state in {"terminated", "exited"}:
-            self._step_mode_pids.discard(pid)
+            self._debug_state_pids.discard(pid)
 
     def _extract_task_state_pc(self, task_data: JsonDict) -> Optional[int]:
         details = None

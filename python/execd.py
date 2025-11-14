@@ -299,7 +299,7 @@ class ExecutiveState:
         self.wait_mbx_deadlines: Dict[int, float] = {}
         self._pending_scheduler_context: Optional[Dict[str, Any]] = None
         self.enforce_context_isolation: bool = True
-        self.step_mode: Set[int] = set()
+        self.debug_state: Set[int] = set()
         self.session_numbers: Dict[str, int] = {}
         self._next_session_number: int = 1
 
@@ -3181,6 +3181,12 @@ class ExecutiveState:
             sleep_flag = bool(task.get("sleep_pending"))
             state_entry["sleep_pending"] = sleep_flag
             state_entry["context"] = context
+            in_debug_state = pid in self.debug_state
+            context["debug_state"] = in_debug_state
+            task["debug_state"] = in_debug_state
+            # Preserve legacy single_step field for older clients.
+            context["single_step"] = in_debug_state
+            task["single_step"] = in_debug_state
             context["state"] = new_state
             if self.enforce_context_isolation:
                 self._assert_context_isolation(pid, context, new_state_enum)
@@ -3305,6 +3311,8 @@ class ExecutiveState:
             )
             self.trace_last_regs.pop(pid, None)
             self._untrack_sleep(pid)
+        for pid in removed_pids:
+            self.debug_state.discard(pid)
 
         self.task_states = new_states
         context = self._pending_scheduler_context or {}
@@ -3343,6 +3351,30 @@ class ExecutiveState:
             self.trace_last_regs.pop(pid, None)
             with self.trace_lock:
                 self.trace_buffers.pop(pid, None)
+
+    def _annotate_debug_state_flags(self, block: Any) -> None:
+        def _apply(entry: Any) -> None:
+            if not isinstance(entry, dict):
+                return
+            pid_raw = entry.get("pid")
+            try:
+                pid_int = int(pid_raw)
+            except (TypeError, ValueError):
+                return
+            in_debug = pid_int in self.debug_state
+            entry["debug_state"] = in_debug
+            entry["single_step"] = in_debug
+
+        if isinstance(block, list):
+            for entry in block:
+                _apply(entry)
+        elif isinstance(block, dict):
+            tasks = block.get("tasks")
+            if isinstance(tasks, list):
+                for entry in tasks:
+                    _apply(entry)
+            else:
+                _apply(block)
 
     def log(self, level: str, message: str, **fields: Any) -> None:
         entry = {
@@ -3401,6 +3433,7 @@ class ExecutiveState:
         clock = self.get_clock_status()
         payload["auto"] = clock["running"]
         payload["clock"] = clock
+        self._annotate_debug_state_flags(payload.get("tasks"))
         return payload
 
     def load(self, path: str, verbose: bool = False, *, symbols: Optional[str] = None) -> Dict[str, Any]:
@@ -3465,10 +3498,12 @@ class ExecutiveState:
         ignore_breakpoints: bool = False,
     ) -> Dict[str, Any]:
         budget = steps if steps is not None else self.step_batch
-        if pid is not None and pid in self.step_mode:
+        manual_debug_state = pid is not None and pid in self.debug_state
+        if manual_debug_state:
             ignore_breakpoints = True
         if not source_only:
             result, _ = self._step_once(budget, pid=pid, source=source, ignore_breakpoints=ignore_breakpoints)
+            self._enforce_single_step_pause(pid, result, manual_debug_state=manual_debug_state, source=source)
             return result
         source_steps = steps if steps is not None else 1
         iterations = max(1, source_steps)
@@ -3498,11 +3533,12 @@ class ExecutiveState:
             if final_result is None or not final_result.get("running"):
                 break
         if final_result is None:
-            return {"executed": 0, "running": False, "events": []}
+            final_result = {"executed": 0, "running": False, "events": []}
         final_events = aggregated_events or final_result.get("events") or []
         final_result["events"] = final_events
         if total_executed:
             final_result["executed"] = total_executed
+        self._enforce_single_step_pause(pid, final_result, manual_debug_state=manual_debug_state, source=source)
         return final_result
 
     def _step_once(
@@ -3590,6 +3626,26 @@ class ExecutiveState:
             result.setdefault("events", []).extend(watch_events)
         return result, trace_last
 
+    def _enforce_single_step_pause(
+        self,
+        pid: Optional[int],
+        result: Dict[str, Any],
+        *,
+        manual_debug_state: bool,
+        source: str,
+    ) -> None:
+        if not manual_debug_state or pid is None or source == "auto":
+            return
+        if not result.get("running"):
+            return
+        try:
+            self.pause_task(pid)
+        except Exception:
+            self.log("debug", "single-step pause failed", pid=pid, exc_info=True)
+            return
+        result["paused"] = True
+        result["running"] = False
+
     def start_auto(self) -> None:
         if self.auto_thread and self.auto_thread.is_alive():
             return
@@ -3597,7 +3653,6 @@ class ExecutiveState:
         self.clock_mode = "rate" if self.clock_rate_hz > 0 else "active"
         self._clock_throttle_reason = None
         self._clock_last_wait = 0.0
-        self.step_mode.clear()
         self.auto_thread = threading.Thread(target=self._auto_loop, daemon=True)
         self.auto_thread.start()
 
@@ -3797,7 +3852,7 @@ class ExecutiveState:
         return dict(self.get_task(pid))
 
     def resume_task(self, pid: int) -> Dict[str, Any]:
-        self.step_mode.discard(pid)
+        self.debug_state.discard(pid)
         self.get_task(pid)
         self._set_task_state_pending(pid, "resume", target_state="running", ts=time.time())
         skip_pc: Optional[int] = None
@@ -3828,22 +3883,23 @@ class ExecutiveState:
         self._refresh_tasks()
         return dict(self.get_task(pid))
 
-    def set_step_mode(self, pid: int, enable: bool) -> Dict[str, Any]:
+    def set_debug_state(self, pid: int, enable: bool) -> Dict[str, Any]:
         self.get_task(pid)
-        enabled = pid in self.step_mode
+        enabled = pid in self.debug_state
         if enable:
             if not enabled:
                 self.pause_task(pid)
-                self.step_mode.add(pid)
-                self.log("info", "step_mode_enabled", pid=pid)
+                self.debug_state.add(pid)
+                self.log("info", "debug_state_enabled", pid=pid)
         else:
             if enabled:
-                self.step_mode.discard(pid)
-                self.log("info", "step_mode_disabled", pid=pid)
-        return {"pid": pid, "step_mode": pid in self.step_mode}
+                self.debug_state.discard(pid)
+                self.log("info", "debug_state_disabled", pid=pid)
+        value = pid in self.debug_state
+        return {"pid": pid, "debug_state": value, "step_mode": value}
 
     def kill_task(self, pid: int) -> Dict[str, Any]:
-        self.step_mode.discard(pid)
+        self.debug_state.discard(pid)
         self._set_task_state_pending(pid, "killed", target_state="terminated", ts=time.time())
         self.stop_auto()
         with self.lock:
@@ -5101,7 +5157,7 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 pid_int = int(pid_value) if pid_value is not None else None
                 if pid_int is not None:
                     self.state.ensure_pid_access(pid_int, session_id)
-                ignore_bps = bool(pid_int is not None and pid_int in self.state.step_mode)
+                ignore_bps = bool(pid_int is not None and pid_int in self.state.debug_state)
                 result = self.state.step(
                     steps_int,
                     pid=pid_int,
@@ -5446,13 +5502,13 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
             if cmd == "dmesg.clear":
                 result = self.state.clear_logs()
                 return {"version": 1, "status": "ok", "logs": [], **result}
-            if cmd == "step.mode":
+            if cmd in {"debug.state", "step.mode"}:
                 pid_value = request.get("pid")
                 if pid_value is None:
-                    raise ValueError("step.mode requires 'pid'")
+                    raise ValueError("debug.state requires 'pid'")
                 mode_value = request.get("mode")
                 if mode_value is None:
-                    raise ValueError("step.mode requires 'mode'")
+                    raise ValueError("debug.state requires 'mode'")
                 if isinstance(mode_value, bool):
                     enable = mode_value
                 elif isinstance(mode_value, (int, float)):
@@ -5460,11 +5516,11 @@ class ExecutiveServer(socketserver.ThreadingTCPServer):
                 elif isinstance(mode_value, str):
                     enable = mode_value.strip().lower() in {"1", "true", "on", "enable"}
                 else:
-                    raise ValueError("step.mode mode must be boolean-compatible")
+                    raise ValueError("debug.state mode must be boolean-compatible")
                 pid_int = int(pid_value)
                 self.state.ensure_pid_access(pid_int, session_id)
-                info = self.state.set_step_mode(pid_int, enable)
-                return {"version": 1, "status": "ok", "step_mode": info}
+                info = self.state.set_debug_state(pid_int, enable)
+                return {"version": 1, "status": "ok", "debug_state": info, "step_mode": info}
             if cmd == "stdio_fanout":
                 pid_raw = request.get("pid")
                 default_only = False

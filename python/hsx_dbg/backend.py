@@ -390,10 +390,17 @@ class DebuggerBackend:
         resp = self.request({"cmd": "watch", "op": "remove", "pid": pid, "watch_id": int(watch_id)})
         self._expect_ok(resp, "watch remove")
 
-    def set_step_mode(self, pid: int, enable: bool) -> None:
-        payload: Dict[str, Any] = {"cmd": "step.mode", "pid": int(pid), "mode": bool(enable)}
-        resp = self.request(payload)
-        self._expect_ok(resp, "step mode")
+    def set_debug_state(self, pid: int, enable: bool) -> None:
+        payload: Dict[str, Any] = {"cmd": "debug.state", "pid": int(pid), "mode": bool(enable)}
+        try:
+            resp = self.request(payload)
+        except DebuggerBackendError as exc:
+            if "unknown_cmd" in str(exc):
+                payload["cmd"] = "step.mode"
+                resp = self.request(payload)
+            else:
+                raise
+        self._expect_ok(resp, "debug state")
 
     # ------------------------------------------------------------------
     # Trace helpers

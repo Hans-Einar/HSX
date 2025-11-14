@@ -478,10 +478,10 @@ def test_dmesg_clear_payloads_and_output(capsys: pytest.CaptureFixture[str], tmp
     assert "5" in output and "cleared" in output
 
 
-def test_stepmode_payload_builder() -> None:
-    payload = shell_client._build_stepmode_payload(["7", "on"])
-    assert payload == {"cmd": "step.mode", "pid": 7, "mode": True}
-    payload = shell_client._build_stepmode_payload(["0xFF", "off"])
-    assert payload == {"cmd": "step.mode", "pid": 255, "mode": False}
+def test_debugstate_payload_builder() -> None:
+    payload = shell_client._build_debugstate_payload(["7", "on"])
+    assert payload == {"cmd": "debug.state", "pid": 7, "mode": True}
+    payload = shell_client._build_debugstate_payload(["0xFF", "off"])
+    assert payload == {"cmd": "debug.state", "pid": 255, "mode": False}
     with pytest.raises(ValueError):
-        shell_client._build_stepmode_payload(["7"])
+        shell_client._build_debugstate_payload(["7"])

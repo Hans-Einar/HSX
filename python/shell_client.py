@@ -53,6 +53,7 @@ COMMAND_NAMES = sorted(
         "dbg",
         "dumpregs",
         "dmesg",
+        "debugstate",
         "stepmode",
         "dmesg.clear",
         "events",
@@ -750,7 +751,7 @@ def _pretty_info(payload: dict) -> None:
     tasks = info.get('tasks', [])
     if tasks:
         print("  tasks:")
-        header = "      PID   State         Prio  Quantum  Steps     Sleep     Exit  Trace  Program"
+        header = "      PID   State         Prio  Quantum  Steps     Sleep     Exit  Trace  Debug  Program"
         print(header)
         print("      " + "-" * (len(header) - 6))
         for task in tasks:
@@ -763,9 +764,10 @@ def _pretty_info(payload: dict) -> None:
             exit_status = task.get("exit_status")
             exit_text = "-" if exit_status is None else str(exit_status)
             trace_text = "on" if task.get("trace") else "off"
+            step_text = "on" if task.get("debug_state") else "off"
             program = task.get("program", "")
             marker = "*" if current is not None and pid == current else " "
-            print(f"    {marker} {pid:4}  {state:<12}  {prio:>4}  {quantum:>7}  {steps_val:>8}  {str(sleep):<5}  {exit_text:>8}  {trace_text:>5}  {program}")
+            print(f"    {marker} {pid:4}  {state:<12}  {prio:>4}  {quantum:>7}  {steps_val:>8}  {str(sleep):<5}  {exit_text:>8}  {trace_text:>5}  {step_text:>5}  {program}")
     clock = info.get('clock')
     if isinstance(clock, dict):
         print("  clock:")
@@ -1204,7 +1206,7 @@ def _pretty_ps(payload: dict) -> None:
     if not tasks:
         print("  (no tasks)")
         return
-    header = "    PID   State         Prio  Quantum  Steps     Sleep     Exit  Trace  Program"
+    header = "    PID   State         Prio  Quantum  Steps     Sleep     Exit  Trace  Debug  Program"
     print(header)
     print("    " + "-" * (len(header) - 4))
     for task in tasks:
@@ -1217,9 +1219,10 @@ def _pretty_ps(payload: dict) -> None:
         exit_status = task.get("exit_status")
         exit_text = "-" if exit_status is None else str(exit_status)
         trace_text = "on" if task.get("trace") else "off"
+        step_text = "on" if task.get("debug_state") else "off"
         program = task.get("program", "")
         marker = "*" if current_pid is not None and pid == current_pid else " "
-        print(f"  {marker} {pid:4}  {state:<12}  {prio:>4}  {quantum:>7}  {steps_val:>8}  {str(sleep):<5}  {exit_text:>8}  {trace_text:>5}  {program}")
+        print(f"  {marker} {pid:4}  {state:<12}  {prio:>4}  {quantum:>7}  {steps_val:>8}  {str(sleep):<5}  {exit_text:>8}  {trace_text:>5}  {step_text:>5}  {program}")
 
 def _pretty_clock(payload: dict) -> None:
     if payload.get("status") != "ok":
@@ -2772,8 +2775,10 @@ def _build_payload(
         return _build_dmesg_payload(args, host, port)
     if cmd == "dmesg.clear":
         return _build_dmesg_clear_payload(args)
+    if cmd == "debugstate":
+        return _build_debugstate_payload(args)
     if cmd == "stepmode":
-        return _build_stepmode_payload(args)
+        return _build_debugstate_payload(args)
 
     if cmd == "stdio":
         payload["cmd"] = "stdio_fanout"
@@ -3081,13 +3086,13 @@ def _build_dmesg_clear_payload(args: list[str]) -> dict:
     return {"cmd": "dmesg.clear"}
 
 
-def _build_stepmode_payload(args: list[str]) -> dict:
+def _build_debugstate_payload(args: list[str]) -> dict:
     if len(args) < 2:
-        raise ValueError("stepmode requires <pid> <on|off>")
+        raise ValueError("debugstate requires <pid> <on|off>")
     pid = int(args[0], 0)
     mode = args[1].strip().lower()
     enable = mode in {"1", "on", "true", "enable"}
-    return {"cmd": "step.mode", "pid": pid, "mode": enable}
+    return {"cmd": "debug.state", "pid": pid, "mode": enable}
 
 
 def cmd_loop(host: str, port: int, cwd: Path | None = None, *, default_json: bool = False) -> None:

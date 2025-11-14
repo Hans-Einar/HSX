@@ -447,8 +447,18 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
   );
   context.subscriptions.push(
+    vscode.commands.registerCommand("hsx.views.disassembly.stepInstruction", async () => {
+      await stepHSXInstruction("disassemblyView");
+    }),
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand("hsx.views.trace.stepInstruction", async () => {
+      await stepHSXInstruction("traceView");
+    }),
+  );
+  context.subscriptions.push(
     vscode.commands.registerCommand("hsx.views.stepInstruction", async () => {
-      await stepHSXInstruction();
+      await stepHSXInstruction("commandPalette");
     }),
   );
   context.subscriptions.push(
@@ -2165,17 +2175,27 @@ async function stopActiveHSXSession(): Promise<void> {
   }
   }
 
-async function stepHSXInstruction(): Promise<void> {
+let singleStepInFlight = false;
+
+async function stepHSXInstruction(origin?: string): Promise<void> {
   const session = getActiveHSXSession();
   if (!session) {
     void vscode.window.showWarningMessage("Start an HSX debug session to step instructions.");
     return;
   }
+  if (singleStepInFlight) {
+    void vscode.window.showInformationMessage("Single-step already in progress.");
+    return;
+  }
+  singleStepInFlight = true;
   try {
-    await session.customRequest("stepInstruction", {});
-    void vscode.commands.executeCommand("hsx.views.refreshDisassembly");
+    const payload = origin ? { origin } : {};
+    await session.customRequest("stepInstruction", payload);
+    await HSXDebugViewCoordinator.instance.refreshAll("auto");
   } catch (error) {
     void vscode.window.showErrorMessage(`Unable to step HSX instruction: ${getErrorMessage(error)}`);
+  } finally {
+    singleStepInFlight = false;
   }
 }
 

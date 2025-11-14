@@ -123,9 +123,9 @@
 
 - Scope: VS Code plan Phase 10 (single-step mode) plus shell CLI observability.
 - Highlights:
-  - Executive now tracks a `step_mode` set per PID, exposes the `step.mode` RPC, and forces manual steps to ignore breakpoints whenever the target is in step mode (`python/execd.py`).
-  - `DebuggerBackend`/shell client gained `set_step_mode` plumbing and the CLI’s `stepmode` command works in one-shot mode (fixed `main()` fallback so `python shell_client.py stepmode ...` prints to stdout). Dmesg logs now include command arguments and stable session numbers so users can `... dmesg > log`.
-  - `_handle_next`/`_handle_step*` enable step mode up front, `_handle_continue` disables it, and the adapter emits telemetry for every transition (`hsx_dap/__init__.py`). Instruction steps keep the breakpoint-clear fallback only when the executive lacks step-mode support.
-  - Added harness coverage for the new flow (step-mode enable/disable, instruction fallback) plus backend + CLI unit tests (`python/tests/test_hsx_dap_harness.py`, `python/tests/test_hsx_dbg_backend.py`, `python/tests/test_shell_client.py`).
+  - Executive now tracks a `debug_state` set per PID, exposes the `debug.state` RPC, and forces manual steps to ignore breakpoints whenever the target is in debug state (`python/execd.py`).
+  - `DebuggerBackend`/shell client gained `set_debug_state` plumbing and the CLI’s `debugstate` command (with legacy `stepmode` alias) works in one-shot mode. Dmesg logs now include command arguments and stable session numbers so users can `... dmesg > log`.
+  - `_handle_next`/`_handle_step*` enable debug state up front, `_handle_continue` disables it, and the adapter emits telemetry for every transition (`hsx_dap/__init__.py`). Instruction steps keep the breakpoint-clear fallback only when the executive lacks debug-state support.
+  - Added harness coverage for the new flow (debug-state enable/disable, instruction fallback) plus backend + CLI unit tests (`python/tests/test_hsx_dap_harness.py`, `python/tests/test_hsx_dbg_backend.py`, `python/tests/test_shell_client.py`).
 - Tests: `pytest python/tests/test_hsx_dap_harness.py python/tests/test_shell_client.py python/tests/test_hsx_dbg_backend.py`
 *** End Patch

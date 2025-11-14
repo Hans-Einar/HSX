@@ -617,9 +617,22 @@ class ExecutiveSession:
                 return
             if self.session_id and not force:
                 return
+            release_session_id: Optional[str] = None
             if force and self.session_id:
                 self._stop_event_stream_locked()
                 self._stop_keepalive_locked()
+                release_session_id = self.session_id
+                self.session_id = None
+            if release_session_id:
+                try:
+                    response = self._send_raw({"cmd": "session.close", "session": release_session_id})
+                    if response.get("status") != "ok":
+                        LOGGER.debug(
+                            "session.close during reopen failed: %s",
+                            response.get("error") or "exec error",
+                        )
+                except Exception:
+                    LOGGER.debug("failed to close previous session %s", release_session_id, exc_info=True)
             payload: JsonDict = {
                 "cmd": "session.open",
                 "client": self.client_name,

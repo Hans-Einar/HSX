@@ -3,7 +3,7 @@
   "displayName": "HSX Debugger",
   "publisher": "hsx",
   "description": "Debug Adapter Protocol integration for HSX firmware targets.",
-  "version": "0.0.19",
+  "version": "0.0.23",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -25,7 +25,10 @@
     "onCommand:hsx.views.followProgramCounter",
     "onCommand:hsx.views.goToProgramCounter",
     "onCommand:hsx.views.copyDisassembly",
-    "onCommand:hsx.disassembly.toggleBreakpoint"
+    "onCommand:hsx.disassembly.toggleBreakpoint",
+    "onCommand:hsx.views.disassembly.stepInstruction",
+    "onCommand:hsx.views.trace.stepInstruction",
+    "onCommand:hsx.views.stepInstruction"
   ],
   "contributes": {
     "debuggers": [
@@ -208,6 +211,16 @@
         "icon": "$(debug-continue)"
       },
       {
+        "command": "hsx.views.disassembly.stepInstruction",
+        "title": "Step Instruction (Disassembly)",
+        "icon": "$(debug-step-into)"
+      },
+      {
+        "command": "hsx.views.trace.stepInstruction",
+        "title": "Step Instruction (Trace)",
+        "icon": "$(debug-step-into)"
+      },
+      {
         "command": "hsx.views.stepInstruction",
         "title": "Step Instruction",
         "icon": "$(debug-step-into)"
@@ -321,7 +334,7 @@
           "group": "navigation@7"
         },
         {
-          "command": "hsx.views.stepInstruction",
+          "command": "hsx.views.disassembly.stepInstruction",
           "when": "view == hsxDisassemblyView",
           "group": "navigation@8"
         },
@@ -361,7 +374,7 @@
           "group": "navigation@3"
         },
         {
-          "command": "hsx.views.stepInstruction",
+          "command": "hsx.views.trace.stepInstruction",
           "when": "view == hsxTraceView",
           "group": "navigation@4"
         },

@@ -95,6 +95,18 @@ class TaskStateVM:
         self.state = "running"
         self.exit_status = None
 
+    def step(self, steps: int, pid: Optional[int] = None) -> dict:
+        self.paused = False
+        self.state = "running"
+        executed = steps if steps is not None else 1
+        return {
+            "executed": executed,
+            "running": True,
+            "current_pid": pid or 1,
+            "events": [],
+            "paused": False,
+        }
+
     def kill(self, pid: int) -> dict:
         self.paused = False
         self.state = "terminated"
@@ -122,6 +134,27 @@ def make_task_state_env() -> tuple[ExecutiveState, TaskStateVM]:
     state = ExecutiveState(vm, step_batch=1)
     state.enforce_context_isolation = False
     return state, vm
+
+
+def test_debug_state_marks_tasks_in_ps():
+    state, _ = make_task_state_env()
+    listing_before = state.task_list()
+    assert listing_before["tasks"][0].get("debug_state") is False
+    state.set_debug_state(1, True)
+    listing_after = state.task_list()
+    assert listing_after["tasks"][0].get("debug_state") is True
+
+
+def test_single_step_manual_step_repauses_task():
+    state, vm = make_task_state_env()
+    state.set_debug_state(1, True)
+    vm.paused = False
+    result = state.step(pid=1)
+    assert result.get("paused") is True
+    assert result.get("running") is False
+    assert vm.paused is True
+    listing = state.task_list()
+    assert listing["tasks"][0]["state"] == "paused"
 
 
 def test_value_events_update_registry():

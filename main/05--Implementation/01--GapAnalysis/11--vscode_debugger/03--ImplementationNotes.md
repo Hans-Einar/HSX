@@ -409,3 +409,36 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 
 ### Next Steps
 - Update docs with guidance on the new stop/memory workflows and keep monitoring for additional UX gaps before closing Phase 9 entirely.
+
+## 2025-11-14 - Codex (Session 23)
+
+### Scope
+- Plan items: Phase 11 kickoff (debug-state lifecycle & hsxdbg-centric adapter alignment)
+- Design refs: 04.09--Debugger.md, 04.10--TUI_Debugger.md, 04.11--vscode_debugger.md
+
+### Work Summary
+- Added Phase 11 to `ImplementationPlan.md`, outlining per-module tasks (Executive, hsx-dbg/shared backend, hsx-dap, VS Code extension, docs/tests) required to rename single-step to *debug state* and route all executive interactions through the shared debugger façade.
+- Documented the same direction in these implementation notes so follow-up sessions know the approved approach (debug state semantics, adapter layering expectations).
+
+### Testing
+- Planning/documentation-only session; no code executed.
+
+### Next Steps
+- Start implementing Phase 11 tasks: introduce debug-state RPCs in the executive, refactor hsx_dap to rely on the shared debugger session, and propagate the renamed state through the CLI/TUI/VS Code surfaces.
+
+## 2025-11-14 - Codex (Session 24)
+
+### Scope
+- Plan items: Phase 11 §§11.1–11.3 (rename step mode → debug state across executive/backend/DAP) + CLI command alignment.
+- Design refs: 04.09--Debugger.md (session flow), 04.11--vscode_debugger.md §5 (stepping UX), Implementation Plan §§10–11.
+
+### Work Summary
+- Renamed the executive’s `step_mode` machinery to `debug_state`, introduced the `debug.state` RPC (legacy `step.mode` alias), and propagated the new field through task snapshots/`info` output while keeping `single_step` for backward compatibility (`python/execd.py`). All PID removals, pause/resume handlers, and the debug-state enforcement helper were updated accordingly.
+- Updated the shared debugger backend + DAP adapter to call `set_debug_state`, renamed the adapter’s bookkeeping (`_debug_state_pids`, telemetry subsystem), and improved console warnings when transitions fail. Tests covering step enable/disable paths were updated to the new naming.
+- Exposed the new flow in the CLI: added a `debugstate` command (with legacy `stepmode` alias), refreshed the tabular output column to “Debug”, and ensured payload builders emit the `debug.state` RPC. Documentation/notes referencing `step_mode` now describe the debug-state semantics.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_hsx_dbg_backend.py python/tests/test_hsx_dap_harness.py python/tests/test_shell_client.py python/tests/test_executive_sessions.py`
+
+### Next Steps
+- Continue Phase 11 with the shared `DebuggerSession` façade + adapter refactor, then teach the VS Code extension/TUI to surface debug-state indicators instead of generic pause text.
