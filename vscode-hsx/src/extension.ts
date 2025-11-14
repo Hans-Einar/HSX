@@ -513,6 +513,11 @@ interface DebugEventMessage {
 
 class HSXStatusTracker implements vscode.DebugAdapterTracker {
   private disposed = false;
+  private lastConnectionRender: { text: string; tooltip?: string; show: boolean } = {
+    text: "HSX: Starting...",
+    tooltip: "Waiting for adapter",
+    show: true,
+  };
 
   constructor(
     private readonly session: vscode.DebugSession,
@@ -532,7 +537,23 @@ class HSXStatusTracker implements vscode.DebugAdapterTracker {
       return;
     }
     const body = eventMessage.body ?? {};
-    if (body.subsystem !== "hsx-connection") {
+    const subsystem = (body as Record<string, unknown>).subsystem;
+    if (subsystem === "hsx-step-mode") {
+      const stateValue = String((body as Record<string, unknown>).state || "");
+      const enabled = stateValue.toLowerCase() === "enabled";
+      const pidLabel = optionalString((body as Record<string, unknown>).pid) ?? "pid ?";
+      if (enabled) {
+        this.render(`HSX: Debugging (${pidLabel})`, "Manual stepping; breakpoints temporarily ignored");
+      } else {
+        this.render(
+          this.lastConnectionRender.text,
+          this.lastConnectionRender.tooltip,
+          this.lastConnectionRender.show,
+        );
+      }
+      return;
+    }
+    if (subsystem !== "hsx-connection") {
       return;
     }
     const state = String(body.state || "").toLowerCase();
@@ -546,22 +567,22 @@ class HSXStatusTracker implements vscode.DebugAdapterTracker {
         : undefined;
     switch (state) {
       case "connected":
-        this.render(`HSX: Connected (${pidLabel})`, hostSummary);
+        this.renderConnection(`HSX: Connected (${pidLabel})`, hostSummary);
         break;
       case "reconnecting":
-        this.render("HSX: Reconnecting…", optionalString(body.message));
+        this.renderConnection("HSX: Reconnecting…", optionalString(body.message));
         break;
       case "error":
-        this.render("HSX: Error", optionalString(body.message) ?? "connection error");
+        this.renderConnection("HSX: Error", optionalString(body.message) ?? "connection error");
         if (typeof body.message === "string") {
           vscode.window.showWarningMessage(`HSX debugger connection issue: ${body.message}`);
         }
         break;
       case "disconnected":
-        this.render("HSX: Disconnected", undefined, false);
+        this.renderConnection("HSX: Disconnected", undefined, false);
         break;
       default:
-        this.render(`HSX: ${state}`, optionalString(body.message));
+        this.renderConnection(`HSX: ${state}`, optionalString(body.message));
     }
   }
 
@@ -571,6 +592,11 @@ class HSXStatusTracker implements vscode.DebugAdapterTracker {
 
   onError(): void {
     this.dispose();
+  }
+
+  private renderConnection(text: string, tooltip?: string, show: boolean = true): void {
+    this.lastConnectionRender = { text, tooltip, show };
+    this.render(text, tooltip, show);
   }
 
   private render(text: string, tooltip?: string, show: boolean = true): void {
@@ -690,6 +716,7 @@ class HSXDebugViewCoordinator {
   private readonly views = new Set<HSXRefreshableView>();
   private readonly frameMetadata = new Map<string, Map<number, FrameMetadata>>();
   private readonly sessionStates = new Map<string, DebugRunState>();
+  private readonly debugState = new Map<string, boolean>();
 
   static get instance(): HSXDebugViewCoordinator {
     if (!HSXDebugViewCoordinator.singleton) {
@@ -750,6 +777,14 @@ class HSXDebugViewCoordinator {
       const subsystem = optionalString(body?.subsystem);
       if (subsystem === "hsx-disassembly") {
         void this.refreshDisassembly("auto");
+        return;
+      }
+      if (subsystem === "hsx-step-mode") {
+        const rawState = optionalString(body?.state) ?? "";
+        const enabled = rawState.toLowerCase() === "enabled";
+        this.debugState.set(session.id, enabled);
+        void vscode.commands.executeCommand("setContext", "hsx.debugStateActive", enabled);
+        return;
       }
       return;
     }
@@ -817,6 +852,7 @@ class HSXDebugViewCoordinator {
   clearSession(session: vscode.DebugSession): void {
     this.frameMetadata.delete(session.id);
     this.sessionStates.delete(session.id);
+    this.debugState.delete(session.id);
   }
 
   private captureStackMetadata(session: vscode.DebugSession, responseBody: unknown): void {

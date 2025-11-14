@@ -556,6 +556,34 @@ def test_disassemble_requires_pid() -> None:
         adapter._handle_disassemble({"instructionCount": 4})
 
 
+def test_attempt_reconnect_uses_cached_config(monkeypatch: pytest.MonkeyPatch) -> None:
+    adapter = hsx_dap.HSXDebugAdapter(StubProtocol())
+    adapter.current_pid = 5
+    adapter._connection_config = {
+        "host": "127.0.0.1",
+        "port": 9998,
+        "pid": 5,
+        "observer_mode": False,
+        "keepalive_interval": None,
+        "heartbeat_override": None,
+    }
+    called: Dict[str, Any] = {}
+
+    def fake_connect(host: str, port: int, pid: int, **kwargs: Any) -> None:
+        called["host"] = host
+        called["port"] = port
+        called["pid"] = pid
+        called["kwargs"] = kwargs
+        adapter.client = object()
+        adapter.backend = adapter.client
+
+    monkeypatch.setattr(adapter, "_connect", fake_connect)
+    monkeypatch.setattr(adapter, "_pid_exists", lambda _pid: True)
+    assert adapter._attempt_reconnect(DebuggerBackendError("transport error"))
+    assert called["host"] == "127.0.0.1"
+    assert called["pid"] == 5
+
+
 def test_clear_all_breakpoints_request(monkeypatch: pytest.MonkeyPatch) -> None:
     class ClearBackend:
         def __init__(self) -> None:

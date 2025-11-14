@@ -246,7 +246,7 @@ class HSXDebugAdapter:
         self._next_source_id: int = 1
         self.project_root = REPO_ROOT
         self._source_base_dirs: List[Path] = [REPO_ROOT]
-        self._connection_config: Dict[str, Any] = {}
+        self._connection_config: Optional[Dict[str, Any]] = None
         self._reconnecting = False
         self._has_session = False
         self._connection_state = "idle"
@@ -1195,6 +1195,15 @@ class HSXDebugAdapter:
             return
 
     def _ensure_client(self) -> None:
+        if self.client:
+            return
+        spec = self._connection_config
+        if spec:
+            try:
+                self.logger.info("Debugger backend missing; attempting reattach with cached configuration.")
+                self._connect(**spec)
+            except Exception:
+                self.logger.exception("Reattach attempt failed")
         if not self.client:
             raise RuntimeError("debug session not connected")
 
@@ -2331,7 +2340,8 @@ class HSXDebugAdapter:
         return any(token in text for token in self._RECONNECT_TRANSIENT_TOKENS)
 
     def _attempt_reconnect(self, exc: Exception) -> bool:
-        if self._reconnecting or not self._connection_config:
+        spec = self._connection_config
+        if self._reconnecting or not spec:
             return False
         self._reconnecting = True
         stored_specs = copy.deepcopy(self._breakpoint_specs)
@@ -2339,7 +2349,7 @@ class HSXDebugAdapter:
         self.logger.warning("Debugger backend error (%s); attempting reconnect", exc)
         self._emit_status_event("reconnecting", message=str(exc))
         try:
-            self._connect(**self._connection_config)
+            self._connect(**spec)
             if self.current_pid and not self._pid_exists(self.current_pid):
                 message = f"Target PID {self.current_pid} is no longer available"
                 self.logger.error(message)
@@ -2464,7 +2474,7 @@ class HSXDebugAdapter:
                 pass
         self.backend = None
         self.client = None
-        self._connection_config.clear()
+        self._connection_config = None
         self._emit_status_event("disconnected")
         self._source_ref_to_path.clear()
         self._source_path_to_ref.clear()

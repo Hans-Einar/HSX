@@ -454,9 +454,26 @@ Append sessions chronologically. Ensure every entry links work back to the desig
 - Refactored `hsx_dap` to instantiate/use the shared session (`self._debugger_session`), removing the bespoke `_create_backend` logic. Connection/reconnect/shutdown paths now go through the session manager while preserving event-stream handling; shutdown disconnects via the new class.
 - Extended the CLI to surface the renamed `debugstate` command (aliasing the legacy `stepmode`), updated info/ps table labels to “Debug”, and ensured alias payloads hit the new `debug.state` RPC. Tests (`python/tests/test_shell_client.py`) cover the new payload helper.
 - Added regression tests for `DebuggerSession` (connect/disconnect/config propagation) and updated existing backend/DAP/executive tests to reflect the debug-state terminology.
+- VS Code extension now listens for the adapter’s debug-state telemetry, updates a global `hsx.debugStateActive` context, and shows “HSX: Debugging (PID …)” in the status bar while manual stepping is active.
 
 ### Testing
 - `PYTHONPATH=. pytest python/tests/test_hsx_dbg_backend.py python/tests/test_hsx_dap_harness.py python/tests/test_shell_client.py python/tests/test_executive_sessions.py`
 
 ### Next Steps
 - Continue Phase 11 by routing more DAP logic through the session façade (event subscriptions, reconnect) and begin surfacing debug-state status in the VS Code extension/TUI.
+
+## 2025-11-14 - Codex (Session 26)
+
+### Scope
+- Plan items: Phase 11 §11.2/11.3 (session-backed reconnect + adapter auto-reattach)
+- Design refs: 04.09--Debugger.md (session lifecycle), Implementation Plan §11.2
+
+### Work Summary
+- Taught the DAP adapter to treat `_connection_config` as optional and to rebuild the debugger backend via `DebuggerSession.connect` whenever `_ensure_client` detects a missing client or `_attempt_reconnect` fires. `_shutdown` now clears the cached spec, and reconnect uses the cached host/port/pid tuple before reapplying breakpoints/watches.
+- Added harness coverage verifying that `_attempt_reconnect` invokes `_connect` with the cached spec (`python/tests/test_hsx_dap_harness.py`) and expanded the backend tests accordingly.
+
+### Testing
+- `PYTHONPATH=. pytest python/tests/test_hsx_dbg_backend.py python/tests/test_hsx_dap_harness.py`
+
+### Next Steps
+- Finish Phase 11 by migrating the remaining adapter helpers (event streaming/pending state) onto the shared session and begin wiring the debug-state context into the HSX view toolbars/TUI.
