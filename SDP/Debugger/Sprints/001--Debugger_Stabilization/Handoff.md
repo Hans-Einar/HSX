@@ -33,31 +33,40 @@ Master sign-off.
     — `534 passed, 2 skipped, 2 failed`; failures were
     `test_break_add_symbol_line` (missing generated
     `examples/demos/build/debug/longrun/main.sym`) and
-    `test_pretty_dmesg_assigns_session_numbers` (unrelated terminal-width-sensitive output).
+    `test_pretty_dmesg_assigns_session_numbers` (untouched optional-`tabulate` pretty-output
+    assertion).
+- Fresh independent review `DBG-RVW-001-001-001` returned PASS against exact implementation
+  head `208063e344b767f82790ce579eba6327e2cdd0ce` with no Blocking/High/Medium findings.
+- Reviewer evidence repeated the targeted `36 passed`, observed initialize response before
+  `initialized` through the production wrapper, exercised launch and attach, completed ten
+  consecutive subprocess runs without a cleanup hang, and rejected injected preamble and
+  trailing raw bytes.
 
 ## Not done
 
-- Independent exact-head review has not run.
 - `DBG-VER-001-001-001` has not been created and no formal verification PASS is claimed.
 - Master exact-head sign-off has not occurred.
 
 ## Exact next step
 
-Assign a fresh independent reviewer to `DBG-RVW-001-001-001` against the exact worker commit.
-Blocking/High/Medium findings require rework and a fresh exact-head review.
+Run the separate formal verifier for `DBG-VER-001-001-001` against exact implementation head
+`208063e344b767f82790ce579eba6327e2cdd0ce`, then return the evidence to the Master for
+traceability reconciliation and exact-head sign-off.
 
 ## Traceability state
 
 - Active evidence: `DBG-ST-001`, `DBG-CR-001`, `DBG-GAP-001`
 - Implementation complete: `DBG-SPR-001`, `DBG-IT-001-001`, `DBG-SL-001-001-001`
-- Ready for review: `DBG-RVW-001-001-001`
-- Planned verification: `DBG-VER-001-001-001`
-- CurrentIndex and Ledger are current through worker completion; Relations required no change.
+- Review PASS: `DBG-RVW-001-001-001`, anchored to
+  `208063e344b767f82790ce579eba6327e2cdd0ce`
+- Ready for verification: `DBG-VER-001-001-001`
+- CurrentIndex, Issues, and Ledger are current through independent review; Relations required
+  no change.
 
 ## Agents and worktree
 
-The bounded worker implementation is complete in the controlled worktree on
-`codex/dbg-rf-001`; no reviewer is open. The user's original dirty
+The bounded worker implementation and fresh independent review are complete in the
+controlled worktree on `codex/dbg-rf-001`; no verifier is open. The user's original dirty
 `Implementation/vscode` worktree remains untouched.
 
 ## Risks

@@ -7,9 +7,11 @@ issues:
     status: accepted
   DBG-RF-001:
     issue: 37
-    status: implementation_complete_awaiting_review
+    status: independent_review_pass_awaiting_verification
     execution_slice: DBG-SL-001-001-001
     review: DBG-RVW-001-001-001
+    review_status: pass
+    reviewed_head: 208063e344b767f82790ce579eba6327e2cdd0ce
     verification: DBG-VER-001-001-001
   DBG-DA-001:
     issue: 38

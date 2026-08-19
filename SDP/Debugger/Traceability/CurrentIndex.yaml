@@ -33,7 +33,7 @@ next:
   refactor:
     id: DBG-RF-001
     name: DAP Protocol Baseline Stabilization
-    status: implementation_complete_awaiting_review
+    status: independent_review_pass_awaiting_verification
     path: SDP/Debugger/Refactor/001--DAP_Protocol_Baseline_Stabilization/README.md
 planned_execution:
   sprint:
@@ -43,17 +43,19 @@ planned_execution:
   iteration:
     id: DBG-IT-001-001
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/ScrumIterations.md
-    status: implementation_complete_awaiting_review
+    status: independent_review_pass_awaiting_verification
   slice:
     id: DBG-SL-001-001-001
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/001--DAP_Protocol_Baseline.md
-    status: implementation_complete_awaiting_review
+    status: independent_review_pass_awaiting_verification
   review:
     id: DBG-RVW-001-001-001
-    status: ready_for_reviewer
+    status: pass
+    reviewed_head: 208063e344b767f82790ce579eba6327e2cdd0ce
+    path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/001--Independent_Review.md
   verification:
     id: DBG-VER-001-001-001
-    status: planned
+    status: ready_for_verifier
 structural_gate:
   rule: No structural product-code refactor starts before DBG-DA-001 and relevant DBG-D contracts are accepted.
   blocked_refactors:

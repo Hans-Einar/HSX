@@ -5,7 +5,7 @@ worker -> reviewer -> verification -> exact-head sign-off loop.
 
 | ID | Name | Status | Primary dependency |
 |---|---|---|---|
-| `DBG-RF-001` | DAP Protocol Baseline Stabilization | IMPLEMENTATION COMPLETE; awaiting independent review | DBG-GAP-001 |
+| `DBG-RF-001` | DAP Protocol Baseline Stabilization | INDEPENDENT REVIEW PASS; awaiting verification | DBG-GAP-001 |
 | `DBG-RF-002` | Debugger Controller, State Machine, Stop Epochs | BLOCKED | DBG-DA-001 |
 | `DBG-RF-003` | Session/Transport/Event Health/Recovery | BLOCKED | DBG-DA-001 + controller contract |
 | `DBG-RF-004` | Symbol/Source/Address/Inspection Model | BLOCKED | DBG-DA-001 + HSX address contract |

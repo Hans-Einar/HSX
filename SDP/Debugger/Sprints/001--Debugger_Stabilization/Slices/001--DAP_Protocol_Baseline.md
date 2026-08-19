@@ -1,9 +1,12 @@
 # DBG-SL-001-001-001 — DAP Protocol and Product-Entrypoint Baseline
 
-Status: IMPLEMENTATION COMPLETE — AWAITING INDEPENDENT REVIEW
+Status: INDEPENDENT REVIEW PASS — AWAITING VERIFICATION
 
 Worker base: `e5a50ab45acdcb515ccd3602ce99487bd668cdfd` on
 `codex/dbg-rf-001`.
+
+Reviewed implementation head: `208063e344b767f82790ce579eba6327e2cdd0ce` by
+`DBG-RVW-001-001-001`.
 
 ## Goal
 

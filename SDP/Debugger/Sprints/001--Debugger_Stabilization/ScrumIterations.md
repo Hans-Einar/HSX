@@ -2,7 +2,7 @@
 
 ## DBG-IT-001-001 — DAP Protocol Baseline Stabilization
 
-Status: IMPLEMENTATION COMPLETE — AWAITING INDEPENDENT REVIEW
+Status: INDEPENDENT REVIEW PASS — AWAITING VERIFICATION
 
 ### Slice
 
@@ -31,8 +31,14 @@ The bounded worker completed `DBG-SL-001-001-001` on `codex/dbg-rf-001` from bas
   initialize plus launch and attach, rejects unframed preambles, and runs on Windows;
 - targeted Windows evidence: `36 passed` across DAP CLI, harness, and backend tests;
 - broader `python/tests` evidence: `534 passed, 2 skipped, 2 failed`; the failures are an
-  absent generated demo symbol artifact and an unrelated terminal-width-sensitive shell
-  pretty-output assertion.
+  absent generated demo symbol artifact and an unrelated shell pretty-output assertion on
+  the untouched optional-`tabulate` rendering path.
 
-No independent reviewer or formal verifier has run yet; this is not a review or
-verification PASS.
+Fresh independent review `DBG-RVW-001-001-001` inspected exact implementation head
+`208063e344b767f82790ce579eba6327e2cdd0ce` and returned PASS with no
+Blocking/High/Medium findings. Reviewer Windows evidence repeated the targeted `36 passed`,
+ran the production-wrapper subprocess cases ten times without a cleanup hang, and confirmed
+strict rejection of both injected preamble and trailing unframed bytes.
+
+Formal `DBG-VER-001-001-001` has not run, Master exact-head sign-off has not occurred, and
+`DBG-DA-001` remains blocked.
