@@ -1,6 +1,9 @@
 # DBG-SL-001-001-001 — DAP Protocol and Product-Entrypoint Baseline
 
-Status: READY FOR WORKER — CONTRACT FROZEN
+Status: IMPLEMENTATION COMPLETE — AWAITING INDEPENDENT REVIEW
+
+Worker base: `e5a50ab45acdcb515ccd3602ce99487bd668cdfd` on
+`codex/dbg-rf-001`.
 
 ## Goal
 

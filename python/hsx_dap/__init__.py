@@ -20,7 +20,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
-    print(f"[hsx-dap] Added repo root to sys.path: {REPO_ROOT}", flush=True)
+    print(f"[hsx-dap] Added repo root to sys.path: {REPO_ROOT}", file=sys.stderr, flush=True)
 
 from hsx_dbg import DebuggerBackend, DebuggerBackendError, DebuggerSession, RegisterState, StackFrame, WatchValue
 from hsx_dbg.symbols import SymbolIndex
@@ -271,7 +271,7 @@ class HSXDebugAdapter:
         while True:
             message = self.protocol.read_message()
             if message is None:
-                print("[hsx-dap] EOF on stdin, shutting down", flush=True)
+                self.logger.info("EOF on stdin, shutting down")
                 break
             if message.get("type") != "request":
                 continue
@@ -290,6 +290,8 @@ class HSXDebugAdapter:
         try:
             body = handler(arguments) or {}
             self.protocol.send_response(seq, command or "", body=body)
+            if command == "initialize":
+                self.protocol.send_event("initialized", {})
         except AdapterCommandError as exc:
             self.logger.info("DAP command failed: %s (%s)", command, exc)
             self.protocol.send_response(seq, command or "", success=False, message=str(exc))
@@ -312,7 +314,6 @@ class HSXDebugAdapter:
             "supportsInstructionBreakpoints": True,
         }
         self._initialized = True
-        self.protocol.send_event("initialized", {})
         return {"capabilities": capabilities}
 
     def _handle_launch(self, args: JsonDict) -> JsonDict:
@@ -3228,7 +3229,6 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--log-level", default="INFO")
     parser.add_argument("--adapter-version", default=os.environ.get("HSX_EXTENSION_VERSION", "unknown"))
     args, _ = parser.parse_known_args(argv)
-    print(f"[hsx-dap] CLI args: pid={args.pid} host={args.host} port={args.port} log={args.log_file}", flush=True)
     if args.log_file:
         log_path = Path(args.log_file)
         log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -3238,13 +3238,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         format="[%(asctime)s] %(levelname)s: %(message)s",
         force=True,
     )
+    logger = logging.getLogger("hsx-dap")
+    logger.info("CLI args: pid=%s host=%s port=%s log=%s", args.pid, args.host, args.port, args.log_file)
     protocol = DAPProtocol(sys.stdin.buffer, sys.stdout.buffer)
     adapter = HSXDebugAdapter(protocol)
     adapter.current_pid = args.pid
     adapter_version = args.adapter_version or "unknown"
     if adapter_version == "unknown":
         adapter_version = _detect_extension_version()
-    logger = logging.getLogger("hsx-dap")
     logger.info("HSX DAP adapter starting (pid=%s, version=%s)", os.getpid(), adapter_version)
     try:
         adapter.serve()

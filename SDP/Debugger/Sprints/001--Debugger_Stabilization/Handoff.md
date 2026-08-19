@@ -21,31 +21,51 @@ Master sign-off.
 - Exact product baseline provenance and the execution contracts were added and re-audited at
   PR #49 head `403d55c621d50212940b4c8668ac20a3cf8519b5`.
 - Steering acceptance was recorded in issue #36; the Slice contract is frozen.
+- A fresh bounded worker completed `DBG-SL-001-001-001` from base
+  `e5a50ab45acdcb515ccd3602ce99487bd668cdfd` on `codex/dbg-rf-001`.
+- The production wrapper now keeps raw diagnostics off stdout, initialize response precedes
+  `initialized`, and strict Windows black-box coverage exercises initialize plus launch and
+  attach through `vscode-hsx/debugAdapter/hsx-dap.py`.
+- Worker evidence:
+  - `c:/Users/hanse/miniconda3/python.exe -m pytest python/tests/test_hsx_dap_cli.py python/tests/test_hsx_dap_harness.py python/tests/test_hsx_dbg_backend.py -q`
+    — `36 passed`.
+  - `c:/Users/hanse/miniconda3/python.exe -m pytest python/tests -q`
+    — `534 passed, 2 skipped, 2 failed`; failures were
+    `test_break_add_symbol_line` (missing generated
+    `examples/demos/build/debug/longrun/main.sym`) and
+    `test_pretty_dmesg_assigns_session_numbers` (unrelated terminal-width-sensitive output).
 
 ## Not done
 
-- No product-code worker has started.
-- Review and verification records are planned only.
+- Independent exact-head review has not run.
+- `DBG-VER-001-001-001` has not been created and no formal verification PASS is claimed.
+- Master exact-head sign-off has not occurred.
 
 ## Exact next step
 
-Dispatch one fresh worker with the exact Slice contract and require it to record
-`slice_started` before product implementation.
+Assign a fresh independent reviewer to `DBG-RVW-001-001-001` against the exact worker commit.
+Blocking/High/Medium findings require rework and a fresh exact-head review.
 
 ## Traceability state
 
 - Active evidence: `DBG-ST-001`, `DBG-CR-001`, `DBG-GAP-001`
-- Planned execution: `DBG-SPR-001`, `DBG-IT-001-001`, `DBG-SL-001-001-001`
-- Planned review/verification: `DBG-RVW-001-001-001`, `DBG-VER-001-001-001`
-- CurrentIndex/Relations/Ledger are current through Steering acceptance and contract freeze.
+- Implementation complete: `DBG-SPR-001`, `DBG-IT-001-001`, `DBG-SL-001-001-001`
+- Ready for review: `DBG-RVW-001-001-001`
+- Planned verification: `DBG-VER-001-001-001`
+- CurrentIndex and Ledger are current through worker completion; Relations required no change.
 
 ## Agents and worktree
 
-No worker or reviewer is open. The user's original dirty `Implementation/vscode` worktree
-must remain untouched; controlled work uses a separate clean worktree/branch.
+The bounded worker implementation is complete in the controlled worktree on
+`codex/dbg-rf-001`; no reviewer is open. The user's original dirty
+`Implementation/vscode` worktree remains untouched.
 
 ## Risks
 
 - `DBG-RF-004` and `DBG-RF-006` remain blocked on stable HSX cross-track contracts to be
   produced from `HSX-ST-001`.
 - Structural debugger work remains blocked by `DBG-DA-001` and accepted `DBG-D-*` contracts.
+- Linux product-wrapper execution was not available in this Windows worker cycle; the
+  remaining cross-platform evidence obligation stays assigned to `DBG-RF-009`.
+- The two broader-suite failures listed above remain non-Slice evidence for the reviewer/
+  verifier to classify; no out-of-scope product changes were made for them.

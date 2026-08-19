@@ -17,7 +17,7 @@ class RecordedEvent:
 class CapturingBackend:
     """Minimal backend used by subprocess DAP tests."""
 
-    def __init__(self, *, host: str, port: int, features: List[str]) -> None:
+    def __init__(self, *, host: str, port: int, features: List[str], **_: Any) -> None:
         self.host = host
         self.port = port
         self.features = list(features)

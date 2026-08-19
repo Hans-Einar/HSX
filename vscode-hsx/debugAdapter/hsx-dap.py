@@ -31,7 +31,7 @@ def _bootstrap_paths() -> None:
         if python_dir.is_dir():
             sys.path.insert(0, str(resolved))
             sys.path.insert(0, str(python_dir))
-            print(f"[hsx-dap] Using repo root {resolved}", flush=True)
+            print(f"[hsx-dap] Using repo root {resolved}", file=sys.stderr, flush=True)
             return
     raise RuntimeError(
         "Unable to locate HSX python modules. Set HSX_REPO_ROOT to your workspace path.",
@@ -39,7 +39,7 @@ def _bootstrap_paths() -> None:
 
 
 def main() -> int:
-    print("hsx-dap argv:", sys.argv, flush=True)
+    print("hsx-dap argv:", sys.argv, file=sys.stderr, flush=True)
     _bootstrap_paths()
     from python.hsx_dap import main as dap_main  # noqa: WPS433
 

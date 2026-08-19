@@ -2,7 +2,7 @@
 
 ## DBG-IT-001-001 — DAP Protocol Baseline Stabilization
 
-Status: READY FOR WORKER — CONTRACT FROZEN
+Status: IMPLEMENTATION COMPLETE — AWAITING INDEPENDENT REVIEW
 
 ### Slice
 
@@ -22,5 +22,17 @@ Status: READY FOR WORKER — CONTRACT FROZEN
 
 ### Current result
 
-No product-code work has started. The next action is fresh worker dispatch; no reviewer is
-open yet.
+The bounded worker completed `DBG-SL-001-001-001` on `codex/dbg-rf-001` from base
+`e5a50ab45acdcb515ccd3602ce99487bd668cdfd`:
+
+- raw adapter/bootstrap diagnostics now use stderr or configured logging;
+- initialize response is serialized before the `initialized` event;
+- the black-box subprocess test launches `vscode-hsx/debugAdapter/hsx-dap.py`, exercises
+  initialize plus launch and attach, rejects unframed preambles, and runs on Windows;
+- targeted Windows evidence: `36 passed` across DAP CLI, harness, and backend tests;
+- broader `python/tests` evidence: `534 passed, 2 skipped, 2 failed`; the failures are an
+  absent generated demo symbol artifact and an unrelated terminal-width-sensitive shell
+  pretty-output assertion.
+
+No independent reviewer or formal verifier has run yet; this is not a review or
+verification PASS.

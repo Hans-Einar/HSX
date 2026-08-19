@@ -7,7 +7,7 @@ issues:
     status: accepted
   DBG-RF-001:
     issue: 37
-    status: ready_for_worker
+    status: implementation_complete_awaiting_review
     execution_slice: DBG-SL-001-001-001
     review: DBG-RVW-001-001-001
     verification: DBG-VER-001-001-001
