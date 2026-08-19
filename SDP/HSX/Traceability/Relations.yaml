@@ -1,0 +1,65 @@
+schema_version: 1
+track: HSX
+relations:
+  - from: HSX-ST-001
+    type: spawns
+    to:
+      - HSX-ST-002
+      - HSX-ST-003
+      - HSX-ST-004
+      - HSX-ST-005
+      - HSX-ST-006
+  - from: DBG-ST-006
+    type: depends_on
+    to:
+      - HSX-ST-001
+      - HSX-ST-002
+      - HSX-ST-003
+      - HSX-ST-004
+      - HSX-ST-005
+      - HSX-ST-006
+  - from: HSX-ST-002
+    type: informs
+    to:
+      - HSX-ST-001
+      - DBG-ST-006
+  - from: HSX-ST-003
+    type: informs
+    to:
+      - HSX-ST-001
+      - DBG-ST-006
+  - from: HSX-ST-004
+    type: informs
+    to:
+      - HSX-ST-001
+      - DBG-ST-006
+  - from: HSX-ST-005
+    type: informs
+    to:
+      - HSX-ST-001
+      - DBG-ST-006
+  - from: HSX-ST-006
+    type: informs
+    to:
+      - HSX-ST-001
+      - DBG-ST-006
+  - from: HSX-ST-001
+    type: reviewed_by
+    to:
+      - HSX-RVW-001-001-001
+coordination:
+  - from: HSX-ST-001
+    type: coordinated_with
+    to:
+      - DBG-ST-006
+    issues:
+      - 47
+      - 38
+guards:
+  - subject: HSX-ST-001..HSX-ST-006
+    product_code_authorized: false
+    avr_work_authorized: false
+  - subject: DBG-D-001..DBG-D-010
+    implementation_authority: false
+  - subject: DBG-RF-002..DBG-RF-009
+    product_code_authorized: false

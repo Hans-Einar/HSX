@@ -20,5 +20,13 @@ or silently discarded. Migration starts with `HSX-ST-001`, which will inventory 
 `DR-*`, `DG-*`, design decisions, and current implementation evidence before establishing
 stable `HSX-*` IDs.
 
+## Current phase
+
+Steering activated `HSX-ST-001` in issue #47 as the coordinator for portable runtime
+contracts required by Debugger `DBG-ST-006`. Five numbered Studies (`HSX-ST-002..006`) own
+identity/lifecycle, address/ABI/unwind, execution/snapshot/blocked states, event continuity,
+and resource provenance. This phase produces reviewed proposed contracts only; it authorizes
+no product or AVR work.
+
 Target-specific implementations such as AVR belong in `SDP/AVR` and reference HSX core
 requirements rather than duplicating them.

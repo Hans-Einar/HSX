@@ -209,3 +209,70 @@ comment `5346421143`; the iteration is waiting at the Steering gate. `DBG-A-*` /
 remain target/proposed, `DBG-D-002..DBG-D-006`
 remain gated by `DBG-ST-006` and stable HSX inputs, and all `DBG-RF-002..DBG-RF-009` product
 implementation remains blocked.
+
+## DBG-IT-001-003 — Portable Debug Runtime Contracts
+
+Status: ACTIVE — CROSS-TRACK STUDIES
+
+### Goal
+
+Complete `DBG-ST-006` by producing reviewed, stable, traceable HSX contract proposals for the
+portable runtime semantics required by `DBG-D-002..DBG-D-006`.
+
+### Authority
+
+- issue #38 Steering comment `5348190806` accepts `DBG-A-001..DBG-A-008` as target direction,
+  keeps every `DBG-D-*` proposed, and authorizes `DBG-ST-006`;
+- issue #47 Steering comment `5348192567` activates `HSX-ST-001` as HSX coordinator and
+  authorizes numbered HSX Studies;
+- no structural product implementation and no AVR work are authorized.
+
+### Study decomposition
+
+1. `HSX-ST-001` — legacy provenance/migration coordinator.
+2. `HSX-ST-002` — executive/target/image identity, generations, lifecycle and ownership.
+3. `HSX-ST-003` — address spaces, ABI, unwind, frame and variable-location semantics.
+4. `HSX-ST-004` — run/stop evidence, snapshots, exact stepping and blocked-state inspection.
+5. `HSX-ST-005` — event-stream cursor, ACK, gaps, drops, resume and capability profiles.
+6. `HSX-ST-006` — breakpoint/watch identity, provenance, revisions and reconciliation evidence.
+
+### Expected files
+
+- `SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md`
+- `SDP/HSX/02--Study/001--Legacy_Traceability_Migration.md`
+- `SDP/HSX/02--Study/002--Runtime_Identity_Lifecycle.md`
+- `SDP/HSX/02--Study/003--Address_ABI_Unwind.md`
+- `SDP/HSX/02--Study/004--Execution_Snapshot_Blocked_States.md`
+- `SDP/HSX/02--Study/005--Event_Stream_Continuity.md`
+- `SDP/HSX/02--Study/006--Resource_Provenance_Revisions.md`
+- proposed HSX Requirements/Architecture/Design contract documents and both track traceability
+- independent review record `HSX-RVW-001-001-001`
+
+No product/runtime/extension/test/package/AVR file may be modified.
+
+### Invariants and non-goals
+
+- legacy DR/DG/DO IDs remain provenance, not silently renamed authority;
+- current behavior, legacy intent, and proposed portable target semantics remain distinct;
+- each contract states identity, type/range, ordering, failure/degraded behavior, capability,
+  versioning, and conformance evidence;
+- Debugger owns dependency consumption; HSX owns portable runtime semantics;
+- no `DBG-D-*` freeze, RF implementation, AVR design, or product change;
+- missing evidence becomes an explicit gap/Study route, not an assumed contract.
+
+### Traceability
+
+- Debugger: `DBG-ST-006`, `DBG-D-002..DBG-D-006`, `DBG-IT-001-003`
+- HSX: `HSX-ST-001..HSX-ST-006`, proposed stable `HSX-R-*`, `HSX-A-*`, `HSX-D-*`
+- Review: `HSX-RVW-001-001-001`
+- Issues: #47 coordination and #38 Steering gate
+
+### Completion signal
+
+- every `DBG-ST-006` question maps to a stable proposed HSX contract and conformance fixture;
+- all HSX Studies distinguish evidence, decisions, uncertainty, and cross-track ownership;
+- HSX CurrentIndex/Relations/Ledger and Debugger cross-track relations agree;
+- fresh independent review passes the exact contract package head;
+- reviewed decision packages are posted to #47 and #38;
+- status becomes `awaiting_steering_acceptance`, with every `DBG-D-*` and RF product gate still
+  closed.

@@ -1,6 +1,6 @@
 # Proposed Modular Debugger Architecture
 
-- Status: REVIEWED / AWAITING STEERING ACCEPTANCE
+- Status: ACCEPTED TARGET DIRECTION / NOT IMPLEMENTED
 - DesignAnalysis: `DBG-DA-001`
 - Independent review: `DBG-RVW-001-002-003` — PASS at
   `89d95de2d944179219a93895f1ab956f2786a232`
@@ -8,8 +8,9 @@
 - Requirements: `DBG-R-001..DBG-R-036`
 - Target state: not implemented
 
-This document proposes architecture boundaries. It is not an accepted `DBG-A-*` baseline and
-does not authorize product implementation.
+Steering accepted `DBG-A-001..DBG-A-008` conceptually as target architecture direction in
+issue #38 comment `5348190806`. This acceptance does not implement the architecture, freeze
+the proposed `DBG-D-*`, or authorize product work.
 
 ## Proposed architecture decisions
 

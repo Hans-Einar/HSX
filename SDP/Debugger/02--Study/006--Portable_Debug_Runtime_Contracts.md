@@ -1,11 +1,11 @@
 # DBG-ST-006 — Portable Debug Runtime Contract Study
 
-- Status: PROPOSED / REQUIRED BEFORE DESIGN FREEZE
+- Status: ACTIVE COORDINATED STUDY
 - Owning track: Debugger
 - Required coordinator: HSX track through `HSX-ST-001`
 - Proposed by: `DBG-DA-001`
 - Evidence inputs: `DBG-ST-002`, `DBG-ST-003`, `DBG-ST-005`
-- Owning issue/gate: #38 pending Steering routing decision
+- Owning issue/gate: #38, Steering activation comment `5348190806`
 
 ## Question and scope
 
@@ -108,10 +108,10 @@ Steering scope; this Study never grants product implementation authority by itse
 
 ## Steering routing decision requested
 
-Issue #38 should explicitly authorize `DBG-ST-006` as the next coordinated Debugger/HSX Study
-or identify an accepted equivalent. The current `DBG-DA-001` decision may accept the overall
-architecture direction, but must not freeze `DBG-D-002..DBG-D-006` or authorize the blocked
-Refactor scopes until this Study and its HSX inputs are complete.
+Steering authorized `DBG-ST-006` as the coordinated Debugger Study and `HSX-ST-001`/#47 as the
+HSX coordinator. `HSX-ST-002..HSX-ST-006` own the five natural runtime-contract domains. The
+Study must return reviewed mappings and contracts to #47/#38; it still cannot freeze
+`DBG-D-002..DBG-D-006` or authorize blocked Refactor scopes.
 
 ## Conclusion
 

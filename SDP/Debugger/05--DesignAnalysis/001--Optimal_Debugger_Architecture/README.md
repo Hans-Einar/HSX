@@ -1,11 +1,12 @@
 # DBG-DA-001 — Optimal Modular Debugger Architecture
 
-- Status: REVIEWED / AWAITING STEERING ACCEPTANCE
+- Status: TARGET ARCHITECTURE DIRECTION ACCEPTED / DETAILED CONTRACTS PROPOSED
 - Started by Steering: issue #38 comment `5345600066`
 - Active iteration: `DBG-IT-001-002`
 - Evidence head for completed Studies: `a8eae871537cb70ea78502f7d34fbdbe68d837fa`
 - Final independent review: `DBG-RVW-001-002-003` — PASS at
   `89d95de2d944179219a93895f1ab956f2786a232`
+- Steering architecture acceptance: issue #38 comment `5348190806`
 - Implementation authority: none
 
 ## Objective and decision boundary
@@ -14,8 +15,10 @@ Design the debugger from accepted `DBG-R-001..DBG-R-036`, without treating the l
 monoliths as required structure. The output is one recommended architecture, proposed
 architecture/design contracts, migration sequencing, and a reuse/adapt/replace matrix.
 
-This proposal is not accepted design. `DBG-RF-002..DBG-RF-009` remain blocked until a later
-Steering decision accepts or revises the proposed `DBG-A-*` / `DBG-D-*` contracts.
+`DBG-A-001..DBG-A-008` are accepted as target architecture direction. Detailed
+`DBG-D-001..DBG-D-010` remain proposed and have no implementation authority.
+`DBG-RF-002..DBG-RF-009` remain blocked until a later Steering decision freezes the required
+contracts and authorizes explicit Slices.
 
 ## Evidence synthesized
 

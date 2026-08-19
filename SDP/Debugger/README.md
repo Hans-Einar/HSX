@@ -16,9 +16,10 @@ runtime capability. Those capabilities are dependencies on the `SDP/HSX` track.
 ## Current phase
 
 The current product baseline originated on `Implementation/vscode`. `DBG-RF-001` completed
-the production-path protocol baseline, and the active activity is `DBG-DA-001`: the proposed
-modular debugger architecture passed independent exact-head review and awaits Steering
-acceptance. No structural product implementation is authorized.
+the production-path protocol baseline. Steering accepted the reviewed `DBG-A-001..DBG-A-008`
+target direction. The active activity is coordinated `DBG-ST-006` / `HSX-ST-001..006`
+portable-runtime contract work; every `DBG-D-*` remains proposed and no structural product
+implementation is authorized.
 
 Read in this order:
 
@@ -33,5 +34,6 @@ Read in this order:
 9. for `DBG-DA-001`, Studies `DBG-ST-002..DBG-ST-005`, the proposed Architecture and Design
    documents, and `DBG-ST-006`
 
-`DBG-DA-001` is the active design gate. `DBG-RF-002..DBG-RF-009` remain blocked until issue
-#38 records Steering acceptance of the relevant target-state contracts.
+`DBG-ST-006` is the active Debugger dependency umbrella. `DBG-RF-002..DBG-RF-009` remain
+blocked until portable HSX contracts are reviewed, the relevant `DBG-D-*` contracts are
+frozen by Steering, and explicit implementation Slices are authorized.

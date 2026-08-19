@@ -1,6 +1,6 @@
 # Proposed Debugger Design Contracts
 
-- Status: REVIEWED / AWAITING STEERING ACCEPTANCE
+- Status: REVIEWED PROPOSAL / NOT FROZEN / NO IMPLEMENTATION AUTHORITY
 - DesignAnalysis: `DBG-DA-001`
 - Architecture: `DBG-A-001..DBG-A-008`
 - Independent review: `DBG-RVW-001-002-003` — PASS at

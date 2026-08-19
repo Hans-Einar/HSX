@@ -1,15 +1,17 @@
 # DBG-SPR-001 Handoff
 
-Status: `DBG-DA-001_reviewed_awaiting_steering_acceptance`
+Status: `DBG-ST-006_HSX-ST-001_active`
 
 ## Current objective
 
-Wait for Steering acceptance or revision of the reviewed `DBG-DA-001` package in issue #38.
-No structural product work may be dispatched.
+Complete `DBG-ST-006` and coordinated `HSX-ST-001..HSX-ST-006`, obtain fresh independent
+review of the portable contract package, and return to issues #47/#38. No structural product
+or AVR work may be dispatched.
 
 ## Authority
 
-- issue #38 — active `DBG-DA-001` Steering/review gate
+- issue #38 comment `5348190806` — accepted architecture direction and authorized `DBG-ST-006`
+- issue #47 comment `5348192567` — activated `HSX-ST-001` and numbered HSX Studies
 - `SDP/Debugger/Traceability/CurrentIndex.yaml`
 - `SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md`
 - `SDP/Debugger/04--Architecture/001--Modular_Debugger_Architecture.md`
@@ -79,16 +81,23 @@ No structural product work may be dispatched.
 - Master posted the reviewed decision package to issue #38 as comment `5346421143`, covering
   recommendations, alternatives, reuse decisions, `DBG-ST-006` routing, Steering choices,
   proposed dependencies, and explicit implementation guards.
+- Steering accepted `DBG-A-001..DBG-A-008` as target direction, accepted the compatibility
+  and proposed DAG principles, kept `DBG-D-001..DBG-D-010` proposed, and authorized the
+  portable-runtime Study phase.
+- Master activated coordinated iteration `DBG-IT-001-003`, `DBG-ST-006`, `HSX-ST-001`, and
+  the five bounded HSX domain Studies.
 
 ## Not done
 
-- Steering has not accepted any proposed `DBG-A-*` / `DBG-D-*` contract.
-- `DBG-ST-006` has not been authorized/executed and its required HSX inputs do not yet exist.
+- `DBG-D-001..DBG-D-010` remain proposed and have no implementation authority.
+- `DBG-ST-006` and `HSX-ST-001..HSX-ST-006` are not yet complete or reviewed.
+- Required stable HSX contract proposals and conformance fixtures do not yet exist.
 
 ## Exact next step
 
-Steering reviews issue #38 comment `5346421143` and records acceptance, requested revision, or
-`DBG-ST-006` routing. A later Master must update SDP/traceability before dependent work.
+Run the bounded HSX Studies, synthesize the stable portable contract proposal and Debugger
+mapping, obtain exact-head independent review, post decision packages to #47 and #38, then
+stop before any design freeze or implementation authorization.
 
 ## Traceability state
 
@@ -108,15 +117,20 @@ Steering reviews issue #38 comment `5346421143` and records acceptance, requeste
 - Final architecture review: `DBG-RVW-001-002-003` — PASS at
   `89d95de2d944179219a93895f1ab956f2786a232`
 - Steering decision package: issue #38 comment `5346421143`
+- Architecture-direction acceptance: issue #38 comment `5348190806`
 - Proposed architecture: `DBG-A-001..DBG-A-008`
 - Proposed detailed design: `DBG-D-001..DBG-D-010`
-- Proposed follow-up Study: `DBG-ST-006`
+- Active Debugger Study: `DBG-ST-006`
+- Active HSX coordinator: `HSX-ST-001`, issue #47
+- Active HSX Studies: `HSX-ST-002..HSX-ST-006`
+- Active iteration: `DBG-IT-001-003`
+- Planned cross-track review: `HSX-RVW-001-001-001`
 
 ## Agents and worktree
 
-The prior product chain, all Study workers, and all three architecture-review attempts are
-complete. No worker or reviewer remains open. Steering owns the issue #38 decision gate.
-The controlled branch is `codex/dbg-da-001`; the user's original dirty
+The prior product/design chain is complete. No new Study worker or reviewer is open yet;
+bounded HSX Study workers are the next roles. The controlled branch is `codex/dbg-st-006`;
+the user's original dirty
 `Implementation/vscode` worktree remains untouched.
 
 ## Risks
@@ -126,6 +140,8 @@ The controlled branch is `codex/dbg-da-001`; the user's original dirty
 - Structural debugger work remains blocked by `DBG-DA-001` and accepted `DBG-D-*` contracts.
 - `DBG-D-002..DBG-D-006`, RF-003..RF-006, and RF-002 target-identity/epoch/snapshot scopes are
   additionally blocked by `DBG-ST-006` and its stable HSX inputs.
+- Steering also conservatively blocks all RF-002 work until the portable contract phase
+  returns to issue #38.
 - WSL2 was reachable, but only Python 3.6.15 without pytest was available; no suitable Linux
   project test environment existed. No Linux PASS is claimed, and the remaining
   cross-platform product-wrapper obligation stays assigned to `DBG-RF-009`.

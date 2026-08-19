@@ -28,13 +28,14 @@ active:
   design_analysis:
     id: DBG-DA-001
     path: SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md
-    status: reviewed_awaiting_steering_acceptance
+    status: architecture_direction_accepted_contract_study_active
     issue: 38
     steering_start_comment: 5345600066
     architecture_review: DBG-RVW-001-002-003
     architecture_review_status: pass
     reviewed_head: 89d95de2d944179219a93895f1ab956f2786a232
     steering_decision_package_comment: 5346421143
+    steering_architecture_acceptance_comment: 5348190806
   design_studies:
     - id: DBG-ST-002
       path: SDP/Debugger/02--Study/002--Controller_State_Concurrency.md
@@ -50,7 +51,7 @@ active:
       status: complete_for_synthesis
     - id: DBG-ST-006
       path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
-      status: proposed_required_before_design_freeze
+      status: active
 completed:
   refactor:
     id: DBG-RF-001
@@ -88,11 +89,11 @@ active_gate:
     id: DBG-DA-001
     issue: 38
     path: SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md
-    status: reviewed_awaiting_steering_acceptance
+    status: architecture_direction_accepted_contract_study_active
   iteration:
-    id: DBG-IT-001-002
+    id: DBG-IT-001-003
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/ScrumIterations.md
-    status: awaiting_steering_acceptance
+    status: active_cross_track_studies
   architecture_review:
     id: DBG-RVW-001-002-001
     status: rework
@@ -111,12 +112,20 @@ active_gate:
   steering_gate:
     issue: 38
     decision_package_comment: 5346421143
-    status: awaiting_steering_acceptance
+    status: architecture_direction_accepted
+    acceptance_comment: 5348190806
+  portable_contract_study:
+    debugger_study: DBG-ST-006
+    hsx_coordinator: HSX-ST-001
+    hsx_issue: 47
+    hsx_studies: HSX-ST-002..HSX-ST-006
+    status: active
+    review: HSX-RVW-001-001-001
 proposed:
   architecture:
     range: DBG-A-001..DBG-A-008
     path: SDP/Debugger/04--Architecture/001--Modular_Debugger_Architecture.md
-    status: reviewed_awaiting_steering_acceptance
+    status: accepted_target_direction
     state: target
   design:
     range: DBG-D-001..DBG-D-010
@@ -131,7 +140,7 @@ proposed:
   study:
     id: DBG-ST-006
     path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
-    status: proposed_required_before_design_freeze
+    status: active
 structural_gate:
   rule: No structural product-code refactor starts before DBG-DA-001 and relevant DBG-D contracts are accepted.
   blocked_refactors:

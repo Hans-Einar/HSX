@@ -60,18 +60,37 @@ relations:
       - DBG-D-001..DBG-D-010
       - DBG-ST-006
   - from: DBG-ST-006
-    type: planned_to_resolve_dependency_for
+    type: requires_outputs_from
     to:
-      - DBG-D-002..DBG-D-006
-      - DBG-RF-003..DBG-RF-006
+      - HSX-ST-001
+      - HSX-ST-002
+      - HSX-ST-003
+      - HSX-ST-004
+      - HSX-ST-005
+      - HSX-ST-006
   - from: DBG-SPR-001
     type: contains
     to:
       - DBG-IT-001-002
+      - DBG-IT-001-003
   - from: DBG-IT-001-002
     type: analyzes
     to:
       - DBG-DA-001
+  - from: DBG-IT-001-003
+    type: executes
+    to:
+      - DBG-ST-006
+      - HSX-ST-001
+      - HSX-ST-002
+      - HSX-ST-003
+      - HSX-ST-004
+      - HSX-ST-005
+      - HSX-ST-006
+  - from: DBG-ST-006
+    type: reviewed_by
+    to:
+      - HSX-RVW-001-001-001
   - from: DBG-A-001..DBG-A-008
     type: refined_by
     to:
@@ -192,9 +211,14 @@ cross_track_dependencies:
     blocks:
       - DBG-RF-006
   - from: DBG-ST-006
-    type: planned_coordination_with
+    type: coordinated_with
     to:
       - HSX-ST-001
+      - HSX-ST-002
+      - HSX-ST-003
+      - HSX-ST-004
+      - HSX-ST-005
+      - HSX-ST-006
     required_contract: portable_debug_runtime_semantics
     blocks:
       - DBG-RF-003
@@ -209,7 +233,7 @@ cross_track_dependencies:
           - snapshot
           - reference_lifetime
 proposed_dependency_changes:
-  status: pending_steering_acceptance
+  status: accepted_direction_contracts_unfrozen
   relations:
     - from: DBG-RF-004
       type: prerequisite_for

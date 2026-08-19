@@ -1,11 +1,45 @@
 schema_version: 1
 track: HSX
 namespace: HSX
-status: legacy_migration_planned
+status: portable_debug_contract_studies_active
 active:
-  study:
+  coordinating_study:
     id: HSX-ST-001
     path: SDP/HSX/02--Study/001--Legacy_Traceability_Migration.md
+    status: active
+    issue: 47
+  studies:
+    - id: HSX-ST-002
+      path: SDP/HSX/02--Study/002--Runtime_Identity_Lifecycle.md
+      status: active
+    - id: HSX-ST-003
+      path: SDP/HSX/02--Study/003--Address_ABI_Unwind.md
+      status: active
+    - id: HSX-ST-004
+      path: SDP/HSX/02--Study/004--Execution_Snapshot_Blocked_States.md
+      status: active
+    - id: HSX-ST-005
+      path: SDP/HSX/02--Study/005--Event_Stream_Continuity.md
+      status: active
+    - id: HSX-ST-006
+      path: SDP/HSX/02--Study/006--Resource_Provenance_Revisions.md
+      status: active
+  coordinated_debugger_study:
+    id: DBG-ST-006
+    issue: 38
+    status: active
+  review:
+    id: HSX-RVW-001-001-001
+    status: planned
+proposed_contract_baseline:
+  requirements:
+    path: SDP/HSX/03--Requirements/001--Portable_Debug_Runtime_Requirements.md
+    status: planned
+  architecture:
+    path: SDP/HSX/04--Architecture/001--Portable_Debug_Runtime_Architecture.md
+    status: planned
+  design:
+    path: SDP/HSX/06--Design/001--Portable_Debug_Runtime_Contracts.md
     status: planned
 legacy_sources:
   - main/02--Study
@@ -19,3 +53,12 @@ migration_rules:
 cross_track:
   debugger: SDP/Debugger
   avr: SDP/AVR
+coordination:
+  sprint: DBG-SPR-001
+  iteration: DBG-IT-001-003
+  debugger_steering_comment: 5348190806
+  hsx_steering_comment: 5348192567
+guards:
+  product_code_authorized: false
+  debugger_refactor_authorized: false
+  avr_work_authorized: false

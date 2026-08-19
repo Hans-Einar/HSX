@@ -3,4 +3,34 @@ track: HSX
 issues:
   HSX-ST-001:
     issue: 47
-    status: planned
+    status: active_coordinator
+    steering_comment: 5348192567
+    spawned_studies:
+      - HSX-ST-002
+      - HSX-ST-003
+      - HSX-ST-004
+      - HSX-ST-005
+      - HSX-ST-006
+    debugger_dependency: DBG-ST-006
+    debugger_issue: 38
+    review: HSX-RVW-001-001-001
+  HSX-ST-002:
+    issue: 47
+    status: active
+    role: runtime_identity_lifecycle
+  HSX-ST-003:
+    issue: 47
+    status: active
+    role: address_abi_unwind
+  HSX-ST-004:
+    issue: 47
+    status: active
+    role: execution_snapshot_blocked_states
+  HSX-ST-005:
+    issue: 47
+    status: active
+    role: event_stream_continuity
+  HSX-ST-006:
+    issue: 47
+    status: active
+    role: resource_provenance_revisions
