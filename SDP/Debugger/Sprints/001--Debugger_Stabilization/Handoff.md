@@ -1,11 +1,11 @@
 # DBG-SPR-001 Handoff
 
-Status: `DBG-DA-001_rework_complete_pending_fresh_review`
+Status: `DBG-DA-001_reviewed_awaiting_steering_acceptance`
 
 ## Current objective
 
-Complete `DBG-DA-001` through bounded Studies, Master synthesis, and fresh independent
-architecture review, then stop at issue #38 Steering acceptance.
+Post the reviewed `DBG-DA-001` decision package to issue #38, then stop and wait for Steering
+acceptance without dispatching structural product work.
 
 ## Authority
 
@@ -68,19 +68,26 @@ architecture review, then stop at issue #38 Steering acceptance.
 - Fresh review `DBG-RVW-001-002-002` confirmed technical closure and returned one Medium
   status-drift finding plus one Low stale row-count claim; Master corrected both current
   surfaces.
+- Fresh final review `DBG-RVW-001-002-003` reviewed exact corrected proposal head
+  `89d95de2d944179219a93895f1ab956f2786a232` and returned PASS with no
+  Blocking/High/Medium findings.
+- Final-review evidence repeated `118 passed`, validated CurrentIndex/Issues/Relations YAML
+  and the 23-record Ledger NDJSON after appending the review event, found 14 balanced Mermaid
+  blocks and no broken local Markdown links, confirmed all `DBG-R-001..036` and
+  `DBG-F-001..026` coverage, counted the detailed reuse audit as 34 rows, and confirmed the
+  complete proposal diff is SDP-only.
 
 ## Not done
 
-- Fresh `DBG-RVW-001-002-003` has not reviewed the corrected exact head.
+- The reviewed decision package has not yet been posted to issue #38.
 - Steering has not accepted any proposed `DBG-A-*` / `DBG-D-*` contract.
 - `DBG-ST-006` has not been authorized/executed and its required HSX inputs do not yet exist.
 
 ## Exact next step
 
-Commit the corrected proposal, assign fresh `DBG-RVW-001-002-003` to that exact head, correct
-any further Blocking/High/Medium findings with another fresh review, then update
-SDP/traceability and post the decision package to issue #38. Stop there pending Steering
-acceptance.
+Master posts the short reviewed decision package to issue #38, including the recommended
+architecture, material tradeoffs, unresolved Steering choices, `DBG-ST-006` routing request,
+review PASS, and proposed Refactor dependency changes. Then stop pending Steering acceptance.
 
 ## Traceability state
 
@@ -94,19 +101,20 @@ acceptance.
 - CurrentIndex, Issues, sprint records, implementation notes, and Ledger are current through
   Master sign-off; Relations required no sign-off change.
 - Active DesignAnalysis: `DBG-DA-001`, `DBG-IT-001-002`
-- Active Studies: `DBG-ST-002..DBG-ST-005`
+- Completed Design Studies: `DBG-ST-002..DBG-ST-005`
 - Architecture review: `DBG-RVW-001-002-001` — REWORK at `f8b8097`
 - Architecture re-review: `DBG-RVW-001-002-002` — REWORK at `e1f72a5`
-- Planned fresh review: `DBG-RVW-001-002-003`
+- Final architecture review: `DBG-RVW-001-002-003` — PASS at
+  `89d95de2d944179219a93895f1ab956f2786a232`
 - Proposed architecture: `DBG-A-001..DBG-A-008`
 - Proposed detailed design: `DBG-D-001..DBG-D-010`
 - Proposed follow-up Study: `DBG-ST-006`
 
 ## Agents and worktree
 
-The prior product chain, all Study workers, and review attempts 1/2 are complete. No agent remains
-open. The next agent is one fresh architecture reviewer after the rework commit. The
-controlled branch is `codex/dbg-da-001`; the user's original dirty
+The prior product chain, all Study workers, and all three architecture-review attempts are
+complete. No worker or reviewer remains open. The Master owns the issue #38 decision package.
+The controlled branch is `codex/dbg-da-001`; the user's original dirty
 `Implementation/vscode` worktree remains untouched.
 
 ## Risks

@@ -28,10 +28,12 @@ active:
   design_analysis:
     id: DBG-DA-001
     path: SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md
-    status: rework_complete_pending_fresh_review
+    status: reviewed_awaiting_steering_acceptance
     issue: 38
     steering_start_comment: 5345600066
-    architecture_review: DBG-RVW-001-002-001
+    architecture_review: DBG-RVW-001-002-003
+    architecture_review_status: pass
+    reviewed_head: 89d95de2d944179219a93895f1ab956f2786a232
   design_studies:
     - id: DBG-ST-002
       path: SDP/Debugger/02--Study/002--Controller_State_Concurrency.md
@@ -85,11 +87,11 @@ active_gate:
     id: DBG-DA-001
     issue: 38
     path: SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md
-    status: active_design_analysis
+    status: reviewed_awaiting_steering_acceptance
   iteration:
     id: DBG-IT-001-002
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/ScrumIterations.md
-    status: active
+    status: review_pass_pending_steering_package
   architecture_review:
     id: DBG-RVW-001-002-001
     status: rework
@@ -102,23 +104,25 @@ active_gate:
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/003--Architecture_Rereview.md
   architecture_review_attempt_3:
     id: DBG-RVW-001-002-003
-    status: planned
+    status: pass
+    reviewed_head: 89d95de2d944179219a93895f1ab956f2786a232
+    path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/004--Architecture_Final_Review.md
 proposed:
   architecture:
     range: DBG-A-001..DBG-A-008
     path: SDP/Debugger/04--Architecture/001--Modular_Debugger_Architecture.md
-    status: rework_complete_pending_fresh_review
+    status: reviewed_awaiting_steering_acceptance
     state: target
   design:
     range: DBG-D-001..DBG-D-010
     path: SDP/Debugger/06--Design/001--Debugger_Design_Contracts.md
-    status: rework_complete_pending_fresh_review
+    status: reviewed_awaiting_steering_acceptance
     state: target
     gates:
       - range: DBG-D-002..DBG-D-006
         status: blocked_by_DBG-ST-006_and_stable_HSX_contracts
       - ids: DBG-D-001,DBG-D-007..DBG-D-010
-        status: proposed_pending_fresh_review_and_steering
+        status: reviewed_proposal_pending_steering_acceptance
   study:
     id: DBG-ST-006
     path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md

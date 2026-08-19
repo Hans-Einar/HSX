@@ -1,6 +1,6 @@
 # DBG-SPR-001 — Debugger Stabilization
 
-- Status: ACTIVE PROGRAM — ITERATION 002 DESIGNANALYSIS
+- Status: ACTIVE PROGRAM — ITERATION 002 REVIEW PASS / STEERING PACKAGE PENDING
 - Owning track: Debugger
 - Owning GapAnalysis: `DBG-GAP-001`
 
@@ -23,7 +23,8 @@ authorized pre-design product activity is `DBG-RF-001`.
 - Proposed required follow-up: `DBG-ST-006`
 - Architecture review `DBG-RVW-001-002-001`: REWORK
 - Architecture re-review `DBG-RVW-001-002-002`: REWORK
-- Fresh architecture review attempt: `DBG-RVW-001-002-003`
+- Final architecture review `DBG-RVW-001-002-003`: PASS at
+  `89d95de2d944179219a93895f1ab956f2786a232`
 - Stop gate: issue #38 Steering acceptance
 
 ## Non-goals for this iteration

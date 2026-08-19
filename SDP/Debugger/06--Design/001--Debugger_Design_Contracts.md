@@ -1,8 +1,10 @@
 # Proposed Debugger Design Contracts
 
-- Status: REWORKED PROPOSAL / PENDING FRESH INDEPENDENT REVIEW
+- Status: REVIEWED / AWAITING STEERING ACCEPTANCE
 - DesignAnalysis: `DBG-DA-001`
 - Architecture: `DBG-A-001..DBG-A-008`
+- Independent review: `DBG-RVW-001-002-003` — PASS at
+  `89d95de2d944179219a93895f1ab956f2786a232`
 - Evidence: `DBG-ST-002..DBG-ST-005`
 - Target state: not implemented
 

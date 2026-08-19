@@ -1,7 +1,9 @@
 # Proposed Modular Debugger Architecture
 
-- Status: REWORKED PROPOSAL / PENDING FRESH INDEPENDENT REVIEW
+- Status: REVIEWED / AWAITING STEERING ACCEPTANCE
 - DesignAnalysis: `DBG-DA-001`
+- Independent review: `DBG-RVW-001-002-003` — PASS at
+  `89d95de2d944179219a93895f1ab956f2786a232`
 - Evidence: `DBG-ST-001..DBG-ST-005`, `DBG-CR-001`, `DBG-GAP-001`
 - Requirements: `DBG-R-001..DBG-R-036`
 - Target state: not implemented

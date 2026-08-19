@@ -16,9 +16,9 @@ runtime capability. Those capabilities are dependencies on the `SDP/HSX` track.
 ## Current phase
 
 The current product baseline originated on `Implementation/vscode`. `DBG-RF-001` completed
-the production-path protocol baseline, and the active activity is `DBG-DA-001`: proposed
-modular debugger architecture pending independent review and Steering acceptance. No
-structural product implementation is authorized.
+the production-path protocol baseline, and the active activity is `DBG-DA-001`: the proposed
+modular debugger architecture passed independent exact-head review and awaits Steering
+acceptance. No structural product implementation is authorized.
 
 Read in this order:
 

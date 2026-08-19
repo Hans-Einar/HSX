@@ -19,7 +19,7 @@ issues:
     master_signoff: pass
   DBG-DA-001:
     issue: 38
-    status: rework_complete_pending_fresh_review
+    status: reviewed_awaiting_steering_acceptance
     steering_start_comment: 5345600066
     iteration: DBG-IT-001-002
     architecture_review: DBG-RVW-001-002-001
@@ -27,6 +27,9 @@ issues:
     architecture_rereview: DBG-RVW-001-002-002
     architecture_rereview_status: rework
     architecture_review_attempt_3: DBG-RVW-001-002-003
+    architecture_review_attempt_3_status: pass
+    final_reviewed_head: 89d95de2d944179219a93895f1ab956f2786a232
+    final_review_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/004--Architecture_Final_Review.md
     rereviewed_head: e1f72a59bed3455a06d4443750ebf2f8c068e409
     reviewed_head: f8b80977c5a78b81488ffc486a3604be863dfb26
     proposed_architecture: DBG-A-001..DBG-A-008
