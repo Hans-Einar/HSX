@@ -1,0 +1,40 @@
+schema_version: 1
+track: Debugger
+issues:
+  DBG-GAP-001:
+    issue: 36
+    role: steering_acceptance
+    status: accepted
+  DBG-RF-001:
+    issue: 37
+    status: ready_for_worker
+    execution_slice: DBG-SL-001-001-001
+    review: DBG-RVW-001-001-001
+    verification: DBG-VER-001-001-001
+  DBG-DA-001:
+    issue: 38
+    status: blocked_by_DBG-RF-001
+  DBG-RF-002:
+    issue: 39
+    status: blocked_by_DBG-DA-001
+  DBG-RF-003:
+    issue: 40
+    status: blocked_by_DBG-DA-001_and_controller_contract
+  DBG-RF-004:
+    issue: 41
+    status: blocked_by_DBG-DA-001_and_stop_epoch_contract
+  DBG-RF-005:
+    issue: 42
+    status: blocked_by_DBG-RF-002_and_DBG-RF-003
+  DBG-RF-006:
+    issue: 43
+    status: blocked_by_DBG-RF-002_DBG-RF-003_DBG-RF-004
+  DBG-RF-007:
+    issue: 44
+    status: blocked_by_DBG-RF-002_through_DBG-RF-006
+  DBG-RF-008:
+    issue: 45
+    status: blocked_by_DBG-RF-007
+  DBG-RF-009:
+    issue: 46
+    status: blocked_by_DBG-RF-002_through_DBG-RF-008

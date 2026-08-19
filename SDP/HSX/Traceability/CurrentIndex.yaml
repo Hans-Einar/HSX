@@ -1,0 +1,21 @@
+schema_version: 1
+track: HSX
+namespace: HSX
+status: legacy_migration_planned
+active:
+  study:
+    id: HSX-ST-001
+    path: SDP/HSX/02--Study/001--Legacy_Traceability_Migration.md
+    status: planned
+legacy_sources:
+  - main/02--Study
+  - main/03--Architecture
+  - main/04--Design
+  - main/05--Implementation
+migration_rules:
+  preserve_legacy_ids: true
+  redesign_authorized: false
+  product_code_authorized: false
+cross_track:
+  debugger: SDP/Debugger
+  avr: SDP/AVR

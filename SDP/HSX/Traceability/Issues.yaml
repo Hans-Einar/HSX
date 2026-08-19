@@ -1,0 +1,6 @@
+schema_version: 1
+track: HSX
+issues:
+  HSX-ST-001:
+    issue: 47
+    status: planned

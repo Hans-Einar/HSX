@@ -1,0 +1,144 @@
+schema_version: 1
+track: Debugger
+relations:
+  - from: DBG-ST-001
+    type: informs
+    to:
+      - DBG-R-001..DBG-R-036
+      - DBG-CR-001
+  - from: DBG-CR-001
+    type: evidence_for
+    to:
+      - DBG-GAP-001
+  - from: DBG-GAP-001
+    type: spawns
+    to:
+      - DBG-RF-001
+      - DBG-DA-001
+      - DBG-RF-002
+      - DBG-RF-003
+      - DBG-RF-004
+      - DBG-RF-005
+      - DBG-RF-006
+      - DBG-RF-007
+      - DBG-RF-008
+      - DBG-RF-009
+  - from: DBG-RF-001
+    type: prerequisite_for
+    to:
+      - DBG-DA-001
+  - from: DBG-RF-001
+    type: implemented_by
+    to:
+      - DBG-SL-001-001-001
+  - from: DBG-SPR-001
+    type: contains
+    to:
+      - DBG-IT-001-001
+  - from: DBG-IT-001-001
+    type: executes
+    to:
+      - DBG-SL-001-001-001
+  - from: DBG-SL-001-001-001
+    type: addresses
+    to:
+      - DBG-F-001
+      - DBG-F-002
+      - DBG-F-003
+      - DBG-R-001
+      - DBG-R-002
+      - DBG-R-032
+      - DBG-R-033
+      - DBG-R-036
+  - from: DBG-SL-001-001-001
+    type: reviewed_by
+    to:
+      - DBG-RVW-001-001-001
+  - from: DBG-SL-001-001-001
+    type: verified_by
+    to:
+      - DBG-VER-001-001-001
+  - from: DBG-DA-001
+    type: design_gate_for
+    to:
+      - DBG-RF-002
+      - DBG-RF-003
+      - DBG-RF-004
+      - DBG-RF-005
+      - DBG-RF-006
+      - DBG-RF-007
+      - DBG-RF-008
+  - from: DBG-RF-002
+    type: prerequisite_for
+    to:
+      - DBG-RF-005
+      - DBG-RF-006
+      - DBG-RF-007
+  - from: DBG-RF-003
+    type: prerequisite_for
+    to:
+      - DBG-RF-005
+      - DBG-RF-006
+      - DBG-RF-007
+  - from: DBG-RF-004
+    type: prerequisite_for
+    to:
+      - DBG-RF-006
+      - DBG-RF-007
+  - from: DBG-RF-005
+    type: prerequisite_for
+    to:
+      - DBG-RF-007
+  - from: DBG-RF-006
+    type: prerequisite_for
+    to:
+      - DBG-RF-007
+  - from: DBG-RF-007
+    type: prerequisite_for
+    to:
+      - DBG-RF-008
+  - from: DBG-RF-008
+    type: prerequisite_for
+    to:
+      - DBG-RF-009
+  - from: DBG-RF-002..DBG-RF-008
+    type: verification_input_for
+    to:
+      - DBG-RF-009
+legacy_provenance:
+  - from: DR-8.1
+    type: migrated_into
+    to:
+      - DBG-R-005
+      - DBG-R-007..DBG-R-015
+      - DBG-R-020
+      - DBG-R-026..DBG-R-027
+  - from: DG-8.1
+    type: migrated_into
+    to:
+      - DBG-R-016..DBG-R-022
+      - DBG-R-027
+      - DBG-R-030
+  - from: DG-8.2
+    type: migrated_into
+    to:
+      - DBG-R-008..DBG-R-013
+  - from: DG-8.3
+    type: migrated_into
+    to:
+      - DBG-R-031..DBG-R-035
+cross_track_dependencies:
+  - from: DBG-R-023
+    type: requires_stable_contract_from
+    to:
+      - HSX-ST-001
+    required_contract: portable_address_model
+    blocks:
+      - DBG-RF-004
+  - from: DBG-R-016..DBG-R-020
+    type: requires_stable_contract_from
+    to:
+      - HSX-ST-001
+    required_contract: debug_execution_semantics
+    blocks:
+      - DBG-RF-006

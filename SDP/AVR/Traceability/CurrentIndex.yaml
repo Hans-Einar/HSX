@@ -1,0 +1,15 @@
+schema_version: 1
+track: AVR
+namespace: AVR
+status: reserved_inactive
+active: {}
+next:
+  study:
+    id: AVR-ST-001
+    name: AVR Target and Embedded Port Constraints
+    status: not_started
+entry_criteria:
+  - Portable HSX requirements/architecture have a stable SDP baseline.
+  - Debugger development environment and reference behavior are stable enough to serve as an oracle.
+  - AVR target choice and hardware constraints are explicitly studied rather than assumed.
+portable_dependency: SDP/HSX
