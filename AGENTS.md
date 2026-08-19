@@ -4,6 +4,20 @@ This repository follows the local Standard Document Procedure (SDP).
 The repository documents and GitHub issue records, not chat history, are the durable source
 of truth for planning, design, implementation, review, verification, and handoff.
 
+## Mandatory Master startup reading order
+
+Before planning or delegating work, the Master agent must read:
+
+1. `AGENTS.md`
+2. `SDP/README.md`
+3. `SDP/Shared/Process.md`
+4. the active track `README.md`
+5. the active track `Traceability/CurrentIndex.yaml`
+6. the active GitHub issue(s) named by that index or owning the current work
+7. the active Study / Requirements / DesignAnalysis / Design / Feature / Refactor / Slice documents referenced by traceability
+
+Do not begin product-code work from an issue title alone.
+
 ## Governance: Steering Group and Master agent
 
 The project has a human-facing **Steering Group chat** that provides product/architecture
