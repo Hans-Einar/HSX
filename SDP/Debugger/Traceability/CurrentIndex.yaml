@@ -1,0 +1,47 @@
+schema_version: 1
+track: Debugger
+namespace: DBG
+status: gap_analysis_ready_for_steering
+baseline:
+  repository: Hans-Einar/HSX
+  implementation_branch: Implementation/vscode
+  relation_to_main:
+    ahead_by: 84
+    behind_by: 0
+active:
+  study:
+    id: DBG-ST-001
+    path: SDP/Debugger/02--Study/001--Legacy_Debugger_Baseline.md
+  requirements:
+    path: SDP/Debugger/03--Requirements/001--Debugger_Requirements.md
+    range: DBG-R-001..DBG-R-036
+  code_review:
+    id: DBG-CR-001
+    path: SDP/Debugger/CodeReview/001--Legacy_VSCode_Debugger/01--CodeReview.md
+    findings: DBG-F-001..DBG-F-026
+  gap_analysis:
+    id: DBG-GAP-001
+    path: SDP/Debugger/GapAnalysis/001--Debugger_Stabilization/01--GapAnalysis.md
+  design_analysis:
+    id: DBG-DA-001
+    path: SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md
+    status: blocked
+next:
+  refactor:
+    id: DBG-RF-001
+    name: DAP Protocol Baseline Stabilization
+    status: ready_after_steering_acceptance
+structural_gate:
+  rule: No structural product-code refactor starts before DBG-DA-001 and relevant DBG-D contracts are accepted.
+  blocked_refactors:
+    - DBG-RF-002
+    - DBG-RF-003
+    - DBG-RF-004
+    - DBG-RF-005
+    - DBG-RF-006
+    - DBG-RF-007
+    - DBG-RF-008
+    - DBG-RF-009
+source_of_truth:
+  process: AGENTS.md
+  shared_process: SDP/Shared/Process.md
