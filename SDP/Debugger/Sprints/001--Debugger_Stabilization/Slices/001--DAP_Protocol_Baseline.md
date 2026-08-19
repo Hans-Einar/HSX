@@ -1,12 +1,16 @@
 # DBG-SL-001-001-001 — DAP Protocol and Product-Entrypoint Baseline
 
-Status: INDEPENDENT REVIEW PASS — AWAITING VERIFICATION
+Status: `verified_pending_master_signoff`
 
 Worker base: `e5a50ab45acdcb515ccd3602ce99487bd668cdfd` on
 `codex/dbg-rf-001`.
 
 Reviewed implementation head: `208063e344b767f82790ce579eba6327e2cdd0ce` by
 `DBG-RVW-001-001-001`.
+
+Verified repository head: `fefd4b0c427dfa71d637e4f4cce9e4a345912591` by
+`DBG-VER-001-001-001`; no product/test diff exists between it and the reviewed
+implementation head.
 
 ## Goal
 
@@ -78,3 +82,11 @@ consumer page. The general anti-monolith and no-half-wired rules still apply.
 One exact implementation commit has a fresh independent review PASS, rerunnable verification
 evidence, no unresolved Blocking/High/Medium findings, updated traceability/sprint records,
 and Master exact-head sign-off in issue #37.
+
+## Verification result
+
+`DBG-VER-001-001-001` is PASS for the contracted Windows evidence. Targeted tests reported
+`36 passed`; production-wrapper framing/lifecycle cases reported `3 passed`; direct raw
+preamble and trailing-byte controls were both rejected. The broad suite's two failures were
+classified outside Slice ownership. Linux remains a `DBG-RF-009` residual and is not claimed
+as PASS. The Slice awaits Master exact-head sign-off only.

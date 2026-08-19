@@ -2,7 +2,7 @@
 
 ## DBG-IT-001-001 — DAP Protocol Baseline Stabilization
 
-Status: INDEPENDENT REVIEW PASS — AWAITING VERIFICATION
+Status: `verified_pending_master_signoff`
 
 ### Slice
 
@@ -40,5 +40,16 @@ Blocking/High/Medium findings. Reviewer Windows evidence repeated the targeted `
 ran the production-wrapper subprocess cases ten times without a cleanup hang, and confirmed
 strict rejection of both injected preamble and trailing unframed bytes.
 
-Formal `DBG-VER-001-001-001` has not run, Master exact-head sign-off has not occurred, and
-`DBG-DA-001` remains blocked.
+Formal `DBG-VER-001-001-001` passed against repository head
+`fefd4b0c427dfa71d637e4f4cce9e4a345912591`, with no product/test diff from independently
+reviewed implementation head `208063e344b767f82790ce579eba6327e2cdd0ce`:
+
+- targeted Windows DAP CLI/harness/backend evidence: `36 passed`;
+- production wrapper initialize ordering plus launch/attach: `3 passed`;
+- raw preamble and trailing-byte negative controls: `2/2 rejected`;
+- broader `python/tests`: `534 passed, 2 skipped, 2 failed`, both independently classified
+  outside Slice ownership;
+- traceability YAML and Ledger NDJSON validation: PASS.
+
+Linux execution is not claimed and remains assigned to `DBG-RF-009`. Master exact-head
+sign-off has not occurred, and `DBG-DA-001` remains blocked.

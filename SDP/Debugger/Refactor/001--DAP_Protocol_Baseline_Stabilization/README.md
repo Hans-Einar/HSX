@@ -1,6 +1,6 @@
 # DBG-RF-001 — DAP Protocol Baseline Stabilization
 
-- Status: INDEPENDENT REVIEW PASS — AWAITING VERIFICATION
+- Status: `verified_pending_master_signoff`
 - Owning issue: #37
 - Steering gate: #36 — accepted against PR #49 head
   `403d55c621d50212940b4c8668ac20a3cf8519b5`
@@ -76,3 +76,15 @@ constrain those designs.
 - `DBG-VER-001-001-001` records exact commands/platform/results;
 - Master signs off the exact commit in issue #37 and traceability;
 - only then may `DBG-DA-001` move from blocked to its Steering/design gate.
+
+## Current gate result
+
+Independent review `DBG-RVW-001-001-001` passed exact implementation head
+`208063e344b767f82790ce579eba6327e2cdd0ce`. Verification
+`DBG-VER-001-001-001` then passed the contracted Windows evidence against repository head
+`fefd4b0c427dfa71d637e4f4cce9e4a345912591`, which has no product/test diff from that
+reviewed implementation head.
+
+The Refactor is verified and awaits only Master exact-head sign-off. Linux product-wrapper
+evidence remains a tracked `DBG-RF-009` residual; no Linux PASS is claimed. `DBG-DA-001` and
+all structural product work remain blocked.
