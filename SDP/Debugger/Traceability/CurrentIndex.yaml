@@ -97,6 +97,11 @@ active_gate:
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/002--Architecture_Review.md
   architecture_rereview:
     id: DBG-RVW-001-002-002
+    status: rework
+    reviewed_head: e1f72a59bed3455a06d4443750ebf2f8c068e409
+    path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/003--Architecture_Rereview.md
+  architecture_review_attempt_3:
+    id: DBG-RVW-001-002-003
     status: planned
 proposed:
   architecture:

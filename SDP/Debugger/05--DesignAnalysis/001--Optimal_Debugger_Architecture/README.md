@@ -4,7 +4,7 @@
 - Started by Steering: issue #38 comment `5345600066`
 - Active iteration: `DBG-IT-001-002`
 - Evidence head for completed Studies: `a8eae871537cb70ea78502f7d34fbdbe68d837fa`
-- Planned review: `DBG-RVW-001-002-001`
+- Planned fresh review: `DBG-RVW-001-002-003`
 - Implementation authority: none
 
 ## Objective and decision boundary

@@ -65,16 +65,19 @@ architecture review, then stop at issue #38 Steering acceptance.
   the findings are recorded in issue #38 and the architecture review record.
 - Master completed documentation-only rework for event-authoritative pending states,
   `DBG-ST-006` ownership/gates, active iteration traceability/Handoff, and the reuse row count.
+- Fresh review `DBG-RVW-001-002-002` confirmed technical closure and returned one Medium
+  status-drift finding plus one Low stale row-count claim; Master corrected both current
+  surfaces.
 
 ## Not done
 
-- Fresh `DBG-RVW-001-002-002` has not reviewed the corrected exact head.
+- Fresh `DBG-RVW-001-002-003` has not reviewed the corrected exact head.
 - Steering has not accepted any proposed `DBG-A-*` / `DBG-D-*` contract.
 - `DBG-ST-006` has not been authorized/executed and its required HSX inputs do not yet exist.
 
 ## Exact next step
 
-Commit the corrected proposal, assign fresh `DBG-RVW-001-002-002` to that exact head, correct
+Commit the corrected proposal, assign fresh `DBG-RVW-001-002-003` to that exact head, correct
 any further Blocking/High/Medium findings with another fresh review, then update
 SDP/traceability and post the decision package to issue #38. Stop there pending Steering
 acceptance.
@@ -93,14 +96,15 @@ acceptance.
 - Active DesignAnalysis: `DBG-DA-001`, `DBG-IT-001-002`
 - Active Studies: `DBG-ST-002..DBG-ST-005`
 - Architecture review: `DBG-RVW-001-002-001` — REWORK at `f8b8097`
-- Planned fresh re-review: `DBG-RVW-001-002-002`
+- Architecture re-review: `DBG-RVW-001-002-002` — REWORK at `e1f72a5`
+- Planned fresh review: `DBG-RVW-001-002-003`
 - Proposed architecture: `DBG-A-001..DBG-A-008`
 - Proposed detailed design: `DBG-D-001..DBG-D-010`
 - Proposed follow-up Study: `DBG-ST-006`
 
 ## Agents and worktree
 
-The prior product chain, all Study workers, and review attempt 1 are complete. No agent remains
+The prior product chain, all Study workers, and review attempts 1/2 are complete. No agent remains
 open. The next agent is one fresh architecture reviewer after the rework commit. The
 controlled branch is `codex/dbg-da-001`; the user's original dirty
 `Implementation/vscode` worktree remains untouched.

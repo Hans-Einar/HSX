@@ -22,7 +22,8 @@ authorized pre-design product activity is `DBG-RF-001`.
 - Completed Studies: `DBG-ST-002..DBG-ST-005`
 - Proposed required follow-up: `DBG-ST-006`
 - Architecture review `DBG-RVW-001-002-001`: REWORK
-- Fresh architecture re-review: `DBG-RVW-001-002-002`
+- Architecture re-review `DBG-RVW-001-002-002`: REWORK
+- Fresh architecture review attempt: `DBG-RVW-001-002-003`
 - Stop gate: issue #38 Steering acceptance
 
 ## Non-goals for this iteration

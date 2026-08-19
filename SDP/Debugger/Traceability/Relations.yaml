@@ -52,6 +52,7 @@ relations:
     to:
       - DBG-RVW-001-002-001
       - DBG-RVW-001-002-002
+      - DBG-RVW-001-002-003
   - from: DBG-DA-001
     type: proposes
     to:

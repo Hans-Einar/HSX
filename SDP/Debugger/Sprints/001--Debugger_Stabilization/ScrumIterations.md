@@ -60,7 +60,7 @@ separate gate and was not started in this iteration.
 
 ## DBG-IT-001-002 — Optimal Modular Debugger DesignAnalysis
 
-Status: ACTIVE — STUDIES AND DESIGN SYNTHESIS
+Status: REWORK COMPLETE — PENDING FRESH REVIEW `DBG-RVW-001-002-003`
 
 ### Goal
 
@@ -82,7 +82,7 @@ explicitly withholds structural product-code implementation authority.
 - `SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md`
 - proposed documents under `SDP/Debugger/04--Architecture/` and `SDP/Debugger/06--Design/`
 - this sprint's `ScrumIterations.md`, `Handoff.md`, and Debugger traceability files
-- architecture review record `DBG-RVW-001-002-001`
+- architecture review records `DBG-RVW-001-002-001..DBG-RVW-001-002-003`
 
 No product, runtime, extension, test, or packaging file may be modified in this iteration.
 
@@ -118,7 +118,8 @@ cross-domain synthesis.
 
 - Inputs: `DBG-ST-001`, `DBG-CR-001`, `DBG-GAP-001`, `DBG-R-001..DBG-R-036`
 - Active: `DBG-DA-001`, `DBG-ST-002..DBG-ST-005`, `DBG-IT-001-002`
-- Planned review: `DBG-RVW-001-002-001`
+- Completed review attempts: `DBG-RVW-001-002-001`, `DBG-RVW-001-002-002` — REWORK
+- Planned fresh review: `DBG-RVW-001-002-003`
 - Downstream blocked work: `DBG-RF-002..DBG-RF-009`
 
 ### Validation and completion signal
@@ -143,7 +144,7 @@ All four bounded Studies are complete for Master synthesis:
 - `DBG-ST-004` recommends thin CLI/DAP peers, one DAP outbound serializer, standard-DAP-first
   VS Code presentation, a vendored immutable Python runtime, compatibility registry, and
   extracted-artifact Windows/Linux verification;
-- `DBG-ST-005` classifies 36 legacy component/responsibility rows and recommends a strangler
+- `DBG-ST-005` classifies 34 legacy component/responsibility rows and recommends a strangler
   migration that preserves proven semantics/tests while replacing legacy ownership.
 
 Study-worker evidence included 51 and 118 targeted Python tests, balanced Mermaid/Markdown,
@@ -181,4 +182,12 @@ or implementation-authorized before review attempt `DBG-RVW-001-002-001`.
 Master corrected the target state machine with pending states and authoritative-evidence
 transitions, rebuilt the first-class `DBG-ST-006` contract/gates, synchronized iteration and
 review traceability, and corrected the row count through an append-only Ledger correction.
-Fresh exact-head re-review is `DBG-RVW-001-002-002`.
+Fresh exact-head re-review was reserved as `DBG-RVW-001-002-002`.
+
+### Architecture review attempt 2
+
+`DBG-RVW-001-002-002` reviewed exact rework head
+`e1f72a59bed3455a06d4443750ebf2f8c068e409`. It confirmed technical closure of pending
+states and `DBG-ST-006`, then returned REWORK for one stale review-stage/iteration status and
+one remaining stale 36-row claim. Master corrected those current surfaces. Fresh review
+attempt 3 is `DBG-RVW-001-002-003`.
