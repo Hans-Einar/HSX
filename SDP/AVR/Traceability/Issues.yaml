@@ -1,0 +1,6 @@
+schema_version: 1
+track: AVR
+issues:
+  AVR-ST-001:
+    issue: 48
+    status: blocked_reserved
