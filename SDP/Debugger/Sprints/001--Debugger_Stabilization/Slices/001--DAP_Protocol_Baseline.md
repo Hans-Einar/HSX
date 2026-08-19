@@ -1,6 +1,6 @@
 # DBG-SL-001-001-001 — DAP Protocol and Product-Entrypoint Baseline
 
-Status: `verified_pending_master_signoff`
+Status: CLOSED — MASTER EXACT-HEAD SIGN-OFF
 
 Worker base: `e5a50ab45acdcb515ccd3602ce99487bd668cdfd` on
 `codex/dbg-rf-001`.

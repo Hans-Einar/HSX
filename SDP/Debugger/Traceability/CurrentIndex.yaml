@@ -28,14 +28,16 @@ active:
   design_analysis:
     id: DBG-DA-001
     path: SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md
-    status: blocked
-next:
+    status: next_gate_not_started
+completed:
   refactor:
     id: DBG-RF-001
     name: DAP Protocol Baseline Stabilization
-    status: verified_pending_master_signoff
+    status: complete
     path: SDP/Debugger/Refactor/001--DAP_Protocol_Baseline_Stabilization/README.md
-planned_execution:
+    implementation_head: 208063e344b767f82790ce579eba6327e2cdd0ce
+    master_signoff: SDP/Debugger/Verification/DBG-RF-001--Master_Signoff.md
+completed_execution:
   sprint:
     id: DBG-SPR-001
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/README.md
@@ -43,11 +45,11 @@ planned_execution:
   iteration:
     id: DBG-IT-001-001
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/ScrumIterations.md
-    status: verified_pending_master_signoff
+    status: closed
   slice:
     id: DBG-SL-001-001-001
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/001--DAP_Protocol_Baseline.md
-    status: verified_pending_master_signoff
+    status: closed
   review:
     id: DBG-RVW-001-001-001
     status: pass
@@ -59,6 +61,12 @@ planned_execution:
     implementation_head: 208063e344b767f82790ce579eba6327e2cdd0ce
     repository_head_tested: fefd4b0c427dfa71d637e4f4cce9e4a345912591
     path: SDP/Debugger/Verification/DBG-VER-001-001-001.md
+next_gate:
+  design_analysis:
+    id: DBG-DA-001
+    issue: 38
+    path: SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md
+    status: not_started
 structural_gate:
   rule: No structural product-code refactor starts before DBG-DA-001 and relevant DBG-D contracts are accepted.
   blocked_refactors:

@@ -7,7 +7,7 @@ issues:
     status: accepted
   DBG-RF-001:
     issue: 37
-    status: verified_pending_master_signoff
+    status: complete
     execution_slice: DBG-SL-001-001-001
     review: DBG-RVW-001-001-001
     review_status: pass
@@ -15,9 +15,11 @@ issues:
     verification: DBG-VER-001-001-001
     verification_status: pass
     repository_head_tested: fefd4b0c427dfa71d637e4f4cce9e4a345912591
+    implementation_head_signed_off: 208063e344b767f82790ce579eba6327e2cdd0ce
+    master_signoff: pass
   DBG-DA-001:
     issue: 38
-    status: blocked_by_DBG-RF-001
+    status: next_gate_not_started
   DBG-RF-002:
     issue: 39
     status: blocked_by_DBG-DA-001

@@ -1,12 +1,11 @@
 # DBG-SPR-001 Handoff
 
-Status: `verified_pending_master_signoff`
+Status: `DBG-RF-001_complete_stop_boundary`
 
 ## Current objective
 
-Complete Master exact-head reconciliation and sign-off for the already implemented,
-independently reviewed, and verified `DBG-SL-001-001-001`, then stop before issue #38 /
-`DBG-DA-001`.
+Stop after completed Master exact-head sign-off for `DBG-RF-001`. Issue #38 /
+`DBG-DA-001` is the next separate gate and has not started.
 
 ## Authority
 
@@ -51,35 +50,38 @@ independently reviewed, and verified `DBG-SL-001-001-001`, then stop before issu
   syntax/import sanity PASS; Debugger traceability YAML and Ledger NDJSON PASS.
 - The broad suite repeated `534 passed, 2 skipped, 2 failed`; both failures were independently
   classified as pre-existing/non-Slice and no out-of-scope fix was made.
+- Master reconciled the frozen contract, independent review, verification, CurrentIndex,
+  Issues, Relations, Ledger, implementation notes, and Handoff, then signed exact
+  implementation head `208063e344b767f82790ce579eba6327e2cdd0ce`.
 
 ## Not done
 
-- Master exact-head sign-off has not occurred.
 - No issue #38 / `DBG-DA-001` work has started.
 
 ## Exact next step
 
-Master reconciles `DBG-VER-001-001-001`, records the exact-head decision in issue #37 and
-traceability, signs off `DBG-RF-001` only if the evidence agrees, and then stops. Issue #38 /
-`DBG-DA-001` is the next separate gate and must not be started in this cycle.
+A later Master starts with issue #38 and the `DBG-DA-001` DesignAnalysis gate only after a
+new Steering instruction. No product-code worker may start from issue #38 before accepted
+`DBG-D-*` contracts exist.
 
 ## Traceability state
 
 - Active evidence: `DBG-ST-001`, `DBG-CR-001`, `DBG-GAP-001`
-- Implementation complete: `DBG-SPR-001`, `DBG-IT-001-001`, `DBG-SL-001-001-001`
+- Implementation signed off: `DBG-RF-001`, `DBG-IT-001-001`, `DBG-SL-001-001-001`
 - Review PASS: `DBG-RVW-001-001-001`, anchored to
   `208063e344b767f82790ce579eba6327e2cdd0ce`
 - Verification PASS: `DBG-VER-001-001-001`, anchored to implementation head
   `208063e344b767f82790ce579eba6327e2cdd0ce` and repository head tested
   `fefd4b0c427dfa71d637e4f4cce9e4a345912591`.
 - CurrentIndex, Issues, sprint records, implementation notes, and Ledger are current through
-  verification; Relations required no change.
+  Master sign-off; Relations required no sign-off change.
 
 ## Agents and worktree
 
 The bounded worker implementation, fresh independent review, and formal verification are
-complete in the controlled worktree on `codex/dbg-rf-001`. The user's original dirty
-`Implementation/vscode` worktree remains untouched.
+complete. No worker, reviewer, verifier, or sidecar agent remains open. The controlled branch
+is `codex/dbg-rf-001`; the user's original dirty `Implementation/vscode` worktree remains
+untouched.
 
 ## Risks
 
@@ -89,5 +91,5 @@ complete in the controlled worktree on `codex/dbg-rf-001`. The user's original d
 - WSL2 was reachable, but only Python 3.6.15 without pytest was available; no suitable Linux
   project test environment existed. No Linux PASS is claimed, and the remaining
   cross-platform product-wrapper obligation stays assigned to `DBG-RF-009`.
-- The two broader-suite failures listed above remain non-Slice evidence for the reviewer/
-  verifier to classify; no out-of-scope product changes were made for them.
+- The two broader-suite failures listed above were independently classified outside this
+  Slice; no out-of-scope product changes were made for them.

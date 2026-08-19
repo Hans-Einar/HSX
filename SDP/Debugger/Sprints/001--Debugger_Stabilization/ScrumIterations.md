@@ -2,7 +2,7 @@
 
 ## DBG-IT-001-001 — DAP Protocol Baseline Stabilization
 
-Status: `verified_pending_master_signoff`
+Status: CLOSED — MASTER SIGN-OFF COMPLETE
 
 ### Slice
 
@@ -51,5 +51,9 @@ reviewed implementation head `208063e344b767f82790ce579eba6327e2cdd0ce`:
   outside Slice ownership;
 - traceability YAML and Ledger NDJSON validation: PASS.
 
-Linux execution is not claimed and remains assigned to `DBG-RF-009`. Master exact-head
-sign-off has not occurred, and `DBG-DA-001` remains blocked.
+Linux execution is not claimed and remains assigned to `DBG-RF-009`. Master signed off exact
+implementation head `208063e344b767f82790ce579eba6327e2cdd0ce` after reconciling
+`DBG-RVW-001-001-001`, `DBG-VER-001-001-001`, the Slice contract, traceability, and handoff.
+
+`DBG-IT-001-001` and `DBG-SL-001-001-001` are closed. Issue #38 / `DBG-DA-001` is the next
+separate gate and was not started in this iteration.

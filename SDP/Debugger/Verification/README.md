@@ -15,3 +15,8 @@ requirements/design IDs it verifies. At minimum record:
 
 `DBG-RF-001` reserves `DBG-VER-001-001-001`. Its evidence record is created only after
 implementation and independent exact-head review; a planned relation is not verification.
+
+Completed records:
+
+- `DBG-VER-001-001-001.md` — Windows PASS for signed implementation head `208063e`.
+- `DBG-RF-001--Master_Signoff.md` — Master exact-head reconciliation and completion decision.

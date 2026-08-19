@@ -4,8 +4,7 @@ Record verified work only.
 
 ## DBG-VER-001-001-001
 
-`DBG-SL-001-001-001` is verified on Windows and is
-`verified_pending_master_signoff`.
+`DBG-SL-001-001-001` is verified on Windows and has Master exact-head sign-off.
 
 - exact reviewed implementation head:
   `208063e344b767f82790ce579eba6327e2cdd0ce`;
@@ -21,5 +20,11 @@ Record verified work only.
 - independent review `DBG-RVW-001-001-001`: PASS with no findings.
 
 Linux product-wrapper evidence remains assigned to `DBG-RF-009`; no Linux PASS is claimed.
-Master exact-head sign-off is still required before `DBG-RF-001` completes or
-`DBG-DA-001` can advance.
+
+## Master sign-off
+
+Master exact-head reconciliation accepted implementation head
+`208063e344b767f82790ce579eba6327e2cdd0ce` after PASS records
+`DBG-RVW-001-001-001` and `DBG-VER-001-001-001`. `DBG-RF-001` and
+`DBG-SL-001-001-001` are complete. Issue #38 / `DBG-DA-001` is the next gate and has not
+started; structural product-code work remains blocked pending accepted design contracts.

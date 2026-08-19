@@ -1,7 +1,10 @@
 # DBG-DA-001 — Optimal Debugger Architecture DesignAnalysis
 
-Status: BLOCKED  
-Blocked by: `DBG-RF-001` baseline protocol stabilization and its independent review.
+Status: NEXT GATE — NOT STARTED
+
+Former prerequisite: `DBG-RF-001` baseline protocol stabilization, independent review, and
+verification. The prerequisite is complete at signed implementation head
+`208063e344b767f82790ce579eba6327e2cdd0ce`.
 
 This DesignAnalysis is intentionally reserved but not yet performed.
 
@@ -31,6 +34,6 @@ explicit per-component reuse/adapt/replace decision against the legacy implement
 
 ## Guard
 
-No structural product-code worker is authorized by this placeholder. The Master must first
-complete the analysis, obtain steering acceptance, create/freeze the detailed design
-contracts, and update traceability/dependencies.
+No structural product-code worker is authorized by this placeholder. A later Master must
+open the separate issue #38 gate, complete the analysis, obtain Steering acceptance,
+create/freeze the detailed design contracts, and update traceability/dependencies.
