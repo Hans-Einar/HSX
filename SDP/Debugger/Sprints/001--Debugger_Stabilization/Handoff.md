@@ -4,8 +4,8 @@ Status: `DBG-DA-001_reviewed_awaiting_steering_acceptance`
 
 ## Current objective
 
-Post the reviewed `DBG-DA-001` decision package to issue #38, then stop and wait for Steering
-acceptance without dispatching structural product work.
+Wait for Steering acceptance or revision of the reviewed `DBG-DA-001` package in issue #38.
+No structural product work may be dispatched.
 
 ## Authority
 
@@ -76,18 +76,19 @@ acceptance without dispatching structural product work.
   blocks and no broken local Markdown links, confirmed all `DBG-R-001..036` and
   `DBG-F-001..026` coverage, counted the detailed reuse audit as 34 rows, and confirmed the
   complete proposal diff is SDP-only.
+- Master posted the reviewed decision package to issue #38 as comment `5346421143`, covering
+  recommendations, alternatives, reuse decisions, `DBG-ST-006` routing, Steering choices,
+  proposed dependencies, and explicit implementation guards.
 
 ## Not done
 
-- The reviewed decision package has not yet been posted to issue #38.
 - Steering has not accepted any proposed `DBG-A-*` / `DBG-D-*` contract.
 - `DBG-ST-006` has not been authorized/executed and its required HSX inputs do not yet exist.
 
 ## Exact next step
 
-Master posts the short reviewed decision package to issue #38, including the recommended
-architecture, material tradeoffs, unresolved Steering choices, `DBG-ST-006` routing request,
-review PASS, and proposed Refactor dependency changes. Then stop pending Steering acceptance.
+Steering reviews issue #38 comment `5346421143` and records acceptance, requested revision, or
+`DBG-ST-006` routing. A later Master must update SDP/traceability before dependent work.
 
 ## Traceability state
 
@@ -98,14 +99,15 @@ review PASS, and proposed Refactor dependency changes. Then stop pending Steerin
 - Verification PASS: `DBG-VER-001-001-001`, anchored to implementation head
   `208063e344b767f82790ce579eba6327e2cdd0ce` and repository head tested
   `fefd4b0c427dfa71d637e4f4cce9e4a345912591`.
-- CurrentIndex, Issues, sprint records, implementation notes, and Ledger are current through
-  Master sign-off; Relations required no sign-off change.
+- CurrentIndex, Issues, sprint records, Relations, Ledger, and Handoff are current through the
+  issue #38 decision package.
 - Active DesignAnalysis: `DBG-DA-001`, `DBG-IT-001-002`
 - Completed Design Studies: `DBG-ST-002..DBG-ST-005`
 - Architecture review: `DBG-RVW-001-002-001` — REWORK at `f8b8097`
 - Architecture re-review: `DBG-RVW-001-002-002` — REWORK at `e1f72a5`
 - Final architecture review: `DBG-RVW-001-002-003` — PASS at
   `89d95de2d944179219a93895f1ab956f2786a232`
+- Steering decision package: issue #38 comment `5346421143`
 - Proposed architecture: `DBG-A-001..DBG-A-008`
 - Proposed detailed design: `DBG-D-001..DBG-D-010`
 - Proposed follow-up Study: `DBG-ST-006`
@@ -113,7 +115,7 @@ review PASS, and proposed Refactor dependency changes. Then stop pending Steerin
 ## Agents and worktree
 
 The prior product chain, all Study workers, and all three architecture-review attempts are
-complete. No worker or reviewer remains open. The Master owns the issue #38 decision package.
+complete. No worker or reviewer remains open. Steering owns the issue #38 decision gate.
 The controlled branch is `codex/dbg-da-001`; the user's original dirty
 `Implementation/vscode` worktree remains untouched.
 

@@ -60,7 +60,7 @@ separate gate and was not started in this iteration.
 
 ## DBG-IT-001-002 — Optimal Modular Debugger DesignAnalysis
 
-Status: REVIEW PASS — STEERING DECISION PACKAGE PENDING
+Status: AWAITING STEERING ACCEPTANCE
 
 ### Goal
 
@@ -204,7 +204,8 @@ and the 34-row append-only correction. It also revalidated full requirements/fin
 coverage, anti-monolith responsibilities, proposal-only dependency changes, SDP-only scope,
 YAML/NDJSON, 14 Mermaid blocks, and the read-only `118 passed` evidence.
 
-The proposal is reviewed but not accepted. The remaining iteration action is the Master issue
-#38 decision package. `DBG-A-*` / `DBG-D-*` remain target/proposed, `DBG-D-002..DBG-D-006`
+The proposal is reviewed but not accepted. Master posted the issue #38 decision package as
+comment `5346421143`; the iteration is waiting at the Steering gate. `DBG-A-*` / `DBG-D-*`
+remain target/proposed, `DBG-D-002..DBG-D-006`
 remain gated by `DBG-ST-006` and stable HSX inputs, and all `DBG-RF-002..DBG-RF-009` product
 implementation remains blocked.

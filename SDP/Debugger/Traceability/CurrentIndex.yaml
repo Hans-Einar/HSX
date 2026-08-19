@@ -34,6 +34,7 @@ active:
     architecture_review: DBG-RVW-001-002-003
     architecture_review_status: pass
     reviewed_head: 89d95de2d944179219a93895f1ab956f2786a232
+    steering_decision_package_comment: 5346421143
   design_studies:
     - id: DBG-ST-002
       path: SDP/Debugger/02--Study/002--Controller_State_Concurrency.md
@@ -91,7 +92,7 @@ active_gate:
   iteration:
     id: DBG-IT-001-002
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/ScrumIterations.md
-    status: review_pass_pending_steering_package
+    status: awaiting_steering_acceptance
   architecture_review:
     id: DBG-RVW-001-002-001
     status: rework
@@ -107,6 +108,10 @@ active_gate:
     status: pass
     reviewed_head: 89d95de2d944179219a93895f1ab956f2786a232
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/004--Architecture_Final_Review.md
+  steering_gate:
+    issue: 38
+    decision_package_comment: 5346421143
+    status: awaiting_steering_acceptance
 proposed:
   architecture:
     range: DBG-A-001..DBG-A-008
