@@ -4,10 +4,10 @@ issues:
   DBG-GAP-001:
     issue: 36
     role: steering_acceptance
-    status: master_audit_corrections_in_progress
+    status: accepted
   DBG-RF-001:
     issue: 37
-    status: ready_after_issue_36_acceptance
+    status: ready_for_worker
     execution_slice: DBG-SL-001-001-001
     review: DBG-RVW-001-001-001
     verification: DBG-VER-001-001-001

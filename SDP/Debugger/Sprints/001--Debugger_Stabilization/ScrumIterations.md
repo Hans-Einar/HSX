@@ -2,7 +2,7 @@
 
 ## DBG-IT-001-001 — DAP Protocol Baseline Stabilization
 
-Status: PLANNED — AWAITING ISSUE #36 ACCEPTANCE
+Status: READY FOR WORKER — CONTRACT FROZEN
 
 ### Slice
 
@@ -11,7 +11,8 @@ Status: PLANNED — AWAITING ISSUE #36 ACCEPTANCE
 
 ### Execution order
 
-1. Master records Steering acceptance and freezes the exact contract/head.
+1. Master recorded Steering acceptance against PR #49 head
+   `403d55c621d50212940b4c8668ac20a3cf8519b5` and froze the contract.
 2. Fresh worker records `slice_started` and implements only the Slice.
 3. Fresh independent reviewer reviews the exact worker head.
 4. Blocking/High/Medium findings cause rework and a fresh exact-head review.
@@ -21,4 +22,5 @@ Status: PLANNED — AWAITING ISSUE #36 ACCEPTANCE
 
 ### Current result
 
-No product-code work has started. No worker or reviewer is open.
+No product-code work has started. The next action is fresh worker dispatch; no reviewer is
+open yet.

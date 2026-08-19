@@ -1,8 +1,9 @@
 # DBG-RF-001 — DAP Protocol Baseline Stabilization
 
-- Status: PROPOSED CONTRACT — READY AFTER STEERING ACCEPTANCE
+- Status: FROZEN — READY FOR WORKER
 - Owning issue: #37
-- Steering gate: #36
+- Steering gate: #36 — accepted against PR #49 head
+  `403d55c621d50212940b4c8668ac20a3cf8519b5`
 - Parent: `DBG-GAP-001`
 Reviewed product baseline: `Implementation/vscode` at
 `a1daa1c62605c44ac67e58e2b71320006f73cdd9`

@@ -1,6 +1,6 @@
 # DBG-SL-001-001-001 — DAP Protocol and Product-Entrypoint Baseline
 
-Status: PLANNED — AWAITING ISSUE #36 ACCEPTANCE
+Status: READY FOR WORKER — CONTRACT FROZEN
 
 ## Goal
 

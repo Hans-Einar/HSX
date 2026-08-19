@@ -1,6 +1,6 @@
 # DBG-R Requirements Baseline
 
-Status: DRAFT BASELINE FOR GAP ANALYSIS  
+Status: ACCEPTED DEBUGGER STABILIZATION BASELINE
 Date: 2026-08-19  
 Scope: debugger subsystem only
 

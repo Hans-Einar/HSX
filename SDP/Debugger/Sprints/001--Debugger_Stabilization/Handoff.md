@@ -2,7 +2,7 @@
 
 ## Current objective
 
-Obtain Steering acceptance of the corrected SDP baseline, then execute only
+Execute only
 `DBG-SL-001-001-001` through worker, independent reviewer, verification, and exact-head
 Master sign-off.
 
@@ -18,26 +18,26 @@ Master sign-off.
 
 - Master audited PR #49 head `43168e9fee21ba48fbd7b0964b153ef0b6bc51bc`.
 - Findings were recorded durably in issue #36.
-- Exact product baseline provenance and the planned execution contracts are being added.
+- Exact product baseline provenance and the execution contracts were added and re-audited at
+  PR #49 head `403d55c621d50212940b4c8668ac20a3cf8519b5`.
+- Steering acceptance was recorded in issue #36; the Slice contract is frozen.
 
 ## Not done
 
-- Steering acceptance is not yet recorded against the corrected PR head.
 - No product-code worker has started.
 - Review and verification records are planned only.
 
 ## Exact next step
 
-Commit/push the documentation corrections, re-audit the exact PR head, and record the gate
-decision in issue #36. Only an accepted state permits worker dispatch.
+Dispatch one fresh worker with the exact Slice contract and require it to record
+`slice_started` before product implementation.
 
 ## Traceability state
 
 - Active evidence: `DBG-ST-001`, `DBG-CR-001`, `DBG-GAP-001`
 - Planned execution: `DBG-SPR-001`, `DBG-IT-001-001`, `DBG-SL-001-001-001`
 - Planned review/verification: `DBG-RVW-001-001-001`, `DBG-VER-001-001-001`
-- CurrentIndex/Relations are updated in the correction change.
-- Ledger still needs the correction/freeze events appended before commit.
+- CurrentIndex/Relations/Ledger are current through Steering acceptance and contract freeze.
 
 ## Agents and worktree
 

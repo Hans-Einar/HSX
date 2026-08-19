@@ -1,6 +1,6 @@
 # DBG-SPR-001 — Debugger Stabilization
 
-- Status: PLANNED — AWAITING ISSUE #36 ACCEPTANCE
+- Status: ACTIVE — ISSUE #36 ACCEPTED
 - Owning track: Debugger
 - Owning GapAnalysis: `DBG-GAP-001`
 
@@ -9,7 +9,7 @@
 Execute the accepted debugger stabilization program in dependency order. The first and only
 authorized pre-design product activity is `DBG-RF-001`.
 
-## Active planned iteration
+## Active iteration
 
 - `DBG-IT-001-001` — DAP protocol baseline stabilization
 - Slice: `DBG-SL-001-001-001`

@@ -1,7 +1,7 @@
 schema_version: 1
 track: Debugger
 namespace: DBG
-status: gap_analysis_ready_for_steering
+status: debugger_stabilization_active
 baseline:
   repository: Hans-Einar/HSX
   implementation_branch: Implementation/vscode
@@ -16,6 +16,7 @@ active:
   requirements:
     path: SDP/Debugger/03--Requirements/001--Debugger_Requirements.md
     range: DBG-R-001..DBG-R-036
+    status: accepted
   code_review:
     id: DBG-CR-001
     path: SDP/Debugger/CodeReview/001--Legacy_VSCode_Debugger/01--CodeReview.md
@@ -23,6 +24,7 @@ active:
   gap_analysis:
     id: DBG-GAP-001
     path: SDP/Debugger/GapAnalysis/001--Debugger_Stabilization/01--GapAnalysis.md
+    status: accepted
   design_analysis:
     id: DBG-DA-001
     path: SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md
@@ -31,13 +33,13 @@ next:
   refactor:
     id: DBG-RF-001
     name: DAP Protocol Baseline Stabilization
-    status: ready_after_steering_acceptance
+    status: ready_for_worker
     path: SDP/Debugger/Refactor/001--DAP_Protocol_Baseline_Stabilization/README.md
 planned_execution:
   sprint:
     id: DBG-SPR-001
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/README.md
-    status: planned
+    status: active
   iteration:
     id: DBG-IT-001-001
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/ScrumIterations.md
@@ -66,3 +68,8 @@ structural_gate:
 source_of_truth:
   process: AGENTS.md
   shared_process: SDP/Shared/Process.md
+steering_acceptance:
+  issue: 36
+  accepted_pr: 49
+  accepted_pr_head: 403d55c621d50212940b4c8668ac20a3cf8519b5
+  issue_comment: 5345077893
