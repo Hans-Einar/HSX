@@ -60,15 +60,15 @@ architecture review, then stop at issue #38 Steering acceptance.
 
 ## Not done
 
-- The recommended architecture and reuse/adapt/replace matrix are not yet synthesized.
 - `DBG-RVW-001-002-001` has not reviewed an exact design head.
 - Steering has not accepted any proposed `DBG-A-*` / `DBG-D-*` contract.
 
 ## Exact next step
 
-Master synthesizes one coherent proposal from `DBG-ST-002..DBG-ST-005`, obtains exact-head
-independent architecture review, updates SDP/traceability, and posts the decision package to
-issue #38. Stop there pending Steering acceptance.
+Commit the complete Master proposal, assign fresh `DBG-RVW-001-002-001` to its exact head,
+correct any Blocking/High/Medium findings with a new exact-head review, then update
+SDP/traceability and post the decision package to issue #38. Stop there pending Steering
+acceptance.
 
 ## Traceability state
 
@@ -84,12 +84,16 @@ issue #38. Stop there pending Steering acceptance.
 - Active DesignAnalysis: `DBG-DA-001`, `DBG-IT-001-002`
 - Active Studies: `DBG-ST-002..DBG-ST-005`
 - Planned architecture review: `DBG-RVW-001-002-001`
+- Proposed architecture: `DBG-A-001..DBG-A-008`
+- Proposed detailed design: `DBG-D-001..DBG-D-010`
+- Proposed follow-up Study: `DBG-ST-006`
 
 ## Agents and worktree
 
-The prior worker/reviewer/verifier chain is complete. Fresh bounded Study agents may be open
-only while producing `DBG-ST-002..DBG-ST-005`. The controlled branch is `codex/dbg-da-001`;
-the user's original dirty `Implementation/vscode` worktree remains untouched.
+The prior product worker/reviewer/verifier chain and all four Study workers are complete. No
+Study agent remains open. The next agent is one fresh architecture reviewer after the proposal
+commit. The controlled branch is `codex/dbg-da-001`; the user's original dirty
+`Implementation/vscode` worktree remains untouched.
 
 ## Risks
 

@@ -51,6 +51,21 @@ relations:
     type: reviewed_by
     to:
       - DBG-RVW-001-002-001
+  - from: DBG-DA-001
+    type: proposes
+    to:
+      - DBG-A-001..DBG-A-008
+      - DBG-D-001..DBG-D-010
+      - DBG-ST-006
+  - from: DBG-ST-006
+    type: resolves_dependency_for
+    to:
+      - DBG-D-002..DBG-D-006
+      - DBG-RF-003..DBG-RF-006
+  - from: DBG-A-001..DBG-A-008
+    type: refined_by
+    to:
+      - DBG-D-001..DBG-D-010
   - from: DBG-RF-001
     type: implemented_by
     to:
@@ -166,3 +181,34 @@ cross_track_dependencies:
     required_contract: debug_execution_semantics
     blocks:
       - DBG-RF-006
+  - from: DBG-ST-006
+    type: coordinates_with
+    to:
+      - HSX-ST-001
+    required_contract: portable_debug_runtime_semantics
+    blocks:
+      - DBG-RF-003
+      - DBG-RF-004
+      - DBG-RF-005
+      - DBG-RF-006
+proposed_dependency_changes:
+  status: pending_steering_acceptance
+  relations:
+    - from: DBG-RF-004
+      type: prerequisite_for
+      to:
+        - DBG-RF-005
+    - from: DBG-RF-005
+      type: prerequisite_for
+      to:
+        - DBG-RF-006
+    - from: DBG-RF-002
+      type: interface_freeze_with
+      to:
+        - DBG-RF-003
+    - from: DBG-RF-007
+      type: requires_slice_domains
+      domains:
+        - thin_cli_migration
+        - modular_dap_migration
+        - frontend_parity_integration

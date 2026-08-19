@@ -15,9 +15,10 @@ runtime capability. Those capabilities are dependencies on the `SDP/HSX` track.
 
 ## Current phase
 
-The current baseline is legacy code on branch `Implementation/vscode`, which is 84
-commits ahead of the repository `main` branch. The immediate activity is a formal
-legacy CodeReview and GapAnalysis before any broad redesign.
+The current product baseline originated on `Implementation/vscode`. `DBG-RF-001` completed
+the production-path protocol baseline, and the active activity is `DBG-DA-001`: proposed
+modular debugger architecture pending independent review and Steering acceptance. No
+structural product implementation is authorized.
 
 Read in this order:
 
@@ -29,7 +30,8 @@ Read in this order:
 6. `Refactor/README.md`
 7. when `DBG-RF-001` is active, `Refactor/001--DAP_Protocol_Baseline_Stabilization/README.md`
 8. the active sprint, iteration, and Slice contract under `Sprints/001--Debugger_Stabilization/`
+9. for `DBG-DA-001`, Studies `DBG-ST-002..DBG-ST-005`, the proposed Architecture and Design
+   documents, and `DBG-ST-006`
 
-The next structural activity after baseline correctness fixes is
-`DBG-DA-001` — an optimal debugger architecture DesignAnalysis that decides what is
-reused, adapted, or replaced.
+`DBG-DA-001` is the active design gate. `DBG-RF-002..DBG-RF-009` remain blocked until issue
+#38 records Steering acceptance of the relevant target-state contracts.

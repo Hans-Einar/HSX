@@ -149,3 +149,20 @@ All four bounded Studies are complete for Master synthesis:
 Study-worker evidence included 51 and 118 targeted Python tests, balanced Mermaid/Markdown,
 complete `DBG-F-001..026` and `DBG-R-001..036` coverage in the reuse audit, and clean diffs.
 No Study granted implementation authority. Master synthesis is now the active action.
+
+### Master synthesis result
+
+Master synthesized one proposal across all four Studies:
+
+- proposed architecture `DBG-A-001..DBG-A-008`;
+- proposed detailed contracts `DBG-D-001..DBG-D-010`;
+- first-class follow-up `DBG-ST-006` for unresolved portable HSX runtime contracts;
+- context, command/event, connection, target lifecycle, and responsibility diagrams/tables;
+- complete major-component reuse/adapt/replace matrix with the 36-row `DBG-ST-005` audit as
+  detailed evidence;
+- strangler migration and proposed RF-004→RF-005→RF-006 dependency refinements;
+- explicit Steering choices for controller model, packaging, runtime requirements, lifecycle
+  defaults, watch semantics, custom views, and compatibility window.
+
+Status is `proposed_pending_review`. No target-state item is accepted or implementation
+authorized. The next action is fresh exact-head `DBG-RVW-001-002-001`.
