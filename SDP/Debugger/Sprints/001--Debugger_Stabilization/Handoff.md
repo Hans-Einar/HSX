@@ -53,18 +53,21 @@ architecture review, then stop at issue #38 Steering acceptance.
 - Master reconciled the frozen contract, independent review, verification, CurrentIndex,
   Issues, Relations, Ledger, implementation notes, and Handoff, then signed exact
   implementation head `208063e344b767f82790ce579eba6327e2cdd0ce`.
+- Steering authorized `DBG-DA-001` in issue #38, and Master activated
+  `DBG-IT-001-002` at `ea2b53728de5abfe9e9482560390bd1a2de6c9d2`.
+- Fresh bounded workers completed `DBG-ST-002..DBG-ST-005` in disjoint Study documents with
+  no product changes or shared-traceability writes.
 
 ## Not done
 
-- `DBG-ST-002..DBG-ST-005` evidence is not yet complete.
 - The recommended architecture and reuse/adapt/replace matrix are not yet synthesized.
 - `DBG-RVW-001-002-001` has not reviewed an exact design head.
 - Steering has not accepted any proposed `DBG-A-*` / `DBG-D-*` contract.
 
 ## Exact next step
 
-Run the four bounded Study work packages, synthesize one coherent proposal, obtain exact-head
-independent architecture review, update SDP/traceability, and post the decision package to
+Master synthesizes one coherent proposal from `DBG-ST-002..DBG-ST-005`, obtains exact-head
+independent architecture review, updates SDP/traceability, and posts the decision package to
 issue #38. Stop there pending Steering acceptance.
 
 ## Traceability state

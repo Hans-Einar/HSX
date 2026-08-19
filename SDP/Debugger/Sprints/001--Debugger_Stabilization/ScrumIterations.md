@@ -130,3 +130,22 @@ cross-domain synthesis.
 - Blocking/High/Medium review findings are corrected and re-reviewed;
 - reviewed decision package is posted to issue #38;
 - status becomes `awaiting_steering_acceptance`, not accepted/implementation-authorized.
+
+### Study work-package result
+
+All four bounded Studies are complete for Master synthesis:
+
+- `DBG-ST-002` recommends a single actor/command-queue controller, typed executive gateway,
+  orthogonal connection/target state, explicit stop epochs, and reconciliation barrier;
+- `DBG-ST-003` recommends typed target/image/address boundaries, immutable artifact/source and
+  inspection services, owner-scoped resources, explicit lifecycle, and a bounded shared step
+  planner while recording eight missing HSX contracts;
+- `DBG-ST-004` recommends thin CLI/DAP peers, one DAP outbound serializer, standard-DAP-first
+  VS Code presentation, a vendored immutable Python runtime, compatibility registry, and
+  extracted-artifact Windows/Linux verification;
+- `DBG-ST-005` classifies 36 legacy component/responsibility rows and recommends a strangler
+  migration that preserves proven semantics/tests while replacing legacy ownership.
+
+Study-worker evidence included 51 and 118 targeted Python tests, balanced Mermaid/Markdown,
+complete `DBG-F-001..026` and `DBG-R-001..036` coverage in the reuse audit, and clean diffs.
+No Study granted implementation authority. Master synthesis is now the active action.

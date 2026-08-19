@@ -35,16 +35,16 @@ active:
   design_studies:
     - id: DBG-ST-002
       path: SDP/Debugger/02--Study/002--Controller_State_Concurrency.md
-      status: active
+      status: complete_for_synthesis
     - id: DBG-ST-003
       path: SDP/Debugger/02--Study/003--Inspection_Resources_Execution.md
-      status: active
+      status: complete_for_synthesis
     - id: DBG-ST-004
       path: SDP/Debugger/02--Study/004--Frontend_Packaging_Verification.md
-      status: active
+      status: complete_for_synthesis
     - id: DBG-ST-005
       path: SDP/Debugger/02--Study/005--Legacy_Reuse_Audit.md
-      status: active
+      status: complete_for_synthesis
 completed:
   refactor:
     id: DBG-RF-001
