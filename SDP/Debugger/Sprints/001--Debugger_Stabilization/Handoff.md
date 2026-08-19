@@ -1,11 +1,11 @@
 # DBG-SPR-001 Handoff
 
-Status: `DBG-RF-001_complete_stop_boundary`
+Status: `DBG-DA-001_active_design_analysis`
 
 ## Current objective
 
-Stop after completed Master exact-head sign-off for `DBG-RF-001`. Issue #38 /
-`DBG-DA-001` is the next separate gate and has not started.
+Complete `DBG-DA-001` through bounded Studies, Master synthesis, and fresh independent
+architecture review, then stop at issue #38 Steering acceptance.
 
 ## Authority
 
@@ -56,13 +56,16 @@ Stop after completed Master exact-head sign-off for `DBG-RF-001`. Issue #38 /
 
 ## Not done
 
-- No issue #38 / `DBG-DA-001` work has started.
+- `DBG-ST-002..DBG-ST-005` evidence is not yet complete.
+- The recommended architecture and reuse/adapt/replace matrix are not yet synthesized.
+- `DBG-RVW-001-002-001` has not reviewed an exact design head.
+- Steering has not accepted any proposed `DBG-A-*` / `DBG-D-*` contract.
 
 ## Exact next step
 
-A later Master starts with issue #38 and the `DBG-DA-001` DesignAnalysis gate only after a
-new Steering instruction. No product-code worker may start from issue #38 before accepted
-`DBG-D-*` contracts exist.
+Run the four bounded Study work packages, synthesize one coherent proposal, obtain exact-head
+independent architecture review, update SDP/traceability, and post the decision package to
+issue #38. Stop there pending Steering acceptance.
 
 ## Traceability state
 
@@ -75,13 +78,15 @@ new Steering instruction. No product-code worker may start from issue #38 before
   `fefd4b0c427dfa71d637e4f4cce9e4a345912591`.
 - CurrentIndex, Issues, sprint records, implementation notes, and Ledger are current through
   Master sign-off; Relations required no sign-off change.
+- Active DesignAnalysis: `DBG-DA-001`, `DBG-IT-001-002`
+- Active Studies: `DBG-ST-002..DBG-ST-005`
+- Planned architecture review: `DBG-RVW-001-002-001`
 
 ## Agents and worktree
 
-The bounded worker implementation, fresh independent review, and formal verification are
-complete. No worker, reviewer, verifier, or sidecar agent remains open. The controlled branch
-is `codex/dbg-rf-001`; the user's original dirty `Implementation/vscode` worktree remains
-untouched.
+The prior worker/reviewer/verifier chain is complete. Fresh bounded Study agents may be open
+only while producing `DBG-ST-002..DBG-ST-005`. The controlled branch is `codex/dbg-da-001`;
+the user's original dirty `Implementation/vscode` worktree remains untouched.
 
 ## Risks
 

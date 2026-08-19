@@ -19,7 +19,10 @@ issues:
     master_signoff: pass
   DBG-DA-001:
     issue: 38
-    status: next_gate_not_started
+    status: active_design_analysis
+    steering_start_comment: 5345600066
+    iteration: DBG-IT-001-002
+    architecture_review: DBG-RVW-001-002-001
   DBG-RF-002:
     issue: 39
     status: blocked_by_DBG-DA-001

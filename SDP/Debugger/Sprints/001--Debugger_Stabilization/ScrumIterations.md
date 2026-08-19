@@ -57,3 +57,76 @@ implementation head `208063e344b767f82790ce579eba6327e2cdd0ce` after reconciling
 
 `DBG-IT-001-001` and `DBG-SL-001-001-001` are closed. Issue #38 / `DBG-DA-001` is the next
 separate gate and was not started in this iteration.
+
+## DBG-IT-001-002 — Optimal Modular Debugger DesignAnalysis
+
+Status: ACTIVE — STUDIES AND DESIGN SYNTHESIS
+
+### Goal
+
+Produce one requirements-driven modular debugger architecture, reuse/adapt/replace matrix,
+migration sequence, and proposed architecture/design-contract set for Steering review.
+
+### Why now
+
+`DBG-RF-001` established a trustworthy production DAP baseline and completed exact-head
+sign-off. Steering comment `5345600066` in issue #38 authorizes `DBG-DA-001` analysis, but
+explicitly withholds structural product-code implementation authority.
+
+### Expected files
+
+- `SDP/Debugger/02--Study/002--Controller_State_Concurrency.md`
+- `SDP/Debugger/02--Study/003--Inspection_Resources_Execution.md`
+- `SDP/Debugger/02--Study/004--Frontend_Packaging_Verification.md`
+- `SDP/Debugger/02--Study/005--Legacy_Reuse_Audit.md`
+- `SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md`
+- proposed documents under `SDP/Debugger/04--Architecture/` and `SDP/Debugger/06--Design/`
+- this sprint's `ScrumIterations.md`, `Handoff.md`, and Debugger traceability files
+- architecture review record `DBG-RVW-001-002-001`
+
+No product, runtime, extension, test, or packaging file may be modified in this iteration.
+
+### Invariants
+
+- optimize from accepted `DBG-R-001..DBG-R-036`, not existing monolith boundaries;
+- preserve legacy behavior as an oracle until replacement parity is independently proven;
+- one authoritative debugger state owner and one serialized mutation model;
+- explicit responsibility and non-responsibility for every proposed module;
+- frontend-neutral core reused by CLI and DAP;
+- executive-only runtime control;
+- proposed `DBG-A-*` / `DBG-D-*` remain target state pending Steering acceptance;
+- `DBG-RF-002..DBG-RF-009` product implementation stays blocked.
+
+### Non-goals
+
+- no structural product-code change;
+- no final acceptance or freezing of `DBG-D-*` contracts;
+- no worker dispatch for any Refactor;
+- no silent invention of missing HSX address/execution semantics.
+
+### Bounded Study work packages
+
+1. `DBG-ST-002`: controller/state/concurrency/events/reconnect alternatives.
+2. `DBG-ST-003`: inspection/resources/lifecycle/stepping alternatives and HSX dependencies.
+3. `DBG-ST-004`: DAP/VS Code/package/verification boundaries.
+4. `DBG-ST-005`: legacy reuse/adapt/replace evidence and regression-oracle audit.
+
+Study workers own only their assigned documents. Master owns shared traceability and final
+cross-domain synthesis.
+
+### Traceability
+
+- Inputs: `DBG-ST-001`, `DBG-CR-001`, `DBG-GAP-001`, `DBG-R-001..DBG-R-036`
+- Active: `DBG-DA-001`, `DBG-ST-002..DBG-ST-005`, `DBG-IT-001-002`
+- Planned review: `DBG-RVW-001-002-001`
+- Downstream blocked work: `DBG-RF-002..DBG-RF-009`
+
+### Validation and completion signal
+
+- every requirement is mapped to proposed architecture/design responsibility;
+- architecture, state, lifecycle, API/boundary, reuse, and migration outputs are complete;
+- Markdown links, Mermaid syntax, YAML, and Ledger NDJSON validate;
+- a fresh independent architecture reviewer reviews the exact proposed-design head;
+- Blocking/High/Medium review findings are corrected and re-reviewed;
+- reviewed decision package is posted to issue #38;
+- status becomes `awaiting_steering_acceptance`, not accepted/implementation-authorized.

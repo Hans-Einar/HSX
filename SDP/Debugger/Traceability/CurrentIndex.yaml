@@ -28,7 +28,23 @@ active:
   design_analysis:
     id: DBG-DA-001
     path: SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md
-    status: next_gate_not_started
+    status: active
+    issue: 38
+    steering_start_comment: 5345600066
+    architecture_review: DBG-RVW-001-002-001
+  design_studies:
+    - id: DBG-ST-002
+      path: SDP/Debugger/02--Study/002--Controller_State_Concurrency.md
+      status: active
+    - id: DBG-ST-003
+      path: SDP/Debugger/02--Study/003--Inspection_Resources_Execution.md
+      status: active
+    - id: DBG-ST-004
+      path: SDP/Debugger/02--Study/004--Frontend_Packaging_Verification.md
+      status: active
+    - id: DBG-ST-005
+      path: SDP/Debugger/02--Study/005--Legacy_Reuse_Audit.md
+      status: active
 completed:
   refactor:
     id: DBG-RF-001
@@ -61,12 +77,19 @@ completed_execution:
     implementation_head: 208063e344b767f82790ce579eba6327e2cdd0ce
     repository_head_tested: fefd4b0c427dfa71d637e4f4cce9e4a345912591
     path: SDP/Debugger/Verification/DBG-VER-001-001-001.md
-next_gate:
+active_gate:
   design_analysis:
     id: DBG-DA-001
     issue: 38
     path: SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md
-    status: not_started
+    status: active_design_analysis
+  iteration:
+    id: DBG-IT-001-002
+    path: SDP/Debugger/Sprints/001--Debugger_Stabilization/ScrumIterations.md
+    status: active
+  architecture_review:
+    id: DBG-RVW-001-002-001
+    status: planned
 structural_gate:
   rule: No structural product-code refactor starts before DBG-DA-001 and relevant DBG-D contracts are accepted.
   blocked_refactors:

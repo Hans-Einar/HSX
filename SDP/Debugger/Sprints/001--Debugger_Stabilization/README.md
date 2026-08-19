@@ -1,6 +1,6 @@
 # DBG-SPR-001 — Debugger Stabilization
 
-- Status: ACTIVE PROGRAM — ITERATION 001 CLOSED
+- Status: ACTIVE PROGRAM — ITERATION 002 DESIGNANALYSIS
 - Owning track: Debugger
 - Owning GapAnalysis: `DBG-GAP-001`
 
@@ -14,6 +14,14 @@ authorized pre-design product activity is `DBG-RF-001`.
 - `DBG-IT-001-001` — DAP protocol baseline stabilization
 - Slice: `DBG-SL-001-001-001`
 - Parent Refactor: `DBG-RF-001`
+
+## Active iteration
+
+- `DBG-IT-001-002` — optimal modular debugger DesignAnalysis
+- DesignAnalysis: `DBG-DA-001`
+- Studies: `DBG-ST-002..DBG-ST-005`
+- Independent architecture review: `DBG-RVW-001-002-001`
+- Stop gate: issue #38 Steering acceptance
 
 ## Non-goals for this iteration
 

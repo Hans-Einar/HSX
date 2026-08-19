@@ -27,6 +27,30 @@ relations:
     type: prerequisite_for
     to:
       - DBG-DA-001
+  - from: DBG-R-001..DBG-R-036
+    type: analyzed_by
+    to:
+      - DBG-DA-001
+  - from: DBG-ST-002
+    type: informs
+    to:
+      - DBG-DA-001
+  - from: DBG-ST-003
+    type: informs
+    to:
+      - DBG-DA-001
+  - from: DBG-ST-004
+    type: informs
+    to:
+      - DBG-DA-001
+  - from: DBG-ST-005
+    type: informs
+    to:
+      - DBG-DA-001
+  - from: DBG-DA-001
+    type: reviewed_by
+    to:
+      - DBG-RVW-001-002-001
   - from: DBG-RF-001
     type: implemented_by
     to:
