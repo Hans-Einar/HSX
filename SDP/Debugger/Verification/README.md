@@ -13,4 +13,5 @@ requirements/design IDs it verifies. At minimum record:
 - residual risks or explicit none;
 - exact commit SHA accepted by Master sign-off.
 
-`DBG-RF-001` will create the first `DBG-VER-*` record after implementation/review.
+`DBG-RF-001` reserves `DBG-VER-001-001-001`. Its evidence record is created only after
+implementation and independent exact-head review; a planned relation is not verification.

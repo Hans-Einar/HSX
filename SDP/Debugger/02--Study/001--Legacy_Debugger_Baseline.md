@@ -13,6 +13,7 @@ redesign or structural refactor?
 
 - Repository: `Hans-Einar/HSX`
 - Product baseline branch: `Implementation/vscode`
+- Reviewed product commit: `a1daa1c62605c44ac67e58e2b71320006f73cdd9`
 - Relation to `main`: 84 commits ahead, 0 behind at study time.
 - Historical debugger design/implementation material lives under legacy
   `main/04--Design` and `main/05--Implementation/01--GapAnalysis`.

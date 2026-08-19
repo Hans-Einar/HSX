@@ -2,7 +2,7 @@
 
 Status: COMPLETE FOR GAP ANALYSIS  
 Review date: 2026-08-19  
-Reviewed baseline: `Implementation/vscode`  
+Reviewed baseline: `Implementation/vscode` at `a1daa1c62605c44ac67e58e2b71320006f73cdd9`
 Review purpose: evidence for `DBG-GAP-001`, not final implementation sign-off
 
 ## Scope

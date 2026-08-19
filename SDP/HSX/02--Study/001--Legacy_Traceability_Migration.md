@@ -21,6 +21,8 @@ requirements.
 - known design gaps and unresolved questions;
 - debugger dependencies that should become cross-track relations rather than HSX debugger
   requirements;
+- stable HSX IDs/contracts for the portable address model and debugger execution semantics
+  currently required by `DBG-R-023` and `DBG-R-016..DBG-R-020`;
 - future embedded-port constraints that belong in AVR rather than HSX core.
 
 ## Output

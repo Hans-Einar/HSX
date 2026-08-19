@@ -27,6 +27,8 @@ Read in this order:
 4. `CodeReview/001--Legacy_VSCode_Debugger/01--CodeReview.md`
 5. `GapAnalysis/001--Debugger_Stabilization/01--GapAnalysis.md`
 6. `Refactor/README.md`
+7. when `DBG-RF-001` is active, `Refactor/001--DAP_Protocol_Baseline_Stabilization/README.md`
+8. the active sprint, iteration, and Slice contract under `Sprints/001--Debugger_Stabilization/`
 
 The next structural activity after baseline correctness fixes is
 `DBG-DA-001` — an optimal debugger architecture DesignAnalysis that decides what is
