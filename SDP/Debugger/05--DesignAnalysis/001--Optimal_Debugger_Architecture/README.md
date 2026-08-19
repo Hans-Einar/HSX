@@ -1,6 +1,6 @@
 # DBG-DA-001 — Optimal Modular Debugger Architecture
 
-- Status: PROPOSED / PENDING INDEPENDENT ARCHITECTURE REVIEW
+- Status: REWORKED PROPOSAL / PENDING FRESH INDEPENDENT REVIEW
 - Started by Steering: issue #38 comment `5345600066`
 - Active iteration: `DBG-IT-001-002`
 - Evidence head for completed Studies: `a8eae871537cb70ea78502f7d34fbdbe68d837fa`
@@ -22,7 +22,7 @@ Steering decision accepts or revises the proposed `DBG-A-*` / `DBG-D-*` contract
 - `DBG-ST-002` controller/state/concurrency/events/recovery alternatives;
 - `DBG-ST-003` inspection/resources/lifecycle/execution semantics;
 - `DBG-ST-004` DAP/CLI/VS Code/package/verification architecture;
-- `DBG-ST-005` 36-row legacy reuse/adapt/replace audit;
+- `DBG-ST-005` 34-row legacy reuse/adapt/replace audit;
 - `DBG-CR-001` / `DBG-F-001..DBG-F-026`;
 - accepted `DBG-GAP-001` and signed `DBG-RF-001` production-path oracle;
 - current product, protocol, test, package, and legacy-document evidence cited by the Studies.
@@ -89,6 +89,8 @@ Attach, launch, detach, disconnect, terminate, and kill are distinct core intent
 supports atomic true launch, frontends expose attach rather than mislabeled launch. One shared
 Execution Planner owns instruction/into/over/out plans, budgets, internal conditions,
 preemption, and canonical completion. Timers cannot fabricate stops.
+Command acceptance creates a pending operation only; target run/stop state and step completion
+advance solely on authoritative response/event/reconciliation evidence.
 
 ### 7. Frontends and VS Code
 
@@ -162,7 +164,7 @@ not yet exist for target-state items.
 
 ## Master reuse/adapt/replace matrix
 
-The authoritative evidence-rich 36-row audit is `DBG-ST-005`. This synthesis sets the
+The authoritative evidence-rich 34-row audit is `DBG-ST-005`. This synthesis sets the
 recommended disposition for the major current surfaces required by issue #38.
 
 | Current component/responsibility | Decision | Preserved value | Target owner | Migration/retirement gate |
@@ -247,8 +249,9 @@ acceptance.
 
 `DBG-ST-006` records unresolved target/image/stream identity, address/ABI, stop token/snapshot,
 event cursor, exact step, lifecycle authority, resource provenance, and stable blocked-state
-contracts. The Debugger design defines ports but cannot invent HSX answers. RF-004 and full
-RF-006 conformance remain blocked on the relevant stable HSX contracts.
+contracts. The Debugger design defines ports but cannot invent HSX answers. Until the Study
+and its stable HSX inputs are complete, `DBG-D-002..DBG-D-006`, all product implementation in
+RF-003..RF-006, and RF-002 target-identity/epoch/snapshot slices remain blocked.
 
 ### Steering choices requested
 
@@ -266,6 +269,8 @@ RF-006 conformance remain blocked on the relevant stable HSX contracts.
 7. Decide the supported extension/runtime/executive compatibility window; the proposed
    registry defaults to exact extension/runtime coherence and capability-negotiated executive
    behavior.
+8. Authorize `DBG-ST-006` as the next coordinated Debugger/HSX Study, or identify an accepted
+   equivalent; do not freeze D-002..D-006 or unblock the affected Refactor scopes beforehand.
 
 ## Anti-monolith compliance
 

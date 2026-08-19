@@ -19,13 +19,17 @@ issues:
     master_signoff: pass
   DBG-DA-001:
     issue: 38
-    status: proposed_pending_architecture_review
+    status: rework_complete_pending_fresh_review
     steering_start_comment: 5345600066
     iteration: DBG-IT-001-002
     architecture_review: DBG-RVW-001-002-001
+    architecture_review_status: rework
+    architecture_rereview: DBG-RVW-001-002-002
+    reviewed_head: f8b80977c5a78b81488ffc486a3604be863dfb26
     proposed_architecture: DBG-A-001..DBG-A-008
     proposed_design: DBG-D-001..DBG-D-010
     proposed_followup_study: DBG-ST-006
+    blocked_design_pending_study: DBG-D-002..DBG-D-006
   DBG-RF-002:
     issue: 39
     status: blocked_by_DBG-DA-001

@@ -51,6 +51,7 @@ relations:
     type: reviewed_by
     to:
       - DBG-RVW-001-002-001
+      - DBG-RVW-001-002-002
   - from: DBG-DA-001
     type: proposes
     to:
@@ -58,10 +59,18 @@ relations:
       - DBG-D-001..DBG-D-010
       - DBG-ST-006
   - from: DBG-ST-006
-    type: resolves_dependency_for
+    type: planned_to_resolve_dependency_for
     to:
       - DBG-D-002..DBG-D-006
       - DBG-RF-003..DBG-RF-006
+  - from: DBG-SPR-001
+    type: contains
+    to:
+      - DBG-IT-001-002
+  - from: DBG-IT-001-002
+    type: analyzes
+    to:
+      - DBG-DA-001
   - from: DBG-A-001..DBG-A-008
     type: refined_by
     to:
@@ -182,7 +191,7 @@ cross_track_dependencies:
     blocks:
       - DBG-RF-006
   - from: DBG-ST-006
-    type: coordinates_with
+    type: planned_coordination_with
     to:
       - HSX-ST-001
     required_contract: portable_debug_runtime_semantics
@@ -191,6 +200,13 @@ cross_track_dependencies:
       - DBG-RF-004
       - DBG-RF-005
       - DBG-RF-006
+    blocked_scopes:
+      - refactor: DBG-RF-002
+        scopes:
+          - target_identity
+          - stop_epoch
+          - snapshot
+          - reference_lifetime
 proposed_dependency_changes:
   status: pending_steering_acceptance
   relations:

@@ -1,6 +1,6 @@
 # Proposed Modular Debugger Architecture
 
-- Status: PROPOSED / PENDING STEERING ACCEPTANCE
+- Status: REWORKED PROPOSAL / PENDING FRESH INDEPENDENT REVIEW
 - DesignAnalysis: `DBG-DA-001`
 - Evidence: `DBG-ST-001..DBG-ST-005`, `DBG-CR-001`, `DBG-GAP-001`
 - Requirements: `DBG-R-001..DBG-R-036`
@@ -157,11 +157,19 @@ stateDiagram-v2
     NoTarget --> Launching: launch
     Attaching --> Synchronizing: target identified
     Launching --> Synchronizing: target created and claimed
-    Synchronizing --> Running: running evidence
-    Synchronizing --> Stopped: stable stop evidence
+    Synchronizing --> Running: authoritative running evidence
+    Synchronizing --> Stopped: authoritative stable stop
     Running --> Stopped: authoritative stop
     Running --> Blocked: stable runtime block
-    Stopped --> Running: continue or step accepted
+    Stopped --> RunPending: continue requested
+    Stopped --> StepPending: step requested
+    RunPending --> Running: authoritative running evidence
+    RunPending --> Stopped: failure or authoritative stop
+    StepPending --> Running: authoritative running evidence
+    StepPending --> Stopped: authoritative completion or preemption
+    Running --> StopPending: pause requested
+    StopPending --> Stopped: authoritative stop evidence
+    StopPending --> Running: pause failed or cancelled
     Blocked --> Running: wake evidence
     Stopped --> Terminating: terminate
     Running --> Terminating: terminate
@@ -172,27 +180,32 @@ stateDiagram-v2
     Terminated --> NoTarget: release
 ```
 
-A stop epoch is created only for inspection-stable stopped evidence. It is invalidated before
-resume, target-generation change, or uncertain recovery. Deadlines may fail or reconcile an
-operation but never fabricate running/stopped state.
+A stop epoch is created only for inspection-stable stopped evidence. It is invalidated when a
+run/step effect is accepted for execution, before a target can mutate, while the controller
+enters `RunPending` or `StepPending`. Command acceptance never proves `Running` and never
+proves step completion. Only authoritative response/event/reconciliation evidence advances
+pending states. Target-generation change or uncertain recovery also invalidates the epoch.
+Deadlines may fail or reconcile an operation but never fabricate running/stopped state.
 
 ## Architectural invariants
 
 1. Only the controller actor mutates authoritative debugger state.
 2. Every effect/completion/event/deadline is tagged with session, target generation, and
    operation identity; stale input is rejected deterministically.
-3. Frontends cannot call raw executive RPC or mutate VM internals.
-4. Healthy event-capable sessions perform no periodic task/resource polling.
-5. Fallback modes are capability-selected, bounded, observable, tested, and removable.
-6. ACK never advances beyond an event successfully applied by the controller.
-7. Reconnect becomes healthy only after identity, ownership, capabilities, cursor/state,
+3. Command acceptance creates a pending operation; it is never authoritative target-state or
+   step-completion evidence.
+4. Frontends cannot call raw executive RPC or mutate VM internals.
+5. Healthy event-capable sessions perform no periodic task/resource polling.
+6. Fallback modes are capability-selected, bounded, observable, tested, and removable.
+7. ACK never advances beyond an event successfully applied by the controller.
+8. Reconnect becomes healthy only after identity, ownership, capabilities, cursor/state,
    resources, and stop epoch are reconciled.
-8. Inspection handles never silently rebind across epochs.
-9. Standard debugger watch expressions are snapshot queries; persistent live watches are a
+9. Inspection handles never silently rebind across epochs.
+10. Standard debugger watch expressions are snapshot queries; persistent live watches are a
    separate optional HSX resource.
-10. Frontend output has one ordered writer per protocol connection.
-11. Optional VS Code views are derived projections and never target truth.
-12. Compatibility has a named owner, version/capability trigger, evidence, and removal test.
+11. Frontend output has one ordered writer per protocol connection.
+12. Optional VS Code views are derived projections and never target truth.
+13. Compatibility has a named owner, version/capability trigger, evidence, and removal test.
 
 ## Cross-track boundary
 

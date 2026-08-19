@@ -19,8 +19,10 @@ authorized pre-design product activity is `DBG-RF-001`.
 
 - `DBG-IT-001-002` — optimal modular debugger DesignAnalysis
 - DesignAnalysis: `DBG-DA-001`
-- Studies: `DBG-ST-002..DBG-ST-005`
-- Independent architecture review: `DBG-RVW-001-002-001`
+- Completed Studies: `DBG-ST-002..DBG-ST-005`
+- Proposed required follow-up: `DBG-ST-006`
+- Architecture review `DBG-RVW-001-002-001`: REWORK
+- Fresh architecture re-review: `DBG-RVW-001-002-002`
 - Stop gate: issue #38 Steering acceptance
 
 ## Non-goals for this iteration
@@ -29,8 +31,15 @@ authorized pre-design product activity is `DBG-RF-001`.
 - no structural debugger product refactor;
 - no work on `DBG-RF-002..DBG-RF-009`.
 
-## Sprint exit for the current gate
+## Completed iteration 001 exit
 
-The current iteration closes only after worker implementation, independent exact-head
-review, verification evidence, traceability updates, and Master exact-head sign-off for
-`DBG-RF-001`. The Master then stops; issue #38 / `DBG-DA-001` is the next gate.
+`DBG-IT-001-001` closed after worker implementation, independent exact-head review,
+verification evidence, traceability updates, and Master exact-head sign-off for
+`DBG-RF-001`.
+
+## Iteration 002 exit
+
+`DBG-IT-001-002` closes only when the complete corrected proposal has a fresh exact-head
+architecture-review PASS, SDP/traceability/Handoff agree, and the reviewed decision package
+is posted to issue #38 with status `awaiting_steering_acceptance`. No `DBG-D-*` acceptance or
+Refactor implementation authority is part of this exit.

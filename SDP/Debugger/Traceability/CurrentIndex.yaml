@@ -28,7 +28,7 @@ active:
   design_analysis:
     id: DBG-DA-001
     path: SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md
-    status: proposed_pending_review
+    status: rework_complete_pending_fresh_review
     issue: 38
     steering_start_comment: 5345600066
     architecture_review: DBG-RVW-001-002-001
@@ -47,7 +47,7 @@ active:
       status: complete_for_synthesis
     - id: DBG-ST-006
       path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
-      status: proposed_required_followup
+      status: proposed_required_before_design_freeze
 completed:
   refactor:
     id: DBG-RF-001
@@ -92,22 +92,32 @@ active_gate:
     status: active
   architecture_review:
     id: DBG-RVW-001-002-001
+    status: rework
+    reviewed_head: f8b80977c5a78b81488ffc486a3604be863dfb26
+    path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/002--Architecture_Review.md
+  architecture_rereview:
+    id: DBG-RVW-001-002-002
     status: planned
 proposed:
   architecture:
     range: DBG-A-001..DBG-A-008
     path: SDP/Debugger/04--Architecture/001--Modular_Debugger_Architecture.md
-    status: proposed_pending_review
+    status: rework_complete_pending_fresh_review
     state: target
   design:
     range: DBG-D-001..DBG-D-010
     path: SDP/Debugger/06--Design/001--Debugger_Design_Contracts.md
-    status: proposed_pending_review
+    status: rework_complete_pending_fresh_review
     state: target
+    gates:
+      - range: DBG-D-002..DBG-D-006
+        status: blocked_by_DBG-ST-006_and_stable_HSX_contracts
+      - ids: DBG-D-001,DBG-D-007..DBG-D-010
+        status: proposed_pending_fresh_review_and_steering
   study:
     id: DBG-ST-006
     path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
-    status: proposed_required_followup
+    status: proposed_required_before_design_freeze
 structural_gate:
   rule: No structural product-code refactor starts before DBG-DA-001 and relevant DBG-D contracts are accepted.
   blocked_refactors:

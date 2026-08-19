@@ -1,6 +1,6 @@
 # DBG-SPR-001 Handoff
 
-Status: `DBG-DA-001_active_design_analysis`
+Status: `DBG-DA-001_rework_complete_pending_fresh_review`
 
 ## Current objective
 
@@ -9,11 +9,13 @@ architecture review, then stop at issue #38 Steering acceptance.
 
 ## Authority
 
-- issue #36 — Steering acceptance
-- issue #37 — `DBG-RF-001`
+- issue #38 — active `DBG-DA-001` Steering/review gate
 - `SDP/Debugger/Traceability/CurrentIndex.yaml`
-- `SDP/Debugger/Refactor/001--DAP_Protocol_Baseline_Stabilization/README.md`
-- `SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/001--DAP_Protocol_Baseline.md`
+- `SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md`
+- `SDP/Debugger/04--Architecture/001--Modular_Debugger_Architecture.md`
+- `SDP/Debugger/06--Design/001--Debugger_Design_Contracts.md`
+- `SDP/Debugger/Sprints/001--Debugger_Stabilization/ScrumIterations.md`
+- issues #36/#37 and `DBG-RF-001` records are completed provenance only
 
 ## Done
 
@@ -57,16 +59,23 @@ architecture review, then stop at issue #38 Steering acceptance.
   `DBG-IT-001-002` at `ea2b53728de5abfe9e9482560390bd1a2de6c9d2`.
 - Fresh bounded workers completed `DBG-ST-002..DBG-ST-005` in disjoint Study documents with
   no product changes or shared-traceability writes.
+- Master synthesized `DBG-A-001..DBG-A-008`, `DBG-D-001..DBG-D-010`, and proposed
+  `DBG-ST-006`, then committed exact proposal head `f8b80977c5a78b81488ffc486a3604be863dfb26`.
+- Independent review `DBG-RVW-001-002-001` returned one High, two Medium, and one Low finding;
+  the findings are recorded in issue #38 and the architecture review record.
+- Master completed documentation-only rework for event-authoritative pending states,
+  `DBG-ST-006` ownership/gates, active iteration traceability/Handoff, and the reuse row count.
 
 ## Not done
 
-- `DBG-RVW-001-002-001` has not reviewed an exact design head.
+- Fresh `DBG-RVW-001-002-002` has not reviewed the corrected exact head.
 - Steering has not accepted any proposed `DBG-A-*` / `DBG-D-*` contract.
+- `DBG-ST-006` has not been authorized/executed and its required HSX inputs do not yet exist.
 
 ## Exact next step
 
-Commit the complete Master proposal, assign fresh `DBG-RVW-001-002-001` to its exact head,
-correct any Blocking/High/Medium findings with a new exact-head review, then update
+Commit the corrected proposal, assign fresh `DBG-RVW-001-002-002` to that exact head, correct
+any further Blocking/High/Medium findings with another fresh review, then update
 SDP/traceability and post the decision package to issue #38. Stop there pending Steering
 acceptance.
 
@@ -83,16 +92,17 @@ acceptance.
   Master sign-off; Relations required no sign-off change.
 - Active DesignAnalysis: `DBG-DA-001`, `DBG-IT-001-002`
 - Active Studies: `DBG-ST-002..DBG-ST-005`
-- Planned architecture review: `DBG-RVW-001-002-001`
+- Architecture review: `DBG-RVW-001-002-001` — REWORK at `f8b8097`
+- Planned fresh re-review: `DBG-RVW-001-002-002`
 - Proposed architecture: `DBG-A-001..DBG-A-008`
 - Proposed detailed design: `DBG-D-001..DBG-D-010`
 - Proposed follow-up Study: `DBG-ST-006`
 
 ## Agents and worktree
 
-The prior product worker/reviewer/verifier chain and all four Study workers are complete. No
-Study agent remains open. The next agent is one fresh architecture reviewer after the proposal
-commit. The controlled branch is `codex/dbg-da-001`; the user's original dirty
+The prior product chain, all Study workers, and review attempt 1 are complete. No agent remains
+open. The next agent is one fresh architecture reviewer after the rework commit. The
+controlled branch is `codex/dbg-da-001`; the user's original dirty
 `Implementation/vscode` worktree remains untouched.
 
 ## Risks
@@ -100,6 +110,8 @@ commit. The controlled branch is `codex/dbg-da-001`; the user's original dirty
 - `DBG-RF-004` and `DBG-RF-006` remain blocked on stable HSX cross-track contracts to be
   produced from `HSX-ST-001`.
 - Structural debugger work remains blocked by `DBG-DA-001` and accepted `DBG-D-*` contracts.
+- `DBG-D-002..DBG-D-006`, RF-003..RF-006, and RF-002 target-identity/epoch/snapshot scopes are
+  additionally blocked by `DBG-ST-006` and its stable HSX inputs.
 - WSL2 was reachable, but only Python 3.6.15 without pytest was available; no suitable Linux
   project test environment existed. No Linux PASS is claimed, and the remaining
   cross-platform product-wrapper obligation stays assigned to `DBG-RF-009`.

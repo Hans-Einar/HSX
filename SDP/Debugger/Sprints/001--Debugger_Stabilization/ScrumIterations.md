@@ -158,11 +158,27 @@ Master synthesized one proposal across all four Studies:
 - proposed detailed contracts `DBG-D-001..DBG-D-010`;
 - first-class follow-up `DBG-ST-006` for unresolved portable HSX runtime contracts;
 - context, command/event, connection, target lifecycle, and responsibility diagrams/tables;
-- complete major-component reuse/adapt/replace matrix with the 36-row `DBG-ST-005` audit as
+- complete major-component reuse/adapt/replace matrix with the 34-row `DBG-ST-005` audit as
   detailed evidence;
 - strangler migration and proposed RF-004→RF-005→RF-006 dependency refinements;
 - explicit Steering choices for controller model, packaging, runtime requirements, lifecycle
   defaults, watch semantics, custom views, and compatibility window.
 
-Status is `proposed_pending_review`. No target-state item is accepted or implementation
-authorized. The next action is fresh exact-head `DBG-RVW-001-002-001`.
+The initial synthesis status was `proposed_pending_review`. No target-state item was accepted
+or implementation-authorized before review attempt `DBG-RVW-001-002-001`.
+
+### Architecture review attempt 1
+
+`DBG-RVW-001-002-001` reviewed exact proposal head
+`f8b80977c5a78b81488ffc486a3604be863dfb26` and returned REWORK:
+
+- High: command acceptance incorrectly transitioned the target directly to running;
+- Medium: `DBG-ST-006` ownership/structure/gate effects disagreed across documents;
+- Medium: `DBG-IT-001-002`, sprint exit, Handoff authority, and review-stage traceability
+  were incomplete or stale;
+- Low: `DBG-ST-005` contains 34 component rows, not the claimed 36.
+
+Master corrected the target state machine with pending states and authoritative-evidence
+transitions, rebuilt the first-class `DBG-ST-006` contract/gates, synchronized iteration and
+review traceability, and corrected the row count through an append-only Ledger correction.
+Fresh exact-head re-review is `DBG-RVW-001-002-002`.

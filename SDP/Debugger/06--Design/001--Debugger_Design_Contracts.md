@@ -1,6 +1,6 @@
 # Proposed Debugger Design Contracts
 
-- Status: PROPOSED / PENDING STEERING ACCEPTANCE
+- Status: REWORKED PROPOSAL / PENDING FRESH INDEPENDENT REVIEW
 - DesignAnalysis: `DBG-DA-001`
 - Architecture: `DBG-A-001..DBG-A-008`
 - Evidence: `DBG-ST-002..DBG-ST-005`
@@ -26,6 +26,10 @@ Steering decision must accept or revise them before their statuses can change fr
 
 All contracts are `proposed_pending_steering`.
 
+`DBG-D-002..DBG-D-006` are additionally blocked from design freeze by `DBG-ST-006` and its
+required stable HSX inputs. This does not weaken the existing implementation block on any
+structural Refactor.
+
 ## DBG-D-001 — Serialized controller contract
 
 ### Public shape
@@ -48,6 +52,8 @@ session generation, target generation, and capability profile generation.
 - one bounded controller inbox and one actor/reducer are the only authoritative state writer;
 - blocking RPC/event reads, timers, and frontend callbacks execute outside the actor;
 - timer callbacks enqueue `DeadlineExpired`; elapsed time cannot create target state;
+- an accepted command creates a pending operation only; `RunPending`, `StepPending`, and
+  `StopPending` advance solely on authoritative completion/event/reconciliation evidence;
 - output subscribers use bounded queues and cannot block the controller;
 - shutdown is idempotent, rejects new commands, resolves pending Futures once, cancels effects,
   and joins workers without self-join or lock inversion;
@@ -175,6 +181,12 @@ frontend spelling.
 `Instruction`, `SourceInto`, `SourceOver`, and `SourceOut` are distinct plan kinds with origin
 epoch/frame/source location, owned internal conditions, instruction/time budgets, and typed
 completion/preemption.
+
+Submitting a continue/pause/step command and receiving request acceptance creates a pending
+operation; it does not establish `Running`, `Stopped`, or plan completion. The controller
+invalidates the old epoch before an accepted target-mutating effect and waits for authoritative
+evidence. A direct stopped completion may move `StepPending` to a new `Stopped` epoch without
+an intermediate observed `Running` state.
 
 - instruction step retires exactly the accepted HSX primitive;
 - into stops at the next distinct source location and may enter a callee;
