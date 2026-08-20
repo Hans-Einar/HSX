@@ -86,6 +86,8 @@ issues:
     first_wave_iteration: DBG-IT-001-004
     first_wave_slices: DBG-SL-001-004-001..DBG-SL-001-004-003
     first_wave_shared_interface: dbg.controller-gateway/1
+    first_wave_activation_comment: 5356712010
+    first_wave_activation_correction_comment: 5356745504
     portable_contract_current_gate: first_structural_wave_active
   DBG-RF-002:
     issue: 39

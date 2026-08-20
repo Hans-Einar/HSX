@@ -15,6 +15,7 @@ or RF-004..009 work is allowed.
 - issue #47 comment `5348192567` — activated `HSX-ST-001` and numbered HSX Studies
 - issue #47 comment `5356480919` — froze `HSX-R/A/D` portable target baseline
 - issue #38 comment `5356484309` — froze `DBG-D-001..010` and authorized first wave
+- issue #38 comment `5356745504` — corrected exact contract head before product edits
 - `SDP/Debugger/Traceability/CurrentIndex.yaml`
 - `SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md`
 - `SDP/Debugger/04--Architecture/001--Modular_Debugger_Architecture.md`
@@ -133,7 +134,7 @@ or RF-004..009 work is allowed.
 Commit the frozen iteration/refactor/slice/interface contracts, then spawn fresh bounded
 RF-002/RF-003 workers only within disjoint file ownership.
 
-Contract head `97d8c5bda717ce285b5c01c94c2fe19a714121ac` is the exact implementation
+Contract head `97d8c5b8d62d56dcfcab59c97c516d83f68c7075` is the exact implementation
 base for both parallel foundation Slices.
 
 ## Traceability state

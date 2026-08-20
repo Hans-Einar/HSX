@@ -7,7 +7,7 @@
 - Interface: frozen `dbg.controller-gateway/1`
 - Review: `DBG-RVW-001-004-003`
 - Verification: `DBG-VER-001-004-003`
-- Contract base: `97d8c5bda717ce285b5c01c94c2fe19a714121ac`
+- Contract base: `97d8c5b8d62d56dcfcab59c97c516d83f68c7075`
 
 ## Bounded vertical outcome
 
