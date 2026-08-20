@@ -1,9 +1,10 @@
 # DBG-SL-001-004-003 — Early Controller/Gateway Integration
 
-- Status: **REVIEW + FORMAL VERIFICATION PASS — MASTER SIGN-OFF PENDING**
+- Status: **PASS / EXACT-HEAD SIGNED**
 
 - Exact reviewed head: `860a98a68440b8e22b67f03fbdbb93d2dd33ab7a`
 - Verification `DBG-VER-001-004-003`: **PASS**
+- Signed product head: `860a98a68440b8e22b67f03fbdbb93d2dd33ab7a`
 - Parents: `DBG-RF-002`, `DBG-RF-003`
 - Iteration: `DBG-IT-001-004`
 - Steering: issue #38 comment `5356484309`

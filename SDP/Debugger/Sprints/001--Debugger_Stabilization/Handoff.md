@@ -1,11 +1,10 @@
 # DBG-SPR-001 Handoff
 
-Status: `integration_verification_pass_master_signoff_pending`
+Status: `all_slices_signed_parent_final_reviews_pending`
 
 ## Current objective
 
-Perform Master exact-head sign-off for verified integration head `860a98a…`. Parent final
-reviews remain after integration sign-off.
+Run fresh final parent RF-002 and RF-003 reviews, then parent formal verification/sign-off.
 
 ## Authority
 
@@ -135,12 +134,12 @@ reviews remain after integration sign-off.
 - RF-002 parent review's general terminal-result High and the follow-up saturated-inbox edge
   are corrected at `a064020…`; fresh `DBG-RVW-001-004-008` returned PASS. RF-003 has no
   product finding and remains signed.
-- `DBG-SL-001-004-003` has independent review and formal verification PASS; sign-off remains.
+- `DBG-SL-001-004-003` is exact-head signed at `860a98a…`.
 - `DBG-RF-004..DBG-RF-009` remain blocked.
 
 ## Exact next step
 
-Reconcile Master exact-head integration sign-off at `860a98a…`.
+Run `DBG-RVW-002-001-002` and `DBG-RVW-003-001-002` against the complete signed chain.
 
 ## Traceability state
 
@@ -196,7 +195,8 @@ Reconcile Master exact-head integration sign-off at `860a98a…`.
 - Corrected RF-002 sign-off: PASS at `a064020…`; RF-003 remains PASS at `cf4d8a6…`
 - Integration review `DBG-RVW-001-004-003`: PASS at `860a98a…`
 - Verification `DBG-VER-001-004-003`: PASS at `860a98a…`
-- Active gate: Master exact-head integration sign-off
+- Integration sign-off: PASS at `860a98a…`
+- Active gate: fresh parent final reviews
 
 ## Agents and worktree
 

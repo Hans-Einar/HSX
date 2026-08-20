@@ -26,4 +26,5 @@ Completed records:
   and exact-head sign-off at `cf4d8a6…`.
 - `DBG-VER-001-004-004.md` and `DBG-SL-001-004-001--Master_Signoff_v2.md` — corrected RF-002
   Slice PASS and exact-head sign-off at `a064020…`.
-- `DBG-VER-001-004-003.md` — integration Slice PASS at `860a98a…`, sign-off pending.
+- `DBG-VER-001-004-003.md` and `DBG-SL-001-004-003--Master_Signoff.md` — integration Slice
+  PASS and exact-head sign-off at `860a98a…`.
