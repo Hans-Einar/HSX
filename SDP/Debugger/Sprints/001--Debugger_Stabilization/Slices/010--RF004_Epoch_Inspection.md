@@ -32,6 +32,8 @@ gateway, Executive, DAP/CLI and VS Code modules are read-only.
 - implement exact `InspectionService.create/open_epoch/invalidate_epoch/close`,
   EpochInspectionSession and EpochHandleStore constructor/intern/resolve/invalidate APIs with
   explicit index/read-port/architecture/limit/stack/location dependencies;
+- factory validates exact architecture/ABI ref+digest, full portable capability profile and
+  profile limits with the frozen status/code matrix;
 - allocate every frame/scope/variable DomainHandle here and wrap Slice 005's handle-free
   `UnwindFrame` values without editing the signed stack module;
 - registers/stack/scopes/variables/memory/disassembly use one exact snapshot or explicitly
@@ -53,7 +55,8 @@ gateway, Executive, DAP/CLI and VS Code modules are read-only.
 - best-effort live evidence cannot create coherent results or stable handles;
 - bounded concurrent fixture calls are deterministic and immutable.
 - same-context open is idempotent, different valid epoch invalidates old before publish, same
-  epoch ID/different context is stale, and lifecycle/handle mutations are linearizable.
+  epoch ID/different context or any previously invalidated ID is stale; close is terminal;
+  handles embed complete context and lifecycle/handle mutations are linearizable.
 
 ## Invariants and non-goals
 

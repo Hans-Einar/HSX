@@ -498,8 +498,8 @@ frontend mapping remain separate responsibilities.
 
 Interface review `DBG-RVW-001-005-007` returned REWORK at exact remote-published head
 `82154c614a31284723bf3e6a337c5bedfb8aba5d`. Master corrected only the candidate interface,
-Slice ownership and live traceability. Reviews 008 through 010 also returned REWORK; fresh
-`DBG-RVW-001-005-012` must PASS before product
+Slice ownership and live traceability. Reviews 008..010 and 012 also returned REWORK; fresh
+`DBG-RVW-001-005-013` must PASS before product
 dispatch. A finding requiring an accepted DBG/HSX design change returns to Steering.
 
 ### Frozen execution units
@@ -534,7 +534,7 @@ exact-head sign-off before the next Slice starts.
 - Requirements: `DBG-R-004`, `DBG-R-021..DBG-R-028`, `DBG-R-034..DBG-R-036`.
 - Design: `DBG-D-003`, `DBG-D-004`, `DBG-D-009`; portable `HSX-D-001..003`.
 - Slice reviews: `DBG-RVW-001-005-001..006` and `DBG-RVW-001-005-011`; interface
-  reviews: `DBG-RVW-001-005-007..010`, then `...012`; verifications
+  reviews: `DBG-RVW-001-005-007..010`, then `...012..013`; verifications
   `DBG-VER-001-005-001..007`.
 - Parent final: `DBG-RVW-004-001-001`, `DBG-VER-004-001-001`.
 - RF-005 explicitly depends on RF-004's accepted `dbg.resolver-inspection/1`; partial/frozen
@@ -619,3 +619,22 @@ Master froze explicit service/session/store factory and lifecycle/concurrency se
 standardized variables end-to-end on SymbolRecord.symbol_id with referential validation, and
 corrected `.unsigned_value` ordering plus SymbolKind rank. Review 011 remains reserved for
 Recipe Slice 007; fresh interface review is `DBG-RVW-001-005-012`.
+
+### Interface review attempt 5
+
+Fresh read-only `DBG-RVW-001-005-012` reviewed exact remote head `573f396e2…`. It confirmed
+all earlier interface/sequence/identity/query closures and trace/scope checks, then returned
+REWORK:
+
+- High: service stale history did not forbid reopening an invalidated epoch and close/store
+  invalidation terminal/idempotent behavior remained incomplete;
+- High: DomainHandle lacked full context and could alias equal epoch strings/serials across
+  independent services;
+- High: service factory omitted exact architecture digest, ABI ref/digest and accepted
+  capability-profile checks/status mapping.
+
+Master made close terminal, retained/rejected stale epoch IDs for service lifetime, froze
+first/repeated store invalidation, embedded full InspectionContext in DomainHandle with exact
+foreign/stale behavior, and added first-match architecture/ABI ref+digest/full-profile/limit
+factory validation. No product file changed. Fresh exact-head review is
+`DBG-RVW-001-005-013`.

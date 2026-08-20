@@ -1,6 +1,6 @@
 # `dbg.resolver-inspection/1` — Typed Resolver and Inspection Interface
 
-- Status: **REFROZEN CANDIDATE — REVIEWS 007..010 REWORK / REVIEW 012 PENDING**
+- Status: **REFROZEN CANDIDATE — REVIEWS 007..010/012 REWORK / REVIEW 013 PENDING**
 - Iteration: `DBG-IT-001-005`
 - Parent Refactor: `DBG-RF-004`
 - Steering authority: issue #38 comment `5362514094`
@@ -11,7 +11,8 @@
 - Review `DBG-RVW-001-005-008`: REWORK at `8d6c0f571f46a10ce6db7331618ef7600d6a8203`
 - Review `DBG-RVW-001-005-009`: REWORK at `07f7e16040bec1c225d263c682066f65b173e6aa`
 - Review `DBG-RVW-001-005-010`: REWORK at `72b06ad0bae53b70bc3d64edad91591998d2408d`
-- Fresh independent re-review: `DBG-RVW-001-005-012` (`...011` is reserved for Slice 007)
+- Review `DBG-RVW-001-005-012`: REWORK at `573f396e29de728f69abb0961e9b79a2fdb3c29d`
+- Fresh independent re-review: `DBG-RVW-001-005-013` (`...011` is reserved for Slice 007)
 - Public interface ID: `dbg.resolver-inspection/1`
 
 This document freezes the public Python-domain interface to be implemented by the seven bounded
@@ -310,6 +311,8 @@ Domain failures are returned, not hidden by `None`, first-candidate selection or
 
 `InvalidationStatus`: `INVALIDATED`, `ALREADY_STALE`, `UNKNOWN_EPOCH`
 
+`ServiceCloseStatus`: `CLOSED`, `ALREADY_CLOSED`
+
 `AddressStatus`:
 
 - `VALID`
@@ -365,6 +368,9 @@ InspectionOpenResult { status: InspectionOpenStatus,
                        session: EpochInspectionSession | None,
                        diagnostics: tuple[Diagnostic, ...] }
 InvalidationResult { status: InvalidationStatus, stop_epoch_id: StopEpochId,
+                     diagnostics: tuple[Diagnostic, ...] }
+ServiceCloseResult { status: ServiceCloseStatus,
+                     invalidation: InvalidationResult | None,
                      diagnostics: tuple[Diagnostic, ...] }
 HandleResolution { status: COMPLETE | UNKNOWN_HANDLE | STALE,
                    context: InspectionContext,
@@ -449,7 +455,7 @@ UnwindFrame { context: InspectionContext, frame_index: int >= 0,
               call_site_pc: HsxAddress | None, function: FunctionRecord | None,
               source: SourceLocation | None, terminal: bool,
               diagnostics: tuple[Diagnostic, ...] }
-DomainHandle { stop_epoch_id: StopEpochId,
+DomainHandle { context: InspectionContext,
                kind: FRAME | SCOPE | VARIABLE, serial: int >= 1 }
 FrameRecord { context: InspectionContext, handle: DomainHandle, unwind: UnwindFrame }
 FramePage { total_frames: int >= 0, offset: int >= 0,
@@ -594,6 +600,7 @@ Public queries:
 
 ```text
 binding() -> ImageDebugBinding
+bundle_identity() -> ImageDebugBundleIdentityPayload
 source_identities() -> tuple[SourceRef, ...]
 functions() -> tuple[FunctionRecord, ...]
 types() -> tuple[TypeRecord, ...]
@@ -821,6 +828,7 @@ active EpochInspectionSession:
 InspectionService.create(index: DebugArtifactIndex,
                          read_port: SnapshotReadPort,
                          architecture: ArchitectureDescriptor,
+                         abi: AbiDescriptorRef,
                          profile_limits: RecipeLimits,
                          stack_service: StackService,
                          location_evaluator: LocationEvaluator)
@@ -830,7 +838,7 @@ InspectionService.open_epoch(context: InspectionContext,
                              request_limits: RecipeRequestLimits) -> InspectionOpenResult
 InspectionService.invalidate_epoch(expected_epoch_id: StopEpochId,
                                    reason: str) -> InvalidationResult
-InspectionService.close(reason: str) -> InvalidationResult | None
+InspectionService.close(reason: str) -> ServiceCloseResult
 
 EpochInspectionSession.context() -> InspectionContext
 EpochInspectionSession.is_active() -> bool
@@ -854,14 +862,27 @@ EpochHandleStore.resolve(handle: DomainHandle,
 EpochHandleStore.invalidate(reason: str) -> InvalidationResult
 ```
 
-`create` validates that `index.binding.payload.accepted_architecture_descriptor_ref ==
-architecture.ref.ref`, that profile_limits exactly equal the accepted limits above, and stores
-every dependency unchanged; mismatch returns the applicable ResolutionStatus and no service.
-No hidden default service, port, limit or cache is constructed. `open_epoch` requires
+`create` applies this first-match validation and returns no service on failure:
+
+| Condition | ResolutionStatus | Diagnostic code |
+|---|---|---|
+| binding accepted capability profile is not exactly `hsx.portable-debug-runtime/1` | `SCHEMA_UNSUPPORTED` | `inspection_profile_unsupported` |
+| binding accepted architecture ref != `architecture.ref.ref` | `ARTIFACT_MISMATCH` | `binding_architecture_ref_mismatch` |
+| bundle identity architecture ref or digest != `architecture.ref` | `ARTIFACT_MISMATCH` | `bundle_architecture_mismatch` |
+| binding accepted ABI ref != `abi.ref` | `ARTIFACT_MISMATCH` | `binding_abi_ref_mismatch` |
+| bundle identity ABI ref or digest != `abi` | `ARTIFACT_MISMATCH` | `bundle_abi_mismatch` |
+| profile_limits differ from the exact accepted profile limits | `SCHEMA_UNSUPPORTED` | `recipe_profile_limits_mismatch` |
+| every check passes | `RESOLVED` | none |
+
+The successful service stores every dependency unchanged. No hidden default service, port,
+limit or cache is constructed. `open_epoch` requires
 context.image to equal the binding
 payload LoadedImageRef and context.target to equal its TargetRef. Binding/image/artifact
-mismatch follows the frozen ContextBinding status categories. If there is no active session,
-it creates one handle store and session. Opening the same exact InspectionContext is
+mismatch follows the frozen ContextBinding status categories. The service retains every
+invalidated StopEpochId and its exact InspectionContext until that service is closed. Before
+opening, it rejects any ID in that stale history as STALE/`epoch_id_previously_invalidated`,
+even when no session is active; an epoch ID never rebinds. If there is no active session and
+the service is open, it creates one handle store and session. Opening the same exact InspectionContext is
 idempotent only when request_limits also match and returns the existing session. Same context
 with different limits returns UNAVAILABLE/`epoch_request_limits_conflict` and changes nothing.
 Opening a different valid StopEpoch first
@@ -871,9 +892,12 @@ does not replace the active session.
 
 `invalidate_epoch` is exact and idempotent: matching active ID invalidates session/store and
 returns INVALIDATED; an ID retained in stale history returns ALREADY_STALE; an unseen ID
-returns UNKNOWN_EPOCH. `close` applies the same invalidation to the active epoch and returns
-None only when no active/stale mutation occurs. Every method on an invalidated session returns
-STALE with its original InspectionContext and allocates no handle/read.
+returns UNKNOWN_EPOCH. `close` is terminal: the first call invalidates any active epoch,
+retains stale history and returns CLOSED plus that optional invalidation; later calls return
+ALREADY_CLOSED. A closed service rejects every `open_epoch` as
+UNAVAILABLE/`inspection_service_closed`. Direct EpochHandleStore.invalidate returns
+INVALIDATED the first time and ALREADY_STALE on every repeat. Every method on an invalidated
+session returns STALE with its original InspectionContext and allocates no handle/read.
 
 Slice 006 converts handle-free `UnwindFrame`s from StackService into `FrameRecord`s and is the
 only allocator of DomainHandle values. All returned frames, scopes and variables retain the
@@ -884,13 +908,17 @@ return `UNKNOWN_HANDLE`; invalidated or different-epoch handles return `STALE`; 
 to a current/top/first frame. DAP integer IDs are outside this interface and later map to domain
 handles without owning their lifetime.
 
-Within one epoch the store interns exact object keys: FRAME uses frame_index; SCOPE uses
+Every DomainHandle embeds the store's complete InspectionContext. Within one epoch the store
+interns exact object keys: FRAME uses frame_index; SCOPE uses
 `(frame_handle.serial, scope_kind)`; VARIABLE uses
 `(scope_handle.serial, declaration_order, symbol_id)`. Repeating the same query returns the
 same handle; a new exact key receives the next never-reused serial. A handle kind/key mismatch
 is `UNKNOWN_HANDLE`; a known serial from an invalidated epoch is `STALE`.
 `intern` rejects a key not matching its declared kind as CORRUPT without allocating a serial;
-`resolve` returns the exact interned key only for COMPLETE.
+`resolve` returns the exact interned key only for COMPLETE. A handle whose context differs
+from the active store context is never looked up by serial: if its epoch ID belongs to this
+service's stale history the session returns STALE, otherwise it returns UNKNOWN_HANDLE. Thus
+equal opaque epoch strings/serials in independent services/targets/images cannot alias.
 
 InspectionService and EpochHandleStore each serialize only lifecycle/handle-map mutations with
 one internal lock. Snapshot reads and immutable index/recipe work may execute concurrently
