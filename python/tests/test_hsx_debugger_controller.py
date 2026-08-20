@@ -891,11 +891,13 @@ def test_actor_effect_observes_reservation_already_committed_and_only_actor_muta
         sink, initial_generation=stamp, id_factory=deterministic_ids()
     )
     controller.start()
-    result = controller.submit(
-        ControllerCommand("connect-1", "open_session")
-    ).result(timeout=1)
-    assert result.status is CommandStatus.ACCEPTED
+    command_future = controller.submit(ControllerCommand("connect-1", "open_session"))
+    assert not command_future.done()
     assert pending_seen.wait(1)
+
+    result = command_future.result(timeout=1)
+    assert result.status is CommandStatus.FAILED
+    assert result.error == "SessionUnavailable"
 
     deadline = time.monotonic() + 1
     snapshot = controller.snapshot().result(timeout=1)
@@ -907,6 +909,205 @@ def test_actor_effect_observes_reservation_already_committed_and_only_actor_muta
     assert len(controller.mutation_thread_ids) == 1
     writer_id = next(iter(controller.mutation_thread_ids))
     assert sink_thread_ids[0] != writer_id
+    controller.close().result(timeout=1)
+
+
+def test_public_future_waits_for_correlated_success_and_late_duplicate_is_ignored() -> None:
+    stamp = generation()
+    effects: queue.Queue[GatewayEffect] = queue.Queue()
+    controller = ControllerActor(
+        effects.put,
+        initial_generation=stamp,
+        id_factory=deterministic_ids(),
+    )
+    controller.start()
+
+    command_future = controller.submit(ControllerCommand("request-1", "request"))
+    effect = effects.get(timeout=1)
+    assert not command_future.done()
+
+    controller.accept_gateway_notice(completion(effect))
+    result = command_future.result(timeout=1)
+    assert result.status is CommandStatus.COMPLETED
+    assert result.command_id == "request-1"
+    assert result.operation_id == effect.operation_id
+    assert controller._operation_futures == {}
+
+    controller.accept_gateway_notice(completion(effect))
+    controller.snapshot().result(timeout=1)
+    assert command_future.result(timeout=0) is result
+    assert controller._operation_futures == {}
+    controller.close().result(timeout=1)
+
+
+def test_public_future_resolves_on_exact_deadline_and_not_late_completion() -> None:
+    stamp = generation()
+    effects: queue.Queue[GatewayEffect] = queue.Queue()
+    controller = ControllerActor(
+        effects.put,
+        initial_generation=stamp,
+        id_factory=deterministic_ids(),
+    )
+    controller.start()
+
+    command_future = controller.submit(ControllerCommand("request-timeout", "request"))
+    effect = effects.get(timeout=1)
+    assert not command_future.done()
+    controller.accept_deadline(
+        DeadlineExpired("deadline-2", effect.operation_id, effect.generation)
+    )
+
+    result = command_future.result(timeout=1)
+    assert result.status is CommandStatus.FAILED
+    assert result.error == "OperationTimeout"
+    assert result.operation_id == effect.operation_id
+    assert controller._operation_futures == {}
+
+    controller.accept_gateway_notice(completion(effect))
+    controller.snapshot().result(timeout=1)
+    assert command_future.result(timeout=0) is result
+    assert controller._operation_futures == {}
+    controller.close().result(timeout=1)
+
+
+def test_public_future_waits_through_reconcile_ack_for_authoritative_result() -> None:
+    stamp = generation()
+    effects: queue.Queue[GatewayEffect] = queue.Queue()
+    controller = ControllerActor(
+        effects.put,
+        initial_generation=stamp,
+        id_factory=deterministic_ids(),
+    )
+    controller.start()
+
+    command_future = controller.submit(ControllerCommand("reconcile-actor", "reconcile"))
+    effect = effects.get(timeout=1)
+    controller.accept_gateway_notice(completion(effect))
+    controller.snapshot().result(timeout=1)
+    assert not command_future.done()
+
+    controller.accept_gateway_notice(
+        ReconcileResult(
+            generation=stamp,
+            status=ReconcileStatus.RETAINED,
+            evidence_grade=stamp.evidence_grade,
+            baseline={"target_state": "none"},
+        )
+    )
+    result = command_future.result(timeout=1)
+    assert result.status is CommandStatus.COMPLETED
+    assert result.command_id == "reconcile-actor"
+    assert result.operation_id == effect.operation_id
+    assert controller._operation_futures == {}
+    controller.close().result(timeout=1)
+
+
+def test_public_future_resolves_exact_cancel_and_immediate_rejection() -> None:
+    stamp = generation()
+    effects: queue.Queue[GatewayEffect] = queue.Queue()
+    controller = ControllerActor(
+        effects.put,
+        initial_generation=stamp,
+        id_factory=deterministic_ids(),
+    )
+    controller.start()
+
+    rejected = controller.submit(
+        ControllerCommand("stale-command", "request", expected_revision=99)
+    ).result(timeout=1)
+    assert rejected.status is CommandStatus.REJECTED
+    assert rejected.error == "RevisionMismatch"
+    assert effects.empty()
+
+    command_future = controller.submit(ControllerCommand("cancel-command", "request"))
+    effect = effects.get(timeout=1)
+    assert not command_future.done()
+    controller.accept_gateway_notice(
+        completion(effect, status=CompletionStatus.CANCELLED)
+    )
+    cancelled = command_future.result(timeout=1)
+    assert cancelled.status is CommandStatus.CANCELLED
+    assert cancelled.error == "Cancelled"
+    assert cancelled.operation_id == effect.operation_id
+    assert controller._operation_futures == {}
+    controller.close().result(timeout=1)
+
+
+def test_same_operation_retry_resolves_every_public_future_without_replacement() -> None:
+    stamp = generation()
+    effects: queue.Queue[GatewayEffect] = queue.Queue()
+    allocated_ids = iter(
+        (
+            "operation-retry",
+            "deadline-first",
+            "operation-retry",
+            "deadline-second",
+            "epoch-completion",
+        )
+    )
+    controller = ControllerActor(
+        effects.put,
+        initial_generation=stamp,
+        id_factory=lambda _kind: next(allocated_ids),
+    )
+    controller.start()
+
+    command = ControllerCommand("inspect-retry", "inspect")
+    first_future = controller.submit(command)
+    first_effect = effects.get(timeout=1)
+    second_future = controller.submit(command)
+    second_effect = effects.get(timeout=1)
+    assert first_effect is second_effect
+    assert not first_future.done()
+    assert not second_future.done()
+
+    controller.accept_gateway_notice(completion(first_effect))
+    first_result = first_future.result(timeout=1)
+    second_result = second_future.result(timeout=1)
+    assert first_result is second_result
+    assert first_result.status is CommandStatus.COMPLETED
+    assert first_result.operation_id == "operation-retry"
+    assert controller._operation_futures == {}
+    controller.close().result(timeout=1)
+
+
+def test_multiple_pending_operations_resolve_to_their_own_out_of_order_results() -> None:
+    stamp = generation()
+    effects: queue.Queue[GatewayEffect] = queue.Queue()
+    controller = ControllerActor(
+        effects.put,
+        initial_generation=stamp,
+        id_factory=deterministic_ids(),
+    )
+    controller.start()
+
+    futures = {
+        f"request-{index}": controller.submit(
+            ControllerCommand(f"request-{index}", "request")
+        )
+        for index in range(16)
+    }
+    dispatched = [effects.get(timeout=1) for _ in futures]
+    assert all(not future.done() for future in futures.values())
+
+    for effect_value in reversed(dispatched):
+        controller.accept_gateway_notice(completion(effect_value))
+
+    results = {
+        command_id: future.result(timeout=1)
+        for command_id, future in futures.items()
+    }
+    assert {
+        command_id: (result.command_id, result.status)
+        for command_id, result in results.items()
+    } == {
+        command_id: (command_id, CommandStatus.COMPLETED)
+        for command_id in futures
+    }
+    assert {result.operation_id for result in results.values()} == {
+        effect_value.operation_id for effect_value in dispatched
+    }
+    assert controller._operation_futures == {}
     controller.close().result(timeout=1)
 
 
@@ -949,7 +1150,14 @@ def test_subscriber_exception_backpressure_and_unsubscribe_cannot_block_actor() 
 
 def test_concurrent_submitters_converge_through_one_actor_writer() -> None:
     stamp = generation()
+
+    controller: ControllerActor
+
+    def complete(effect_value: GatewayEffect) -> None:
+        controller.accept_gateway_notice(completion(effect_value))
+
     controller = ControllerActor(
+        complete,
         initial_generation=stamp,
         inbox_capacity=32,
         id_factory=deterministic_ids(),
@@ -975,8 +1183,9 @@ def test_concurrent_submitters_converge_through_one_actor_writer() -> None:
         worker.join(1)
 
     assert len(results) == 8
-    assert all(result.status is CommandStatus.ACCEPTED for result in results)
-    assert len(controller.snapshot().result(timeout=1).pending_operation_ids) == 8
+    assert all(result.status is CommandStatus.COMPLETED for result in results)
+    assert len(controller.snapshot().result(timeout=1).pending_operation_ids) == 0
+    assert controller._operation_futures == {}
     assert len(controller.mutation_thread_ids) == 1
     controller.close().result(timeout=1)
 
@@ -1079,8 +1288,10 @@ def test_bounded_inbox_reports_saturation_without_secondary_state_writer() -> No
             HealthNotice(stamp, RpcHealth.DEGRADED, EventHealth.HEALTHY, "overflow")
         )
     release_id.set()
-    assert command_future.result(timeout=1).status is CommandStatus.ACCEPTED
+    assert not command_future.done()
     controller.close().result(timeout=1)
+    assert command_future.result(timeout=1).status is CommandStatus.CANCELLED
+    assert controller._operation_futures == {}
     assert len(controller.mutation_thread_ids) == 1
 
 
@@ -1100,8 +1311,9 @@ def test_close_is_idempotent_and_bounded_when_effect_sink_is_blocked() -> None:
         id_factory=deterministic_ids(),
     )
     controller.start()
-    controller.submit(ControllerCommand("c1", "request")).result(timeout=1)
+    command_future = controller.submit(ControllerCommand("c1", "request"))
     assert sink_entered.wait(1)
+    assert not command_future.done()
 
     before = time.monotonic()
     first = controller.close()
@@ -1110,6 +1322,8 @@ def test_close_is_idempotent_and_bounded_when_effect_sink_is_blocked() -> None:
 
     assert first is second
     assert result.status is CommandStatus.COMPLETED
+    assert command_future.result(timeout=1).status is CommandStatus.CANCELLED
+    assert controller._operation_futures == {}
     assert time.monotonic() - before < 0.5
     assert controller.wait_closed(1)
 
@@ -1142,8 +1356,10 @@ def test_effect_sink_exception_returns_exact_typed_failure_to_actor() -> None:
         time.sleep(0.005)
         snapshot = controller.snapshot().result(timeout=1)
 
-    assert result.status is CommandStatus.ACCEPTED
+    assert result.status is CommandStatus.FAILED
+    assert result.error == "EffectSinkFailure"
     assert snapshot.pending_operation_ids == ()
+    assert controller._operation_futures == {}
     observed = []
     event_deadline = time.monotonic() + 1
     while (

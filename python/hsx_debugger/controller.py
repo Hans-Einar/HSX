@@ -221,6 +221,11 @@ class ControllerActor:
         self._accepting = False
         self._closed = False
         self._close_future: Future[CommandResult] | None = None
+        # Public command Futures are terminal-result channels.  ACCEPTED is an internal
+        # reducer acknowledgement; the actor retains exact operation correlation until a
+        # later reducer input produces COMPLETED, FAILED, or CANCELLED.  A list preserves
+        # same-operation idempotent retry callers without replacing/leaking the first Future.
+        self._operation_futures: dict[str, list[Future[CommandResult]]] = {}
         self._effect_stop = threading.Event()
         self._mutation_thread_ids: set[int] = set()
         self._dropped_internal_notices = 0
@@ -415,6 +420,34 @@ class ControllerActor:
             self._model = reduction.model
         self._publish(reduction.events)
 
+    def _track_command_future(
+        self, future: Future[CommandResult], reduction: Reduction
+    ) -> None:
+        """Bind one public submission to its operation or finish an immediate rejection."""
+
+        if len(reduction.results) != 1:
+            raise RuntimeError("command reduction must produce exactly one result")
+        result = reduction.results[0]
+        if result.status is CommandStatus.ACCEPTED:
+            operation_id = result.operation_id
+            if operation_id is None:
+                raise RuntimeError("accepted command result must carry operation_id")
+            self._operation_futures.setdefault(operation_id, []).append(future)
+            return
+        if not future.done():
+            future.set_result(result)
+
+    def _resolve_terminal_results(self, reduction: Reduction) -> None:
+        """Resolve and retire exact operation-correlated public Futures once."""
+
+        for result in reduction.results:
+            if result.status is CommandStatus.ACCEPTED or result.operation_id is None:
+                continue
+            futures = self._operation_futures.pop(result.operation_id, ())
+            for future in futures:
+                if not future.done():
+                    future.set_result(result)
+
     def _queue_effect(self, effect: GatewayEffect) -> None:
         try:
             self._effects.put_nowait(effect)
@@ -428,7 +461,9 @@ class ControllerActor:
                     "EffectQueueFull", "effect queue is full", True
                 ),
             )
-            self._apply(reduce_notice(self._model, completion))
+            reduction = reduce_notice(self._model, completion)
+            self._apply(reduction)
+            self._resolve_terminal_results(reduction)
 
     def _run_actor(self) -> None:
         while True:
@@ -446,8 +481,7 @@ class ControllerActor:
                         deadline_id,
                     )
                     self._apply(reduction)
-                    if reduction.results and not message.future.done():
-                        message.future.set_result(reduction.results[0])
+                    self._track_command_future(message.future, reduction)
                     for effect in reduction.effects:
                         self._queue_effect(effect)
                 except Exception as exc:
@@ -459,16 +493,21 @@ class ControllerActor:
                         self._model, message.notice, epoch_id=self._new_id("epoch")
                     )
                     self._apply(reduction)
+                    self._resolve_terminal_results(reduction)
                 except Exception as exc:
                     self._publish_input_error("gateway_notice", exc)
             elif isinstance(message, _DeadlineMessage):
                 try:
-                    self._apply(reduce_deadline(self._model, message.expired))
+                    reduction = reduce_deadline(self._model, message.expired)
+                    self._apply(reduction)
+                    self._resolve_terminal_results(reduction)
                 except Exception as exc:
                     self._publish_input_error("deadline", exc)
             elif isinstance(message, _EffectFailureMessage):
                 try:
-                    self._apply(reduce_notice(self._model, message.completion))
+                    reduction = reduce_notice(self._model, message.completion)
+                    self._apply(reduction)
+                    self._resolve_terminal_results(reduction)
                 except Exception as exc:
                     self._publish_input_error("effect_failure", exc)
             elif isinstance(message, _SnapshotMessage):
@@ -477,6 +516,7 @@ class ControllerActor:
             elif isinstance(message, _CloseMessage):
                 reduction = close_model(self._model)
                 self._apply(reduction)
+                self._resolve_terminal_results(reduction)
                 self._effect_stop.set()
                 with self._subscribers_lock:
                     subscribers = tuple(self._subscribers)
