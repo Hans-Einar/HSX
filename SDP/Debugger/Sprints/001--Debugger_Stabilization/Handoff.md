@@ -1,10 +1,10 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf002_parent_verified_rf003_reverification_active`
+Status: `parent_verifications_pass_master_signoffs_pending`
 
 ## Current objective
 
-Run fresh formal RF-003 parent reverification, then Master parent sign-offs.
+Perform Master exact-head parent sign-offs for RF-002 and RF-003.
 
 ## Authority
 
@@ -139,7 +139,7 @@ Run fresh formal RF-003 parent reverification, then Master parent sign-offs.
 
 ## Exact next step
 
-Run `DBG-VER-003-001-002`.
+Reconcile parent sign-offs against `DBG-VER-002-001-001` and `DBG-VER-003-001-002`.
 
 ## Traceability state
 
@@ -201,8 +201,8 @@ Run `DBG-VER-003-001-002`.
 - Dependent integration review `DBG-RVW-001-004-010`: PASS at `1e47953…`
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
-- Parent final reviews: PASS; RF-002 parent verification PASS
-- Active gate: fresh RF-003 parent reverification
+- Parent final reviews and both parent verifications: PASS
+- Active gate: Master parent exact-head sign-offs
 
 ## Agents and worktree
 

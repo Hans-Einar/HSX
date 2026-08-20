@@ -297,7 +297,7 @@ relations:
       - DBG-SL-001-004-001
       - DBG-SL-001-004-002
       - DBG-SL-001-004-003
-    status: RF002_parent_verified_RF003_reverification_active
+    status: parent_verifications_pass_pending_master_signoffs
   - from: DBG-RF-001
     type: implemented_by
     to:
