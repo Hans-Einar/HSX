@@ -1374,3 +1374,248 @@ def test_effect_sink_exception_returns_exact_typed_failure_to_actor() -> None:
     assert len(controller.mutation_thread_ids) == 1
     subscription.close()
     controller.close().result(timeout=1)
+
+
+def test_internal_effect_failure_bypasses_saturated_one_slot_public_inbox() -> None:
+    stamp = generation()
+    sink_entered = threading.Event()
+    release_failure = threading.Event()
+    second_operation_entered = threading.Event()
+    release_second_operation = threading.Event()
+    id_lock = threading.Lock()
+    id_counter = itertools.count(1)
+    operation_count = 0
+    sink_count = 0
+
+    def blocking_ids(kind: str) -> str:
+        nonlocal operation_count
+        with id_lock:
+            value = next(id_counter)
+            if kind == "operation":
+                operation_count += 1
+                current_operation = operation_count
+            else:
+                current_operation = 0
+        if current_operation == 2:
+            second_operation_entered.set()
+            release_second_operation.wait(1)
+        return f"{kind}-{value}"
+
+    def fail_first_effect(_effect_value: GatewayEffect) -> None:
+        nonlocal sink_count
+        sink_count += 1
+        if sink_count == 1:
+            sink_entered.set()
+            release_failure.wait(1)
+            raise RuntimeError("deterministic first dispatch failure")
+
+    controller = ControllerActor(
+        fail_first_effect,
+        initial_generation=stamp,
+        inbox_capacity=1,
+        id_factory=blocking_ids,
+    )
+    controller.start()
+    first = controller.submit(ControllerCommand("first", "request"))
+    assert sink_entered.wait(1)
+
+    second = controller.submit(ControllerCommand("second", "request"))
+    assert second_operation_entered.wait(1)
+    controller.accept_gateway_notice(
+        HealthNotice(stamp, RpcHealth.HEALTHY, EventHealth.HEALTHY, "fills public slot")
+    )
+    with pytest.raises(ControllerInboxFullError):
+        controller.accept_gateway_notice(
+            HealthNotice(stamp, RpcHealth.DEGRADED, EventHealth.HEALTHY, "overflow")
+        )
+
+    release_failure.set()
+    assert controller._internal_failures_ready.wait(1)
+    assert not first.done()
+    release_second_operation.set()
+
+    first_result = first.result(timeout=1)
+    assert first_result.status is CommandStatus.FAILED
+    assert first_result.error == "EffectSinkFailure"
+    assert first_result.operation_id not in controller._operation_futures
+    assert controller.dropped_internal_notices == 0
+    assert controller._internal_failure_peak == 1
+
+    controller.close().result(timeout=1)
+    assert second.result(timeout=1).status is CommandStatus.CANCELLED
+    assert controller._operation_futures == {}
+    assert len(controller.mutation_thread_ids) == 1
+
+
+def test_multiple_accumulated_effect_failures_reduce_fifo_without_correlation_leaks() -> None:
+    stamp = generation()
+    release_failures = threading.Event()
+    first_sink_entered = threading.Event()
+    blocker_entered = threading.Event()
+    release_blocker = threading.Event()
+    operation_lock = threading.Lock()
+    operation_count = 0
+    id_counter = itertools.count(1)
+    command_count = 8
+
+    def blocking_ids(kind: str) -> str:
+        nonlocal operation_count
+        with operation_lock:
+            value = next(id_counter)
+            if kind == "operation":
+                operation_count += 1
+                current_operation = operation_count
+            else:
+                current_operation = 0
+        if current_operation == command_count + 1:
+            blocker_entered.set()
+            release_blocker.wait(1)
+        return f"{kind}-{value}"
+
+    def failing_sink(_effect_value: GatewayEffect) -> None:
+        first_sink_entered.set()
+        release_failures.wait(1)
+        raise RuntimeError("batch transport failure")
+
+    controller = ControllerActor(
+        failing_sink,
+        initial_generation=stamp,
+        inbox_capacity=command_count + 1,
+        effect_capacity=command_count + 1,
+        id_factory=blocking_ids,
+    )
+    controller.start()
+    futures = [
+        controller.submit(ControllerCommand(f"batch-{index}", "request"))
+        for index in range(command_count)
+    ]
+    assert first_sink_entered.wait(1)
+
+    deadline = time.monotonic() + 1
+    while controller._effects.qsize() < command_count - 1 and time.monotonic() < deadline:
+        time.sleep(0.001)
+    assert controller._effects.qsize() == command_count - 1
+
+    blocker = controller.submit(ControllerCommand("blocker", "request"))
+    assert blocker_entered.wait(1)
+    release_failures.set()
+    deadline = time.monotonic() + 1
+    while controller._internal_failure_peak < command_count and time.monotonic() < deadline:
+        time.sleep(0.001)
+    assert controller._internal_failure_peak == command_count
+    assert controller._internal_failure_peak <= controller._internal_failure_limit
+    release_blocker.set()
+
+    results = [future.result(timeout=1) for future in futures]
+    assert [result.command_id for result in results] == [
+        f"batch-{index}" for index in range(command_count)
+    ]
+    assert all(result.status is CommandStatus.FAILED for result in results)
+    assert all(result.error == "EffectSinkFailure" for result in results)
+    assert len({result.operation_id for result in results}) == command_count
+    assert controller.dropped_internal_notices == 0
+
+    assert blocker.result(timeout=1).status is CommandStatus.FAILED
+    assert controller._operation_futures == {}
+    controller.close().result(timeout=1)
+
+
+def test_duplicate_same_operation_effect_failures_resolve_all_callers_once() -> None:
+    stamp = generation()
+    release_sink = threading.Event()
+    first_sink_entered = threading.Event()
+    sink_operations: list[str] = []
+    allocated_ids = iter(
+        (
+            "operation-duplicate",
+            "deadline-first",
+            "operation-duplicate",
+            "deadline-second",
+        )
+    )
+
+    def failing_sink(effect_value: GatewayEffect) -> None:
+        sink_operations.append(effect_value.operation_id)
+        first_sink_entered.set()
+        release_sink.wait(1)
+        raise RuntimeError("duplicate dispatch failure")
+
+    controller = ControllerActor(
+        failing_sink,
+        initial_generation=stamp,
+        id_factory=lambda _kind: next(allocated_ids),
+    )
+    events: queue.Queue[object] = queue.Queue()
+    subscription = controller.subscribe(events.put)
+    controller.start()
+    command = ControllerCommand("duplicate", "inspect")
+    first = controller.submit(command)
+    assert first_sink_entered.wait(1)
+    second = controller.submit(command)
+    deadline = time.monotonic() + 1
+    while controller._effects.empty() and time.monotonic() < deadline:
+        time.sleep(0.001)
+    assert not controller._effects.empty()
+    release_sink.set()
+
+    first_result = first.result(timeout=1)
+    second_result = second.result(timeout=1)
+    assert first_result is second_result
+    assert first_result.status is CommandStatus.FAILED
+    assert first_result.operation_id == "operation-duplicate"
+    assert sink_operations == ["operation-duplicate", "operation-duplicate"]
+    controller.snapshot().result(timeout=1)
+    assert controller._operation_futures == {}
+    assert controller.dropped_internal_notices == 0
+
+    observed = []
+    event_deadline = time.monotonic() + 1
+    while time.monotonic() < event_deadline:
+        try:
+            observed.append(events.get(timeout=0.01))
+        except queue.Empty:
+            if any(
+                getattr(item, "kind", None) == "operation_completed"
+                for item in observed
+            ):
+                break
+    assert sum(
+        getattr(item, "kind", None) == "operation_completed" for item in observed
+    ) == 1
+    subscription.close()
+    controller.close().result(timeout=1)
+
+
+def test_close_seals_internal_failure_lane_and_cancels_late_sink_failure() -> None:
+    stamp = generation()
+    sink_entered = threading.Event()
+    release_sink = threading.Event()
+
+    def late_failing_sink(_effect_value: GatewayEffect) -> None:
+        sink_entered.set()
+        release_sink.wait(2)
+        raise RuntimeError("failure after close linearization")
+
+    controller = ControllerActor(
+        late_failing_sink,
+        initial_generation=stamp,
+        close_timeout=0.05,
+        id_factory=deterministic_ids(),
+    )
+    controller.start()
+    command_future = controller.submit(ControllerCommand("closing", "request"))
+    assert sink_entered.wait(1)
+
+    close_result = controller.close().result(timeout=1)
+    command_result = command_future.result(timeout=1)
+    assert close_result.status is CommandStatus.COMPLETED
+    assert command_result.status is CommandStatus.CANCELLED
+    assert controller._operation_futures == {}
+
+    release_sink.set()
+    deadline = time.monotonic() + 1
+    while controller.effect_thread_alive and time.monotonic() < deadline:
+        time.sleep(0.005)
+    assert not controller.effect_thread_alive
+    assert controller.dropped_internal_notices == 0
+    assert controller._take_internal_failures() == ()

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import deque
 from concurrent.futures import Future
 from dataclasses import dataclass
 import queue
@@ -64,8 +65,8 @@ class _CloseMessage:
 
 
 @dataclass(frozen=True, slots=True)
-class _EffectFailureMessage:
-    completion: GatewayCompletion
+class _InternalFailureWakeMessage:
+    pass
 
 
 _ActorMessage = (
@@ -74,7 +75,7 @@ _ActorMessage = (
     | _DeadlineMessage
     | _SnapshotMessage
     | _CloseMessage
-    | _EffectFailureMessage
+    | _InternalFailureWakeMessage
 )
 
 
@@ -206,11 +207,25 @@ class ControllerActor:
         )
         self._effect_sink = effect_sink or (lambda effect: None)
         self._id_factory = id_factory or (lambda kind: f"{kind}-{uuid.uuid4().hex}")
-        # The physical extra slot is reserved for close.  The semaphore is the public bounded
-        # inbox budget, so shutdown cannot be starved by ordinary messages.
-        self._inbox: queue.Queue[_ActorMessage] = queue.Queue(maxsize=inbox_capacity + 1)
+        # Two physical slots are reserved for close and the coalesced internal-failure wake.
+        # The semaphore remains the public bounded inbox budget, so neither terminal delivery
+        # nor shutdown can be starved by ordinary messages.
+        self._inbox: queue.Queue[_ActorMessage] = queue.Queue(maxsize=inbox_capacity + 2)
         self._inbox_slots = threading.BoundedSemaphore(inbox_capacity)
         self._effects: queue.Queue[GatewayEffect] = queue.Queue(maxsize=effect_capacity)
+        # Effect-sink failures are terminal reducer inputs, not optional public notices.  They
+        # therefore use a private FIFO lane which cannot consume the bounded public inbox.
+        # The lane has a structural bound of effect_capacity + 1: at most effect_capacity
+        # previously queued effects plus the one effect emitted by the actor's current turn
+        # can fail before the actor drains this lane at the next turn boundary.  The deque has
+        # no maxlen so an invariant violation can never evict a terminal result silently.
+        self._internal_failures: deque[GatewayCompletion] = deque()
+        self._internal_failures_lock = threading.Lock()
+        self._internal_failures_ready = threading.Event()
+        self._internal_failures_open = True
+        self._internal_failure_wake_outstanding = False
+        self._internal_failure_limit = effect_capacity + 1
+        self._internal_failure_peak = 0
         self._subscriber_capacity = subscriber_capacity
         self._subscriber_limit = subscriber_limit
         self._close_timeout = float(close_timeout)
@@ -465,9 +480,73 @@ class ControllerActor:
             self._apply(reduction)
             self._resolve_terminal_results(reduction)
 
+    def _offer_internal_failure(self, completion: GatewayCompletion) -> bool:
+        """Offer terminal effect failure without blocking or using public inbox capacity.
+
+        ``False`` means close already sealed the lane and owns terminal cancellation for every
+        operation still live at that actor boundary.  While the lane is open every accepted
+        failure is retained until the actor reduces it.
+        """
+
+        with self._internal_failures_lock:
+            if not self._internal_failures_open:
+                return False
+            if len(self._internal_failures) >= self._internal_failure_limit:
+                raise RuntimeError("internal effect-failure lane bound exceeded")
+            self._internal_failures.append(completion)
+            self._internal_failure_peak = max(
+                self._internal_failure_peak, len(self._internal_failures)
+            )
+            self._internal_failures_ready.set()
+            if not self._internal_failure_wake_outstanding:
+                self._internal_failure_wake_outstanding = True
+                # Public messages are semaphore-bounded and close/wake each have one reserved
+                # physical slot, so this nonblocking wake cannot contend with public capacity.
+                self._inbox.put_nowait(_InternalFailureWakeMessage())
+            return True
+
+    def _take_internal_failures(
+        self, *, seal: bool = False, consume_wake: bool = False
+    ) -> tuple[GatewayCompletion, ...]:
+        """Atomically take the FIFO lane and optionally close its lifetime boundary."""
+
+        with self._internal_failures_lock:
+            if seal:
+                self._internal_failures_open = False
+            if seal or consume_wake:
+                self._internal_failure_wake_outstanding = False
+            failures = tuple(self._internal_failures)
+            self._internal_failures.clear()
+            self._internal_failures_ready.clear()
+            return failures
+
+    def _reduce_internal_failures(
+        self, failures: tuple[GatewayCompletion, ...]
+    ) -> None:
+        for completion in failures:
+            try:
+                reduction = reduce_notice(self._model, completion)
+                self._apply(reduction)
+                self._resolve_terminal_results(reduction)
+            except Exception as exc:
+                self._publish_input_error("effect_failure", exc)
+
+    def _drain_internal_failures(self) -> None:
+        if self._internal_failures_ready.is_set():
+            self._reduce_internal_failures(self._take_internal_failures())
+
     def _run_actor(self) -> None:
         while True:
+            # Internal terminal failures take priority at actor turn boundaries.  The single
+            # coalesced wake makes an empty public inbox immediately runnable; under saturation
+            # this pre-turn drain happens before another public message is reduced.
+            self._drain_internal_failures()
             message = self._inbox.get()
+            if isinstance(message, _InternalFailureWakeMessage):
+                self._reduce_internal_failures(
+                    self._take_internal_failures(consume_wake=True)
+                )
+                continue
             if not isinstance(message, _CloseMessage):
                 self._inbox_slots.release()
             if isinstance(message, _CommandMessage):
@@ -503,21 +582,21 @@ class ControllerActor:
                     self._resolve_terminal_results(reduction)
                 except Exception as exc:
                     self._publish_input_error("deadline", exc)
-            elif isinstance(message, _EffectFailureMessage):
-                try:
-                    reduction = reduce_notice(self._model, message.completion)
-                    self._apply(reduction)
-                    self._resolve_terminal_results(reduction)
-                except Exception as exc:
-                    self._publish_input_error("effect_failure", exc)
             elif isinstance(message, _SnapshotMessage):
                 if not message.future.done():
                     message.future.set_result(self._model.snapshot())
             elif isinstance(message, _CloseMessage):
+                # Seal against the effect worker first.  Failures that linearized before the
+                # seal are reduced in FIFO order; failures whose sink returns afterwards are
+                # superseded by close_model's exact terminal cancellation and cannot leak a
+                # correlation into an actor that has exited.
+                self._effect_stop.set()
+                self._reduce_internal_failures(
+                    self._take_internal_failures(seal=True)
+                )
                 reduction = close_model(self._model)
                 self._apply(reduction)
                 self._resolve_terminal_results(reduction)
-                self._effect_stop.set()
                 with self._subscribers_lock:
                     subscribers = tuple(self._subscribers)
                     self._subscribers.clear()
@@ -564,12 +643,7 @@ class ControllerActor:
                         cause=str(exc) or type(exc).__name__,
                     ),
                 )
-                with self._lifecycle_lock:
-                    enqueued = self._accepting and self._enqueue_user(
-                        _EffectFailureMessage(completion)
-                    )
-                if not enqueued:
-                    self._dropped_internal_notices += 1
+                self._offer_internal_failure(completion)
 
 
 __all__ = [
