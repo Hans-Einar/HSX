@@ -139,7 +139,7 @@ Run fresh final parent RF-002/RF-003 reviews against the complete signed chain.
 
 ## Exact next step
 
-Run `DBG-RVW-002-001-005` and `DBG-RVW-003-001-004`.
+Run `DBG-RVW-002-001-005` and `DBG-RVW-003-001-005`.
 
 ## Traceability state
 
@@ -192,7 +192,7 @@ Run `DBG-RVW-002-001-005` and `DBG-RVW-003-001-004`.
 - Slice sign-offs: PASS at `232e20a6…` and `cf4d8a6…`
 - Parent review attempts `DBG-RVW-002-001-001` / `DBG-RVW-003-001-001`: REWORK
 - Review `DBG-RVW-001-004-008`: PASS at `a064020…`
-- Corrected RF-002 sign-off: PASS at `a064020…`; RF-003 remains PASS at `cf4d8a6…`
+- Corrected RF-002 sign-off: PASS at `a064020…`; corrected RF-003 PASS at `1e47953…`
 - Integration review `DBG-RVW-001-004-003`: PASS at `860a98a…`
 - Verification `DBG-VER-001-004-003`: PASS at `860a98a…`
 - Parent review attempts `DBG-RVW-002-001-002` / `DBG-RVW-003-001-002`: REWORK

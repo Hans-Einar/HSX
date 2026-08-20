@@ -19,7 +19,7 @@ issues:
     master_signoff: pass
   DBG-DA-001:
     issue: 38
-    status: debugger_v1_design_frozen_foundation_resume_ready
+    status: debugger_v1_design_frozen_complete_signed_chain_parent_final_reviews_active
     decision_package_comment: 5346421143
     architecture_acceptance_comment: 5348190806
     steering_start_comment: 5345600066
@@ -142,6 +142,8 @@ issues:
     rf003_parent_review_attempt_2_status: rework
     rf003_parent_review_attempt_3: DBG-RVW-003-001-003
     rf003_parent_review_attempt_3_status: rework_trace_only
+    rf003_parent_review_attempt_4: DBG-RVW-003-001-004
+    rf003_parent_review_attempt_4_status: rework_trace_only
     rf003_implicit_reopen_review: DBG-RVW-001-004-009
     rf003_implicit_reopen_review_status: rework
     rf003_corrected_review: DBG-RVW-001-004-011
@@ -156,7 +158,7 @@ issues:
     dependent_integration_verification: DBG-VER-001-004-006
     dependent_integration_verification_status: pass
     dependent_integration_signed_head: 1e479536ce5e746e1b06a53b1039b1af84adaed6
-    portable_contract_current_gate: fresh_parent_final_reviews_DBG-RVW-002-001-005_and_DBG-RVW-003-001-004
+    portable_contract_current_gate: fresh_parent_final_reviews_DBG-RVW-002-001-005_and_DBG-RVW-003-001-005
   DBG-RF-002:
     issue: 39
     status: complete_signed_chain_parent_final_review_active

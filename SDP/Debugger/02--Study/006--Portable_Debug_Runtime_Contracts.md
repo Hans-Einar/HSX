@@ -1,11 +1,16 @@
 # DBG-ST-006 — Portable Debug Runtime Contract Study
 
-- Status: REVIEW 005 REWORK CORRECTED — PENDING FRESH REVIEW 006
+- Status: COMPLETE / REVIEW 006 PASS / STEERING ACCEPTED DEPENDENCY
 - Owning track: Debugger
 - Required coordinator: HSX track through `HSX-ST-001`
 - Proposed by: `DBG-DA-001`
 - Evidence inputs: `DBG-ST-002`, `DBG-ST-003`, `DBG-ST-005`
 - Owning issue/gate: #38, Steering activation comment `5348190806`
+
+Current authoritative state: `HSX-R-001..036`, `HSX-A-001..005`, and `HSX-D-001..005`
+are accepted/frozen target contracts; `DBG-D-001..010` is frozen, and Steering authorized
+only the completed RF-002/RF-003/integration first wave. Pre-acceptance gate prose below is
+retained as historical rationale and does not override this state.
 
 ## Question and scope
 
@@ -68,7 +73,7 @@ The Study must produce or link stable HSX requirement/design IDs for every item 
 
 ## Master-synthesized contract outputs
 
-The coordinated Studies produced stable proposed HSX IDs:
+The coordinated Studies produced the now accepted/frozen HSX IDs:
 
 - requirements `HSX-R-001..HSX-R-036`;
 - architecture `HSX-A-001..HSX-A-005`;
@@ -76,7 +81,7 @@ The coordinated Studies produced stable proposed HSX IDs:
 - conformance fixture matrix in
   `SDP/HSX/06--Design/001--Portable_Debug_Runtime_Contracts.md`.
 
-All remain target/proposed pending independent review and Steering acceptance.
+All passed `HSX-RVW-001-001-006`, formal verification, Master sign-off and Steering freeze.
 
 ## Dependency closure matrix
 
@@ -113,8 +118,8 @@ upper-half preservation is a named legacy nonconformance against the zero-extend
 profile, and the `HSX-D-002` appendix fixes literal digest domains, field encodings, serializer
 bytes and cross-runtime golden vectors.
 
-These closures are synthesized into existing proposed IDs; no additional numeric R/A/D IDs
-were needed. They remain unaccepted until fresh review and Steering decision.
+These closures are synthesized into existing frozen IDs; no additional numeric R/A/D IDs
+were needed.
 
 ## Proposed compatibility boundary
 
@@ -128,9 +133,9 @@ were needed. They remain unaccepted until fresh review and Steering decision.
   Debugger architecture. Runtime/Executive behavior is selected only from negotiated profiles,
   never version guessing.
 
-## Exact gate effect
+## Historical exact gate effect — satisfied
 
-Until `DBG-ST-006` is complete and its required stable HSX contracts are accepted:
+Before `DBG-ST-006` completion and HSX acceptance, the following gate applied:
 
 - `DBG-D-002..DBG-D-006` remain proposed and may not be frozen as implementation authority;
 - all product implementation in `DBG-RF-003`, `DBG-RF-004`, `DBG-RF-005`, and `DBG-RF-006`
@@ -143,9 +148,9 @@ Until `DBG-ST-006` is complete and its required stable HSX contracts are accepte
 Documentation, test-oracle design, and interface comparison remain allowed within explicit
 Steering scope; this Study never grants product implementation authority by itself.
 
-The evidence and contract mapping are now complete, but the gate stays closed until review-005
-rework is corrected, the exact package passes fresh `HSX-RVW-001-001-006`, Steering accepts
-the HSX contracts, and a later decision freezes the affected `DBG-D-*` contracts.
+That gate was satisfied by review 006 PASS, verification/sign-off, Steering HSX freeze and the
+Debugger design freeze. Only the explicitly authorized first wave executed; RF-004..009 remain
+blocked by the later-wave Steering boundary.
 
 ## Affected proposed contracts and requirements
 
@@ -185,7 +190,6 @@ return reviewed mappings and contracts to #47/#38; it still cannot freeze
 
 ## Conclusion
 
-The dependency questions now map to a complete stable proposed HSX contract set and
-conformance plan. `DBG-ST-006` is complete for independent review. Completion is not
-acceptance: `DBG-D-001..DBG-D-010`, `DBG-RF-002..DBG-RF-009`, product code and AVR work remain
-blocked pending exact-head review and durable Steering decisions in #47/#38.
+The dependency questions map to the complete frozen HSX contract set and conformance plan.
+`DBG-ST-006` is complete and accepted as a dependency. The first structural wave is separately
+authorized and signed; RF-004..009 and AVR work remain blocked pending later Steering decisions.

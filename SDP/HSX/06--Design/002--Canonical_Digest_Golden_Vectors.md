@@ -3,7 +3,7 @@
 - Status: ACCEPTED / FROZEN `HSX-D-002` TARGET APPENDIX
 - Parent contract: `HSX-D-002`
 - Evidence: `HSX-ST-008`, `HSX-RVW-001-001-005`
-- State: target; not implemented or frozen
+- State: accepted/frozen target contract; runtime implementation not claimed
 - Product/AVR authority: **NONE**
 
 This appendix makes the structured identity bytes in `HSX-D-002` interoperable. It allocates
