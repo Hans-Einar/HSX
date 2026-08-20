@@ -126,7 +126,8 @@ Detailed proposals are defined in
   resources, lifecycle/execution, frontends/DAP, VS Code/package, compatibility/migration,
   and artifact verification contracts.
 
-Every item is `proposed_pending_steering` and `state: target`.
+Every item is accepted/frozen as the Debugger v1 target baseline; implementation authority is
+still limited to explicit Steering-authorized Refactor/Slice contracts.
 
 ## Module/API and diagram outputs
 
@@ -283,13 +284,14 @@ component spans transport framing, debugger lifecycle truth, resource reconcilia
 symbol interpretation, and IDE presentation. Controller coordination does not absorb domain
 algorithms or transport mechanics.
 
-## Review and stop gate
+## Historical review and stop gate — satisfied
 
 Fresh independent review `DBG-RVW-001-002-003` reviewed the exact complete proposal at
 `89d95de2d944179219a93895f1ab956f2786a232` and returned PASS with no
-Blocking/High/Medium findings. The proposal is reviewed, not accepted.
+Blocking/High/Medium findings. At that review head the proposal was reviewed, not yet accepted;
+Steering subsequently accepted the architecture direction and froze `DBG-D-001..010`.
 
-Master will now:
+The historical next actions, subsequently completed, were:
 
 - use the reviewed CurrentIndex, Relations, Ledger, ScrumIterations, and Handoff state;
 - post a short decision package with review result, material tradeoffs, unresolved questions,
@@ -297,5 +299,5 @@ Master will now:
 - set status `awaiting_steering_acceptance`;
 - stop.
 
-No structural product worker, accepted `DBG-D-*`, or implementation authorization follows
-from this reviewed proposal before the required Steering decisions.
+No structural product worker followed from that review alone. Later Steering decisions froze
+the design and authorized only RF-002, RF-003 and the early integration Slice.

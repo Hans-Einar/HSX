@@ -213,7 +213,7 @@ implementation remains blocked.
 
 ## DBG-IT-001-003 — Portable Debug Runtime Contracts
 
-Status: REMOTE PUBLICATION VERIFIED — AWAITING STEERING
+Status: COMPLETE / REMOTE VERIFIED / STEERING ACCEPTED AND FROZEN
 
 ### Goal
 

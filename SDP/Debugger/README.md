@@ -37,5 +37,5 @@ Read in this order:
    documents, and `DBG-ST-006`
 
 `DBG-ST-006` is complete. Active work is `DBG-IT-001-004` with the frozen
-`dbg.controller-gateway/1` interface and Slices `DBG-SL-001-004-001..003`. Existing Executive
+`dbg.controller-gateway/1.1` interface and Slices `DBG-SL-001-004-001..003`. Existing Executive
 behavior remains `hsx.python-debug-legacy/1`; RF-004..009 remain blocked.
