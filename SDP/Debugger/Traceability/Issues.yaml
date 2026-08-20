@@ -42,6 +42,8 @@ issues:
     hsx_coordinator_issue: 47
     hsx_studies: HSX-ST-001..HSX-ST-006
     cross_track_review: HSX-RVW-001-001-001
+    portable_contracts: HSX-R-001..HSX-R-036,HSX-A-001..HSX-A-005,HSX-D-001..HSX-D-005
+    portable_contract_status: proposed_pending_review
   DBG-RF-002:
     issue: 39
     status: blocked_by_DBG-DA-001

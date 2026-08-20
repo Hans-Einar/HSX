@@ -88,17 +88,19 @@ or AVR work may be dispatched.
   the five bounded HSX domain Studies.
 - Fresh bounded workers completed `HSX-ST-001..HSX-ST-006` with disjoint document ownership,
   complete provenance/technical evidence and no product/AVR/shared-traceability writes.
+- Master synthesized stable proposed `HSX-R-001..036`, `HSX-A-001..005`, and
+  `HSX-D-001..005`, plus the complete `DBG-ST-006` mapping and fixture/profile plan.
 
 ## Not done
 
 - `DBG-D-001..DBG-D-010` remain proposed and have no implementation authority.
-- `DBG-ST-006` mapping and the Master-synthesized HSX contracts are not yet complete or reviewed.
+- The portable contract package has not yet passed `HSX-RVW-001-001-001`.
 - Required stable HSX contract proposals and conformance fixtures do not yet exist.
 
 ## Exact next step
 
-Synthesize the stable portable HSX contract proposal and `DBG-ST-006` mapping, obtain
-exact-head independent review, post decision packages to #47 and #38, then
+Commit the stable portable HSX proposal/Debugger mapping, obtain exact-head independent
+review, post decision packages to #47 and #38, then
 stop before any design freeze or implementation authorization.
 
 ## Traceability state
@@ -125,13 +127,14 @@ stop before any design freeze or implementation authorization.
 - Active Debugger Study: `DBG-ST-006`
 - Active HSX coordinator: `HSX-ST-001`, issue #47
 - Active HSX Studies: `HSX-ST-002..HSX-ST-006`
+- Proposed contracts: `HSX-R-001..036`, `HSX-A-001..005`, `HSX-D-001..005`
 - Active iteration: `DBG-IT-001-003`
 - Planned cross-track review: `HSX-RVW-001-001-001`
 
 ## Agents and worktree
 
-The prior product/design chain is complete. No new Study worker or reviewer is open yet;
-bounded HSX Study workers are the next roles. The controlled branch is `codex/dbg-st-006`;
+The prior product/design chain and bounded HSX Study workers are complete. No reviewer is open
+yet; fresh `HSX-RVW-001-001-001` is the next role. The controlled branch is `codex/dbg-st-006`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.
 

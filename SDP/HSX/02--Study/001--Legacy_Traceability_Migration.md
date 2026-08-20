@@ -351,3 +351,15 @@ Completion does **not** mean:
 The next valid action is Master synthesis after `HSX-ST-002..HSX-ST-006` complete, followed by
 fresh independent exact-head review `HSX-RVW-001-001-001` and Steering decision packages in
 issues #47/#38.
+
+## 15. Master synthesis allocation
+
+After all domain Studies completed, Master allocated stable proposed IDs:
+
+- `HSX-R-001..HSX-R-036`;
+- `HSX-A-001..HSX-A-005`;
+- `HSX-D-001..HSX-D-005`.
+
+The contract package and `DBG-ST-006` mapping are complete pending
+`HSX-RVW-001-001-001`. Broader HSX migration remains open exactly as routed above. No ID is
+accepted or implementation-authoritative merely because it is stable.

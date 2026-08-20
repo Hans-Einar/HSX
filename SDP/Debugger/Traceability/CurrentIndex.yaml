@@ -51,7 +51,7 @@ active:
       status: complete_for_synthesis
     - id: DBG-ST-006
       path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
-      status: active
+      status: complete_pending_cross_track_review
 completed:
   refactor:
     id: DBG-RF-001
@@ -119,8 +119,11 @@ active_gate:
     hsx_coordinator: HSX-ST-001
     hsx_issue: 47
     hsx_studies: HSX-ST-002..HSX-ST-006
-    status: active
+    status: contracts_proposed_pending_review
     review: HSX-RVW-001-001-001
+    hsx_requirements: HSX-R-001..HSX-R-036
+    hsx_architecture: HSX-A-001..HSX-A-005
+    hsx_design: HSX-D-001..HSX-D-005
 proposed:
   architecture:
     range: DBG-A-001..DBG-A-008

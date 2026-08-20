@@ -28,5 +28,9 @@ identity/lifecycle, address/ABI/unwind, execution/snapshot/blocked states, event
 and resource provenance. This phase produces reviewed proposed contracts only; it authorizes
 no product or AVR work.
 
+`HSX-ST-001..HSX-ST-006` are complete for this portable debugger-contract scope. Master has
+synthesized stable proposed `HSX-R-001..036`, `HSX-A-001..005`, and `HSX-D-001..005`; the
+active gate is independent review `HSX-RVW-001-001-001` followed by issues #47/#38.
+
 Target-specific implementations such as AVR belong in `SDP/AVR` and reference HSX core
 requirements rather than duplicating them.

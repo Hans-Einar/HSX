@@ -294,3 +294,16 @@ No product/runtime/extension/test/package/AVR file may be modified.
 Read-only evidence totals include 90, 40, 106, 77 and 114 passing targeted tests across the
 five technical Studies. All workers changed only their assigned Study. Master contract
 synthesis is now active.
+
+### Master contract synthesis result
+
+Master allocated and synthesized:
+
+- `HSX-R-001..HSX-R-036` portable requirements;
+- `HSX-A-001..HSX-A-005` architecture boundaries;
+- `HSX-D-001..HSX-D-005` detailed contract groups;
+- full `DBG-ST-006` dependency closure matrix;
+- named full/degraded capability profiles and reusable conformance fixtures.
+
+All artifacts remain target/proposed. The active action is fresh independent exact-head
+review `HSX-RVW-001-001-001`; no design freeze or implementation authority exists.

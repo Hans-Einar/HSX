@@ -1,6 +1,6 @@
 # HSX Portable Debug Contract Handoff
 
-- Status: STUDIES COMPLETE — MASTER SYNTHESIS ACTIVE
+- Status: CONTRACTS PROPOSED — INDEPENDENT REVIEW PENDING
 - Coordinator: `HSX-ST-001`, issue #47
 - Debugger dependency: `DBG-ST-006`, issue #38
 - Iteration: `DBG-IT-001-003`
@@ -8,9 +8,8 @@
 
 ## Current objective
 
-Synthesize stable portable contract proposals and conformance fixtures from completed
-`HSX-ST-001..HSX-ST-006`, review the exact package, and return to Steering before any Debugger
-design freeze or product work.
+Review the exact stable proposed contract package and `DBG-ST-006` mapping, then return to
+Steering before any Debugger design freeze or product work.
 
 ## Authority
 
@@ -21,8 +20,8 @@ design freeze or product work.
 
 ## Exact next step
 
-Master allocates stable IDs and synthesizes Requirements/Architecture/Design plus the
-`DBG-ST-006` cross-track matrix. Then a fresh reviewer inspects the exact complete package.
+Commit the Requirements/Architecture/Design and `DBG-ST-006` mapping, then assign fresh
+`HSX-RVW-001-001-001` to the exact complete head.
 
 ## Guards
 

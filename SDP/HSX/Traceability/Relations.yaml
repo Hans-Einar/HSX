@@ -47,6 +47,81 @@ relations:
     type: reviewed_by
     to:
       - HSX-RVW-001-001-001
+  - from: HSX-ST-001
+    type: provides_provenance_for
+    to:
+      - HSX-R-001..HSX-R-036
+      - HSX-A-001..HSX-A-005
+      - HSX-D-001..HSX-D-005
+  - from: HSX-ST-002
+    type: derives
+    to:
+      - HSX-R-001..HSX-R-011
+      - HSX-A-001
+      - HSX-D-001
+  - from: HSX-ST-003
+    type: derives
+    to:
+      - HSX-R-012..HSX-R-018
+      - HSX-A-002
+      - HSX-D-002
+  - from: HSX-ST-004
+    type: derives
+    to:
+      - HSX-R-019..HSX-R-027
+      - HSX-A-003
+      - HSX-D-003
+  - from: HSX-ST-005
+    type: derives
+    to:
+      - HSX-R-028..HSX-R-033
+      - HSX-A-004
+      - HSX-D-004
+  - from: HSX-ST-006
+    type: derives
+    to:
+      - HSX-R-034..HSX-R-036
+      - HSX-A-005
+      - HSX-D-005
+  - from: HSX-R-001..HSX-R-036
+    type: refined_by
+    to:
+      - HSX-A-001..HSX-A-005
+      - HSX-D-001..HSX-D-005
+  - from: HSX-A-001..HSX-A-005
+    type: refined_by
+    to:
+      - HSX-D-001..HSX-D-005
+  - from: HSX-D-001
+    type: provides_contract_to
+    to:
+      - DBG-D-002
+      - DBG-D-003
+      - DBG-D-006
+  - from: HSX-D-002
+    type: provides_contract_to
+    to:
+      - DBG-D-003
+      - DBG-D-004
+      - DBG-D-006
+  - from: HSX-D-003
+    type: provides_contract_to
+    to:
+      - DBG-D-003
+      - DBG-D-004
+      - DBG-D-006
+  - from: HSX-D-004
+    type: provides_contract_to
+    to:
+      - DBG-D-002
+      - DBG-D-003
+      - DBG-D-005
+      - DBG-D-006
+  - from: HSX-D-005
+    type: provides_contract_to
+    to:
+      - DBG-D-005
+      - DBG-D-006
 coordination:
   - from: HSX-ST-001
     type: coordinated_with
@@ -63,3 +138,52 @@ guards:
     implementation_authority: false
   - subject: DBG-RF-002..DBG-RF-009
     product_code_authorized: false
+legacy_provenance:
+  - sources:
+      - DR-1.1
+      - DR-1.2
+      - DR-2.5
+      - DR-8.1
+      - DG-5.3
+    type: migrated_into_proposed
+    to:
+      - HSX-R-001..HSX-R-011
+  - sources:
+      - DR-2.1
+      - DR-2.2
+      - DR-3.1
+      - DG-2.1
+      - DG-2.2
+      - DG-2.3
+      - DG-3.3
+      - DG-3.5
+    type: migrated_into_proposed
+    to:
+      - HSX-R-012..HSX-R-018
+  - sources:
+      - DR-5.1
+      - DR-6.1
+      - DR-8.1
+      - DG-4.2
+      - DG-4.3
+      - DG-5.1
+      - DG-5.4
+    type: migrated_into_proposed
+    to:
+      - HSX-R-019..HSX-R-027
+  - sources:
+      - DR-8.1
+      - DG-5.2
+      - DG-5.3
+      - DG-8.2
+    type: migrated_into_proposed
+    to:
+      - HSX-R-028..HSX-R-033
+  - sources:
+      - DR-8.1
+      - DG-4.2
+      - DG-5.2
+      - DG-5.3
+    type: migrated_into_proposed
+    to:
+      - HSX-R-034..HSX-R-036
