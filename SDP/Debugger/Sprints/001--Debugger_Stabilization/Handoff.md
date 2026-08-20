@@ -1,10 +1,11 @@
 # DBG-SPR-001 Handoff
 
-Status: `all_slices_signed_parent_final_reviews_pending`
+Status: `rf003_implicit_reopen_rework_active`
 
 ## Current objective
 
-Run fresh final parent RF-002 and RF-003 reviews, then parent formal verification/sign-off.
+Correct RF-003 implicit-reopen false-HEALTHY handling with a fresh bounded worker, then fresh
+RF-003 Slice and dependent integration review/verification/sign-off chains.
 
 ## Authority
 
@@ -134,12 +135,12 @@ Run fresh final parent RF-002 and RF-003 reviews, then parent formal verificatio
 - RF-002 parent review's general terminal-result High and the follow-up saturated-inbox edge
   are corrected at `a064020…`; fresh `DBG-RVW-001-004-008` returned PASS. RF-003 has no
   product finding and remains signed.
-- `DBG-SL-001-004-003` is exact-head signed at `860a98a…`.
+- Prior RF-003/integration sign-offs are historical dependency evidence pending revalidation.
 - `DBG-RF-004..DBG-RF-009` remain blocked.
 
 ## Exact next step
 
-Run `DBG-RVW-002-001-002` and `DBG-RVW-003-001-002` against the complete signed chain.
+Assign a fresh RF-003 worker limited to legacy gateway + its test for the implicit-reopen High.
 
 ## Traceability state
 
@@ -195,15 +196,15 @@ Run `DBG-RVW-002-001-002` and `DBG-RVW-003-001-002` against the complete signed 
 - Corrected RF-002 sign-off: PASS at `a064020…`; RF-003 remains PASS at `cf4d8a6…`
 - Integration review `DBG-RVW-001-004-003`: PASS at `860a98a…`
 - Verification `DBG-VER-001-004-003`: PASS at `860a98a…`
-- Integration sign-off: PASS at `860a98a…`
-- Active gate: fresh parent final reviews
+- Parent review attempts `DBG-RVW-002-001-002` / `DBG-RVW-003-001-002`: REWORK
+- Active gate: fresh RF-003 implicit-reopen rework
 
 ## Agents and worktree
 
 The prior design/portable-contract chain is complete. Steering authorized the v1.1 refreeze,
 and its exact implementation passed fresh review. Foundation rework and fresh re-reviews are
-complete; RF-003 remains exact-head signed. RF-002 requires bounded product rework and a fresh
-Slice chain before integration. Controlled work is on
+complete; RF-002 product is PASS. RF-003 requires bounded implicit-reopen rework and dependent
+integration revalidation. Controlled work is on
 `codex/dbg-rf-002-003`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.

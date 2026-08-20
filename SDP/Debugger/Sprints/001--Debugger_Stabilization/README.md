@@ -1,6 +1,6 @@
 # DBG-SPR-001 — Debugger Stabilization
 
-- Status: ITERATION 004 RF-002 TERMINAL-RESULT REWORK ACTIVE
+- Status: ITERATION 004 RF-003 IMPLICIT-REOPEN REWORK ACTIVE
 - Owning track: Debugger
 - Owning GapAnalysis: `DBG-GAP-001`
 

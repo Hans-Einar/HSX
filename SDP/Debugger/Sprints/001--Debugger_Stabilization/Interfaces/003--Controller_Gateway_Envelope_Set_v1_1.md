@@ -126,3 +126,6 @@ health independence and single DTO imports.
 
 Status becomes implementation-resumable only after `DBG-RVW-001-004-004` PASS at exact
 refreeze/interface-test head.
+
+That prerequisite passed at `0cf52fcf69d11f254b957cfc52605a8be3114955`; the interface is
+frozen and unchanged through the first structural wave.

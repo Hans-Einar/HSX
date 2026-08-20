@@ -28,3 +28,13 @@ Master exact-head reconciliation accepted implementation head
 `DBG-RVW-001-001-001` and `DBG-VER-001-001-001`. `DBG-RF-001` and
 `DBG-SL-001-001-001` are complete. Issue #38 / `DBG-DA-001` is the next gate and has not
 started; structural product-code work remains blocked pending accepted design contracts.
+
+## DBG-IT-001-004 current verified state
+
+- Frozen `dbg.controller-gateway/1.1` interface review PASS at `0cf52fcf…`.
+- Corrected RF-002 Slice review/verification/sign-off PASS at `a064020…`.
+- RF-003 prior Slice review/verification/sign-off at `cf4d8a6…` is historical; final parent
+  review found an implicit-reopen false-HEALTHY path requiring bounded RF-003 rework.
+- Integration review/verification/sign-off at `860a98a…` is historical dependency evidence and
+  must be revalidated after RF-003 correction.
+- No Executive/VM/frontend/AVR change and no RF-004..009 authority.

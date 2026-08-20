@@ -1,6 +1,6 @@
 # DBG-RF-003 — Typed Executive Gateway, Health, and Recovery Foundation
 
-- Status: **SLICE SIGNED — INTEGRATION ELIGIBLE AFTER RF-002 RE-SIGN-OFF**
+- Status: **REWORK REQUIRED — IMPLICIT SESSION REOPEN FALSE HEALTHY**
 - Steering authority: issue #38 comment `5356484309`
 - Iteration: `DBG-IT-001-004`
 - Owning Slice: `DBG-SL-001-004-002`
@@ -79,3 +79,8 @@ integration Slice 003 passes without Executive/runtime or frontend mutation.
 Parent review `DBG-RVW-003-001-001` found no product defect but correctly rejected the
 circular gate that attempted parent final sign-off before integration. Fresh parent final
 review/verification/sign-off follows the separately signed integration Slice.
+
+Final parent review `DBG-RVW-003-001-002` found that a background loss which has already
+cleared `session_id` can be followed by implicit idempotent reopen reported falsely HEALTHY.
+Fresh bounded RF-003 correction and `DBG-RVW-001-004-009` / `DBG-VER-001-004-005` /
+exact-head Slice re-sign-off are required; dependent integration must then be revalidated.
