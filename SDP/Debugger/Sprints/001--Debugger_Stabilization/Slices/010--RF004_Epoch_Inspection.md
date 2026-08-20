@@ -29,6 +29,8 @@ gateway, Executive, DAP/CLI and VS Code modules are read-only.
 
 - every result carries exact TargetRef, LoadedImageRef, StopEpochId, StopToken and
   InspectionSnapshotRef evidence;
+- allocate every frame/scope/variable DomainHandle here and wrap Slice 005's handle-free
+  `UnwindFrame` values without editing the signed stack module;
 - registers/stack/scopes/variables/memory/disassembly use one exact snapshot or explicitly
   identified immutable image bytes;
 - SnapshotReadPort rejects target/image/token/snapshot/revision mismatches and late data;

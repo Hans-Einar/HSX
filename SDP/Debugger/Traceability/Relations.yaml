@@ -185,7 +185,7 @@ relations:
     type: produces_interface
     to:
       - dbg.resolver-inspection/1
-    status: frozen_pending_review_and_implementation
+    status: refrozen_candidate_pending_rereview_and_implementation
   - from: DBG-SL-001-005-001
     type: reviewed_by
     to: [DBG-RVW-001-005-001]
@@ -253,6 +253,13 @@ relations:
     type: reviewed_by
     to:
       - DBG-RVW-001-005-007
+    status: rework
+    reviewed_head: 82154c614a31284723bf3e6a337c5bedfb8aba5d
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/029--RF004_Interface_Review.md
+  - from: dbg.resolver-inspection/1
+    type: reviewed_by
+    to:
+      - DBG-RVW-001-005-008
     status: planned
   - from: DBG-RF-005
     type: depends_on_accepted_interface
@@ -436,7 +443,7 @@ relations:
       - DBG-SL-001-004-001
       - DBG-SL-001-004-002
       - DBG-SL-001-004-003
-    status: first_wave_complete_awaiting_steering
+    status: first_wave_complete_steering_accepted
   - from: DBG-IT-001-004
     type: published_on_remote_branch
     to:
@@ -559,8 +566,11 @@ cross_track_dependencies:
     to:
       - HSX-ST-001
     required_contract: portable_address_model
-    blocks:
+    historical_blocked_before_hsx_acceptance:
       - DBG-RF-004
+    status: satisfied_by_issue_47_comment_5356480919
+    later_authorized_refactor: DBG-RF-004
+    authorization_comment: 5362514094
   - from: DBG-R-016..DBG-R-020
     type: requires_stable_contract_from
     to:
@@ -581,9 +591,10 @@ cross_track_dependencies:
       - HSX-ST-008
     required_contract: portable_debug_runtime_semantics
     status: satisfied_by_issue_47_comment_5356480919
-    unblocks_authorized_wave:
+    unblocks_authorized_refactors:
       - DBG-RF-002
       - DBG-RF-003
+      - DBG-RF-004
     implementation_guard: current_executive_legacy_degraded_only
 proposed_dependency_changes:
   status: accepted_frozen_debugger_v1

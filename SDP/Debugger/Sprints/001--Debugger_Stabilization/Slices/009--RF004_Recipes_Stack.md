@@ -31,6 +31,7 @@ are read-only.
 - use descriptor byte order, declared widths and checked typed-address operations only;
 - select non-overlapping half-open rows by exact image/ABI/function/scope/frame/PC;
 - reconstruct entry/push/body/pop/RET and terminal rows from immutable snapshot fixtures;
+- return handle-free `UnwindFrame` values; Slice 006 alone allocates/wraps domain handles;
 - return resume PC separately from checked call-site PC;
 - return partial/unavailable/unsupported/corrupt/stale/limit-exceeded distinctly;
 - evaluate selected non-top-frame variables from that frame/context;

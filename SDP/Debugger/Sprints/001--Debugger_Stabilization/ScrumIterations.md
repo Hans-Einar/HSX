@@ -496,9 +496,10 @@ addresses use descriptor-checked spaces/ranges; best-effort live reads are expli
 and cannot be coherent. Artifact index, source resolver, recipes/stack, epoch inspection and
 frontend mapping remain separate responsibilities.
 
-Planned independent interface review: `DBG-RVW-001-005-007`. Product dispatch waits until the
-activation/interface head is published and that fresh review passes. A finding requiring a
-frozen interface/design change returns to Steering.
+Interface review `DBG-RVW-001-005-007` returned REWORK at exact remote-published head
+`82154c614a31284723bf3e6a337c5bedfb8aba5d`. Master corrected only the candidate interface,
+Slice ownership and live traceability. Fresh `DBG-RVW-001-005-008` must PASS before product
+dispatch. A finding requiring an accepted DBG/HSX design change returns to Steering.
 
 ### Frozen execution units
 
@@ -530,7 +531,7 @@ exact-head sign-off before the next Slice starts.
   `DBG-SL-001-005-001..006`.
 - Requirements: `DBG-R-004`, `DBG-R-021..DBG-R-028`, `DBG-R-034..DBG-R-036`.
 - Design: `DBG-D-003`, `DBG-D-004`, `DBG-D-009`; portable `HSX-D-001..003`.
-- Reviews: `DBG-RVW-001-005-001..007`; verifications `DBG-VER-001-005-001..006`.
+- Reviews: `DBG-RVW-001-005-001..008`; verifications `DBG-VER-001-005-001..006`.
 - Parent final: `DBG-RVW-004-001-001`, `DBG-VER-004-001-001`.
 - RF-005 explicitly depends on RF-004's accepted `dbg.resolver-inspection/1`; partial/frozen
   implementation does not satisfy the dependency and no RF-005 worker is authorized.
@@ -544,3 +545,19 @@ parent Master sign-off, remote publication/fresh reconstruction and issue #38 de
 package. The package must cover interfaces, address/source/stack/variables/memory/disassembly,
 legacy status, degraded behavior, exact heads and RF-005 recommendation. Master then stops for
 Steering.
+
+### Interface review attempt 1
+
+Fresh read-only `DBG-RVW-001-005-007` confirmed exact remote head/ancestry, SDP-only scope,
+clean worktree, YAML/114-row NDJSON, IDs/paths/fences and one active iteration, but returned
+REWORK:
+
+- High: incomplete record/query/pagination/expression schemas plus contradictory wrap API;
+- High: Slice 005 required handles owned only by Slice 006;
+- Medium: RF-002 StopEpoch consumption seam was unspecified;
+- Medium: two live Relations gates remained stale.
+
+Master refroze a complete public schema/result surface, explicit checked/wrap mode,
+handle-free Slice 005 output with Slice 006 wrapping, a read-only `ControllerEpochAdapter`, and
+corrected live dependency statuses. No product file changed. Fresh exact-head review is
+`DBG-RVW-001-005-008`; Slice 001 remains unstarted.

@@ -175,6 +175,9 @@ issues:
     rf004_slices: DBG-SL-001-005-001..DBG-SL-001-005-006
     rf004_interface: dbg.resolver-inspection/1
     rf004_interface_review: DBG-RVW-001-005-007
+    rf004_interface_review_status: rework
+    rf004_interface_reviewed_head: 82154c614a31284723bf3e6a337c5bedfb8aba5d
+    rf004_interface_rereview: DBG-RVW-001-005-008
     rf005_dependency_clarification_issue: 42
     rf005_dependency_clarification_comment: 5362515750
     portable_contract_gate: complete_accepted_frozen
@@ -210,11 +213,14 @@ issues:
     steering_completion_comment: 5362514094
   DBG-RF-004:
     issue: 41
-    status: active_contracts_frozen_product_not_started
+    status: active_candidate_refrozen_rereview_pending_product_not_started
     iteration: DBG-IT-001-005
     slices: DBG-SL-001-005-001..DBG-SL-001-005-006
     public_interface: dbg.resolver-inspection/1
     interface_review: DBG-RVW-001-005-007
+    interface_review_status: rework
+    interface_reviewed_head: 82154c614a31284723bf3e6a337c5bedfb8aba5d
+    interface_rereview: DBG-RVW-001-005-008
     steering_authority_comment: 5362514094
   DBG-RF-005:
     issue: 42

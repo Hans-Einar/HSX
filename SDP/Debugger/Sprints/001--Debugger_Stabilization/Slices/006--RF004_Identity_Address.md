@@ -28,6 +28,9 @@ Existing `contracts.py`, controller/model/epochs/gateway/runtime files are read-
 
 - all values and nested payloads are deeply immutable and validate exact portable fields;
 - `InspectionContext` rejects any target/image/epoch/stop/snapshot mismatch;
+- `ControllerEpochAdapter` consumes RF-002 `contracts.StopEpoch` read-only and binds only
+  already-typed portable StopToken/SnapshotRef values with an exact GenerationStamp match;
+  legacy/untyped inputs return unavailable and no context;
 - equality is exact and case-sensitive; only frozen digest fields require lowercase Hex64;
 - descriptor operations validate named spaces, widths, units, half-open ranges, alignment,
   permissions and explicit wrap policy;
