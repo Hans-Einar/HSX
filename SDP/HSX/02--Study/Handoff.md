@@ -1,6 +1,6 @@
 # HSX Portable Debug Contract Handoff
 
-- Status: REVIEW 005 REWORK CORRECTED — CONTENT COMMIT/ANCHOR NEXT
+- Status: REVIEW 006 ASSIGNED — EXACT PROPOSAL CONTENT ANCHORED
 - Coordinator: `HSX-ST-001`, issue #47
 - Debugger dependency: `DBG-ST-006`, issue #38
 - Iteration: `DBG-IT-001-003`
@@ -10,9 +10,9 @@
 
 ## Current objective
 
-Commit the validated review-005 f16/canonical-digest/gate corrections, anchor the resulting
-proposal-content SHA in a trace-only assignment record, then obtain fresh
-`HSX-RVW-001-001-006` before any Debugger design freeze or product work.
+Obtain fresh `HSX-RVW-001-001-006` against exact proposal-content head
+`b57e368f77bb533b09397d633fc92565655e1668`. The assignment commit changes trace/Handoff only;
+no proposal-content change is permitted before review.
 
 ## Authority
 
@@ -23,8 +23,8 @@ proposal-content SHA in a trace-only assignment record, then obtain fresh
 
 ## Exact next step
 
-Validate and commit the documentation-only rework, then add a trace-only assignment record
-that anchors the proposal-content SHA for fresh `HSX-RVW-001-001-006`.
+Fresh reviewer independently reviews exact proposal-content head
+`b57e368f77bb533b09397d633fc92565655e1668` and the current trace-only assignment state.
 
 ## Master verification
 

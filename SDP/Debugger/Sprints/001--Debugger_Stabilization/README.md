@@ -1,6 +1,6 @@
 # DBG-SPR-001 — Debugger Stabilization
 
-- Status: ITERATION 003 REVIEW 005 REWORK CORRECTED — REVIEW 006 ANCHOR NEXT
+- Status: ITERATION 003 REVIEW 006 ASSIGNED — PROPOSAL CONTENT `b57e368…`
 - Owning track: Debugger
 - Owning GapAnalysis: `DBG-GAP-001`
 
@@ -42,7 +42,7 @@ Steering accepted `DBG-A-001..DBG-A-008` as target architecture direction in com
 - Review `HSX-RVW-001-001-004`: REWORK
 - Supplemental Studies `HSX-ST-007`, `HSX-ST-008`: complete and resynthesized
 - Review `HSX-RVW-001-001-005`: REWORK at `84df21d763b73209efd0292990799f469283460a`
-- Next gate: documentation-only rework then fresh `HSX-RVW-001-001-006`
+- Review `HSX-RVW-001-001-006`: assigned to exact proposal-content head `b57e368…`
 - Stop gate: issues #47 and #38 before any `DBG-D-*` freeze
 
 ## Non-goals for this iteration

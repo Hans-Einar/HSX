@@ -213,7 +213,7 @@ implementation remains blocked.
 
 ## DBG-IT-001-003 — Portable Debug Runtime Contracts
 
-Status: REVIEW 005 REWORK CORRECTED — CONTENT COMMIT/REVIEW 006 ANCHOR NEXT
+Status: REVIEW 006 ASSIGNED — EXACT PROPOSAL CONTENT `b57e368…`
 
 ### Goal
 
@@ -378,5 +378,6 @@ or implementation-authorized.
 - current Handoffs did not anchor the reviewed SHA or reflect the already-assigned review.
 
 All other technical, traceability, scope and evidence checks passed. Master completed and
-validated documentation-only corrections. The next actions are exact proposal-content
-anchoring and fresh `HSX-RVW-001-001-006`. Every design/RF/product/AVR gate remains closed.
+validated documentation-only corrections at exact proposal-content head
+`b57e368f77bb533b09397d633fc92565655e1668`; fresh `HSX-RVW-001-001-006` is assigned. Every
+design/RF/product/AVR gate remains closed.

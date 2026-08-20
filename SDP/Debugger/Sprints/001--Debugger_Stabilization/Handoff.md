@@ -1,12 +1,13 @@
 # DBG-SPR-001 Handoff
 
-Status: `portable_contract_review5_rework_corrected_content_anchor_next`
+Status: `portable_contract_review6_assigned_exact_content_b57e368`
 
 ## Current objective
 
-Commit the validated review-005 f16/canonical-digest/gate corrections, anchor the resulting
-proposal-content SHA, then obtain fresh `HSX-RVW-001-001-006` and return reviewed decision
-packages to issues #47/#38. No structural product or AVR work may be dispatched.
+Obtain fresh `HSX-RVW-001-001-006` against exact proposal-content head
+`b57e368f77bb533b09397d633fc92565655e1668`, then return reviewed decision packages to issues
+#47/#38. The current assignment delta is trace/Handoff only. No structural product or AVR work
+may be dispatched.
 
 ## Authority
 
@@ -118,9 +119,10 @@ packages to issues #47/#38. No structural product or AVR work may be dispatched.
 
 ## Exact next step
 
-Commit the documentation-only corrections, create a trace-only assignment anchor for the
-proposal-content SHA, obtain fresh review 006, post reviewed packages to #47 and #38, then
-stop before any design freeze or implementation authorization.
+Fresh reviewer reviews exact proposal-content head
+`b57e368f77bb533b09397d633fc92565655e1668` plus the trace-only assignment state. On PASS,
+Master verifies the review record, posts packages to #47/#38, and stops before design freeze or
+implementation authorization.
 
 ## Traceability state
 
@@ -154,13 +156,13 @@ stop before any design freeze or implementation authorization.
 - Review `HSX-RVW-001-001-004`: REWORK at `cbddfa2`
 - Review `HSX-RVW-001-001-005`: REWORK at `84df21d`
 - Resynthesized supplemental Studies: `HSX-ST-007`, `HSX-ST-008`
-- Active gate: Master corrections, then fresh `HSX-RVW-001-001-006`
+- Active gate: fresh `HSX-RVW-001-001-006` on proposal content `b57e368…`
 
 ## Agents and worktree
 
-The prior product/design chain and all bounded HSX Study workers are complete. Master has
-validated the review-005 documentation corrections; after the content/assignment commits the
-next agent role is fresh independent reviewer
+The prior product/design chain and all bounded HSX Study workers are complete. Master validated
+the review-005 corrections and anchored exact proposal content. The active agent role is fresh
+independent reviewer
 `HSX-RVW-001-001-006`. The controlled branch is `codex/dbg-st-006`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.

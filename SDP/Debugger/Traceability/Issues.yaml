@@ -43,7 +43,7 @@ issues:
     hsx_studies: HSX-ST-001..HSX-ST-008
     cross_track_review: HSX-RVW-001-001-001
     portable_contracts: HSX-R-001..HSX-R-036,HSX-A-001..HSX-A-005,HSX-D-001..HSX-D-005
-    portable_contract_status: review5_rework_complete_pending_review6
+    portable_contract_status: review6_assigned
     portable_contract_review_status: rework
     portable_contract_rereview: HSX-RVW-001-001-002
     portable_contract_rereview_status: rework
@@ -57,9 +57,10 @@ issues:
     portable_contract_review_attempt_5_record: SDP/HSX/Reviews/005--Portable_Debug_Contract_Review_Attempt5.md
     portable_contract_review_attempt_5_comments: 5354906185,5354906338
     portable_contract_review_attempt_6: HSX-RVW-001-001-006
-    portable_contract_review_attempt_6_status: planned_after_review5_rework
+    portable_contract_review_attempt_6_status: assigned_exact_proposal_content
+    portable_contract_review_attempt_6_proposal_content_head: b57e368f77bb533b09397d633fc92565655e1668
     portable_contract_supplemental_studies: HSX-ST-007,HSX-ST-008
-    portable_contract_current_gate: commit_and_anchor_review6_candidate
+    portable_contract_current_gate: HSX-RVW-001-001-006
   DBG-RF-002:
     issue: 39
     status: blocked_by_DBG-DA-001

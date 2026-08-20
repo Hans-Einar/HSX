@@ -1,7 +1,7 @@
 schema_version: 1
 track: HSX
 namespace: HSX
-status: portable_contract_review5_rework_complete_pending_content_anchor
+status: portable_contract_review6_assigned
 active:
   coordinating_study:
     id: HSX-ST-001
@@ -33,7 +33,7 @@ active:
   coordinated_debugger_study:
     id: DBG-ST-006
     issue: 38
-    status: review5_rework_complete_pending_review6
+    status: review6_assigned
   review:
     id: HSX-RVW-001-001-001
     status: rework
@@ -61,31 +61,32 @@ active:
     path: SDP/HSX/Reviews/005--Portable_Debug_Contract_Review_Attempt5.md
   review_attempt_6:
     id: HSX-RVW-001-001-006
-    status: planned_after_review5_rework
-  current_gate: commit_and_anchor_review6_candidate
+    status: assigned_exact_proposal_content
+    proposal_content_head: b57e368f77bb533b09397d633fc92565655e1668
+  current_gate: independent_review_HSX-RVW-001-001-006
 proposed_contract_baseline:
   requirements:
     range: HSX-R-001..HSX-R-036
     path: SDP/HSX/03--Requirements/001--Portable_Debug_Runtime_Requirements.md
-    status: review5_rework_complete_pending_review6
+    status: review6_assigned
     state: target
   architecture:
     range: HSX-A-001..HSX-A-005
     path: SDP/HSX/04--Architecture/001--Portable_Debug_Runtime_Architecture.md
-    status: review5_rework_complete_pending_review6
+    status: review6_assigned
     state: target
   design:
     range: HSX-D-001..HSX-D-005
     path: SDP/HSX/06--Design/001--Portable_Debug_Runtime_Contracts.md
-    status: review5_rework_complete_pending_review6
+    status: review6_assigned
     state: target
     appendix:
       path: SDP/HSX/06--Design/002--Canonical_Digest_Golden_Vectors.md
-      status: review5_rework_complete_pending_review6
+      status: review6_assigned
   debugger_mapping:
     id: DBG-ST-006
     path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
-    status: review5_rework_complete_pending_review6
+    status: review6_assigned
 legacy_sources:
   - main/02--Study
   - main/03--Architecture
