@@ -1,12 +1,13 @@
 # DBG-SL-001-004-002 — Typed Legacy Executive Gateway / Health Foundation
 
-- Status: **REWORK REQUIRED — REVIEW `DBG-RVW-001-004-002`**
+- Status: **RE-REVIEW PASS — FORMAL VERIFICATION PENDING**
 - Parent: `DBG-RF-003`
 - Iteration: `DBG-IT-001-004`
 - Steering: issue #38 comment `5356484309`
 - Frozen interface: `dbg.controller-gateway/1.1` (read-only implementation dependency)
 - Review: `DBG-RVW-001-004-002`
 - Re-review: `DBG-RVW-001-004-006`
+- Exact reviewed head: `cf4d8a6665e9a6ebf35d425b227bc7a5c7bd3fa9`
 - Verification: `DBG-VER-001-004-002`
 - Implementation base: `97d8c5b8d62d56dcfcab59c97c516d83f68c7075`
 

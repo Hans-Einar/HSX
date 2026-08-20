@@ -1,6 +1,6 @@
 # DBG-RF-002 — Debugger Controller, State Machine, and Stop-Epoch Foundation
 
-- Status: **PAUSED — v1.1 INTERFACE REVIEW REQUIRED BEFORE RESUME**
+- Status: **SLICE RE-REVIEW PASS — FORMAL VERIFICATION PENDING**
 - Steering authority: issue #38 comment `5356484309`
 - Iteration: `DBG-IT-001-004`
 - Owning Slice: `DBG-SL-001-004-001`
@@ -8,7 +8,7 @@
 - Requirements: `DBG-R-004`, `DBG-R-007..010`, `DBG-R-020`, `DBG-R-027..028`
 - Findings: `DBG-F-007..009`, `DBG-F-013`, `DBG-F-025`, core part of `DBG-F-026`
 - Architecture/design: `DBG-A-001`, `DBG-A-003`, `DBG-D-001`, `DBG-D-003`, `DBG-D-009`
-- Shared interface: `dbg.controller-gateway/1.1` (refrozen; review pending)
+- Shared interface: `dbg.controller-gateway/1.1` (refrozen; `DBG-RVW-001-004-004` PASS)
 - Product baseline: `bf92c9be6cf81a7cb704778dafe88e55fee2e235`
 
 ## Refactor objective

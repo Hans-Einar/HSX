@@ -399,7 +399,7 @@ publication passed. Steering froze the HSX portable target contracts in #47 comm
 
 ## DBG-IT-001-004 — Controller/Gateway First Structural Wave
 
-Status: INTERFACE v1.1 REFREEZE IMPLEMENTATION / REVIEW ACTIVE
+Status: FOUNDATION SLICE RE-REVIEWS PASS / FORMAL VERIFICATION ACTIVE
 
 ### Authority and scope
 
@@ -418,8 +418,9 @@ Status: INTERFACE v1.1 REFREEZE IMPLEMENTATION / REVIEW ACTIVE
 3. `DBG-SL-001-004-003` — early controller/gateway integration, blocked until both parent
    Slices are independently signed off.
 
-Shared `dbg.controller-gateway/1` envelopes, generations, health, recovery and public ports are
-frozen in `Interfaces/001--Controller_Gateway_Envelope_Set.md` before worker dispatch.
+Refrozen `dbg.controller-gateway/1.1` envelopes, generations, health, recovery and public
+ports are frozen in `Interfaces/003--Controller_Gateway_Envelope_Set_v1_1.md`; independent
+interface review and both foundation Slice re-reviews passed before formal verification.
 
 ### Parallel ownership
 

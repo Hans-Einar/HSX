@@ -1,12 +1,12 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf002_rf003_slice_review_rework_active`
+Status: `rf002_rf003_slice_rereview_pass_formal_verification_active`
 
 ## Current objective
 
-Correct the independently reviewed RF-002/RF-003 Slice findings with fresh bounded rework
-workers, then obtain fresh exact-head `DBG-RVW-001-004-005` / `...006`. No formal verification
-or sign-off begins before both re-reviews PASS.
+Formally verify exact reviewed RF-002 head `232e20a6…` and RF-003 head `cf4d8a6…`, then
+perform exact-head Slice sign-off and the separate parent Refactor review/verification gates.
+Integration remains blocked until both parent Refactors are signed.
 
 ## Authority
 
@@ -121,18 +121,24 @@ or sign-off begins before both re-reviews PASS.
   vectors, exact-content/scope, 8 YAML, 57 pre-verification Ledger records, 52 Markdown files,
   36/5/5 IDs and ten mappings; PASS. Master subsequently signed exact proposal content
   `b57e368…`.
+- Fresh bounded rework closed every RF-002 and RF-003 Slice-review finding without changing
+  the frozen `dbg.controller-gateway/1.1` interface or protected Executive/frontend/runtime
+  paths. Exact rework heads are `232e20a6…` and `cf4d8a6…`.
+- Fresh independent `DBG-RVW-001-004-005` and `DBG-RVW-001-004-006` returned PASS with no
+  Blocking/High/Medium findings. Their formal Slice verifications remain the active gate.
 
 ## Not done
 
-- `DBG-SL-001-004-001` and `DBG-SL-001-004-002` have implementation commits but REWORK
-  reviews; no verification or sign-off exists.
+- `DBG-SL-001-004-001` and `DBG-SL-001-004-002` have exact-head re-review PASS; formal
+  verification, Slice sign-off, and parent Refactor gates are not yet complete.
 - `DBG-SL-001-004-003` remains blocked on both parent Slice sign-offs.
 - `DBG-RF-004..DBG-RF-009` remain blocked.
 
 ## Exact next step
 
-Assign fresh disjoint rework workers against exact implementation heads `a0e986c…` and
-`1f492d8…`; close only recorded findings and rerun full Slice evidence before fresh re-review.
+Complete fresh formal `DBG-VER-001-004-001` and `DBG-VER-001-004-002` against exact reviewed
+heads, reconcile exact-head Slice sign-offs, then run separate parent Refactor review and
+verification before unblocking integration Slice 003.
 
 ## Traceability state
 
@@ -179,14 +185,15 @@ Assign fresh disjoint rework workers against exact implementation heads `a0e986c
 - Resynthesized supplemental Studies: `HSX-ST-007`, `HSX-ST-008`
 - Interface review `DBG-RVW-001-004-004`: PASS at
   `0cf52fcf69d11f254b957cfc52605a8be3114955`
-- Active gate: fresh RF-002/RF-003 rework workers then `DBG-RVW-001-004-005/006`; integration
-  remains blocked
+- Slice re-reviews: `DBG-RVW-001-004-005` PASS at `232e20a6…` and
+  `DBG-RVW-001-004-006` PASS at `cf4d8a6…`
+- Active gate: `DBG-VER-001-004-001/002`; integration remains blocked
 
 ## Agents and worktree
 
 The prior design/portable-contract chain is complete. Steering authorized the v1.1 refreeze,
-and its exact implementation passed fresh review. Initial foundation heads received REWORK;
-fresh rework workers are the next roles. Controlled work is on
+and its exact implementation passed fresh review. Foundation rework and fresh re-reviews are
+complete; fresh formal verifiers are the active roles. Controlled work is on
 `codex/dbg-rf-002-003`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.
