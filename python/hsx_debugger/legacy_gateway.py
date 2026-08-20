@@ -68,6 +68,7 @@ PORTABLE_RESOURCE_CAPABILITY = "hsx.debug.resource-revision/1"
 
 _RESOURCE_EFFECTS = (EffectKind.OPEN_SESSION, EffectKind.SUBSCRIBE_EVENTS)
 _CACHE_MISS = object()
+_UNOBSERVED_EVENT_TRANSPORT = object()
 
 
 def initial_legacy_generation(*, display_pid: int | None = None) -> GenerationStamp:
@@ -126,6 +127,13 @@ class _LegacyEventState:
     transport_stream: Any = None
 
 
+@dataclass(frozen=True, slots=True)
+class _LegacyTransportSnapshot:
+    session_id: Any
+    active_event_state: _LegacyEventState | None
+    session_event_stream: Any
+
+
 class LegacyExecutiveAdapter:
     """Translate frozen effects to one unchanged ``ExecutiveSession`` instance."""
 
@@ -159,9 +167,14 @@ class LegacyExecutiveAdapter:
         if validation is not _CACHE_MISS:
             return validation
 
+        transport_before = self._transport_snapshot()
         try:
             result = self._dispatch(effect, publish)
         except ConnectionLostError as exc:
+            self._invalidate_event_continuity(
+                rpc_health=RpcHealth.LOST,
+                reason="legacy RPC transport lost",
+            )
             raise GatewayEffectError(
                 "legacy_rpc_transport_lost",
                 "legacy Executive RPC transport was lost",
@@ -170,6 +183,11 @@ class LegacyExecutiveAdapter:
                 cause=exc,
             ) from exc
         except ProtocolVersionError as exc:
+            if self._transport_disruption_reasons(transport_before):
+                self._invalidate_event_continuity(
+                    rpc_health=RpcHealth.DEGRADED,
+                    reason="legacy protocol failure followed hidden transport replacement",
+                )
             raise GatewayEffectError(
                 "legacy_protocol_incompatible",
                 "legacy Executive protocol is incompatible",
@@ -177,6 +195,11 @@ class LegacyExecutiveAdapter:
                 cause=exc,
             ) from exc
         except (ExecutiveSessionError, json.JSONDecodeError, TypeError, ValueError) as exc:
+            if self._transport_disruption_reasons(transport_before):
+                self._invalidate_event_continuity(
+                    rpc_health=RpcHealth.DEGRADED,
+                    reason="legacy protocol failure followed hidden transport replacement",
+                )
             raise GatewayEffectError(
                 "legacy_protocol_error",
                 "legacy Executive request or response was malformed",
@@ -184,6 +207,10 @@ class LegacyExecutiveAdapter:
                 cause=exc,
             ) from exc
         except OSError as exc:
+            self._invalidate_event_continuity(
+                rpc_health=RpcHealth.LOST,
+                reason="legacy RPC transport lost",
+            )
             raise GatewayEffectError(
                 "legacy_rpc_transport_lost",
                 "legacy Executive RPC transport was lost",
@@ -348,6 +375,7 @@ class LegacyExecutiveAdapter:
 
     def _open_session(self, effect: GatewayEffect) -> tuple[GatewayNotice, ...]:
         before = self.health.snapshot()
+        transport_before = self._transport_snapshot()
         connecting_state = (
             RpcHealth.CONNECTING
             if before.rpc_health in (RpcHealth.CLOSED, RpcHealth.LOST)
@@ -385,15 +413,40 @@ class LegacyExecutiveAdapter:
             },
             authoritative_resource=True,
         )
+        disruption_reasons = self._transport_disruption_reasons(transport_before)
         if completion.status is not CompletionStatus.OK:
-            restored = self.health.transition(
-                rpc_health=before.rpc_health,
-                event_health=before.event_health,
-                reason="legacy session OPEN failed; prior continuity retained",
-            )
-            return connecting, completion, restored
+            if disruption_reasons:
+                failed_health = self._invalidate_event_continuity(
+                    rpc_health=RpcHealth.DEGRADED,
+                    reason=(
+                        "legacy session OPEN failed after hidden transport replacement: "
+                        f"{'; '.join(disruption_reasons)}"
+                    ),
+                )
+                # The request has already disproved the pre-call HEALTHY snapshot.  Do not
+                # emit that stale connecting notice after the wrapped session changed.
+                return failed_health, completion
+            else:
+                failed_health = self.health.transition(
+                    rpc_health=before.rpc_health,
+                    event_health=before.event_health,
+                    reason="legacy session OPEN failed; prior continuity retained",
+                )
+            return connecting, completion, failed_health
 
-        self._stop_active_event_transport()
+        lost_continuity: tuple[HealthNotice, ...] = ()
+        if disruption_reasons:
+            lost_continuity = (
+                self._invalidate_event_continuity(
+                    rpc_health=RpcHealth.DEGRADED,
+                    reason=(
+                        "legacy session reopened behind successful OPEN: "
+                        f"{'; '.join(disruption_reasons)}"
+                    ),
+                ),
+            )
+        else:
+            self._stop_active_event_transport()
         healthy = self.health.establish(
             effect.generation,
             rpc_health=RpcHealth.HEALTHY,
@@ -402,6 +455,10 @@ class LegacyExecutiveAdapter:
         )
         self._stream_watermark = 0
         # Completion deliberately precedes every notice stamped with the reserved generation.
+        if lost_continuity:
+            # As above, the pre-call connecting snapshot must not be delivered as current
+            # health after hidden replacement has been observed.
+            return (*lost_continuity, completion, healthy)
         return connecting, completion, healthy
 
     def _close_session(self, effect: GatewayEffect) -> tuple[GatewayNotice, ...]:
@@ -423,13 +480,16 @@ class LegacyExecutiveAdapter:
 
     def _request(self, effect: GatewayEffect) -> tuple[GatewayNotice, ...]:
         request = self._request_payload(effect.payload)
-        session_before = getattr(self._session, "session_id", None)
+        transport_before = self._transport_snapshot()
         response = self._session.request(request, use_session=True, retry=effect.idempotent)
-        session_after = getattr(self._session, "session_id", None)
-        if session_before is not None and session_before != session_after:
-            health_notice = self.health.transition(
+        disruption_reasons = self._transport_disruption_reasons(transport_before)
+        if disruption_reasons:
+            health_notice = self._invalidate_event_continuity(
                 rpc_health=RpcHealth.DEGRADED,
-                reason="legacy session changed during RPC; continuity requires reconciliation",
+                reason=(
+                    "legacy session/stream changed during RPC: "
+                    f"{'; '.join(disruption_reasons)}"
+                ),
             )
         else:
             health_notice = self.health.transition(
@@ -459,6 +519,7 @@ class LegacyExecutiveAdapter:
             ),
             publish=publish,
         )
+        session_id_before = getattr(self._session, "session_id", None)
         with self._event_lock:
             self._pending_event_state = state
         try:
@@ -473,6 +534,21 @@ class LegacyExecutiveAdapter:
                 if self._pending_event_state is state:
                     self._pending_event_state = None
             raise
+        session_id_after = getattr(self._session, "session_id", None)
+        if session_id_after != session_id_before:
+            lost = self._invalidate_event_continuity(
+                rpc_health=RpcHealth.DEGRADED,
+                reason="legacy session changed while establishing event subscription",
+            )
+            return (
+                lost,
+                self._failure_completion(
+                    effect,
+                    CompletionStatus.STALE,
+                    "legacy_session_changed_during_subscribe",
+                    "event subscription was established against unproven replacement session",
+                ),
+            )
         if not started:
             with self._event_lock:
                 state.stop_requested = True
@@ -545,10 +621,24 @@ class LegacyExecutiveAdapter:
 
     def _reconcile(self, effect: GatewayEffect) -> tuple[GatewayNotice, ...]:
         request = self._request_payload(effect.payload, default={"cmd": "ps"})
+        transport_before = self._transport_snapshot()
         try:
             response = self._session.request(request, use_session=True, retry=effect.idempotent)
         except ProtocolVersionError as exc:
+            notices: tuple[GatewayNotice, ...] = ()
+            disruption_reasons = self._transport_disruption_reasons(transport_before)
+            if disruption_reasons:
+                notices = (
+                    self._invalidate_event_continuity(
+                        rpc_health=RpcHealth.DEGRADED,
+                        reason=(
+                            "legacy reconciliation encountered hidden transport replacement: "
+                            f"{'; '.join(disruption_reasons)}"
+                        ),
+                    ),
+                )
             return (
+                *notices,
                 ReconcileResult(
                     generation=effect.generation,
                     status=ReconcileStatus.INCOMPATIBLE,
@@ -560,7 +650,7 @@ class LegacyExecutiveAdapter:
                 ),
             )
         except (ConnectionLostError, ExecutiveSessionError, OSError, json.JSONDecodeError) as exc:
-            notice = self.health.transition(
+            notice = self._invalidate_event_continuity(
                 rpc_health=RpcHealth.LOST,
                 reason=f"legacy reconciliation failed: {type(exc).__name__}",
             )
@@ -578,10 +668,20 @@ class LegacyExecutiveAdapter:
         if not isinstance(response, Mapping):
             raise ValueError("legacy reconciliation response must be an object")
 
-        notice = self.health.transition(
-            rpc_health=RpcHealth.HEALTHY,
-            reason="legacy snapshot received; target continuity remains unproven",
-        )
+        disruption_reasons = self._transport_disruption_reasons(transport_before)
+        if disruption_reasons:
+            notice = self._invalidate_event_continuity(
+                rpc_health=RpcHealth.DEGRADED,
+                reason=(
+                    "legacy reconciliation reopened transport but continuity remains unproven: "
+                    f"{'; '.join(disruption_reasons)}"
+                ),
+            )
+        else:
+            notice = self.health.transition(
+                rpc_health=RpcHealth.HEALTHY,
+                reason="legacy snapshot received; target continuity remains unproven",
+            )
         result = ReconcileResult(
             generation=effect.generation,
             status=ReconcileStatus.LEGACY_UNPROVEN,
@@ -594,6 +694,84 @@ class LegacyExecutiveAdapter:
             evidence_grade=effect.generation.evidence_grade,
         )
         return notice, result
+
+    def _transport_snapshot(self) -> _LegacyTransportSnapshot:
+        with self._event_lock:
+            active_event_state = self._active_event_state
+        return _LegacyTransportSnapshot(
+            session_id=getattr(self._session, "session_id", None),
+            active_event_state=active_event_state,
+            session_event_stream=getattr(
+                self._session,
+                "_event_stream",
+                _UNOBSERVED_EVENT_TRANSPORT,
+            ),
+        )
+
+    def _transport_disruption_reasons(
+        self,
+        before: _LegacyTransportSnapshot,
+    ) -> tuple[str, ...]:
+        reasons: list[str] = []
+        session_after = getattr(self._session, "session_id", None)
+        if before.session_id is not None and session_after != before.session_id:
+            reasons.append("wrapped session_id changed")
+
+        state = before.active_event_state
+        if state is None:
+            return tuple(reasons)
+
+        session_stream_before = before.session_event_stream
+        if session_stream_before is not _UNOBSERVED_EVENT_TRANSPORT:
+            session_stream_after = getattr(self._session, "_event_stream", None)
+            if session_stream_after is not session_stream_before:
+                reasons.append("wrapped event transport stopped or was replaced")
+
+        transport = state.transport_stream
+        stop_event = getattr(transport, "stop_event", None)
+        if (
+            stop_event is not None
+            and callable(getattr(stop_event, "is_set", None))
+            and stop_event.is_set()
+            and "wrapped event transport stopped or was replaced" not in reasons
+        ):
+            reasons.append("wrapped event transport stopped")
+        return tuple(reasons)
+
+    def _invalidate_event_continuity(
+        self,
+        *,
+        rpc_health: RpcHealth,
+        reason: str,
+    ) -> HealthNotice:
+        with self._event_lock:
+            had_event_state = (
+                self._active_event_state is not None
+                or self._pending_event_state is not None
+            )
+        previous = self.health.snapshot()
+        self._mark_event_states_stopped()
+        cleanup_error: BaseException | None = None
+        try:
+            self._session.stop_event_stream()
+        except Exception as exc:  # cleanup failure is retained in the typed diagnostic
+            cleanup_error = exc
+        event_was_enabled = previous.event_health is not EventHealth.DISABLED
+        event_health = (
+            EventHealth.LOST
+            if had_event_state or event_was_enabled
+            else EventHealth.DISABLED
+        )
+        detail = f"{reason}; reconciliation required"
+        if event_health is EventHealth.LOST:
+            detail += "; event continuity lost"
+        if cleanup_error is not None:
+            detail += f"; event cleanup failed: {type(cleanup_error).__name__}"
+        return self.health.transition(
+            rpc_health=rpc_health,
+            event_health=event_health,
+            reason=detail,
+        )
 
     def _start_observed_event_stream(
         self,
@@ -674,6 +852,7 @@ class LegacyExecutiveAdapter:
     ) -> None:
         pending_ack = 0
         last_seq_ack = 0
+        terminal_loss_reported = False
         try:
             while not stream.stop_event.is_set():
                 try:
@@ -684,10 +863,12 @@ class LegacyExecutiveAdapter:
                     if getattr(exc, "errno", None) == socket.timeout:
                         continue
                     self._report_event_failure(state, "event_transport_error", exc, lost=True)
+                    terminal_loss_reported = True
                     break
                 if not line:
                     if not stream.stop_event.is_set():
                         self._report_event_failure(state, "event_eof", None, lost=True)
+                        terminal_loss_reported = True
                     break
                 try:
                     event = json.loads(line)
@@ -722,7 +903,20 @@ class LegacyExecutiveAdapter:
                     pending_ack = 0
         except Exception as exc:
             self._report_event_failure(state, "event_callback_error", exc, lost=True)
+            terminal_loss_reported = True
         finally:
+            with self._event_lock:
+                unexpected_stop = not state.stop_requested
+            if unexpected_stop and not terminal_loss_reported:
+                # ExecutiveSession may stop this transport behind the adapter during a
+                # keepalive/RPC reopen.  Its stop flag is transport evidence, not an
+                # adapter-requested unsubscribe, so it must become observable LOST health.
+                self._report_event_failure(
+                    state,
+                    "event_transport_stopped",
+                    None,
+                    lost=True,
+                )
             stream.stop_event.set()
             try:
                 stream.sock.close()

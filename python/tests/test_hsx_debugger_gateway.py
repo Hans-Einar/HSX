@@ -12,6 +12,7 @@ from python.hsx_debugger.contracts import (
     EvidenceGrade,
     GatewayCompletion,
     GatewayEffect,
+    GatewayEvent,
     GenerationStamp,
     HealthNotice,
     RpcHealth,
@@ -173,6 +174,77 @@ def test_gateway_enforces_completion_before_new_generation_health():
     assert [notice.generation for notice in notices] == [active, reserved, reserved]
     assert isinstance(notices[1], GatewayCompletion)
     assert notices[1].authority is CompletionAuthority.AUTHORITATIVE_RESOURCE_ESTABLISHED
+
+
+@pytest.mark.parametrize("kind", (EffectKind.OPEN_SESSION, EffectKind.SUBSCRIBE_EVENTS))
+def test_authoritative_completion_is_not_starved_by_reentrant_old_event_producer(kind):
+    active = _generation()
+    reserved = (
+        replace(
+            active,
+            session_generation=17,
+            capability_generation=17,
+            stream_generation=0,
+        )
+        if kind is EffectKind.OPEN_SESSION
+        else replace(active, stream_generation=17)
+    )
+    effect = _effect(
+        f"replace-{kind.value}",
+        kind=kind,
+        generation=reserved,
+        idempotent=True,
+    )
+    health = GatewayHealthTracker(active, event_health=EventHealth.HEALTHY)
+    notices = []
+    completed = threading.Event()
+    sequence = 0
+    gateway = None
+
+    def old_event() -> GatewayEvent:
+        nonlocal sequence
+        sequence += 1
+        return GatewayEvent(
+            generation=active,
+            stream_id="old-stream",
+            sequence=sequence,
+            category="task_state",
+            payload={"state": "paused"},
+            evidence_grade=active.evidence_grade,
+        )
+
+    def handler(value, publish):
+        assert publish(old_event()) is True
+        return _completion(
+            value,
+            authority=CompletionAuthority.AUTHORITATIVE_RESOURCE_ESTABLISHED,
+        )
+
+    def sink(notice):
+        notices.append(notice)
+        if isinstance(notice, GatewayEvent):
+            assert gateway is not None
+            # Replenish the live queue from inside delivery.  A live-until-empty drain never
+            # reaches the completion; a snapshot-bounded drain performs only finite work.
+            gateway.publish_notice(old_event())
+        elif isinstance(notice, GatewayCompletion):
+            completed.set()
+
+    gateway = WorkerThreadExecutiveGateway(handler, health, queue_capacity=4)
+    gateway.start(sink)
+    gateway.submit(effect)
+    try:
+        assert completed.wait(1.0)
+    finally:
+        gateway.close()
+
+    completion_index = next(
+        index for index, notice in enumerate(notices) if isinstance(notice, GatewayCompletion)
+    )
+    assert completion_index == 1
+    assert notices[0].generation is active
+    assert notices[completion_index].generation is reserved
+    assert notices[completion_index].authority is CompletionAuthority.AUTHORITATIVE_RESOURCE_ESTABLISHED
 
 
 def test_gateway_rejects_pre_establishment_new_generation_notice():

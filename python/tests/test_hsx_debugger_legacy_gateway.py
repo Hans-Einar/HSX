@@ -49,9 +49,12 @@ class StubLegacySession:
         self.fault_callbacks = []
         self.event_options = []
         self.synchronous_start_events = []
+        self.request_actions = []
+        self.event_start_actions = []
         self.block_next_start = False
         self.start_entered = threading.Event()
         self.start_release = threading.Event()
+        self._event_stream = None
 
     def configure_session(self, **kwargs):
         self.configurations.append(kwargs)
@@ -60,6 +63,8 @@ class StubLegacySession:
         self.requests.append((dict(payload), use_session, retry))
         if self.session_id is None and not self.session_disabled:
             self.session_id = "legacy-session-local-token"
+        if self.request_actions:
+            self.request_actions.pop(0)(self)
         if self.responses:
             response = self.responses.pop(0)
             if isinstance(response, BaseException):
@@ -78,6 +83,8 @@ class StubLegacySession:
         self.event_callbacks.append(event_callback)
         self.fault_callbacks.append(fault_callback)
         self.event_options.append((filters, ack_interval))
+        if self.event_start_actions:
+            self.event_start_actions.pop(0)(self)
         synchronous = list(self.synchronous_start_events)
         self.synchronous_start_events.clear()
         for event in synchronous:
@@ -87,8 +94,12 @@ class StubLegacySession:
             self.start_entered.set()
             self.start_release.wait(1.0)
         if self.event_availability:
-            return self.event_availability.pop(0)
-        return self.events_available
+            available = self.event_availability.pop(0)
+        else:
+            available = self.events_available
+        if available:
+            self._event_stream = SimpleNamespace(stop_event=threading.Event())
+        return available
 
     def emit(self, event, *, stream=-1):
         return self.event_callbacks[stream](event)
@@ -98,6 +109,10 @@ class StubLegacySession:
 
     def stop_event_stream(self):
         self.stop_event_calls += 1
+        stream = self._event_stream
+        if stream is not None:
+            stream.stop_event.set()
+        self._event_stream = None
 
     def close(self):
         self.close_calls += 1
@@ -109,6 +124,15 @@ class _LineReader:
 
     def readline(self):
         return self.lines.popleft() if self.lines else ""
+
+
+class _BlockingLineReader:
+    def __init__(self):
+        self.release = threading.Event()
+
+    def readline(self):
+        self.release.wait(1.0)
+        return ""
 
 
 class _SocketStub:
@@ -166,6 +190,21 @@ class PrivateEventSession:
     def close(self):
         self.close_calls += 1
         self.stop_event_stream()
+
+
+class StoppablePrivateEventSession(PrivateEventSession):
+    def __init__(self):
+        super().__init__()
+        self.reader = _BlockingLineReader()
+
+    def _open_event_stream(self, _filters, _ack_interval):
+        return SimpleNamespace(
+            sock=_SocketStub(),
+            rfile=self.reader,
+            stop_event=threading.Event(),
+            thread=None,
+            token="stoppable-private-stream-token",
+        )
 
 
 def _effect(operation_id, kind, generation, *, payload=None, idempotent=False):
@@ -483,12 +522,255 @@ def test_non_idempotent_transport_failure_is_typed_exact_and_not_retryable():
     assert completion.failure is not None
     assert completion.failure.retryable is False
     assert session.requests[-1][2] is False
-    assert any(
-        isinstance(item, HealthNotice)
+    loss = next(
+        item
+        for item in notices
+        if isinstance(item, HealthNotice)
         and item.generation is reserved
         and item.rpc_health is RpcHealth.LOST
-        for item in notices
     )
+    assert loss.event_health is EventHealth.DISABLED
+
+
+def test_successful_hidden_session_reopen_loses_old_event_continuity_before_open_completion():
+    initial = initial_legacy_generation(display_pid=7)
+    session_stamp = _open_stamp(initial, 1)
+    stream_stamp = _stream_stamp(session_stamp, 1)
+    replacement = _open_stamp(stream_stamp, 2)
+    session = StubLegacySession([{"status": "ok", "tasks": []}])
+    notices = []
+    gateway = LegacyExecutiveGateway(session, initial_generation=initial)
+    gateway.start(notices.append)
+    _open(gateway, notices, session_stamp)
+    gateway.submit(
+        _effect("subscribe", EffectKind.SUBSCRIBE_EVENTS, stream_stamp, idempotent=True)
+    )
+    _wait_for(lambda: _has_completion(notices, "subscribe"))
+    old_callback = session.event_callbacks[-1]
+
+    def hidden_reopen(current):
+        current.stop_event_stream()
+        current.session_id = "legacy-session-reopened"
+
+    session.request_actions.append(hidden_reopen)
+    session.responses.append({"status": "ok", "tasks": []})
+    _open(gateway, notices, replacement, operation_id="open-replacement")
+    _wait_for(lambda: any(
+        isinstance(item, HealthNotice)
+        and item.generation == replacement
+        and item.event_health is EventHealth.DISABLED
+        for item in notices
+    ))
+
+    lost_index = next(
+        index
+        for index, item in enumerate(notices)
+        if isinstance(item, HealthNotice)
+        and item.generation == stream_stamp
+        and item.event_health is EventHealth.LOST
+        and "reconciliation required" in item.reason
+    )
+    completion_index = next(
+        index
+        for index, item in enumerate(notices)
+        if isinstance(item, GatewayCompletion) and item.operation_id == "open-replacement"
+    )
+    candidate_health_index = next(
+        index
+        for index, item in enumerate(notices)
+        if isinstance(item, HealthNotice)
+        and item.generation == replacement
+        and item.event_health is EventHealth.DISABLED
+    )
+    assert lost_index < completion_index < candidate_health_index
+    assert _completion(notices, "open-replacement").authority is CompletionAuthority.AUTHORITATIVE_RESOURCE_ESTABLISHED
+    assert gateway.health.generation is replacement
+    assert old_callback({"seq": 1, "type": "task_state", "pid": 7}) is False
+    gateway.close()
+
+
+def test_failed_replacement_open_cannot_restore_changed_wrapped_session_healthy():
+    initial = initial_legacy_generation(display_pid=7)
+    session_stamp = _open_stamp(initial, 1)
+    stream_stamp = _stream_stamp(session_stamp, 1)
+    failed_replacement = _open_stamp(stream_stamp, 2)
+    session = StubLegacySession([{"status": "ok", "tasks": []}])
+    notices = []
+    gateway = LegacyExecutiveGateway(session, initial_generation=initial)
+    gateway.start(notices.append)
+    _open(gateway, notices, session_stamp)
+    gateway.submit(
+        _effect("subscribe", EffectKind.SUBSCRIBE_EVENTS, stream_stamp, idempotent=True)
+    )
+    _wait_for(lambda: _has_completion(notices, "subscribe"))
+    old_callback = session.event_callbacks[-1]
+    attempt_notice_start = len(notices)
+
+    def failed_hidden_reopen(current):
+        current.stop_event_stream()
+        current.session_id = "legacy-session-rejected-replacement"
+
+    session.request_actions.append(failed_hidden_reopen)
+    session.responses.append({"status": "error", "error": "session denied"})
+    failed = _open(
+        gateway,
+        notices,
+        failed_replacement,
+        operation_id="open-replacement-failed",
+    )
+    _wait_for(lambda: any(
+        isinstance(item, HealthNotice)
+        and item.generation == stream_stamp
+        and item.event_health is EventHealth.LOST
+        for item in notices[attempt_notice_start:]
+    ))
+
+    assert failed.status is CompletionStatus.REJECTED
+    assert failed.authority is CompletionAuthority.ACK_ONLY
+    assert gateway.health.generation is stream_stamp
+    snapshot = gateway.health.snapshot()
+    assert snapshot.rpc_health is RpcHealth.DEGRADED
+    assert snapshot.event_health is EventHealth.LOST
+    assert "reconciliation required" in snapshot.reason
+    attempt_health = [
+        item
+        for item in notices[attempt_notice_start:]
+        if isinstance(item, HealthNotice) and item.generation == stream_stamp
+    ]
+    assert attempt_health
+    assert all(item.event_health is EventHealth.LOST for item in attempt_health)
+    assert old_callback({"seq": 1, "type": "task_state", "pid": 7}) is False
+    gateway.close()
+
+
+def test_rpc_transport_loss_also_loses_active_event_stream_and_requires_reconcile():
+    initial = initial_legacy_generation(display_pid=7)
+    session_stamp = _open_stamp(initial, 1)
+    stream_stamp = _stream_stamp(session_stamp, 1)
+    session = StubLegacySession([{"status": "ok", "tasks": []}])
+    notices = []
+    gateway = LegacyExecutiveGateway(session, initial_generation=initial)
+    gateway.start(notices.append)
+    _open(gateway, notices, session_stamp)
+    gateway.submit(
+        _effect("subscribe", EffectKind.SUBSCRIBE_EVENTS, stream_stamp, idempotent=True)
+    )
+    _wait_for(lambda: _has_completion(notices, "subscribe"))
+    old_callback = session.event_callbacks[-1]
+
+    session.responses.append(ConnectionLostError("connection reset"))
+    gateway.submit(
+        _effect(
+            "transport-loss",
+            EffectKind.REQUEST,
+            stream_stamp,
+            payload={"request": {"cmd": "debug.state", "pid": 7, "state": "running"}},
+            idempotent=False,
+        )
+    )
+    _wait_for(lambda: _has_completion(notices, "transport-loss"))
+
+    completion = _completion(notices, "transport-loss")
+    assert completion.status is CompletionStatus.TRANSPORT_ERROR
+    loss = next(
+        item
+        for item in reversed(notices)
+        if isinstance(item, HealthNotice) and item.generation == stream_stamp
+    )
+    assert loss.rpc_health is RpcHealth.LOST
+    assert loss.event_health is EventHealth.LOST
+    assert "reconciliation required" in loss.reason
+    assert old_callback({"seq": 1, "type": "task_state", "pid": 7}) is False
+    gateway.close()
+
+
+def test_same_session_rpc_that_replaces_event_transport_is_not_reported_healthy():
+    initial = initial_legacy_generation(display_pid=7)
+    session_stamp = _open_stamp(initial, 1)
+    stream_stamp = _stream_stamp(session_stamp, 1)
+    session = StubLegacySession(
+        [
+            {"status": "ok", "tasks": []},
+            {"status": "ok", "tasks": []},
+        ]
+    )
+    notices = []
+    gateway = LegacyExecutiveGateway(session, initial_generation=initial)
+    gateway.start(notices.append)
+    _open(gateway, notices, session_stamp)
+    gateway.submit(
+        _effect("subscribe", EffectKind.SUBSCRIBE_EVENTS, stream_stamp, idempotent=True)
+    )
+    _wait_for(lambda: _has_completion(notices, "subscribe"))
+    old_callback = session.event_callbacks[-1]
+    session_id = session.session_id
+
+    session.request_actions.append(
+        lambda current: setattr(
+            current,
+            "_event_stream",
+            SimpleNamespace(stop_event=threading.Event()),
+        )
+    )
+    gateway.submit(
+        _effect(
+            "transport-replaced",
+            EffectKind.REQUEST,
+            stream_stamp,
+            payload={"request": {"cmd": "ps"}},
+            idempotent=True,
+        )
+    )
+    _wait_for(lambda: _has_completion(notices, "transport-replaced"))
+
+    assert session.session_id == session_id
+    health_notice = next(
+        item
+        for item in reversed(notices)
+        if isinstance(item, HealthNotice) and item.generation == stream_stamp
+    )
+    assert health_notice.rpc_health is RpcHealth.DEGRADED
+    assert health_notice.event_health is EventHealth.LOST
+    assert "event transport stopped or was replaced" in health_notice.reason
+    assert "reconciliation required" in health_notice.reason
+    assert old_callback({"seq": 1, "type": "task_state", "pid": 7}) is False
+    gateway.close()
+
+
+def test_subscribe_cannot_promote_stream_created_under_hidden_replacement_session():
+    initial = initial_legacy_generation(display_pid=7)
+    session_stamp = _open_stamp(initial, 1)
+    stream_stamp = _stream_stamp(session_stamp, 1)
+    session = StubLegacySession([{"status": "ok", "tasks": []}])
+    notices = []
+    gateway = LegacyExecutiveGateway(session, initial_generation=initial)
+    gateway.start(notices.append)
+    _open(gateway, notices, session_stamp)
+    session.event_start_actions.append(
+        lambda current: setattr(current, "session_id", "subscribe-reopened-session")
+    )
+
+    gateway.submit(
+        _effect("subscribe-hidden-reopen", EffectKind.SUBSCRIBE_EVENTS, stream_stamp, idempotent=True)
+    )
+    _wait_for(lambda: _has_completion(notices, "subscribe-hidden-reopen"))
+
+    completion = _completion(notices, "subscribe-hidden-reopen")
+    assert completion.status is CompletionStatus.STALE
+    assert completion.authority is CompletionAuthority.ACK_ONLY
+    assert completion.failure is not None
+    assert completion.failure.code == "legacy_session_changed_during_subscribe"
+    assert gateway.health.generation is session_stamp
+    health_notice = next(
+        item
+        for item in reversed(notices)
+        if isinstance(item, HealthNotice) and item.generation == session_stamp
+    )
+    assert health_notice.rpc_health is RpcHealth.DEGRADED
+    assert health_notice.event_health is EventHealth.LOST
+    assert "reconciliation required" in health_notice.reason
+    assert session.emit({"seq": 1, "type": "task_state", "pid": 7}) is False
+    gateway.close()
 
 
 def test_subscribe_buffers_candidate_event_until_authoritative_completion():
@@ -728,6 +1010,36 @@ def test_private_event_reader_surfaces_malformed_frame_and_eof_without_silent_he
         and item.sequence == 1
         for item in notices
     )
+
+
+def test_private_event_transport_stopped_behind_adapter_surfaces_lost_without_next_effect():
+    initial = initial_legacy_generation()
+    session_stamp = _open_stamp(initial, 1)
+    stream_stamp = _stream_stamp(session_stamp, 1)
+    session = StoppablePrivateEventSession()
+    notices = []
+    gateway = LegacyExecutiveGateway(session, initial_generation=initial)
+    gateway.start(notices.append)
+    _open(gateway, notices, session_stamp)
+    gateway.submit(
+        _effect("subscribe", EffectKind.SUBSCRIBE_EVENTS, stream_stamp, idempotent=True)
+    )
+    _wait_for(lambda: _has_completion(notices, "subscribe"))
+
+    stream = session._event_stream
+    assert stream is not None
+    stream.stop_event.set()
+    session.reader.release.set()
+    _wait_for(lambda: any(
+        isinstance(item, HealthNotice)
+        and item.generation == stream_stamp
+        and item.event_health is EventHealth.LOST
+        and "event_transport_stopped" in item.reason
+        for item in notices
+    ))
+
+    assert gateway.health.snapshot().event_health is EventHealth.LOST
+    gateway.close()
 
 
 def test_reconcile_with_same_legacy_pid_is_always_legacy_unproven():

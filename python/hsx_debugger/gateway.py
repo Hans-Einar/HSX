@@ -280,13 +280,16 @@ class WorkerThreadExecutiveGateway:
         """Deliver queued old-active evidence before a replacement completion.
 
         A blocking OPEN/SUBSCRIBE handler can overlap an existing event reader.  Those event
-        callbacks enqueue onto this worker lane while the handler is busy.  Drain only exact
-        already-established notices now; defer effects, STOP, and candidate-generation
-        evidence until normal FIFO processing resumes.
+        callbacks enqueue onto this worker lane while the handler is busy.  Drain only the
+        queue snapshot that existed when the handler returned, and only exact already-
+        established notices from that snapshot.  A live producer therefore cannot postpone
+        the authoritative completion indefinitely.  Effects, STOP, candidate-generation
+        evidence, and anything appended after the snapshot resume through normal FIFO work.
         """
 
         deferred: list[object] = []
-        while True:
+        snapshot_size = self._queue.qsize()
+        for _ in range(snapshot_size):
             try:
                 item = self._queue.get_nowait()
             except queue.Empty:
@@ -418,17 +421,29 @@ class WorkerThreadExecutiveGateway:
 
     def _deliver_effect_error(self, effect: GatewayEffect, error: GatewayEffectError) -> None:
         if error.status is CompletionStatus.TRANSPORT_ERROR:
+            event_lost = self.health.event_health is EventHealth.LOST
             self._deliver_notice(
                 self.health.transition(
                     rpc_health=RpcHealth.LOST,
-                    reason=f"RPC transport failure: {error.code}",
+                    reason=(
+                        f"RPC transport failure: {error.code}; reconciliation required; "
+                        "event continuity lost"
+                        if event_lost
+                        else f"RPC transport failure: {error.code}; reconciliation required"
+                    ),
                 )
             )
         elif error.status is CompletionStatus.PROTOCOL_ERROR:
+            event_lost = self.health.event_health is EventHealth.LOST
             self._deliver_notice(
                 self.health.transition(
                     rpc_health=RpcHealth.DEGRADED,
-                    reason=f"RPC protocol failure: {error.code}",
+                    reason=(
+                        f"RPC protocol failure: {error.code}; "
+                        "event continuity lost; reconciliation required"
+                        if event_lost
+                        else f"RPC protocol failure: {error.code}"
+                    ),
                 )
             )
         cause = type(error.cause).__name__ if error.cause is not None else None
