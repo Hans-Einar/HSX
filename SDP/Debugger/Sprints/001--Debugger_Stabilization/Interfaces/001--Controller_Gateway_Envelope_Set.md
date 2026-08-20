@@ -1,6 +1,6 @@
 # DBG-D-001 / DBG-D-002 v1 — Frozen Controller/Gateway Envelope Set
 
-- Status: **FROZEN BUT BLOCKED — GENERATION HANDSHAKE REFREEZE REQUIRED**
+- Status: **SUPERSEDED HISTORICAL CONTRACT — DO NOT IMPLEMENT**
 - Interface version: `dbg.controller-gateway/1`
 - Steering authority: issue #38 comment `5356484309`
 - Design inputs: `DBG-D-001`, `DBG-D-002`, `DBG-D-003`, `DBG-D-009`
@@ -15,8 +15,9 @@ Slice may import it but may not edit it. Any incompatible field, enum, generatio
 change stops both workers and returns to Master/Design; no worker may improvise a parallel DTO.
 
 Worker implementation exposed a generation-handshake contradiction before any product commit.
-See `002--Generation_Handshake_Refreeze_Proposal.md`; no implementation may resume until
-Steering authorizes/refuses the proposed `dbg.controller-gateway/1.1` correction.
+See `002--Generation_Handshake_Refreeze_Proposal.md`. Steering refroze the corrected successor
+as `dbg.controller-gateway/1.1` in comment `5357146230`; this v1 text remains unchanged
+historical blocker evidence.
 
 ## Identity and generation rules
 
@@ -138,4 +139,4 @@ keepalive, callbacks and future integration adapters never mutate controller sta
 - deadline expiry produces no synthetic state;
 - gateway/controller imports share the one `contracts.py` definitions with no duplicate DTO.
 
-Status is blocked for refreeze; the workers stopped exactly as this contract required.
+Status is superseded; the workers stopped exactly as this contract required.

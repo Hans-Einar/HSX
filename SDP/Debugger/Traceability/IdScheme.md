@@ -37,6 +37,7 @@ track IDs rather than silently renamed in historical documents.
 - `DBG-SL-001-004-002` — typed legacy gateway/health/recovery foundation
 - `DBG-SL-001-004-003` — early controller/gateway integration
 - `DBG-RVW-001-004-001..DBG-RVW-001-004-003` — independent Slice reviews
+- `DBG-RVW-001-004-004` — fresh independent `dbg.controller-gateway/1.1` refreeze review
 - `DBG-VER-001-004-001..DBG-VER-001-004-003` — formal Slice verifications
 - `DBG-RVW-002-001-001` / `DBG-VER-002-001-001` — RF-002 parent final review/verification
 - `DBG-RVW-003-001-001` / `DBG-VER-003-001-001` — RF-003 parent final review/verification

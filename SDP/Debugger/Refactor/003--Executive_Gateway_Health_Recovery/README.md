@@ -1,6 +1,6 @@
 # DBG-RF-003 — Typed Executive Gateway, Health, and Recovery Foundation
 
-- Status: **PAUSED — SHARED GENERATION HANDSHAKE REFREEZE REQUIRED**
+- Status: **PAUSED — v1.1 INTERFACE REVIEW REQUIRED BEFORE RESUME**
 - Steering authority: issue #38 comment `5356484309`
 - Iteration: `DBG-IT-001-004`
 - Owning Slice: `DBG-SL-001-004-002`
@@ -8,7 +8,7 @@
 - Requirements: `DBG-R-009..013`, `DBG-R-026..027`, `DBG-R-034`
 - Findings: `DBG-F-010..011`, `DBG-F-013`, `DBG-F-017`, transport part of `DBG-F-026`
 - Architecture/design: `DBG-A-002`, `DBG-D-002`, `DBG-D-009`
-- Shared interface: `dbg.controller-gateway/1` (frozen, read-only consumer)
+- Shared interface: `dbg.controller-gateway/1.1` (refrozen, read-only consumer; review pending)
 - Product baseline: `bf92c9be6cf81a7cb704778dafe88e55fee2e235`
 
 ## Refactor objective

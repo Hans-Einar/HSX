@@ -19,7 +19,7 @@ issues:
     master_signoff: pass
   DBG-DA-001:
     issue: 38
-    status: debugger_v1_design_frozen_first_wave_interface_blocked
+    status: debugger_v1_design_frozen_interface_v1_1_review_active
     decision_package_comment: 5346421143
     architecture_acceptance_comment: 5348190806
     steering_start_comment: 5345600066
@@ -93,20 +93,23 @@ issues:
     first_wave_recommended_interface: dbg.controller-gateway/1.1
     first_wave_wip_stash: efc91f2640647402bc92c69bde1c57685cfaa1f1
     first_wave_interface_blocker_comment: 5357088729
-    portable_contract_current_gate: steering_generation_handshake_refreeze_decision
+    first_wave_interface_refreeze_comment: 5357146230
+    first_wave_refrozen_interface: dbg.controller-gateway/1.1
+    first_wave_interface_review: DBG-RVW-001-004-004
+    portable_contract_current_gate: interface_v1_1_implementation_then_independent_review
   DBG-RF-002:
     issue: 39
-    status: paused_uncommitted_interface_blocker
+    status: paused_pending_interface_review
     iteration: DBG-IT-001-004
     slice: DBG-SL-001-004-001
-    shared_interface: dbg.controller-gateway/1
+    shared_interface: dbg.controller-gateway/1.1
     steering_comment: 5356484309
   DBG-RF-003:
     issue: 40
-    status: paused_uncommitted_interface_blocker
+    status: paused_pending_interface_review
     iteration: DBG-IT-001-004
     slice: DBG-SL-001-004-002
-    shared_interface: dbg.controller-gateway/1
+    shared_interface: dbg.controller-gateway/1.1
     steering_comment: 5356484309
   DBG-RF-004:
     issue: 41

@@ -1,10 +1,10 @@
 # DBG-SL-001-004-002 — Typed Legacy Executive Gateway / Health Foundation
 
-- Status: **PAUSED BEFORE PRODUCT COMMIT — SHARED INTERFACE BLOCKER**
+- Status: **PAUSED — v1.1 INTERFACE REVIEW REQUIRED BEFORE FRESH RESUME**
 - Parent: `DBG-RF-003`
 - Iteration: `DBG-IT-001-004`
 - Steering: issue #38 comment `5356484309`
-- Frozen interface: `dbg.controller-gateway/1` (read-only implementation dependency)
+- Frozen interface: `dbg.controller-gateway/1.1` (read-only implementation dependency)
 - Review: `DBG-RVW-001-004-002`
 - Verification: `DBG-VER-001-004-002`
 - Implementation base: `97d8c5b8d62d56dcfcab59c97c516d83f68c7075`
@@ -31,6 +31,9 @@ replace existing backend/DAP/CLI paths.
 7. Reconcile returns conservative typed outcomes. Reopened legacy session/PID is
    `LEGACY_UNPROVEN`, never retained portable continuity.
 8. Close is idempotent, bounded and does not leak/join the current worker thread.
+9. Gateway never allocates a generation: it validates/echoes the controller-reserved stamp,
+   emits authoritative resource-established completion before new-generation notices, and
+   preserves old active continuity while replacement is pending.
 
 ## Owned files
 
@@ -52,6 +55,9 @@ product/test file may be edited.
 - import/compile sanity for all new modules;
 - no `execd.py`, VM, ExecutiveSession, backend, DAP/CLI/VS Code/AVR diff;
 - worker commits exact owned-file head and returns clean status.
+
+The pre-refreeze stash is candidate WIP only. Fresh worker must selectively apply/rework it
+against reviewed v1.1 and rerun all evidence; no old test result carries sign-off credit.
 
 ## Completion signal
 

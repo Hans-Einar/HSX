@@ -169,8 +169,8 @@ relations:
     to:
       - DBG-SL-001-004-002
       - DBG-SL-001-004-003
-    interface: dbg.controller-gateway/1
-    status: blocked_pending_refreeze
+    interface: dbg.controller-gateway/1.1
+    status: refrozen_pending_review
   - from: DBG-SL-001-004-001
     type: prerequisite_for
     to:
@@ -197,7 +197,27 @@ relations:
     type: routed_to_steering
     to:
       - issue-38
-    recommended_resolution: dbg.controller-gateway/1.1_controller_preallocated_generation
+    recommended_resolution: dbg.controller-gateway/1.1_reserve_authoritative_success_promote
+    status: resolved_by_issue_38_comment_5357146230
+  - from: dbg.controller-gateway/1
+    type: superseded_by
+    to:
+      - dbg.controller-gateway/1.1
+  - from: dbg.controller-gateway/1.1
+    type: refrozen_by_steering
+    to:
+      - issue-38-comment-5357146230
+  - from: dbg.controller-gateway/1.1
+    type: reviewed_by
+    to:
+      - DBG-RVW-001-004-004
+  - from: dbg.controller-gateway/1.1
+    type: prerequisite_for
+    to:
+      - DBG-SL-001-004-001
+      - DBG-SL-001-004-002
+      - DBG-SL-001-004-003
+    status: pending_independent_interface_review
   - from: DBG-RF-001
     type: implemented_by
     to:

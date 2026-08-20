@@ -1,10 +1,10 @@
 # DBG-SL-001-004-001 — Controller / State / Stop-Epoch Foundation
 
-- Status: **PAUSED BEFORE PRODUCT COMMIT — SHARED INTERFACE BLOCKER**
+- Status: **PAUSED — v1.1 INTERFACE REVIEW REQUIRED BEFORE FRESH RESUME**
 - Parent: `DBG-RF-002`
 - Iteration: `DBG-IT-001-004`
 - Steering: issue #38 comment `5356484309`
-- Frozen interface: `dbg.controller-gateway/1`
+- Frozen interface: `dbg.controller-gateway/1.1`
 - Review: `DBG-RVW-001-004-001`
 - Verification: `DBG-VER-001-004-001`
 - Implementation base: `97d8c5b8d62d56dcfcab59c97c516d83f68c7075`
@@ -27,6 +27,11 @@ reducer, stop-epoch store and single-writer actor. No existing production fronte
 6. Actor queue is bounded, is the sole state writer, executes effect sink outside state
    mutation, isolates subscriber exceptions and closes idempotently without self-join.
 7. Legacy epoch evidence is explicitly graded and never promoted to portable continuity.
+8. Controller owns separate monotonic session/stream watermarks, stores pending reservations,
+   preserves legal old continuity while pending, and promotes only matching authoritative
+   resource-established success.
+9. Failure/cancellation burns without promotion; same-operation retry reuses; new operation
+   receives the next generation; numeric greater-than adoption is forbidden.
 
 ## Owned files
 
@@ -51,6 +56,9 @@ from this worker's perspective.
 - import/compile sanity for all new modules;
 - no `execd.py`, VM, ExecutiveSession, DAP/CLI/VS Code/AVR diff;
 - worker commits exact owned-file head and returns clean status.
+
+The pre-refreeze stash is candidate WIP only. Fresh worker must selectively apply/rework it
+against reviewed v1.1 and rerun all evidence; no old test result carries sign-off credit.
 
 ## Completion signal
 

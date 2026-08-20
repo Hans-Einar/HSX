@@ -1,10 +1,10 @@
 # DBG-SL-001-004-003 — Early Controller/Gateway Integration
 
-- Status: **BLOCKED — SHARED INTERFACE REFREEZE AND BOTH PARENT SIGN-OFFS REQUIRED**
+- Status: **BLOCKED — v1.1 REVIEW AND BOTH PARENT SIGN-OFFS REQUIRED**
 - Parents: `DBG-RF-002`, `DBG-RF-003`
 - Iteration: `DBG-IT-001-004`
 - Steering: issue #38 comment `5356484309`
-- Interface: frozen `dbg.controller-gateway/1`
+- Interface: refrozen `dbg.controller-gateway/1.1`
 - Review: `DBG-RVW-001-004-003`
 - Verification: `DBG-VER-001-004-003`
 - Contract base: `97d8c5b8d62d56dcfcab59c97c516d83f68c7075`
@@ -26,6 +26,9 @@ interfaces; it does not migrate DAP/CLI production ownership.
 6. Event loss/gap invalidates epoch, marks event health non-healthy and requires reconcile.
 7. `LEGACY_UNPROVEN` reconcile cannot retain epoch/target continuity.
 8. Deadline expiry produces failure/recovery input without synthetic target state.
+9. OPEN/SUBSCRIBE reserve -> pending old continuity -> authoritative success -> promote is
+   proven across the real controller/gateway ports, including failure burn and stale late
+   completion rejection.
 
 ## Owned files
 

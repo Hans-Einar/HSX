@@ -1,7 +1,7 @@
 schema_version: 1
 track: Debugger
 namespace: DBG
-status: debugger_first_structural_wave_blocked_pending_interface_refreeze
+status: debugger_interface_v1_1_refreeze_review_active
 baseline:
   repository: Hans-Einar/HSX
   implementation_branch: Implementation/vscode
@@ -94,7 +94,7 @@ active_gate:
   iteration:
     id: DBG-IT-001-004
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/ScrumIterations.md
-    status: blocked_pending_generation_handshake_refreeze
+    status: interface_v1_1_refreeze_review_active
   architecture_review:
     id: DBG-RVW-001-002-001
     status: rework
@@ -197,57 +197,60 @@ proposed:
     path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
     status: complete_accepted_dependency
 first_structural_wave:
-  status: blocked_pending_generation_handshake_refreeze
+  status: interface_v1_1_refreeze_review_active
   steering_comment: 5356484309
   activation_comment: 5356712010
   activation_correction_comment: 5356745504
   branch: codex/dbg-rf-002-003
   contract_head: 97d8c5b8d62d56dcfcab59c97c516d83f68c7075
   shared_interface:
-    version: dbg.controller-gateway/1
-    path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/001--Controller_Gateway_Envelope_Set.md
-    status: frozen_but_blocked_refreeze_required
+    version: dbg.controller-gateway/1.1
+    path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/003--Controller_Gateway_Envelope_Set_v1_1.md
+    supersedes: dbg.controller-gateway/1
+    historical_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/001--Controller_Gateway_Envelope_Set.md
+    status: refrozen_pending_interface_implementation_and_review
     implementation_owner: DBG-SL-001-004-001
     read_only_consumer: DBG-SL-001-004-002
     blocker_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/002--Generation_Handshake_Refreeze_Proposal.md
-    recommended_next_version: dbg.controller-gateway/1.1
+    steering_refreeze_comment: 5357146230
+    review: DBG-RVW-001-004-004
     steering_blocker_comment: 5357088729
   refactors:
     - id: DBG-RF-002
       path: SDP/Debugger/Refactor/002--Debugger_Controller_State_Epoch/README.md
-      status: paused_uncommitted_interface_blocker
+      status: paused_pending_interface_review
       slice: DBG-SL-001-004-001
       final_review: DBG-RVW-002-001-001
       final_verification: DBG-VER-002-001-001
     - id: DBG-RF-003
       path: SDP/Debugger/Refactor/003--Executive_Gateway_Health_Recovery/README.md
-      status: paused_uncommitted_interface_blocker
+      status: paused_pending_interface_review
       slice: DBG-SL-001-004-002
       final_review: DBG-RVW-003-001-001
       final_verification: DBG-VER-003-001-001
   slices:
     - id: DBG-SL-001-004-001
       path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/002--Controller_Foundation.md
-      status: paused_before_product_commit
+      status: paused_pending_interface_review
       implementation_base: 97d8c5b8d62d56dcfcab59c97c516d83f68c7075
       review: DBG-RVW-001-004-001
       verification: DBG-VER-001-004-001
     - id: DBG-SL-001-004-002
       path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/003--Gateway_Foundation.md
-      status: paused_before_product_commit
+      status: paused_pending_interface_review
       implementation_base: 97d8c5b8d62d56dcfcab59c97c516d83f68c7075
       review: DBG-RVW-001-004-002
       verification: DBG-VER-001-004-002
     - id: DBG-SL-001-004-003
       path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/004--Controller_Gateway_Integration.md
-      status: blocked_pending_interface_refreeze_and_parent_signoff
+      status: blocked_pending_interface_review_and_parent_signoff
       contract_base: 97d8c5b8d62d56dcfcab59c97c516d83f68c7075
       review: DBG-RVW-001-004-003
       verification: DBG-VER-001-004-003
   runtime_profile: hsx.python-debug-legacy/1
   still_blocked: DBG-RF-004..DBG-RF-009
   partial_product_wip_stash: efc91f2640647402bc92c69bde1c57685cfaa1f1
-  current_gate: steering_generation_handshake_refreeze_decision
+  current_gate: interface_v1_1_implementation_then_independent_review
 structural_gate:
   rule: Only Steering-authorized Refactors with frozen Slice/interface contracts may execute.
   authorized_refactors:

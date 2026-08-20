@@ -1,16 +1,12 @@
 # DBG-SPR-001 Handoff
 
-Status: `iteration_004_blocked_pending_generation_handshake_refreeze`
+Status: `interface_v1_1_refrozen_implementation_and_review_active`
 
 ## Current objective
 
-Await Steering/Design decision on the shared OPEN/SUBSCRIBE generation handshake. Both workers
-stopped before staging/committing product code; partial owned-file work is preserved in
-recoverable stash `efc91f2640647402bc92c69bde1c57685cfaa1f1`. Integration and RF-004..009
-remain blocked.
-
-Steering question: issue #38 comment `5357088729`; recommended resolution is controller-owned
-preallocation in `dbg.controller-gateway/1.1`.
+Implement only the refrozen `dbg.controller-gateway/1.1` shared records/reservation helpers and
+the Steering-mandated contract fixtures from a clean head, then obtain fresh
+`DBG-RVW-001-004-004`. RF-002/RF-003 WIP remains stashed/unreviewed until that PASS.
 
 ## Authority
 
@@ -134,9 +130,9 @@ preallocation in `dbg.controller-gateway/1.1`.
 
 ## Exact next step
 
-Wait for Steering on issue #38 comment `5357088729`. On authorization, re-freeze
-`dbg.controller-gateway/1.1` before restoring/reassigning any WIP. Until then, take no product
-action.
+Assign a fresh bounded interface worker for only `__init__.py`, `contracts.py` and
+`test_hsx_debugger_contracts.py`; commit exact refreeze implementation head; assign fresh
+interface reviewer. Resume foundations only on PASS.
 
 ## Traceability state
 
@@ -165,7 +161,7 @@ action.
 - Frozen HSX target contracts: `HSX-R-001..036`, `HSX-A-001..005`, `HSX-D-001..005`
 - Active iteration: `DBG-IT-001-004`
 - Frozen Slices: `DBG-SL-001-004-001..003`
-- Frozen shared interface: `dbg.controller-gateway/1`
+- Refrozen shared interface: `dbg.controller-gateway/1.1`
 - Review `HSX-RVW-001-001-001`: REWORK at `5fff403`
 - Review `HSX-RVW-001-001-002`: REWORK at `ffd0a42`
 - Review `HSX-RVW-001-001-003`: REWORK at `efd43d2`
@@ -181,13 +177,13 @@ action.
 - Publication blocker: #47 comment `5356183884`, #38 comment `5356186692`
 - Fresh remote verification: PASS at `89cb74a10ce36d8b0f4d0cc60332d3070c2c635f`
 - Resynthesized supplemental Studies: `HSX-ST-007`, `HSX-ST-008`
-- Active gate: Steering generation-handshake refreeze decision
+- Active gate: interface v1.1 implementation and `DBG-RVW-001-004-004`
 
 ## Agents and worktree
 
-The prior design/portable-contract chain is complete. RF-002/RF-003 workers stopped on the
-frozen-interface contradiction; no worker is active until refreeze authority. Controlled work
-is on `codex/dbg-rf-002-003`;
+The prior design/portable-contract chain is complete. Steering authorized the v1.1 refreeze;
+RF-002/RF-003 remain paused while a fresh interface worker/reviewer establishes a clean exact
+head. Controlled work is on `codex/dbg-rf-002-003`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.
 

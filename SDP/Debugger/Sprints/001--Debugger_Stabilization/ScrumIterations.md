@@ -399,7 +399,7 @@ publication passed. Steering froze the HSX portable target contracts in #47 comm
 
 ## DBG-IT-001-004 — Controller/Gateway First Structural Wave
 
-Status: BLOCKED — SHARED GENERATION HANDSHAKE REFREEZE REQUIRED
+Status: INTERFACE v1.1 REFREEZE IMPLEMENTATION / REVIEW ACTIVE
 
 ### Authority and scope
 
@@ -455,9 +455,9 @@ generation, while controller exact-fencing rejects the first resulting `N+1` not
 authorized adoption transition. No product file was staged/committed and no Slice review or
 verification began.
 
-Master recommends `dbg.controller-gateway/1.1`: the controller preallocates/atomically adopts
-the next generation before dispatch, and the gateway validates/echoes that exact effect stamp.
-Alternatives and rejection rationale are in
-`Interfaces/002--Generation_Handshake_Refreeze_Proposal.md`. Workers and integration remain
-blocked pending issue #38 Steering direction. Partial owned-file WIP is recoverably stashed at
-`efc91f2640647402bc92c69bde1c57685cfaa1f1` and has no implementation authority.
+Steering authorized `dbg.controller-gateway/1.1` with reserve -> authoritative success ->
+promote semantics in issue #38 comment `5357146230`. The frozen successor is
+`Interfaces/003--Controller_Gateway_Envelope_Set_v1_1.md`. A clean bounded interface
+implementation, all nine specified fixtures and fresh `DBG-RVW-001-004-004` are required
+before RF-002/RF-003 resume. Partial stash `efc91f2640647402bc92c69bde1c57685cfaa1f1`
+remains candidate-only and integration/RF-004..009 remain blocked.
