@@ -213,7 +213,7 @@ implementation remains blocked.
 
 ## DBG-IT-001-003 — Portable Debug Runtime Contracts
 
-Status: MASTER EXACT-CONTENT SIGN-OFF PASS — ISSUE PACKAGES NEXT
+Status: DECISION PACKAGES POSTED — AWAITING STEERING
 
 ### Goal
 

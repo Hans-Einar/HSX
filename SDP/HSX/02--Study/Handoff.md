@@ -1,6 +1,6 @@
 # HSX Portable Debug Contract Handoff
 
-- Status: MASTER EXACT-CONTENT SIGN-OFF PASS — ISSUE PACKAGES NEXT
+- Status: DECISION PACKAGES POSTED — AWAITING STEERING
 - Coordinator: `HSX-ST-001`, issue #47
 - Debugger dependency: `DBG-ST-006`, issue #38
 - Iteration: `DBG-IT-001-003`
@@ -9,13 +9,14 @@
 - Final fresh review: `HSX-RVW-001-001-006` — PASS
 - Verification: `HSX-VER-001-001-001` — PASS
 - Master sign-off: PASS on `b57e368f77bb533b09397d633fc92565655e1668`
-- Active gate: `post_issue_decision_packages_and_await_steering`
+- Decision package: issue #47 comment `5355340420`
+- Cross-track package: issue #38 comment `5355340598`
+- Active gate: `steering_decision_issues_47_38`
 
 ## Current objective
 
-Post the signed reviewed/verified proposal package to issues #47/#38, then stop and await
-Steering. No proposal-content change, acceptance, design freeze or implementation dispatch is
-permitted before a later Steering decision.
+Stop and await Steering decisions in issues #47/#38. No proposal-content change, acceptance,
+design freeze or implementation dispatch is permitted before a later durable decision.
 
 ## Authority
 
@@ -26,9 +27,8 @@ permitted before a later Steering decision.
 
 ## Exact next step
 
-Post the reviewed/verified decision packages to issues #47/#38 and stop before contract
-acceptance, design freeze, or implementation authorization unless Steering records a later
-decision.
+Wait for Steering. If Steering accepts or requests rework, reconstruct the next gate from the
+issue comments and CurrentIndex before any design freeze or implementation authorization.
 
 ## Master verification
 

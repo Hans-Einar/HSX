@@ -17,7 +17,7 @@ issues:
     contract_requirements: HSX-R-001..HSX-R-036
     contract_architecture: HSX-A-001..HSX-A-005
     contract_design: HSX-D-001..HSX-D-005
-    contract_status: master_signed_proposal_pending_steering
+    contract_status: awaiting_steering_acceptance
     review_status: rework
     reviewed_head: 5fff403f6668f794b760caf64ef34b4d1ecb4ae3
     rereview: HSX-RVW-001-001-002
@@ -48,7 +48,10 @@ issues:
     master_signoff_status: pass
     master_signoff_proposal_content_head: b57e368f77bb533b09397d633fc92565655e1668
     master_signoff_record: SDP/HSX/Verification/HSX-ST-001--Master_Signoff.md
-    current_gate: post_issue_decision_packages_and_await_steering
+    master_signoff_record_commit: d8af9b43544cd17a722d26474d9a613fdf08f8d7
+    hsx_decision_package_comment: 5355340420
+    debugger_decision_package_comment: 5355340598
+    current_gate: steering_decision_issues_47_38
     supplemental_studies:
       - HSX-ST-007
       - HSX-ST-008

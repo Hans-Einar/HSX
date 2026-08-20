@@ -1,11 +1,12 @@
 # DBG-SPR-001 Handoff
 
-Status: `master_signed_package_ready_for_issue_decision_packages`
+Status: `decision_packages_posted_awaiting_steering`
 
 ## Current objective
 
-Post the Master-signed reviewed/verified exact proposal-content package to issues #47/#38,
-then stop and await Steering. No structural product or AVR work may be dispatched.
+Stop and await Steering in issues #47/#38. Decision packages are issue #47 comment
+`5355340420` and issue #38 comment `5355340598`. No structural product or AVR work may be
+dispatched.
 
 ## Authority
 
@@ -121,12 +122,12 @@ then stop and await Steering. No structural product or AVR work may be dispatche
 ## Not done
 
 - `DBG-D-001..DBG-D-010` remain proposed and have no implementation authority.
-- Durable issue #47/#38 decision packages are not complete.
+- Steering acceptance/rework decision is not recorded.
 
 ## Exact next step
 
-Post packages to #47/#38 and stop before design freeze or implementation authorization unless
-Steering records a later decision.
+Wait for Steering. Reconstruct any next action from CurrentIndex and issues #47/#38 before
+design freeze, Slice planning or implementation authorization.
 
 ## Traceability state
 
@@ -164,14 +165,16 @@ Steering records a later decision.
 - Verification `HSX-VER-001-001-001`: PASS on proposal content `b57e368…` and review-record
   head `ef1f8d8…`
 - Master exact-content sign-off: PASS on proposal content `b57e368…`
+- HSX package: issue #47 comment `5355340420`
+- Debugger package: issue #38 comment `5355340598`
 - Resynthesized supplemental Studies: `HSX-ST-007`, `HSX-ST-008`
-- Active gate: `post_issue_decision_packages_and_await_steering`
+- Active gate: `steering_decision_issues_47_38`
 
 ## Agents and worktree
 
 The prior product/design chain, all bounded HSX Study workers, independent review
 `HSX-RVW-001-001-006`, verification `HSX-VER-001-001-001`, and Master exact-content sign-off
-are complete. The next action is issue decision-package posting. The controlled branch is
+are complete. The task is stopped at the Steering gate. The controlled branch is
 `codex/dbg-st-006`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.

@@ -19,7 +19,7 @@ issues:
     master_signoff: pass
   DBG-DA-001:
     issue: 38
-    status: architecture_direction_accepted_portable_contract_master_signed_ready_for_issue_decision_packages
+    status: architecture_direction_accepted_portable_contract_package_awaiting_steering
     decision_package_comment: 5346421143
     architecture_acceptance_comment: 5348190806
     steering_start_comment: 5345600066
@@ -43,7 +43,7 @@ issues:
     hsx_studies: HSX-ST-001..HSX-ST-008
     cross_track_review: HSX-RVW-001-001-001
     portable_contracts: HSX-R-001..HSX-R-036,HSX-A-001..HSX-A-005,HSX-D-001..HSX-D-005
-    portable_contract_status: master_signed_proposal_pending_steering
+    portable_contract_status: awaiting_steering_acceptance
     portable_contract_review_status: rework
     portable_contract_rereview: HSX-RVW-001-001-002
     portable_contract_rereview_status: rework
@@ -69,8 +69,11 @@ issues:
     portable_contract_master_signoff_status: pass
     portable_contract_master_signoff_proposal_content_head: b57e368f77bb533b09397d633fc92565655e1668
     portable_contract_master_signoff_record: SDP/HSX/Verification/HSX-ST-001--Master_Signoff.md
+    portable_contract_master_signoff_record_commit: d8af9b43544cd17a722d26474d9a613fdf08f8d7
     portable_contract_supplemental_studies: HSX-ST-007,HSX-ST-008
-    portable_contract_current_gate: post_issue_decision_packages_and_await_steering
+    portable_contract_hsx_decision_package_comment: 5355340420
+    portable_contract_debugger_decision_package_comment: 5355340598
+    portable_contract_current_gate: steering_decision_issues_47_38
   DBG-RF-002:
     issue: 39
     status: blocked_by_DBG-DA-001

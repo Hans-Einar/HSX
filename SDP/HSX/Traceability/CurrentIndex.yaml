@@ -1,7 +1,7 @@
 schema_version: 1
 track: HSX
 namespace: HSX
-status: master_signed_package_ready_for_issue_decision_packages
+status: awaiting_steering_acceptance
 active:
   coordinating_study:
     id: HSX-ST-001
@@ -33,7 +33,7 @@ active:
   coordinated_debugger_study:
     id: DBG-ST-006
     issue: 38
-    status: master_signed_proposal_pending_steering
+    status: awaiting_steering_acceptance
   review:
     id: HSX-RVW-001-001-001
     status: rework
@@ -76,30 +76,37 @@ active:
     status: pass
     proposal_content_head: b57e368f77bb533b09397d633fc92565655e1668
     path: SDP/HSX/Verification/HSX-ST-001--Master_Signoff.md
-  current_gate: post_issue_decision_packages_and_await_steering
+    record_commit: d8af9b43544cd17a722d26474d9a613fdf08f8d7
+  decision_packages:
+    hsx_issue: 47
+    hsx_comment: 5355340420
+    debugger_issue: 38
+    debugger_comment: 5355340598
+    status: posted_awaiting_steering
+  current_gate: steering_decision_issues_47_38
 proposed_contract_baseline:
   requirements:
     range: HSX-R-001..HSX-R-036
     path: SDP/HSX/03--Requirements/001--Portable_Debug_Runtime_Requirements.md
-    status: master_signed_proposal_pending_steering
+    status: awaiting_steering_acceptance
     state: target
   architecture:
     range: HSX-A-001..HSX-A-005
     path: SDP/HSX/04--Architecture/001--Portable_Debug_Runtime_Architecture.md
-    status: master_signed_proposal_pending_steering
+    status: awaiting_steering_acceptance
     state: target
   design:
     range: HSX-D-001..HSX-D-005
     path: SDP/HSX/06--Design/001--Portable_Debug_Runtime_Contracts.md
-    status: master_signed_proposal_pending_steering
+    status: awaiting_steering_acceptance
     state: target
     appendix:
       path: SDP/HSX/06--Design/002--Canonical_Digest_Golden_Vectors.md
-      status: master_signed_proposal_pending_steering
+      status: awaiting_steering_acceptance
   debugger_mapping:
     id: DBG-ST-006
     path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
-    status: master_signed_proposal_pending_steering
+    status: awaiting_steering_acceptance
 legacy_sources:
   - main/02--Study
   - main/03--Architecture
@@ -117,6 +124,8 @@ coordination:
   iteration: DBG-IT-001-003
   debugger_steering_comment: 5348190806
   hsx_steering_comment: 5348192567
+  hsx_decision_package_comment: 5355340420
+  debugger_decision_package_comment: 5355340598
 guards:
   product_code_authorized: false
   debugger_refactor_authorized: false
