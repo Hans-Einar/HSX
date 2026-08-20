@@ -4,7 +4,7 @@ Status: `rf003_implicit_reopen_rework_active`
 
 ## Current objective
 
-Correct RF-003 implicit-reopen false-HEALTHY handling with a fresh bounded worker, then fresh
+Correct RF-003 failed replacement-OPEN false-HEALTHY handling with a fresh bounded worker, then fresh
 RF-003 Slice and dependent integration review/verification/sign-off chains.
 
 ## Authority
@@ -140,7 +140,8 @@ RF-003 Slice and dependent integration review/verification/sign-off chains.
 
 ## Exact next step
 
-Assign a fresh RF-003 worker limited to legacy gateway + its test for the implicit-reopen High.
+Assign a fresh RF-003 worker limited to legacy gateway + its test; retain physical-loss
+evidence until replacement OPEN outcome, and clear only on authoritative success.
 
 ## Traceability state
 
@@ -197,7 +198,8 @@ Assign a fresh RF-003 worker limited to legacy gateway + its test for the implic
 - Integration review `DBG-RVW-001-004-003`: PASS at `860a98a…`
 - Verification `DBG-VER-001-004-003`: PASS at `860a98a…`
 - Parent review attempts `DBG-RVW-002-001-002` / `DBG-RVW-003-001-002`: REWORK
-- Active gate: fresh RF-003 implicit-reopen rework
+- Review `DBG-RVW-001-004-009`: REWORK at `f776b1a…`
+- Active gate: fresh RF-003 failed replacement-OPEN rework
 
 ## Agents and worktree
 

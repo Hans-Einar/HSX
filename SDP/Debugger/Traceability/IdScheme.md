@@ -46,6 +46,7 @@ track IDs rather than silently renamed in historical documents.
   after implicit-reopen finding
 - `DBG-RVW-001-004-010` / `DBG-VER-001-004-006` — dependent integration re-review and
   verification after RF-003 correction
+- `DBG-RVW-001-004-011` — RF-003 fresh review after failed replacement-OPEN finding
 - `DBG-VER-001-004-001..DBG-VER-001-004-003` — formal Slice verifications
 - `DBG-VER-001-004-004` — RF-002 fresh formal Slice verification after parent finding
 - `DBG-RVW-002-001-001` — RF-002 premature parent review, REWORK

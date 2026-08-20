@@ -276,7 +276,7 @@ first_structural_wave:
       corrected_signoff_record: SDP/Debugger/Verification/DBG-SL-001-004-001--Master_Signoff_v2.md
     - id: DBG-SL-001-004-002
       path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/003--Gateway_Foundation.md
-      status: complete_exact_head_signed
+      status: rework_required_failed_replacement_open
       implementation_base: 97d8c5b8d62d56dcfcab59c97c516d83f68c7075
       resume_base: 0cf52fcf69d11f254b957cfc52605a8be3114955
       review: DBG-RVW-001-004-002
@@ -293,8 +293,12 @@ first_structural_wave:
       rereview_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/009--Gateway_Foundation_Rereview.md
       parent_review_attempt_2: DBG-RVW-003-001-002
       parent_review_attempt_2_status: rework
-      next_review: DBG-RVW-001-004-009
+      prior_corrective_review: DBG-RVW-001-004-009
       next_verification: DBG-VER-001-004-005
+      implicit_reopen_review: DBG-RVW-001-004-009
+      implicit_reopen_review_status: rework
+      implicit_reopen_reviewed_head: f776b1a0ef847227ad94676a0328dc9c78eba507
+      next_review: DBG-RVW-001-004-011
     - id: DBG-SL-001-004-003
       path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/004--Controller_Gateway_Integration.md
       status: historical_signed_dependency_revalidation_required
@@ -312,7 +316,7 @@ first_structural_wave:
   runtime_profile: hsx.python-debug-legacy/1
   still_blocked: DBG-RF-004..DBG-RF-009
   partial_product_wip_stash: efc91f2640647402bc92c69bde1c57685cfaa1f1
-  current_gate: fresh_RF003_implicit_reopen_rework_worker
+  current_gate: fresh_RF003_failed_replacement_open_rework_worker
 structural_gate:
   rule: Only Steering-authorized Refactors with frozen Slice/interface contracts may execute.
   authorized_refactors:

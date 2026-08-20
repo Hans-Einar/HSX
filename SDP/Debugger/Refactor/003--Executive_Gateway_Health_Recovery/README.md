@@ -84,3 +84,7 @@ Final parent review `DBG-RVW-003-001-002` found that a background loss which has
 cleared `session_id` can be followed by implicit idempotent reopen reported falsely HEALTHY.
 Fresh bounded RF-003 correction and `DBG-RVW-001-004-009` / `DBG-VER-001-004-005` /
 exact-head Slice re-sign-off are required; dependent integration must then be revalidated.
+
+The first correction at `f776b1a…` closed implicit non-OPEN reopen, but
+`DBG-RVW-001-004-009` found failed explicit replacement OPEN could still restore false prior
+health. Fresh `DBG-RVW-001-004-011` follows a fail-closed replacement-OPEN correction.
