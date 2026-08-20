@@ -121,12 +121,14 @@ issues:
     rf002_corrected_review: DBG-RVW-001-004-008
     rf002_corrected_review_status: pass
     rf002_corrected_reviewed_head: a0640203a1a87c7acb080c75286ef09808e5195c
+    rf002_corrected_verification: DBG-VER-001-004-004
+    rf002_corrected_verification_status: pass
     rf003_parent_review: DBG-RVW-003-001-001
     rf003_parent_review_status: rework_gate_order_only
-    portable_contract_current_gate: formal_DBG-VER-001-004-004
+    portable_contract_current_gate: master_exact_head_RF002_slice_resignoff
   DBG-RF-002:
     issue: 39
-    status: corrected_slice_review_pass_pending_verification
+    status: corrected_slice_verified_pending_resignoff
     iteration: DBG-IT-001-004
     slice: DBG-SL-001-004-001
     shared_interface: dbg.controller-gateway/1.1

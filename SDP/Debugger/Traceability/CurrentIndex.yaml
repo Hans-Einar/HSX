@@ -1,7 +1,7 @@
 schema_version: 1
 track: Debugger
 namespace: DBG
-status: debugger_rf002_corrected_review_pass_pending_verification
+status: debugger_rf002_corrected_verified_pending_resignoff
 baseline:
   repository: Hans-Einar/HSX
   implementation_branch: Implementation/vscode
@@ -197,7 +197,7 @@ proposed:
     path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
     status: complete_accepted_dependency
 first_structural_wave:
-  status: rf002_corrected_review_pass_pending_verification
+  status: rf002_corrected_verified_pending_resignoff
   steering_comment: 5356484309
   activation_comment: 5356712010
   activation_correction_comment: 5356745504
@@ -223,7 +223,7 @@ first_structural_wave:
   refactors:
     - id: DBG-RF-002
       path: SDP/Debugger/Refactor/002--Debugger_Controller_State_Epoch/README.md
-      status: corrected_slice_review_pass_pending_verification
+      status: corrected_slice_verified_pending_resignoff
       slice: DBG-SL-001-004-001
       prior_parent_review: DBG-RVW-002-001-001
       prior_parent_review_status: rework
@@ -240,7 +240,7 @@ first_structural_wave:
   slices:
     - id: DBG-SL-001-004-001
       path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/002--Controller_Foundation.md
-      status: corrected_review_pass_pending_verification
+      status: corrected_verified_pending_resignoff
       implementation_base: 97d8c5b8d62d56dcfcab59c97c516d83f68c7075
       resume_base: 0cf52fcf69d11f254b957cfc52605a8be3114955
       review: DBG-RVW-001-004-001
@@ -265,6 +265,9 @@ first_structural_wave:
       corrected_review_status: pass
       corrected_reviewed_head: a0640203a1a87c7acb080c75286ef09808e5195c
       corrected_review_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/013--RF002_Internal_Failure_Final_Review.md
+      corrected_verification: DBG-VER-001-004-004
+      corrected_verification_status: pass
+      corrected_verification_record: SDP/Debugger/Verification/DBG-VER-001-004-004.md
     - id: DBG-SL-001-004-002
       path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/003--Gateway_Foundation.md
       status: complete_exact_head_signed
@@ -291,7 +294,7 @@ first_structural_wave:
   runtime_profile: hsx.python-debug-legacy/1
   still_blocked: DBG-RF-004..DBG-RF-009
   partial_product_wip_stash: efc91f2640647402bc92c69bde1c57685cfaa1f1
-  current_gate: formal_DBG-VER-001-004-004
+  current_gate: master_exact_head_RF002_slice_resignoff
 structural_gate:
   rule: Only Steering-authorized Refactors with frozen Slice/interface contracts may execute.
   authorized_refactors:

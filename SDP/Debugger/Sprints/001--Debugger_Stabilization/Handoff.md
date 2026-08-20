@@ -1,12 +1,11 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf002_corrected_review_pass_formal_verification_active`
+Status: `rf002_corrected_verification_pass_resignoff_pending`
 
 ## Current objective
 
-Formally verify exact corrected RF-002 head `a064020…` under `DBG-VER-001-004-004`, then
-exact-head re-sign the Slice. RF-003 remains signed and unchanged; integration is blocked only
-on corrected RF-002 sign-off.
+Exact-head re-sign corrected RF-002 head `a064020…` after `DBG-VER-001-004-004` PASS. RF-003
+remains signed and unchanged; integration is blocked only on corrected RF-002 sign-off.
 
 ## Authority
 
@@ -195,7 +194,8 @@ exact-head RF-002 Slice sign-off before integration.
 - Slice sign-offs: PASS at `232e20a6…` and `cf4d8a6…`
 - Parent review attempts `DBG-RVW-002-001-001` / `DBG-RVW-003-001-001`: REWORK
 - Review `DBG-RVW-001-004-008`: PASS at `a064020…`
-- Active gate: `DBG-VER-001-004-004`; integration remains blocked
+- Verification `DBG-VER-001-004-004`: PASS at `a064020…`
+- Active gate: Master RF-002 exact-head re-sign-off; integration remains blocked
 
 ## Agents and worktree
 

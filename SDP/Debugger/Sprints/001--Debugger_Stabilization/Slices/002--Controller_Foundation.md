@@ -1,6 +1,6 @@
 # DBG-SL-001-004-001 — Controller / State / Stop-Epoch Foundation
 
-- Status: **FRESH REVIEW PASS — FORMAL VERIFICATION PENDING**
+- Status: **FRESH REVIEW + VERIFICATION PASS — RE-SIGN-OFF PENDING**
 - Parent: `DBG-RF-002`
 - Iteration: `DBG-IT-001-004`
 - Steering: issue #38 comment `5356484309`
@@ -15,6 +15,7 @@
 - Next review: `DBG-RVW-001-004-008`
 - Review `DBG-RVW-001-004-008`: **PASS** at `a0640203a1a87c7acb080c75286ef09808e5195c`
 - Next verification: `DBG-VER-001-004-004`
+- Verification `DBG-VER-001-004-004`: **PASS** at `a0640203a1a87c7acb080c75286ef09808e5195c`
 - Implementation base: `97d8c5b8d62d56dcfcab59c97c516d83f68c7075`
 
 ## Bounded outcome
