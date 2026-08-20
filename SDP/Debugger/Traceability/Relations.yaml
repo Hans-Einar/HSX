@@ -165,6 +165,11 @@ relations:
     to:
       - DBG-RVW-001-004-001
       - DBG-RVW-001-004-005
+  - from: DBG-SL-001-004-001
+    type: verified_by
+    to:
+      - DBG-VER-001-004-001
+    status: pass
   - from: DBG-RF-003
     type: implemented_by
     to:
@@ -174,6 +179,11 @@ relations:
     to:
       - DBG-RVW-001-004-002
       - DBG-RVW-001-004-006
+  - from: DBG-SL-001-004-002
+    type: verified_by
+    to:
+      - DBG-VER-001-004-002
+    status: pass
   - from: DBG-SL-001-004-001
     type: freezes_shared_interface_for
     to:
