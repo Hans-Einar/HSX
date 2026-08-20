@@ -52,7 +52,8 @@ track IDs rather than silently renamed in historical documents.
 - `DBG-RVW-002-001-001` — RF-002 premature parent review, REWORK
 - `DBG-RVW-002-001-002` — RF-002 final parent attempt, REWORK on trace
 - `DBG-RVW-002-001-003` — RF-002 parent attempt, REWORK on trace
-- `DBG-RVW-002-001-004` / `DBG-VER-002-001-001` — RF-002 final parent review/verification
+- `DBG-RVW-002-001-004` — RF-002 parent attempt, REWORK on initial-status trace
+- `DBG-RVW-002-001-005` / `DBG-VER-002-001-001` — RF-002 final parent review/verification
 - `DBG-RVW-003-001-001` — RF-003 premature parent review, REWORK on gate order
 - `DBG-RVW-003-001-002` — RF-003 final parent attempt, REWORK
 - `DBG-RVW-003-001-003` — RF-003 parent attempt, REWORK on trace

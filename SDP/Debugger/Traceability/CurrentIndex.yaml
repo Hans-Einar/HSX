@@ -231,7 +231,9 @@ first_structural_wave:
       parent_review_attempt_2_status: rework_trace_only
       parent_review_attempt_3: DBG-RVW-002-001-003
       parent_review_attempt_3_status: rework_trace_only
-      final_review: DBG-RVW-002-001-004
+      parent_review_attempt_4: DBG-RVW-002-001-004
+      parent_review_attempt_4_status: rework_trace_only
+      final_review: DBG-RVW-002-001-005
       final_verification: DBG-VER-002-001-001
     - id: DBG-RF-003
       path: SDP/Debugger/Refactor/003--Executive_Gateway_Health_Recovery/README.md
@@ -258,7 +260,7 @@ first_structural_wave:
       signed_product_head: 232e20a6ffe737d609171c311410fbb901b57ddf
       signoff_record: SDP/Debugger/Verification/DBG-SL-001-004-001--Master_Signoff.md
       implementation_head: a0e986c46d741ee46ba7f21615811723630414d0
-      review_status: pass
+      review_status: rework
       review_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/006--Controller_Foundation_Review.md
       prior_rereview: DBG-RVW-001-004-005
       rereviewed_head: 232e20a6ffe737d609171c311410fbb901b57ddf
@@ -290,7 +292,7 @@ first_structural_wave:
       signed_product_head: cf4d8a6665e9a6ebf35d425b227bc7a5c7bd3fa9
       signoff_record: SDP/Debugger/Verification/DBG-SL-001-004-002--Master_Signoff.md
       implementation_head: 1f492d8f5b4f4bf5abe237dd4cb87259f809f6d0
-      review_status: pass
+      review_status: rework
       review_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/007--Gateway_Foundation_Review.md
       prior_rereview: DBG-RVW-001-004-006
       rereviewed_head: cf4d8a6665e9a6ebf35d425b227bc7a5c7bd3fa9
@@ -337,7 +339,7 @@ first_structural_wave:
   runtime_profile: hsx.python-debug-legacy/1
   still_blocked: DBG-RF-004..DBG-RF-009
   partial_product_wip_stash: efc91f2640647402bc92c69bde1c57685cfaa1f1
-  current_gate: fresh_parent_final_reviews_DBG-RVW-002-001-004_and_DBG-RVW-003-001-004
+  current_gate: fresh_parent_final_reviews_DBG-RVW-002-001-005_and_DBG-RVW-003-001-004
 structural_gate:
   rule: Only Steering-authorized Refactors with frozen Slice/interface contracts may execute.
   authorized_refactors:

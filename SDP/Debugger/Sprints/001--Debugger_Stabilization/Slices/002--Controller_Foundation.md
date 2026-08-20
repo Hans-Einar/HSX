@@ -5,16 +5,16 @@
 - Iteration: `DBG-IT-001-004`
 - Steering: issue #38 comment `5356484309`
 - Frozen interface: `dbg.controller-gateway/1.1`
-- Review: `DBG-RVW-001-004-001`
-- Re-review: `DBG-RVW-001-004-005`
+- Initial review: `DBG-RVW-001-004-001` — REWORK
+- Completed re-review: `DBG-RVW-001-004-005` — PASS
 - Exact reviewed head: `232e20a6ffe737d609171c311410fbb901b57ddf`
-- Verification: `DBG-VER-001-004-001`
+- Historical verification: `DBG-VER-001-004-001`
 - Verification status: **PASS**
 - Signed product head: `232e20a6ffe737d609171c311410fbb901b57ddf`
 - Review `DBG-RVW-001-004-007`: **REWORK** at `1586bb84359aa7ed334dde70bdfd9baa128dd99d`
-- Next review: `DBG-RVW-001-004-008`
+- Completed corrective review: `DBG-RVW-001-004-008`
 - Review `DBG-RVW-001-004-008`: **PASS** at `a0640203a1a87c7acb080c75286ef09808e5195c`
-- Next verification: `DBG-VER-001-004-004`
+- Completed corrective verification: `DBG-VER-001-004-004`
 - Verification `DBG-VER-001-004-004`: **PASS** at `a0640203a1a87c7acb080c75286ef09808e5195c`
 - Corrected signed product head: `a0640203a1a87c7acb080c75286ef09808e5195c`
 - Corrected sign-off: `SDP/Debugger/Verification/DBG-SL-001-004-001--Master_Signoff_v2.md`

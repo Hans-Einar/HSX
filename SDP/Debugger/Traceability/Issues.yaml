@@ -101,11 +101,11 @@ issues:
     first_wave_interface_reviewed_head: 0cf52fcf69d11f254b957cfc52605a8be3114955
     first_wave_interface_review_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/005--Controller_Gateway_Interface_v1_1_Review.md
     rf002_slice_review: DBG-RVW-001-004-001
-    rf002_slice_review_status: pass
+    rf002_slice_review_status: rework
     rf002_slice_completed_rereview: DBG-RVW-001-004-005
     rf002_slice_rereviewed_head: 232e20a6ffe737d609171c311410fbb901b57ddf
     rf003_slice_review: DBG-RVW-001-004-002
-    rf003_slice_review_status: pass
+    rf003_slice_review_status: rework
     rf003_slice_completed_rereview: DBG-RVW-001-004-006
     rf003_slice_rereviewed_head: cf4d8a6665e9a6ebf35d425b227bc7a5c7bd3fa9
     rf002_slice_verification: DBG-VER-001-004-001
@@ -136,6 +136,8 @@ issues:
     rf002_parent_review_attempt_2_status: rework_trace_only
     rf002_parent_review_attempt_3: DBG-RVW-002-001-003
     rf002_parent_review_attempt_3_status: rework_trace_only
+    rf002_parent_review_attempt_4: DBG-RVW-002-001-004
+    rf002_parent_review_attempt_4_status: rework_trace_only
     rf003_parent_review_attempt_2: DBG-RVW-003-001-002
     rf003_parent_review_attempt_2_status: rework
     rf003_parent_review_attempt_3: DBG-RVW-003-001-003
@@ -154,7 +156,7 @@ issues:
     dependent_integration_verification: DBG-VER-001-004-006
     dependent_integration_verification_status: pass
     dependent_integration_signed_head: 1e479536ce5e746e1b06a53b1039b1af84adaed6
-    portable_contract_current_gate: fresh_parent_final_reviews_DBG-RVW-002-001-004_and_DBG-RVW-003-001-004
+    portable_contract_current_gate: fresh_parent_final_reviews_DBG-RVW-002-001-005_and_DBG-RVW-003-001-004
   DBG-RF-002:
     issue: 39
     status: complete_signed_chain_parent_final_review_active

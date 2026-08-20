@@ -166,6 +166,7 @@ relations:
       - DBG-RVW-002-001-001
       - DBG-RVW-002-001-002
       - DBG-RVW-002-001-003
+      - DBG-RVW-002-001-004
     status: rework_trace_only
   - from: DBG-SL-001-004-001
     type: reviewed_by

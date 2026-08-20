@@ -5,10 +5,10 @@
 - Iteration: `DBG-IT-001-004`
 - Steering: issue #38 comment `5356484309`
 - Frozen interface: `dbg.controller-gateway/1.1` (read-only implementation dependency)
-- Review: `DBG-RVW-001-004-002`
-- Re-review: `DBG-RVW-001-004-006`
+- Initial review: `DBG-RVW-001-004-002` — REWORK
+- Completed re-review: `DBG-RVW-001-004-006` — PASS
 - Exact reviewed head: `cf4d8a6665e9a6ebf35d425b227bc7a5c7bd3fa9`
-- Verification: `DBG-VER-001-004-002`
+- Historical verification: `DBG-VER-001-004-002`
 - Verification status: **PASS**
 - Signed product head: `cf4d8a6665e9a6ebf35d425b227bc7a5c7bd3fa9`
 - Corrected reviewed/verified head: `1e479536ce5e746e1b06a53b1039b1af84adaed6`

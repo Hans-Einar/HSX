@@ -139,7 +139,7 @@ Run fresh final parent RF-002/RF-003 reviews against the complete signed chain.
 
 ## Exact next step
 
-Run `DBG-RVW-002-001-004` and `DBG-RVW-003-001-004`.
+Run `DBG-RVW-002-001-005` and `DBG-RVW-003-001-004`.
 
 ## Traceability state
 
