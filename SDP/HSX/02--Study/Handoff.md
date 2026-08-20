@@ -1,6 +1,6 @@
 # HSX Portable Debug Contract Handoff
 
-- Status: DECISION PACKAGES POSTED — AWAITING STEERING
+- Status: REMOTE PUBLICATION VERIFIED — AWAITING STEERING
 - Coordinator: `HSX-ST-001`, issue #47
 - Debugger dependency: `DBG-ST-006`, issue #38
 - Iteration: `DBG-IT-001-003`
@@ -11,10 +11,15 @@
 - Master sign-off: PASS on `b57e368f77bb533b09397d633fc92565655e1668`
 - Decision package: issue #47 comment `5355340420`
 - Cross-track package: issue #38 comment `5355340598`
+- Publication blocker: issue #47 comment `5356183884`, issue #38 comment `5356186692`
+- Remote branch: `origin/codex/dbg-st-006`
+- Fresh-checkout verified remote head: `89cb74a10ce36d8b0f4d0cc60332d3070c2c635f`
+- Remote-resolvable proposal content: `b57e368f77bb533b09397d633fc92565655e1668`
 - Active gate: `steering_decision_issues_47_38`
 
 ## Current objective
 
+The final reviewed/verified/sign-off chain is published and fresh-checkout verified.
 Stop and await Steering decisions in issues #47/#38. No proposal-content change, acceptance,
 design freeze or implementation dispatch is permitted before a later durable decision.
 
@@ -29,6 +34,16 @@ design freeze or implementation dispatch is permitted before a later durable dec
 
 Wait for Steering. If Steering accepts or requests rework, reconstruct the next gate from the
 issue comments and CurrentIndex before any design freeze or implementation authorization.
+
+## Remote publication verification
+
+- GitHub resolved full proposal SHA `b57e368f77bb533b09397d633fc92565655e1668`.
+- Existing remote branch advanced without force from `c283dd45689c0d9a0f195d3a897d3c5efd78e962`
+  to `89cb74a10ce36d8b0f4d0cc60332d3070c2c635f`.
+- A fresh clone of that remote head passed 114; 40/1 skip; 99+7; 15+7; 18/1 skip;
+  Python+Node 4/4; eight YAML; 63 Ledger records; Markdown; ID/mapping and diff checks.
+- Both `c283dd4…→89cb74a…` and the complete proposal range are SDP-only and contain no
+  product/runtime/extension/AVR change.
 
 ## Master verification
 

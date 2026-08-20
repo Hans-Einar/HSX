@@ -77,6 +77,20 @@ active:
     proposal_content_head: b57e368f77bb533b09397d633fc92565655e1668
     path: SDP/HSX/Verification/HSX-ST-001--Master_Signoff.md
     record_commit: d8af9b43544cd17a722d26474d9a613fdf08f8d7
+  remote_publication:
+    repository: Hans-Einar/HSX
+    branch: codex/dbg-st-006
+    previous_remote_head: c283dd45689c0d9a0f195d3a897d3c5efd78e962
+    published_head_verified: 89cb74a10ce36d8b0f4d0cc60332d3070c2c635f
+    proposal_content_head_resolvable: b57e368f77bb533b09397d633fc92565655e1668
+    final_review_status: pass
+    verification_status: pass
+    master_signoff_status: pass
+    fresh_checkout_status: pass
+    product_runtime_extension_avr_diff: none
+    status: pass_awaiting_steering_acceptance
+    steering_hsx_blocker_comment: 5356183884
+    steering_debugger_blocker_comment: 5356186692
   decision_packages:
     hsx_issue: 47
     hsx_comment: 5355340420
@@ -126,6 +140,8 @@ coordination:
   hsx_steering_comment: 5348192567
   hsx_decision_package_comment: 5355340420
   debugger_decision_package_comment: 5355340598
+  remote_publication_steering_comment: 5356183884
+  remote_publication_debugger_comment: 5356186692
 guards:
   product_code_authorized: false
   debugger_refactor_authorized: false

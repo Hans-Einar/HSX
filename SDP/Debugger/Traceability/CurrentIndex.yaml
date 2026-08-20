@@ -154,6 +154,15 @@ active_gate:
     master_signoff_proposal_content_head: b57e368f77bb533b09397d633fc92565655e1668
     master_signoff_record: SDP/HSX/Verification/HSX-ST-001--Master_Signoff.md
     master_signoff_record_commit: d8af9b43544cd17a722d26474d9a613fdf08f8d7
+    remote_publication_branch: codex/dbg-st-006
+    remote_previous_head: c283dd45689c0d9a0f195d3a897d3c5efd78e962
+    remote_published_head_verified: 89cb74a10ce36d8b0f4d0cc60332d3070c2c635f
+    remote_proposal_content_head_resolvable: b57e368f77bb533b09397d633fc92565655e1668
+    remote_fresh_checkout_status: pass
+    remote_product_runtime_extension_avr_diff: none
+    remote_publication_status: pass_awaiting_steering_acceptance
+    remote_publication_hsx_steering_comment: 5356183884
+    remote_publication_debugger_steering_comment: 5356186692
     hsx_decision_package_comment: 5355340420
     debugger_decision_package_comment: 5355340598
     current_gate: steering_decision_issues_47_38

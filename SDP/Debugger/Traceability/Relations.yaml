@@ -105,6 +105,14 @@ relations:
     to:
       - HSX-VER-001-001-001
   - from: DBG-ST-006
+    type: published_on_remote_branch
+    to:
+      - origin/codex/dbg-st-006@89cb74a10ce36d8b0f4d0cc60332d3070c2c635f
+  - from: HSX-VER-001-001-001
+    type: fresh_remote_checkout_verified_at
+    to:
+      - origin/codex/dbg-st-006@89cb74a10ce36d8b0f4d0cc60332d3070c2c635f
+  - from: DBG-ST-006
     type: satisfied_by_proposed_contracts
     to:
       - HSX-R-001..HSX-R-036

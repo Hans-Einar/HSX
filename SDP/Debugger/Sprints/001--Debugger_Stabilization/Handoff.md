@@ -1,12 +1,13 @@
 # DBG-SPR-001 Handoff
 
-Status: `decision_packages_posted_awaiting_steering`
+Status: `remote_publication_verified_awaiting_steering`
 
 ## Current objective
 
-Stop and await Steering in issues #47/#38. Decision packages are issue #47 comment
-`5355340420` and issue #38 comment `5355340598`. No structural product or AVR work may be
-dispatched.
+The final HSX/DBG-ST-006 chain is published on `origin/codex/dbg-st-006`; proposal content
+`b57e368f77bb533b09397d633fc92565655e1668` is GitHub-resolvable and remote head
+`89cb74a10ce36d8b0f4d0cc60332d3070c2c635f` passed fresh-checkout verification. Stop and
+await Steering in issues #47/#38. No structural product or AVR work may be dispatched.
 
 ## Authority
 
@@ -167,6 +168,8 @@ design freeze, Slice planning or implementation authorization.
 - Master exact-content sign-off: PASS on proposal content `b57e368…`
 - HSX package: issue #47 comment `5355340420`
 - Debugger package: issue #38 comment `5355340598`
+- Publication blocker: #47 comment `5356183884`, #38 comment `5356186692`
+- Fresh remote verification: PASS at `89cb74a10ce36d8b0f4d0cc60332d3070c2c635f`
 - Resynthesized supplemental Studies: `HSX-ST-007`, `HSX-ST-008`
 - Active gate: `steering_decision_issues_47_38`
 

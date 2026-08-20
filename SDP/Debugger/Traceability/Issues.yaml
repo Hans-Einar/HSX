@@ -70,6 +70,14 @@ issues:
     portable_contract_master_signoff_proposal_content_head: b57e368f77bb533b09397d633fc92565655e1668
     portable_contract_master_signoff_record: SDP/HSX/Verification/HSX-ST-001--Master_Signoff.md
     portable_contract_master_signoff_record_commit: d8af9b43544cd17a722d26474d9a613fdf08f8d7
+    portable_contract_remote_publication_branch: codex/dbg-st-006
+    portable_contract_remote_published_head_verified: 89cb74a10ce36d8b0f4d0cc60332d3070c2c635f
+    portable_contract_remote_proposal_content_head_resolvable: b57e368f77bb533b09397d633fc92565655e1668
+    portable_contract_remote_fresh_checkout_status: pass
+    portable_contract_remote_product_runtime_extension_avr_diff: none
+    portable_contract_remote_publication_status: pass_awaiting_steering_acceptance
+    portable_contract_remote_hsx_steering_comment: 5356183884
+    portable_contract_remote_debugger_steering_comment: 5356186692
     portable_contract_supplemental_studies: HSX-ST-007,HSX-ST-008
     portable_contract_hsx_decision_package_comment: 5355340420
     portable_contract_debugger_decision_package_comment: 5355340598

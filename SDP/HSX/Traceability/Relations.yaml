@@ -83,6 +83,14 @@ relations:
     type: verified_by
     to:
       - HSX-VER-001-001-001
+  - from: HSX-RVW-001-001-006
+    type: published_on_remote_branch
+    to:
+      - origin/codex/dbg-st-006@89cb74a10ce36d8b0f4d0cc60332d3070c2c635f
+  - from: HSX-VER-001-001-001
+    type: fresh_remote_checkout_verified_at
+    to:
+      - origin/codex/dbg-st-006@89cb74a10ce36d8b0f4d0cc60332d3070c2c635f
   - from: HSX-ST-001
     type: provides_provenance_for
     to:
