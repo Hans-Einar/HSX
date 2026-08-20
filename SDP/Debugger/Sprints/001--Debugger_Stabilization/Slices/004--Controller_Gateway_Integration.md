@@ -1,6 +1,8 @@
 # DBG-SL-001-004-003 — Early Controller/Gateway Integration
 
-- Status: **READY FOR FRESH INTEGRATION WORKER**
+- Status: **INDEPENDENT REVIEW PASS — FORMAL VERIFICATION PENDING**
+
+- Exact reviewed head: `860a98a68440b8e22b67f03fbdbb93d2dd33ab7a`
 - Parents: `DBG-RF-002`, `DBG-RF-003`
 - Iteration: `DBG-IT-001-004`
 - Steering: issue #38 comment `5356484309`

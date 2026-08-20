@@ -1,7 +1,7 @@
 schema_version: 1
 track: Debugger
 namespace: DBG
-status: debugger_foundations_signed_integration_slice_ready
+status: debugger_integration_review_pass_pending_verification
 baseline:
   repository: Hans-Einar/HSX
   implementation_branch: Implementation/vscode
@@ -197,7 +197,7 @@ proposed:
     path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
     status: complete_accepted_dependency
 first_structural_wave:
-  status: foundations_signed_integration_slice_ready
+  status: integration_review_pass_pending_verification
   steering_comment: 5356484309
   activation_comment: 5356712010
   activation_correction_comment: 5356745504
@@ -289,14 +289,18 @@ first_structural_wave:
       rereview_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/009--Gateway_Foundation_Rereview.md
     - id: DBG-SL-001-004-003
       path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/004--Controller_Gateway_Integration.md
-      status: ready_for_fresh_worker
+      status: reviewed_pass_pending_verification
       contract_base: 97d8c5b8d62d56dcfcab59c97c516d83f68c7075
       review: DBG-RVW-001-004-003
       verification: DBG-VER-001-004-003
+      implementation_head: 860a98a68440b8e22b67f03fbdbb93d2dd33ab7a
+      review_status: pass
+      reviewed_head: 860a98a68440b8e22b67f03fbdbb93d2dd33ab7a
+      review_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/014--Controller_Gateway_Integration_Review.md
   runtime_profile: hsx.python-debug-legacy/1
   still_blocked: DBG-RF-004..DBG-RF-009
   partial_product_wip_stash: efc91f2640647402bc92c69bde1c57685cfaa1f1
-  current_gate: fresh_DBG-SL-001-004-003_integration_worker
+  current_gate: formal_DBG-VER-001-004-003
 structural_gate:
   rule: Only Steering-authorized Refactors with frozen Slice/interface contracts may execute.
   authorized_refactors:

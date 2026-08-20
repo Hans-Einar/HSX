@@ -124,9 +124,12 @@ issues:
     rf002_corrected_verification: DBG-VER-001-004-004
     rf002_corrected_verification_status: pass
     rf002_corrected_signed_head: a0640203a1a87c7acb080c75286ef09808e5195c
+    integration_review: DBG-RVW-001-004-003
+    integration_review_status: pass
+    integration_reviewed_head: 860a98a68440b8e22b67f03fbdbb93d2dd33ab7a
     rf003_parent_review: DBG-RVW-003-001-001
     rf003_parent_review_status: rework_gate_order_only
-    portable_contract_current_gate: fresh_DBG-SL-001-004-003_integration_worker
+    portable_contract_current_gate: formal_DBG-VER-001-004-003
   DBG-RF-002:
     issue: 39
     status: corrected_slice_signed_integration_pending_parent_final_deferred

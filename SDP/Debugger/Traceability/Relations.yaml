@@ -223,6 +223,11 @@ relations:
     type: prerequisite_for
     to:
       - DBG-SL-001-004-003
+  - from: DBG-SL-001-004-003
+    type: reviewed_by
+    to:
+      - DBG-RVW-001-004-003
+    status: pass
   - from: dbg.controller-gateway/1
     type: blocked_by
     to:
