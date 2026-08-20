@@ -1,13 +1,11 @@
 # DBG-SPR-001 Handoff
 
-Status: `verified_package_pending_master_exact_content_signoff_and_issue_decision_packages`
+Status: `master_signed_package_ready_for_issue_decision_packages`
 
 ## Current objective
 
-Master signs exact proposal-content head `b57e368f77bb533b09397d633fc92565655e1668`
-after reconciling `HSX-RVW-001-001-006` PASS and `HSX-VER-001-001-001` PASS, then returns
-reviewed/verified decision packages to issues #47/#38. No structural product or AVR work may
-be dispatched.
+Post the Master-signed reviewed/verified exact proposal-content package to issues #47/#38,
+then stop and await Steering. No structural product or AVR work may be dispatched.
 
 ## Authority
 
@@ -117,17 +115,18 @@ be dispatched.
   passed. The reviewer correctly made no Master-verification claim.
 - Formal `HSX-VER-001-001-001` repeated every representative oracle set, Python+Node golden
   vectors, exact-content/scope, 8 YAML, 57 pre-verification Ledger records, 52 Markdown files,
-  36/5/5 IDs and ten mappings; PASS. Master exact-content sign-off remains pending.
+  36/5/5 IDs and ten mappings; PASS. Master subsequently signed exact proposal content
+  `b57e368…`.
 
 ## Not done
 
 - `DBG-D-001..DBG-D-010` remain proposed and have no implementation authority.
-- Master exact-content sign-off and durable issue #47/#38 decision packages are not complete.
+- Durable issue #47/#38 decision packages are not complete.
 
 ## Exact next step
 
-Master records exact-content sign-off, posts packages to #47/#38, and stops before design
-freeze or implementation authorization unless Steering records a later decision.
+Post packages to #47/#38 and stop before design freeze or implementation authorization unless
+Steering records a later decision.
 
 ## Traceability state
 
@@ -164,15 +163,16 @@ freeze or implementation authorization unless Steering records a later decision.
   `24beb82…`
 - Verification `HSX-VER-001-001-001`: PASS on proposal content `b57e368…` and review-record
   head `ef1f8d8…`
+- Master exact-content sign-off: PASS on proposal content `b57e368…`
 - Resynthesized supplemental Studies: `HSX-ST-007`, `HSX-ST-008`
-- Active gate: `master_exact_content_signoff_and_issue_decision_packages`
+- Active gate: `post_issue_decision_packages_and_await_steering`
 
 ## Agents and worktree
 
 The prior product/design chain, all bounded HSX Study workers, independent review
-`HSX-RVW-001-001-006`, and verification `HSX-VER-001-001-001` are complete. The next active
-role is Master exact-content sign-off and issue decision-package preparation. The controlled
-branch is `codex/dbg-st-006`;
+`HSX-RVW-001-001-006`, verification `HSX-VER-001-001-001`, and Master exact-content sign-off
+are complete. The next action is issue decision-package posting. The controlled branch is
+`codex/dbg-st-006`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.
 

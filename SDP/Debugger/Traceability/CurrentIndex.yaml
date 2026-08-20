@@ -28,7 +28,7 @@ active:
   design_analysis:
     id: DBG-DA-001
     path: SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md
-    status: architecture_direction_accepted_portable_contract_verified_pending_master_signoff_and_issue_decision_packages
+    status: architecture_direction_accepted_portable_contract_master_signed_ready_for_issue_decision_packages
     issue: 38
     steering_start_comment: 5345600066
     architecture_review: DBG-RVW-001-002-003
@@ -51,7 +51,7 @@ active:
       status: complete_for_synthesis
     - id: DBG-ST-006
       path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
-      status: verified_package_pending_master_signoff_and_issue_decision_packages
+      status: master_signed_proposal_pending_steering
 completed:
   refactor:
     id: DBG-RF-001
@@ -89,11 +89,11 @@ active_gate:
     id: DBG-DA-001
     issue: 38
     path: SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md
-    status: architecture_direction_accepted_portable_contract_verified_pending_master_signoff_and_issue_decision_packages
+    status: architecture_direction_accepted_portable_contract_master_signed_ready_for_issue_decision_packages
   iteration:
     id: DBG-IT-001-003
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/ScrumIterations.md
-    status: verified_package_pending_master_signoff_and_issue_decision_packages
+    status: master_signed_proposal_pending_steering
   architecture_review:
     id: DBG-RVW-001-002-001
     status: rework
@@ -119,7 +119,7 @@ active_gate:
     hsx_coordinator: HSX-ST-001
     hsx_issue: 47
     hsx_studies: HSX-ST-002..HSX-ST-008
-    status: verified_package_pending_master_signoff_and_issue_decision_packages
+    status: master_signed_proposal_pending_steering
     review: HSX-RVW-001-001-001
     review_status: rework
     reviewed_head: 5fff403f6668f794b760caf64ef34b4d1ecb4ae3
@@ -146,7 +146,11 @@ active_gate:
     verification_status: pass
     verification_repository_head_tested: ef1f8d8eaf24ebff18aece71d9836e0b478d1256
     verification_record: SDP/HSX/Verification/HSX-VER-001-001-001.md
-    current_gate: master_exact_content_signoff_and_issue_decision_packages
+    verification_record_commit: acb34734720811a98ee13215ea5e076f519d2dd5
+    master_signoff_status: pass
+    master_signoff_proposal_content_head: b57e368f77bb533b09397d633fc92565655e1668
+    master_signoff_record: SDP/HSX/Verification/HSX-ST-001--Master_Signoff.md
+    current_gate: post_issue_decision_packages_and_await_steering
     hsx_requirements: HSX-R-001..HSX-R-036
     hsx_architecture: HSX-A-001..HSX-A-005
     hsx_design: HSX-D-001..HSX-D-005
@@ -159,7 +163,7 @@ proposed:
   design:
     range: DBG-D-001..DBG-D-010
     path: SDP/Debugger/06--Design/001--Debugger_Design_Contracts.md
-    status: portable_dependency_verified_pending_master_signoff_and_issue_decision_packages
+    status: portable_dependency_master_signed_proposal_pending_steering
     state: target
     gates:
       - range: DBG-D-002..DBG-D-006
@@ -169,7 +173,7 @@ proposed:
   study:
     id: DBG-ST-006
     path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
-    status: verified_package_pending_master_signoff_and_issue_decision_packages
+    status: master_signed_proposal_pending_steering
 structural_gate:
   rule: No structural product-code refactor starts before DBG-DA-001 and relevant DBG-D contracts are accepted.
   blocked_refactors:

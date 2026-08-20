@@ -19,8 +19,8 @@ The current product baseline originated on `Implementation/vscode`. `DBG-RF-001`
 the production-path protocol baseline. Steering accepted the reviewed `DBG-A-001..DBG-A-008`
 target direction. Coordinated `DBG-ST-006` / `HSX-ST-001..008` portable-runtime contract
 work is reviewed and verified. `HSX-RVW-001-001-006` and `HSX-VER-001-001-001` passed exact
-proposal content `b57e368…`; the active gate is Master exact-content sign-off and issue
-decision packages. Every `DBG-D-*`
+proposal content `b57e368…`, and Master exact-content sign-off passed; the active gate is issue
+decision packages and Steering wait. Every `DBG-D-*`
 remains proposed and no structural product implementation is authorized.
 
 Read in this order:

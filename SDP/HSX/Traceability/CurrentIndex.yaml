@@ -1,7 +1,7 @@
 schema_version: 1
 track: HSX
 namespace: HSX
-status: verified_package_pending_master_exact_content_signoff_and_issue_decision_packages
+status: master_signed_package_ready_for_issue_decision_packages
 active:
   coordinating_study:
     id: HSX-ST-001
@@ -33,7 +33,7 @@ active:
   coordinated_debugger_study:
     id: DBG-ST-006
     issue: 38
-    status: verified_package_pending_master_signoff_and_issue_decision_packages
+    status: master_signed_proposal_pending_steering
   review:
     id: HSX-RVW-001-001-001
     status: rework
@@ -71,30 +71,35 @@ active:
     proposal_content_head: b57e368f77bb533b09397d633fc92565655e1668
     repository_head_tested: ef1f8d8eaf24ebff18aece71d9836e0b478d1256
     path: SDP/HSX/Verification/HSX-VER-001-001-001.md
-  current_gate: master_exact_content_signoff_and_issue_decision_packages
+    record_commit: acb34734720811a98ee13215ea5e076f519d2dd5
+  master_signoff:
+    status: pass
+    proposal_content_head: b57e368f77bb533b09397d633fc92565655e1668
+    path: SDP/HSX/Verification/HSX-ST-001--Master_Signoff.md
+  current_gate: post_issue_decision_packages_and_await_steering
 proposed_contract_baseline:
   requirements:
     range: HSX-R-001..HSX-R-036
     path: SDP/HSX/03--Requirements/001--Portable_Debug_Runtime_Requirements.md
-    status: verified_package_pending_master_signoff_and_issue_decision_packages
+    status: master_signed_proposal_pending_steering
     state: target
   architecture:
     range: HSX-A-001..HSX-A-005
     path: SDP/HSX/04--Architecture/001--Portable_Debug_Runtime_Architecture.md
-    status: verified_package_pending_master_signoff_and_issue_decision_packages
+    status: master_signed_proposal_pending_steering
     state: target
   design:
     range: HSX-D-001..HSX-D-005
     path: SDP/HSX/06--Design/001--Portable_Debug_Runtime_Contracts.md
-    status: verified_package_pending_master_signoff_and_issue_decision_packages
+    status: master_signed_proposal_pending_steering
     state: target
     appendix:
       path: SDP/HSX/06--Design/002--Canonical_Digest_Golden_Vectors.md
-      status: verified_package_pending_master_signoff_and_issue_decision_packages
+      status: master_signed_proposal_pending_steering
   debugger_mapping:
     id: DBG-ST-006
     path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
-    status: verified_package_pending_master_signoff_and_issue_decision_packages
+    status: master_signed_proposal_pending_steering
 legacy_sources:
   - main/02--Study
   - main/03--Architecture

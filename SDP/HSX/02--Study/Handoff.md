@@ -1,6 +1,6 @@
 # HSX Portable Debug Contract Handoff
 
-- Status: VERIFICATION PASS — PENDING MASTER EXACT-CONTENT SIGN-OFF AND ISSUE PACKAGES
+- Status: MASTER EXACT-CONTENT SIGN-OFF PASS — ISSUE PACKAGES NEXT
 - Coordinator: `HSX-ST-001`, issue #47
 - Debugger dependency: `DBG-ST-006`, issue #38
 - Iteration: `DBG-IT-001-003`
@@ -8,14 +8,14 @@
   `84df21d763b73209efd0292990799f469283460a`
 - Final fresh review: `HSX-RVW-001-001-006` — PASS
 - Verification: `HSX-VER-001-001-001` — PASS
-- Active gate: `master_exact_content_signoff_and_issue_decision_packages`
+- Master sign-off: PASS on `b57e368f77bb533b09397d633fc92565655e1668`
+- Active gate: `post_issue_decision_packages_and_await_steering`
 
 ## Current objective
 
-Master signs exact proposal-content head `b57e368f77bb533b09397d633fc92565655e1668`
-after reconciling review `HSX-RVW-001-001-006`, verification `HSX-VER-001-001-001` and the
-trace-only review chain, then prepares issue #47/#38 decision packages. No proposal-content
-change is permitted.
+Post the signed reviewed/verified proposal package to issues #47/#38, then stop and await
+Steering. No proposal-content change, acceptance, design freeze or implementation dispatch is
+permitted before a later Steering decision.
 
 ## Authority
 
@@ -26,9 +26,9 @@ change is permitted.
 
 ## Exact next step
 
-Master records exact-content sign-off, posts the reviewed/verified decision packages to issues
-#47/#38, and stops before contract acceptance, design freeze, or implementation authorization
-unless Steering records a later decision.
+Post the reviewed/verified decision packages to issues #47/#38 and stop before contract
+acceptance, design freeze, or implementation authorization unless Steering records a later
+decision.
 
 ## Master verification
 

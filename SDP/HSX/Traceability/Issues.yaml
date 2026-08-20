@@ -17,7 +17,7 @@ issues:
     contract_requirements: HSX-R-001..HSX-R-036
     contract_architecture: HSX-A-001..HSX-A-005
     contract_design: HSX-D-001..HSX-D-005
-    contract_status: verified_package_pending_master_signoff_and_issue_decision_packages
+    contract_status: master_signed_proposal_pending_steering
     review_status: rework
     reviewed_head: 5fff403f6668f794b760caf64ef34b4d1ecb4ae3
     rereview: HSX-RVW-001-001-002
@@ -44,7 +44,11 @@ issues:
     verification_status: pass
     verification_repository_head_tested: ef1f8d8eaf24ebff18aece71d9836e0b478d1256
     verification_record: SDP/HSX/Verification/HSX-VER-001-001-001.md
-    current_gate: master_exact_content_signoff_and_issue_decision_packages
+    verification_record_commit: acb34734720811a98ee13215ea5e076f519d2dd5
+    master_signoff_status: pass
+    master_signoff_proposal_content_head: b57e368f77bb533b09397d633fc92565655e1668
+    master_signoff_record: SDP/HSX/Verification/HSX-ST-001--Master_Signoff.md
+    current_gate: post_issue_decision_packages_and_await_steering
     supplemental_studies:
       - HSX-ST-007
       - HSX-ST-008

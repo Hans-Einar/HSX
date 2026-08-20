@@ -1,6 +1,6 @@
 # DBG-SPR-001 — Debugger Stabilization
 
-- Status: ITERATION 003 VERIFICATION PASS — MASTER SIGN-OFF / ISSUE PACKAGES PENDING
+- Status: ITERATION 003 MASTER SIGN-OFF PASS — ISSUE PACKAGES NEXT
 - Owning track: Debugger
 - Owning GapAnalysis: `DBG-GAP-001`
 
