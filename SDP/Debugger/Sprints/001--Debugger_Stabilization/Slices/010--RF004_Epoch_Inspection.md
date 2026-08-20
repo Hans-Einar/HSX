@@ -29,13 +29,16 @@ gateway, Executive, DAP/CLI and VS Code modules are read-only.
 
 - every result carries exact TargetRef, LoadedImageRef, StopEpochId, StopToken and
   InspectionSnapshotRef evidence;
+- implement exact `InspectionService.create/open_epoch/invalidate_epoch/close`,
+  EpochInspectionSession and EpochHandleStore constructor/intern/resolve/invalidate APIs with
+  explicit index/read-port/architecture/limit/stack/location dependencies;
 - allocate every frame/scope/variable DomainHandle here and wrap Slice 005's handle-free
   `UnwindFrame` values without editing the signed stack module;
 - registers/stack/scopes/variables/memory/disassembly use one exact snapshot or explicitly
   identified immutable image bytes;
 - SnapshotReadPort rejects target/image/token/snapshot/revision mismatches and late data;
 - repeated/paged stack/scope/variable queries retain earlier handles in the same epoch;
-- variable records return exact variable IDs, declaration order, VARIABLE handles and
+- variable records preserve exact SymbolRecord.symbol_id, declaration order, VARIABLE handles and
   structural available/missing pieces; duplicate names remain distinct;
 - all collections follow the frozen order/page-slice rules and exact object keys intern the
   same handle on repeated queries;
@@ -49,6 +52,8 @@ gateway, Executive, DAP/CLI and VS Code modules are read-only.
 - memory/disassembly validate typed spaces/ranges/permissions and preserve unavailable bytes;
 - best-effort live evidence cannot create coherent results or stable handles;
 - bounded concurrent fixture calls are deterministic and immutable.
+- same-context open is idempotent, different valid epoch invalidates old before publish, same
+  epoch ID/different context is stale, and lifecycle/handle mutations are linearizable.
 
 ## Invariants and non-goals
 

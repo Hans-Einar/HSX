@@ -498,8 +498,8 @@ frontend mapping remain separate responsibilities.
 
 Interface review `DBG-RVW-001-005-007` returned REWORK at exact remote-published head
 `82154c614a31284723bf3e6a337c5bedfb8aba5d`. Master corrected only the candidate interface,
-Slice ownership and live traceability. Reviews 008 and 009 also returned REWORK; fresh
-`DBG-RVW-001-005-010` must PASS before product
+Slice ownership and live traceability. Reviews 008 through 010 also returned REWORK; fresh
+`DBG-RVW-001-005-012` must PASS before product
 dispatch. A finding requiring an accepted DBG/HSX design change returns to Steering.
 
 ### Frozen execution units
@@ -534,7 +534,8 @@ exact-head sign-off before the next Slice starts.
 - Requirements: `DBG-R-004`, `DBG-R-021..DBG-R-028`, `DBG-R-034..DBG-R-036`.
 - Design: `DBG-D-003`, `DBG-D-004`, `DBG-D-009`; portable `HSX-D-001..003`.
 - Slice reviews: `DBG-RVW-001-005-001..006` and `DBG-RVW-001-005-011`; interface
-  reviews: `DBG-RVW-001-005-007..010`; verifications `DBG-VER-001-005-001..007`.
+  reviews: `DBG-RVW-001-005-007..010`, then `...012`; verifications
+  `DBG-VER-001-005-001..007`.
 - Parent final: `DBG-RVW-004-001-001`, `DBG-VER-004-001-001`.
 - RF-005 explicitly depends on RF-004's accepted `dbg.resolver-inspection/1`; partial/frozen
   implementation does not satisfy the dependency and no RF-005 worker is authorized.
@@ -601,3 +602,20 @@ Master added the exact opaque TargetRef canonical scalar/emission mapping, resto
 ExpressionValue plus scope composition, introduced early recipe foundation Slice 007 before
 artifact Slice 003, and added LegacyFunctionRecord. No product file changed. Fresh exact-head
 review is `DBG-RVW-001-005-010`.
+
+### Interface review attempt 4
+
+Fresh read-only `DBG-RVW-001-005-010` reviewed exact remote head `72b06ad0…`. It confirmed
+all review 007..009 closures plus seven-Slice ownership/order, SDP-only scope and 120-row
+append-only trace, then returned REWORK:
+
+- High: InspectionService dependency construction, epoch/session activation/invalidation and
+  persistent handle-store lifetime were not public/frozen;
+- High: SymbolRecord used symbol_id while LocationRow/results/handles used an undefined second
+  variable_id namespace;
+- Medium: index order referenced absent address `.value` and no SymbolKind rank.
+
+Master froze explicit service/session/store factory and lifecycle/concurrency semantics,
+standardized variables end-to-end on SymbolRecord.symbol_id with referential validation, and
+corrected `.unsigned_value` ordering plus SymbolKind rank. Review 011 remains reserved for
+Recipe Slice 007; fresh interface review is `DBG-RVW-001-005-012`.

@@ -1,6 +1,6 @@
 # `dbg.resolver-inspection/1` — Typed Resolver and Inspection Interface
 
-- Status: **REFROZEN CANDIDATE — REVIEWS 007..009 REWORK / REVIEW 010 PENDING**
+- Status: **REFROZEN CANDIDATE — REVIEWS 007..010 REWORK / REVIEW 012 PENDING**
 - Iteration: `DBG-IT-001-005`
 - Parent Refactor: `DBG-RF-004`
 - Steering authority: issue #38 comment `5362514094`
@@ -10,7 +10,8 @@
 - Review `DBG-RVW-001-005-007`: REWORK at `82154c614a31284723bf3e6a337c5bedfb8aba5d`
 - Review `DBG-RVW-001-005-008`: REWORK at `8d6c0f571f46a10ce6db7331618ef7600d6a8203`
 - Review `DBG-RVW-001-005-009`: REWORK at `07f7e16040bec1c225d263c682066f65b173e6aa`
-- Fresh independent re-review: `DBG-RVW-001-005-010`
+- Review `DBG-RVW-001-005-010`: REWORK at `72b06ad0bae53b70bc3d64edad91591998d2408d`
+- Fresh independent re-review: `DBG-RVW-001-005-012` (`...011` is reserved for Slice 007)
 - Public interface ID: `dbg.resolver-inspection/1`
 
 This document freezes the public Python-domain interface to be implemented by the seven bounded
@@ -305,6 +306,10 @@ Domain failures are returned, not hidden by `None`, first-candidate selection or
 - `STALE`
 - `ARTIFACT_MISMATCH`
 
+`InspectionOpenStatus`: `OPENED`, `UNAVAILABLE`, `STALE`, `ARTIFACT_MISMATCH`
+
+`InvalidationStatus`: `INVALIDATED`, `ALREADY_STALE`, `UNKNOWN_EPOCH`
+
 `AddressStatus`:
 
 - `VALID`
@@ -355,6 +360,17 @@ ContextBindingResult {
   context: InspectionContext | None,
   diagnostics: tuple[Diagnostic, ...],
 }
+
+InspectionOpenResult { status: InspectionOpenStatus,
+                       session: EpochInspectionSession | None,
+                       diagnostics: tuple[Diagnostic, ...] }
+InvalidationResult { status: InvalidationStatus, stop_epoch_id: StopEpochId,
+                     diagnostics: tuple[Diagnostic, ...] }
+HandleResolution { status: COMPLETE | UNKNOWN_HANDLE | STALE,
+                   context: InspectionContext,
+                   kind: FRAME | SCOPE | VARIABLE,
+                   object_key: tuple | None,
+                   diagnostics: tuple[Diagnostic, ...] }
 
 AddressResult { status: AddressStatus, value: HsxAddress | None,
                 diagnostics: tuple[Diagnostic, ...] }
@@ -411,7 +427,7 @@ UnwindRow { row_id: str, binding: ImageDebugBinding, pc_range: HsxAddressRange,
             register_rules: tuple[tuple[str, RecipeRule], ...],
             boundary: ORDINARY | ENTRY | EPILOGUE | TERMINAL | UNSUPPORTED,
             call_site_adjustment: int | None }
-LocationRow { row_id: str, binding: ImageDebugBinding, variable_id: str,
+LocationRow { row_id: str, binding: ImageDebugBinding, symbol_id: str,
               lexical_scope_id: str, function_id: str,
               pc_range: HsxAddressRange, declared_type_id: str | None,
               declared_bit_size: int >= 1, schema: RecipeSchemaRef,
@@ -446,7 +462,7 @@ ScopeSet { frame_handle: DomainHandle, scopes: tuple[ScopeRecord, ...] }
 ValuePiece { destination_bit_offset: int >= 0, bit_size: int >= 1,
              source_bit_offset: int >= 0, raw_bits: bytes | None,
              status: AVAILABLE | UNAVAILABLE, reason: str | None }
-EvaluatedValue { variable_id: str, name: str, declared_type_id: str | None,
+EvaluatedValue { symbol_id: str, name: str, declared_type_id: str | None,
                  display_value: str, raw_bytes: bytes | None,
                  bit_size: int >= 1 | None,
                  location_status: AVAILABLE | PARTIAL | OPTIMIZED_OUT | UNAVAILABLE,
@@ -457,7 +473,7 @@ ExpressionValue { expression_kind: REGISTER | VARIABLE | SYMBOL | CONSTANT | MEM
                   status: AVAILABLE | PARTIAL | OPTIMIZED_OUT | UNAVAILABLE,
                   pieces: tuple[ValuePiece, ...] }
 VariableRecord { context: InspectionContext, handle: DomainHandle,
-                 scope_handle: DomainHandle, variable_id: str,
+                 scope_handle: DomainHandle, symbol_id: str,
                  declaration_order: int >= 0, evaluated: EvaluatedValue,
                  child_scope_handle: DomainHandle | None }
 VariablePage { scope_handle: DomainHandle, total_variables: int >= 0,
@@ -478,7 +494,7 @@ DisassemblyBlock { start: HsxAddress, requested_count: int >= 1,
 `all_declared=false` with unique explicit IDs. Explicit register results follow request order;
 all-declared results follow ArchitectureDescriptor `register_order`. Stack frames are ordered
 top-first by ascending frame_index; scopes are ordered REGISTERS, LOCALS, GLOBALS;
-variables are ordered by `(declaration_order, variable_id)`; disassembly is ordered by checked
+variables are ordered by `(declaration_order, symbol_id)`; disassembly is ordered by checked
 ascending code address. `PageRequest` slices the complete ordered collection as
 `[offset:min(offset+limit,total)]`; offset at/beyond total returns an empty tuple with the same
 total, and every non-empty page contains exactly that slice. Pagination returns the same total
@@ -491,14 +507,14 @@ empty. `PARTIAL` is legal only for a structural pieces location: `raw_bytes` is 
 ValuePieces have non-overlapping destination ranges within declared `bit_size`, every missing
 piece is retained with `UNAVAILABLE` plus reason, and available pieces retain exact source and
 destination bit ranges without padding. `OPTIMIZED_OUT`/`UNAVAILABLE` have no raw bytes and no
-fabricated piece. VariableRecord always returns its exact variable ID and VARIABLE handle;
+fabricated piece. VariableRecord always returns its exact SymbolRecord.symbol_id and VARIABLE handle;
 duplicate display names therefore remain distinct.
 
 `SnapshotExpression` is a closed typed union:
 
 ```text
 RegisterExpression { register_id: str }
-VariableExpression { variable_id: str, lexical_scope_id: str }
+VariableExpression { symbol_id: str, lexical_scope_id: str }
 SymbolExpression { symbol_id: str }
 ConstantExpression { unsigned_value: int >= 0, bit_width: int >= 1 }
 MemoryExpression { address: HsxAddress, bit_width: int >= 1,
@@ -592,7 +608,7 @@ instruction_at(address: HsxAddress) -> ResolutionResult[InstructionRecord]
 source_locations(source: SourceRef, line: int, column: int | None) -> ResolutionResult[InstructionRecord]
 memory_regions() -> tuple[MemoryRegion, ...]
 unwind_rows(pc: HsxAddress, function_id: str | None) -> ResolutionResult[UnwindRow]
-location_rows(variable_id: str, lexical_scope_id: str,
+location_rows(symbol_id: str, lexical_scope_id: str,
               frame_pc: HsxAddress) -> ResolutionResult[LocationRow]
 
 LegacyDebugArtifactIndex.provenance() -> LegacyArtifactProvenance
@@ -607,11 +623,13 @@ LegacyDebugArtifactIndex.source_spelling_locations(spelling: LegacySourceSpellin
 LegacyDebugArtifactIndex.memory_regions() -> tuple[MemoryRegion, ...]
 ```
 
-Index ordering is observable and fixed: functions by `(space.value, range.start.value,
-function_id)`; symbol candidates by `(space.value, address.value, kind, symbol_id)`;
-instructions/source-location candidates by `(space.value, address.value, instruction_id)`;
-memory regions by `(space.value, range.start.value, region_id)`; unwind/location rows by
-`(space.value, pc_range.start.value, row_id)`; SourceRefs by logical_id UTF-8; types by type_id;
+Index ordering is observable and fixed: functions by `(space.value,
+range.start.unsigned_value, function_id)`; symbol candidates by
+`(space.value, address.unsigned_value, symbol_kind_rank, symbol_id)` where ranks are
+FUNCTION=0, LABEL=1, GLOBAL=2, LOCAL=3, CONSTANT=4; instructions/source-location candidates by
+`(space.value, address.unsigned_value, instruction_id)`; memory regions by
+`(space.value, range.start.unsigned_value, region_id)`; unwind/location rows by
+`(space.value, pc_range.start.unsigned_value, row_id)`; SourceRefs by logical_id UTF-8; types by type_id;
 lexical scopes by `(declaration_order, lexical_scope_id)`; variables by
 `(declaration_order, symbol_id)`. Exact duplicate records are rejected as corrupt;
 distinct same-name/same-address records remain distinct candidates.
@@ -623,6 +641,13 @@ exactly one value, UNAVAILABLE for zero and CORRUPT for duplicate/overlapping id
 for more than one. `source_locations` explicitly asks for the complete executable instruction
 set, so it is UNAVAILABLE for zero and RESOLVED with the ordered one-or-more set; it never
 chooses one address.
+
+`SymbolRecord.symbol_id` is the sole variable identity. Every LocationRow.symbol_id must
+resolve to exactly one LOCAL or GLOBAL SymbolRecord; its function/lexical-scope fields must
+equal that record and every variables_in_scope result must have the requested scope. Missing,
+duplicate or cross-scope joins make the portable component/index `CORRUPT`. VariableExpression,
+EvaluatedValue, VariableRecord, location_rows and VARIABLE handle keys all carry that same
+symbol_id unchanged; no secondary variable-ID namespace exists.
 
 Duplicate symbol names and multiple executable addresses remain candidate sets. Source records
 are keyed by exact `SourceRef`; no basename alias is part of the portable index. All code/data
@@ -789,21 +814,66 @@ local is evaluated from that frame/context, never current live registers.
 
 ## 9. Epoch-bound inspection service and handles
 
-`InspectionService` is composition over the frozen services and SnapshotReadPort:
+`InspectionService` is explicit composition over immutable dependencies and owns at most one
+active EpochInspectionSession:
 
 ```text
-registers(context: InspectionContext, selection: RegisterSelection) -> InspectionResult[RegisterSet]
-stack(context: InspectionContext, page: PageRequest) -> InspectionResult[FramePage]
-scopes(context: InspectionContext, frame_handle: DomainHandle) -> InspectionResult[ScopeSet]
-variables(context: InspectionContext, scope_handle: DomainHandle,
-          page: PageRequest) -> InspectionResult[VariablePage]
-evaluate_snapshot(context: InspectionContext, frame_handle: DomainHandle,
-                  expression: SnapshotExpression) -> InspectionResult[ExpressionValue]
-memory(context: InspectionContext, address: HsxAddress,
-       byte_length: int) -> InspectionResult[MemoryBlock]
-disassemble(context: InspectionContext, address: HsxAddress,
-            instruction_count: int) -> InspectionResult[DisassemblyBlock]
+InspectionService.create(index: DebugArtifactIndex,
+                         read_port: SnapshotReadPort,
+                         architecture: ArchitectureDescriptor,
+                         profile_limits: RecipeLimits,
+                         stack_service: StackService,
+                         location_evaluator: LocationEvaluator)
+    -> ResolutionResult[InspectionService]
+InspectionService.active_epoch_id() -> StopEpochId | None
+InspectionService.open_epoch(context: InspectionContext,
+                             request_limits: RecipeRequestLimits) -> InspectionOpenResult
+InspectionService.invalidate_epoch(expected_epoch_id: StopEpochId,
+                                   reason: str) -> InvalidationResult
+InspectionService.close(reason: str) -> InvalidationResult | None
+
+EpochInspectionSession.context() -> InspectionContext
+EpochInspectionSession.is_active() -> bool
+EpochInspectionSession.registers(selection: RegisterSelection) -> InspectionResult[RegisterSet]
+EpochInspectionSession.stack(page: PageRequest) -> InspectionResult[FramePage]
+EpochInspectionSession.scopes(frame_handle: DomainHandle) -> InspectionResult[ScopeSet]
+EpochInspectionSession.variables(scope_handle: DomainHandle,
+                                 page: PageRequest) -> InspectionResult[VariablePage]
+EpochInspectionSession.evaluate_snapshot(frame_handle: DomainHandle,
+                                         expression: SnapshotExpression) -> InspectionResult[ExpressionValue]
+EpochInspectionSession.memory(address: HsxAddress,
+                              byte_length: int) -> InspectionResult[MemoryBlock]
+EpochInspectionSession.disassemble(address: HsxAddress,
+                                   instruction_count: int) -> InspectionResult[DisassemblyBlock]
+
+EpochHandleStore.create(context: InspectionContext) -> EpochHandleStore
+EpochHandleStore.intern(kind: FRAME | SCOPE | VARIABLE,
+                        object_key: tuple) -> InspectionResult[DomainHandle]
+EpochHandleStore.resolve(handle: DomainHandle,
+                         expected_kind: FRAME | SCOPE | VARIABLE) -> HandleResolution
+EpochHandleStore.invalidate(reason: str) -> InvalidationResult
 ```
+
+`create` validates that `index.binding.payload.accepted_architecture_descriptor_ref ==
+architecture.ref.ref`, that profile_limits exactly equal the accepted limits above, and stores
+every dependency unchanged; mismatch returns the applicable ResolutionStatus and no service.
+No hidden default service, port, limit or cache is constructed. `open_epoch` requires
+context.image to equal the binding
+payload LoadedImageRef and context.target to equal its TargetRef. Binding/image/artifact
+mismatch follows the frozen ContextBinding status categories. If there is no active session,
+it creates one handle store and session. Opening the same exact InspectionContext is
+idempotent only when request_limits also match and returns the existing session. Same context
+with different limits returns UNAVAILABLE/`epoch_request_limits_conflict` and changes nothing.
+Opening a different valid StopEpoch first
+linearizes invalidation of the previous session/store, retains its epoch ID as stale, then
+publishes the new session. Reusing an active epoch ID with any different context is STALE and
+does not replace the active session.
+
+`invalidate_epoch` is exact and idempotent: matching active ID invalidates session/store and
+returns INVALIDATED; an ID retained in stale history returns ALREADY_STALE; an unseen ID
+returns UNKNOWN_EPOCH. `close` applies the same invalidation to the active epoch and returns
+None only when no active/stale mutation occurs. Every method on an invalidated session returns
+STALE with its original InspectionContext and allocates no handle/read.
 
 Slice 006 converts handle-free `UnwindFrame`s from StackService into `FrameRecord`s and is the
 only allocator of DomainHandle values. All returned frames, scopes and variables retain the
@@ -816,9 +886,18 @@ handles without owning their lifetime.
 
 Within one epoch the store interns exact object keys: FRAME uses frame_index; SCOPE uses
 `(frame_handle.serial, scope_kind)`; VARIABLE uses
-`(scope_handle.serial, declaration_order, variable_id)`. Repeating the same query returns the
+`(scope_handle.serial, declaration_order, symbol_id)`. Repeating the same query returns the
 same handle; a new exact key receives the next never-reused serial. A handle kind/key mismatch
 is `UNKNOWN_HANDLE`; a known serial from an invalidated epoch is `STALE`.
+`intern` rejects a key not matching its declared kind as CORRUPT without allocating a serial;
+`resolve` returns the exact interned key only for COMPLETE.
+
+InspectionService and EpochHandleStore each serialize only lifecycle/handle-map mutations with
+one internal lock. Snapshot reads and immutable index/recipe work may execute concurrently
+outside that lock. Handle interning and invalidation are linearizable: invalidation wins before
+any later allocation/read, and a completed immutable snapshot read may return only for the
+still-matching session context. This is inspection lifetime bookkeeping, not controller/run
+state ownership; later controller integration calls invalidate before target-mutating effects.
 
 `SnapshotExpression` is a typed, side-effect-free AST over registers, selected-frame variables,
 symbols/constants and explicit typed memory dereference. String parsing and DAP Watch policy
