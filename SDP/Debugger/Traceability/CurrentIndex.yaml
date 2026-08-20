@@ -197,12 +197,22 @@ proposed:
     path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
     status: complete_accepted_dependency
 first_structural_wave:
-  status: complete_awaiting_steering
+  status: publication_pass_awaiting_steering
   steering_comment: 5356484309
   decision_package_comment: 5361796061
   activation_comment: 5356712010
   activation_correction_comment: 5356745504
   branch: codex/dbg-rf-002-003
+  remote_branch: origin/codex/dbg-rf-002-003
+  published_signed_history_head: b0a9e8161bebac6b9eb1a0bba9003c82fd21fa8c
+  publication_steering_comment: 5361993826
+  publication_verification:
+    status: pass
+    fresh_checkout_head: b0a9e8161bebac6b9eb1a0bba9003c82fd21fa8c
+    contracted_debugger: 121_passed
+    unchanged_regressions: 121_passed
+    traceability: CurrentIndex_Issues_Relations_YAML_and_110_Ledger_records_PASS
+    scope: no_non_SDP_diff_after_1e479536_and_no_Executive_VM_frontend_AVR_change
   contract_head: 97d8c5b8d62d56dcfcab59c97c516d83f68c7075
   shared_interface:
     version: dbg.controller-gateway/1.1
@@ -350,7 +360,7 @@ first_structural_wave:
   runtime_profile: hsx.python-debug-legacy/1
   still_blocked: DBG-RF-004..DBG-RF-009
   partial_product_wip_stash: efc91f2640647402bc92c69bde1c57685cfaa1f1
-  current_gate: awaiting_steering_after_issue_38_comment_5361796061
+  current_gate: final_issue_38_publication_closeout_then_await_steering
 structural_gate:
   rule: Only Steering-authorized Refactors with frozen Slice/interface contracts may execute.
   authorized_refactors:

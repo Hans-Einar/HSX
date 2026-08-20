@@ -163,7 +163,11 @@ issues:
     dependent_integration_verification_status: pass
     dependent_integration_signed_head: 1e479536ce5e746e1b06a53b1039b1af84adaed6
     first_wave_decision_package_comment: 5361796061
-    first_wave_current_gate: awaiting_steering
+    first_wave_publication_steering_comment: 5361993826
+    first_wave_remote_branch: codex/dbg-rf-002-003
+    first_wave_published_head: b0a9e8161bebac6b9eb1a0bba9003c82fd21fa8c
+    first_wave_publication_verification_status: pass
+    first_wave_current_gate: final_publication_closeout_then_await_steering
     portable_contract_gate: complete_accepted_frozen
     rf002_parent_review_attempt_6: DBG-RVW-002-001-006
     rf002_parent_review_attempt_6_status: rework_trace_only

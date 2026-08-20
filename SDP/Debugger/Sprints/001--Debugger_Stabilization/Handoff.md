@@ -1,10 +1,12 @@
 # DBG-SPR-001 Handoff
 
-Status: `first_structural_wave_complete_awaiting_steering`
+Status: `first_structural_wave_publication_pass_awaiting_steering`
 
 ## Current objective
 
-First-wave decision package posted to issue #38 comment `5361796061`; stop for Steering.
+Signed history published on `origin/codex/dbg-rf-002-003`; fresh remote checkout PASS at
+`b0a9e8161bebac6b9eb1a0bba9003c82fd21fa8c`. Publish this final trace reconciliation,
+post the durability closeout to issue #38, then stop for Steering.
 
 ## Authority
 
@@ -202,14 +204,14 @@ Await Steering. Do not start RF-004..009.
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: awaiting Steering after issue #38 comment `5361796061`
+- Active gate: final publication closeout comment in issue #38, then awaiting Steering
 
 ## Agents and worktree
 
 The prior design/portable-contract chain is complete. Steering authorized the v1.1 refreeze,
 and its exact implementation passed fresh review. Foundation rework and fresh re-reviews are
-complete; the corrected signed chain and parent reviews are PASS. RF-003 fresh parent
-verification is active.
+complete; corrected RF-002/RF-003/integration parent review, verification and sign-off are
+PASS. Fresh remote checkout publication verification is PASS.
 Controlled work is on
 `codex/dbg-rf-002-003`;
 the user's original dirty
