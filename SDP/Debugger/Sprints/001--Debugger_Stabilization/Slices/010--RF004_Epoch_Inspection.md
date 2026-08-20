@@ -35,6 +35,10 @@ gateway, Executive, DAP/CLI and VS Code modules are read-only.
   identified immutable image bytes;
 - SnapshotReadPort rejects target/image/token/snapshot/revision mismatches and late data;
 - repeated/paged stack/scope/variable queries retain earlier handles in the same epoch;
+- variable records return exact variable IDs, declaration order, VARIABLE handles and
+  structural available/missing pieces; duplicate names remain distinct;
+- all collections follow the frozen order/page-slice rules and exact object keys intern the
+  same handle on repeated queries;
 - unknown handle is explicit `UNKNOWN_HANDLE` and stale/different epoch is explicit `STALE`;
 - no fallback to current/top/first frame and no handle reuse across epochs;
 - variables use exact selected frame and location row; partial pieces stay partial;

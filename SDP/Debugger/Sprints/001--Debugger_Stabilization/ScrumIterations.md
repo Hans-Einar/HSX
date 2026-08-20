@@ -498,7 +498,8 @@ frontend mapping remain separate responsibilities.
 
 Interface review `DBG-RVW-001-005-007` returned REWORK at exact remote-published head
 `82154c614a31284723bf3e6a337c5bedfb8aba5d`. Master corrected only the candidate interface,
-Slice ownership and live traceability. Fresh `DBG-RVW-001-005-008` must PASS before product
+Slice ownership and live traceability. Review 008 also returned REWORK; fresh
+`DBG-RVW-001-005-009` must PASS before product
 dispatch. A finding requiring an accepted DBG/HSX design change returns to Steering.
 
 ### Frozen execution units
@@ -531,7 +532,7 @@ exact-head sign-off before the next Slice starts.
   `DBG-SL-001-005-001..006`.
 - Requirements: `DBG-R-004`, `DBG-R-021..DBG-R-028`, `DBG-R-034..DBG-R-036`.
 - Design: `DBG-D-003`, `DBG-D-004`, `DBG-D-009`; portable `HSX-D-001..003`.
-- Reviews: `DBG-RVW-001-005-001..008`; verifications `DBG-VER-001-005-001..006`.
+- Reviews: `DBG-RVW-001-005-001..009`; verifications `DBG-VER-001-005-001..006`.
 - Parent final: `DBG-RVW-004-001-001`, `DBG-VER-004-001-001`.
 - RF-005 explicitly depends on RF-004's accepted `dbg.resolver-inspection/1`; partial/frozen
   implementation does not satisfy the dependency and no RF-005 worker is authorized.
@@ -560,4 +561,22 @@ REWORK:
 Master refroze a complete public schema/result surface, explicit checked/wrap mode,
 handle-free Slice 005 output with Slice 006 wrapping, a read-only `ControllerEpochAdapter`, and
 corrected live dependency statuses. No product file changed. Fresh exact-head review is
-`DBG-RVW-001-005-008`; Slice 001 remains unstarted.
+`DBG-RVW-001-005-008`; Slice 001 remained unstarted.
+
+### Interface review attempt 2
+
+Fresh read-only `DBG-RVW-001-005-008` reviewed exact remote head `8d6c0f571…`. It confirmed
+the prior stack-handle and live-Relations closures, exact remote/ancestry/clean scope,
+YAML/116-row append-only Ledger, paths/fences and RF-004-only authority, then returned REWORK:
+
+- High: convenience bundle/ref/binding schemas contradicted the canonical HSX payloads;
+- High: recipe/evaluator/result/order/page semantics remained incomplete;
+- High: returned variables could not carry VARIABLE handles or structural partial pieces;
+- High: legacy index could advertise an exact binding without canonical evidence;
+- Medium: StopEpoch evidence grade and mismatch status/code matrix remained incomplete.
+
+Master replaced the identity types with exact normative payload/ref/binding projections,
+froze recipe/op/rule/evaluator/budget and deterministic ordering/page rules, added variable
+records/handles/pieces, separated LegacyDebugArtifactIndex with mandatory
+LEGACY_UNVERIFIED provenance and no binding/SourceRef, and froze the StopEpoch matrix. No
+product file changed. Fresh exact-head review is `DBG-RVW-001-005-009`.

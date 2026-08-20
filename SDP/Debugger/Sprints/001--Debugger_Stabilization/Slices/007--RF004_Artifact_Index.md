@@ -32,7 +32,8 @@ Legacy `python/hsx_dbg/symbols.py`, source mapping, runtime and frontend files a
   location rows using typed addresses/ranges;
 - reject malformed/overlapping/unsupported metadata with frozen result categories;
 - legacy adapter validates `.sym` v1 plus supplied HXE CRC evidence, uses explicit descriptor
-  conversion, preserves candidates and returns a named degraded profile;
+  conversion, preserves candidates and returns only separate LegacyDebugArtifactIndex /
+  LEGACY_UNVERIFIED provenance with no ImageDebugBinding, SourceRef or portable recipe rows;
 - no basename alias, lowercase identity, hidden mask or first-candidate preference.
 
 ## Invariants and non-goals

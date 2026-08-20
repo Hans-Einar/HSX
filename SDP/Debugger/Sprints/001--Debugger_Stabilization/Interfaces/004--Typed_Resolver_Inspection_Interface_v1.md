@@ -1,6 +1,6 @@
 # `dbg.resolver-inspection/1` — Typed Resolver and Inspection Interface
 
-- Status: **REFROZEN CANDIDATE — REVIEW 007 REWORK / REVIEW 008 PENDING**
+- Status: **REFROZEN CANDIDATE — REVIEWS 007/008 REWORK / REVIEW 009 PENDING**
 - Iteration: `DBG-IT-001-005`
 - Parent Refactor: `DBG-RF-004`
 - Steering authority: issue #38 comment `5362514094`
@@ -8,7 +8,8 @@
 - Frozen design: `DBG-D-003`, `DBG-D-004`, `DBG-D-009`
 - Portable contracts: `HSX-D-001..HSX-D-003`, especially `HSX-D-002`
 - Review `DBG-RVW-001-005-007`: REWORK at `82154c614a31284723bf3e6a337c5bedfb8aba5d`
-- Fresh independent re-review: `DBG-RVW-001-005-008`
+- Review `DBG-RVW-001-005-008`: REWORK at `8d6c0f571f46a10ce6db7331618ef7600d6a8203`
+- Fresh independent re-review: `DBG-RVW-001-005-009`
 - Public interface ID: `dbg.resolver-inspection/1`
 
 This document freezes the public Python-domain interface to be implemented by the six bounded
@@ -65,7 +66,7 @@ EpochBinding {
 
 Construction fails unless all embedded identities agree exactly:
 
-- `LoadedImageRef.target == TargetRef`;
+- `LoadedImageRef.target_ref == TargetRef`;
 - snapshot TargetRef and LoadedImageRef equal the context refs;
 - EpochBinding controller generation and snapshot refs equal the context refs;
 - transition and inspection revisions are non-negative and exact;
@@ -88,12 +89,24 @@ For a coherent result, `controller_epoch.generation` must exactly match TargetRe
 target and target-generation fields; `controller_epoch.stop_token` must already be a typed
 `StopToken`; `controller_epoch.snapshot_ref` must already be a typed
 `InspectionSnapshotRef`; both typed values must embed the same TargetRef/LoadedImageRef and
-revisions; and controller/typed evidence grades must be portable and equal. The adapter does
-not decode strings/dictionaries, infer identity or fetch replacements. Any untyped/degraded
-legacy token/snapshot returns `UNAVAILABLE` with diagnostic
-`coherent_snapshot_unavailable`; a mismatch returns the relevant `STALE` or
-`ARTIFACT_MISMATCH` binding status and publishes no InspectionContext. This preserves RF-002 as
-read-only while making its exact consumption contract executable.
+revisions; and controller/snapshot evidence grades must be `PORTABLE` and equal. The adapter
+does not decode strings/dictionaries, infer identity or fetch replacements.
+
+Mismatch classification is frozen and first-match ordered:
+
+| Condition | Status | Diagnostic code |
+|---|---|---|
+| stop token or snapshot is absent/not the typed RF-004 record | `UNAVAILABLE` | `coherent_snapshot_unavailable` |
+| controller or snapshot evidence grade is not `PORTABLE`, grades differ, or stability is `BEST_EFFORT_LIVE` | `UNAVAILABLE` | `portable_snapshot_evidence_unavailable` |
+| GenerationStamp executive instance, target ID or target generation differs from TargetRef | `STALE` | `controller_epoch_target_stale` |
+| image/token/snapshot TargetRef differs after the prior check | `STALE` | `epoch_target_stale` |
+| loaded-image ID or image generation differs among image/token/snapshot | `STALE` | `loaded_image_stale` |
+| ArtifactRef differs among image/token/snapshot | `ARTIFACT_MISMATCH` | `epoch_artifact_mismatch` |
+| controller StopToken differs from snapshot StopToken, or transition revisions differ | `STALE` | `stop_token_stale` |
+| all checks match exactly | `BOUND` | none |
+
+Every non-BOUND outcome publishes no InspectionContext. This preserves RF-002 as read-only
+while making its exact consumption contract executable.
 
 `best_effort_live` is a named degraded grade. It may produce a typed unavailable/degraded
 diagnostic, but it can never set `coherent=true`, allocate durable epoch handles, or be returned
@@ -123,37 +136,67 @@ Required public values:
 - `InspectionContext`;
 - `AddressSpaceId`, `HsxAddress`, and half-open `HsxAddressRange`.
 
-Exact identity/binding schemas (field meanings and digest construction remain those frozen by
-`HSX-D-001`/`HSX-D-002` and its canonical digest appendix):
+The Python records below are exact projections of the frozen `HSX-D-001`/`HSX-D-002` model,
+not alternate digest models. `CanonicalUInt64` stores a validated Python integer in
+`0..2^64-1` and serializes to the required minimal decimal JSON string. `ContentDigest` and
+`StructuredDigest` store the exact algorithm/value object. `canonical_payload()` on
+ArtifactRef, bundle identity/ref and binding payload emits the exact normative key names,
+omits no mandatory field, adds no convenience field and delegates byte/key/string/integer
+encoding to the frozen canonical appendix. Convenience properties are derived only and are
+excluded from equality/digest scope.
 
 ```text
 ExecutiveInstanceRef { value: str }
 TargetRef { executive: ExecutiveInstanceRef, target_id: str,
             target_generation: int >= 1, display_pid: int,
             pid_generation: int >= 1 }
+CanonicalUInt64 { value: int in 0..2^64-1 }
+ContentDigest { algorithm: "sha256", value: Hex64 }
+StructuredDigest { algorithm: "sha256", value: Hex64 }
+DescriptorDigestRef { ref: str, digest: Hex64 }
+ComponentDigestRef { schema: str, canonical_component_digest: Hex64 }
+
 ArtifactRef { ref_schema: "hsx.artifact-ref/1",
-              media_type: "application/vnd.hsx.hxe", container_version: str,
-              byte_length: int >= 0, sha256: Hex64 }
+              media_type: "application/vnd.hsx.hxe",
+              container_version: CanonicalUInt64,
+              byte_length: CanonicalUInt64,
+              content_digest: ContentDigest }
 LoadedImageRef { ref_schema: "hsx.loaded-image-ref/1",
-                 executive: ExecutiveInstanceRef, target: TargetRef,
-                 loaded_image_id: str, image_generation: int >= 1,
-                 artifact: ArtifactRef }
-ArchitectureDescriptorRef { schema: str, profile_id: str, digest: Hex64 }
-AbiDescriptorRef { schema: "hsx.abi-descriptor/1", profile_id: str, digest: Hex64 }
+                 executive_instance_ref: ExecutiveInstanceRef,
+                 target_ref: TargetRef, loaded_image_id: str,
+                 image_generation: CanonicalUInt64,
+                 artifact_ref: ArtifactRef }
+ArchitectureDescriptorRef { ref: str, digest: Hex64 }
+AbiDescriptorRef { ref: str, digest: Hex64 }
 RecipeSchemaRef { schema: hsx.unwind-recipe/1 | hsx.location-recipe/1,
                   digest: Hex64 }
-ImageDebugBundleRef { ref_schema: "hsx.image-debug-bundle-ref/1", digest: Hex64,
-                      bundle_schema: "hsx.image-debug-bundle/1",
-                      artifact: ArtifactRef, architecture: ArchitectureDescriptorRef,
-                      abi: AbiDescriptorRef, recipe_schemas: tuple[RecipeSchemaRef, ...],
-                      component_digests: tuple[tuple[str, Hex64], ...],
-                      source_manifest_digest: Hex64 }
-ImageDebugBinding { schema: "hsx.image-debug-binding/1", loaded_image: LoadedImageRef,
-                    bundle: ImageDebugBundleRef,
-                    architecture: ArchitectureDescriptorRef,
-                    abi: AbiDescriptorRef, binding_digest: Hex64 }
-SourceRef { bundle: ImageDebugBundleRef, logical_id: str,
-            sha256: Hex64, byte_length: int >= 0 }
+
+ImageDebugBundleIdentityPayload {
+  bundle_schema: "hsx.image-debug-bundle/1",
+  artifact_ref: ArtifactRef,
+  architecture_descriptor: DescriptorDigestRef,
+  abi_descriptor: DescriptorDigestRef,
+  symbol_model: ComponentDigestRef(schema="hsx.debug-component.symbol-model/1"),
+  unwind_recipe: ComponentDigestRef(schema="hsx.unwind-recipe/1"),
+  location_recipe: ComponentDigestRef(schema="hsx.location-recipe/1"),
+  source_identity_manifest_ref: StructuredDigest,
+  required_debug_capabilities: tuple[str, ...],
+  interpretation_schema_versions: tuple[tuple[str, CanonicalUInt64], ...],
+}
+ImageDebugBundleRef { ref_schema: "hsx.image-debug-bundle-ref/1",
+                      artifact_ref: ArtifactRef,
+                      digest_algorithm: "sha256", bundle_digest: Hex64 }
+ImageDebugBindingPayload {
+  binding_schema: "hsx.image-debug-binding/1",
+  loaded_image_ref: LoadedImageRef,
+  image_debug_bundle_ref: ImageDebugBundleRef,
+  accepted_architecture_descriptor_ref: str,
+  accepted_abi_descriptor_ref: str,
+  accepted_image_debug_capability_profile: str,
+}
+ImageDebugBinding { payload: ImageDebugBindingPayload, binding_digest: Hex64 }
+SourceRef { image_debug_bundle_ref: ImageDebugBundleRef, logical_id: str,
+            content_digest: ContentDigest, byte_length: CanonicalUInt64 }
 AddressSpaceId { value: str }
 HsxAddress { space: AddressSpaceId, unsigned_value: int >= 0 }
 HsxAddressRange { start: HsxAddress, byte_length: int >= 0 }
@@ -164,6 +207,7 @@ AddressSpaceDescriptor { space: AddressSpaceId, unit: str, width_bits: int >= 1,
                          permissions: frozenset[READ | WRITE | EXECUTE] }
 ArchitectureDescriptor { ref: ArchitectureDescriptorRef,
                          spaces: tuple[AddressSpaceDescriptor, ...],
+                         register_order: tuple[str, ...],
                          instruction_alignment: int >= 1 }
 ```
 
@@ -186,8 +230,16 @@ InspectionSnapshotRef {
   inspection_revision: int,
   supported_read_sets: frozenset[str],
   stability: IMMUTABLE | REVISION_PINNED | BEST_EFFORT_LIVE,
+  evidence_grade: PORTABLE | LEGACY_DEGRADED,
 }
 ```
+
+Portable bundle construction always carries both
+`ImageDebugBundleIdentityPayload` and its resulting `ImageDebugBundleRef`; the ref does not
+absorb descriptor/component fields. Binding validation recomputes the identity payload digest,
+requires it to equal `bundle_digest`, then recomputes the exact binding payload including
+`accepted_image_debug_capability_profile`. Any mapping that changes a normative key, excludes
+a mandatory field or includes a local/provenance field is `CORRUPT` and produces no ref/binding.
 
 `StopEpochId` is one opaque non-empty exact string; it is never parsed for generation.
 `supported_read_sets` uses the frozen names `registers`, `memory`, `disassembly`, `stack`, and
@@ -277,7 +329,6 @@ Diagnostic {
 ResolutionResult[T] {
   status: ResolutionStatus,
   binding: ImageDebugBinding | None,
-  query_id: str,
   values: tuple[T, ...],
   diagnostics: tuple[Diagnostic, ...],
 }
@@ -313,6 +364,11 @@ Artifact/index record schemas:
 ```text
 DebugComponentInput { component_id: str, schema: str,
                       canonical_digest: Hex64, content: bytes }
+SourceIdentityRecord { logical_id: str, content_digest: ContentDigest,
+                       byte_length: CanonicalUInt64,
+                       media_type_or_language: str | None }
+SourceIdentityManifest { schema: "hsx.source-identity-manifest/1",
+                         records: tuple[SourceIdentityRecord, ...] }
 FunctionRecord { function_id: str, name: str, linkage_name: str | None,
                  range: HsxAddressRange,
                  definition: SourceLocation | None }
@@ -320,7 +376,7 @@ SymbolRecord { symbol_id: str, name: str,
                kind: FUNCTION | LABEL | GLOBAL | LOCAL | CONSTANT,
                address: HsxAddress, byte_size: int >= 0,
                function_id: str | None, lexical_scope_id: str | None,
-               type_id: str | None }
+               type_id: str | None, declaration_order: int >= 0 }
 SourceLocation { source: SourceRef, line: int >= 1, column: int >= 1 | None,
                  discriminator: int | None }
 InstructionRecord { instruction_id: str, address: HsxAddress, byte_size: int >= 1,
@@ -330,13 +386,18 @@ InstructionRecord { instruction_id: str, address: HsxAddress, byte_size: int >= 
 MemoryRegion { region_id: str, name: str, kind: str, range: HsxAddressRange,
                permissions: frozenset[READ | WRITE | EXECUTE] }
 UnwindRow { row_id: str, binding: ImageDebugBinding, pc_range: HsxAddressRange,
-            abi: AbiDescriptorRef, schema: RecipeSchemaRef, cfa_recipe,
-            caller_pc_recipe, caller_sp_recipe,
-            register_recipes: tuple[tuple[str, Recipe], ...], terminal: bool }
+            abi: AbiDescriptorRef, schema: RecipeSchemaRef,
+            cfa_expression: RecipeExpression,
+            caller_pc_rule: RecipeRule, caller_sp_rule: RecipeRule,
+            caller_frame_base_rule: RecipeRule | None,
+            register_rules: tuple[tuple[str, RecipeRule], ...],
+            boundary: ORDINARY | ENTRY | EPILOGUE | TERMINAL | UNSUPPORTED,
+            call_site_adjustment: int | None }
 LocationRow { row_id: str, binding: ImageDebugBinding, variable_id: str,
               lexical_scope_id: str, function_id: str,
               pc_range: HsxAddressRange, declared_type_id: str | None,
-              declared_bit_size: int >= 1, schema: RecipeSchemaRef, location_form }
+              declared_bit_size: int >= 1, schema: RecipeSchemaRef,
+              location_form: LocationForm }
 ```
 
 Pagination and inspection record schemas:
@@ -364,13 +425,21 @@ ScopeRecord { context: InspectionContext, handle: DomainHandle,
               kind: REGISTERS | LOCALS | GLOBALS | WATCH,
               name: str, expensive: bool }
 ScopeSet { frame_handle: DomainHandle, scopes: tuple[ScopeRecord, ...] }
-VariableValue { name: str, declared_type_id: str | None, display_value: str,
-                raw_bytes: bytes | None, bit_size: int >= 1 | None,
-                location_status: AVAILABLE | PARTIAL | OPTIMIZED_OUT | UNAVAILABLE,
-                child_scope_handle: DomainHandle | None }
+ValuePiece { destination_bit_offset: int >= 0, bit_size: int >= 1,
+             source_bit_offset: int >= 0, raw_bits: bytes | None,
+             status: AVAILABLE | UNAVAILABLE, reason: str | None }
+EvaluatedValue { variable_id: str, name: str, declared_type_id: str | None,
+                 display_value: str, raw_bytes: bytes | None,
+                 bit_size: int >= 1 | None,
+                 location_status: AVAILABLE | PARTIAL | OPTIMIZED_OUT | UNAVAILABLE,
+                 pieces: tuple[ValuePiece, ...] }
+VariableRecord { context: InspectionContext, handle: DomainHandle,
+                 scope_handle: DomainHandle, variable_id: str,
+                 declaration_order: int >= 0, evaluated: EvaluatedValue,
+                 child_scope_handle: DomainHandle | None }
 VariablePage { scope_handle: DomainHandle, total_variables: int >= 0,
                offset: int >= 0,
-               variables: tuple[VariableValue, ...] }
+               variables: tuple[VariableRecord, ...] }
 MemorySegment { offset: int >= 0, requested_length: int >= 1,
                 data: bytes, status: COMPLETE | UNAVAILABLE }
 MemoryBlock { start: HsxAddress, requested_length: int >= 1,
@@ -383,10 +452,24 @@ DisassemblyBlock { start: HsxAddress, requested_count: int >= 1,
 ```
 
 `RegisterSelection` requires exactly one of `all_declared=true` with no IDs, or
-`all_declared=false` with unique explicit IDs. Pagination returns the same deterministic total
+`all_declared=false` with unique explicit IDs. Explicit register results follow request order;
+all-declared results follow ArchitectureDescriptor `register_order`. Stack frames are ordered
+top-first by ascending frame_index; scopes are ordered REGISTERS, LOCALS, GLOBALS, WATCH;
+variables are ordered by `(declaration_order, variable_id)`; disassembly is ordered by checked
+ascending code address. `PageRequest` slices the complete ordered collection as
+`[offset:min(offset+limit,total)]`; offset at/beyond total returns an empty tuple with the same
+total, and every non-empty page contains exactly that slice. Pagination returns the same total
 and order for one immutable context. Memory segments are ordered, non-overlapping and exactly
 cover the requested range when status is COMPLETE; gaps are explicit UNAVAILABLE segments in
 a PARTIAL result.
+
+For an `AVAILABLE` scalar, `raw_bytes` contains the complete declared value and `pieces` is
+empty. `PARTIAL` is legal only for a structural pieces location: `raw_bytes` is None,
+ValuePieces have non-overlapping destination ranges within declared `bit_size`, every missing
+piece is retained with `UNAVAILABLE` plus reason, and available pieces retain exact source and
+destination bit ranges without padding. `OPTIMIZED_OUT`/`UNAVAILABLE` have no raw bytes and no
+fabricated piece. VariableRecord always returns its exact variable ID and VARIABLE handle;
+duplicate display names therefore remain distinct.
 
 `SnapshotExpression` is a closed typed union:
 
@@ -410,12 +493,25 @@ SourceLocatorPolicy { exact_overrides: tuple[ExactSourceOverride, ...],
                       prefix_mappings: tuple[SourcePrefixMapping, ...],
                       search_roots: tuple[str, ...] }
 SourceCandidate { locator: str, discovery: OVERRIDE | PREFIX | SEARCH_ROOT,
-                  byte_length: int >= 0, sha256: Hex64,
+                  byte_length: int >= 0, content_digest: ContentDigest,
                   content_matches: bool }
 SourceResolution { status: ResolutionStatus, source: SourceRef,
                    candidates: tuple[SourceCandidate, ...],
                    resolved_locator: str | None,
                    diagnostics: tuple[Diagnostic, ...] }
+LegacyArtifactProvenance { profile: "hsx.python-debug-legacy/1",
+                           identity_status: LEGACY_UNVERIFIED,
+                           sym_content_digest: ContentDigest,
+                           hxe_crc32: int in 0..0xffffffff }
+LegacySourceSpelling { file: str, directory: str | None }
+LegacyInstructionRecord { instruction_id: str, address: HsxAddress,
+                          byte_size: int >= 1, function_id: str | None,
+                          source_spelling: LegacySourceSpelling | None,
+                          line: int >= 1 | None, column: int >= 0 | None }
+LegacyResolutionResult[T] { status: ResolutionStatus,
+                            provenance: LegacyArtifactProvenance,
+                            values: tuple[T, ...],
+                            diagnostics: tuple[Diagnostic, ...] }
 ```
 
 Only `RESOLVED` has one `resolved_locator`, whose candidate has `content_matches=true`.
@@ -431,19 +527,21 @@ Construction entrypoints are exact:
 
 ```text
 DebugArtifactIndex.build(binding: ImageDebugBinding,
+                         bundle_identity: ImageDebugBundleIdentityPayload,
+                         source_manifest: SourceIdentityManifest,
                          components: tuple[DebugComponentInput, ...])
     -> ResolutionResult[DebugArtifactIndex]
-LegacySymbolAdapter.build(binding: ImageDebugBinding,
-                          sym_bytes: bytes,
+LegacySymbolAdapter.build(sym_bytes: bytes,
                           expected_hxe_crc32: int,
                           architecture: ArchitectureDescriptor)
-    -> ResolutionResult[DebugArtifactIndex]
+    -> LegacyResolutionResult[LegacyDebugArtifactIndex]
 ```
 
 Portable build rechecks each input byte digest/schema against the bundle before parsing.
-Legacy build requires `.sym` version 1 and exact `hxe_crc == expected_hxe_crc32`; its returned
-index/result diagnostics carry profile `hsx.python-debug-legacy/1` and never claim portable
-bundle capability.
+Legacy build requires `.sym` version 1 and exact `hxe_crc == expected_hxe_crc32`; it returns a
+different `LegacyDebugArtifactIndex` type with mandatory LegacyArtifactProvenance. That type
+has no ImageDebugBinding accessor, no SourceRef, no portable unwind/location rows and no
+`hsx.debug.image-bundle/1` claim.
 
 Public queries:
 
@@ -457,7 +555,25 @@ memory_regions() -> tuple[MemoryRegion, ...]
 unwind_rows(pc: HsxAddress, function_id: str | None) -> ResolutionResult[UnwindRow]
 location_rows(variable_id: str, lexical_scope_id: str,
               frame_pc: HsxAddress) -> ResolutionResult[LocationRow]
+
+LegacyDebugArtifactIndex.provenance() -> LegacyArtifactProvenance
+LegacyDebugArtifactIndex.functions() -> tuple[FunctionRecord, ...]
+LegacyDebugArtifactIndex.symbols_named(name: str) -> LegacyResolutionResult[SymbolRecord]
+LegacyDebugArtifactIndex.instruction_at(address: HsxAddress)
+    -> LegacyResolutionResult[LegacyInstructionRecord]
+LegacyDebugArtifactIndex.source_spelling_locations(spelling: LegacySourceSpelling,
+                                                    line: int,
+                                                    column: int | None)
+    -> LegacyResolutionResult[LegacyInstructionRecord]
+LegacyDebugArtifactIndex.memory_regions() -> tuple[MemoryRegion, ...]
 ```
+
+Index ordering is observable and fixed: functions by `(space.value, range.start.value,
+function_id)`; symbol candidates by `(space.value, address.value, kind, symbol_id)`;
+instructions/source-location candidates by `(space.value, address.value, instruction_id)`;
+memory regions by `(space.value, range.start.value, region_id)`; unwind/location rows by
+`(space.value, pc_range.start.value, row_id)`. Exact duplicate records are rejected as corrupt;
+distinct same-name/same-address records remain distinct candidates.
 
 Duplicate symbol names and multiple executable addresses remain candidate sets. Source records
 are keyed by exact `SourceRef`; no basename alias is part of the portable index. All code/data
@@ -467,8 +583,10 @@ binding/component mismatch are explicit outcomes and publish no accepted index.
 The legacy `.sym` adapter is a separate, named compatibility input. It may preserve only
 behaviors classified by `DBG-SL-001-005-001` golden evidence. It must validate schema version
 and supplied HXE CRC evidence, convert every integer through an explicit descriptor, preserve
-duplicate candidates and exact spelling, and mark its result `hsx.python-debug-legacy/1` /
-degraded. It may not claim `hsx.debug.image-bundle/1` conformance.
+duplicate candidates and exact spelling, and return only the mandatory
+`hsx.python-debug-legacy/1`/LEGACY_UNVERIFIED provenance type. It may not claim
+`hsx.debug.image-bundle/1` conformance, produce SourceRef, or be passed where a
+DebugArtifactIndex/ImageDebugBinding is required.
 
 ## 6. Source resolver
 
@@ -481,6 +599,14 @@ resolve(source: SourceRef, policy: SourceLocatorPolicy) -> SourceResolution
 `SourceLocatorPolicy` contains only explicit local locators: exact logical-ID overrides,
 prefix mappings and ordered search roots. Candidate discovery may use the exact logical ID
 and explicit mappings. It must not use basename guessing or global lowercase/casefold identity.
+
+Resolution tiers are fixed: one exact per-SourceRef override; otherwise every longest-prefix
+mapping for the exact logical ID; otherwise each search root in declared order joined with the
+full logical ID. The first tier that yields existing locators is the winning tier, but every
+candidate in that tier is collected and content-checked before selection. Multiple matching
+prefix rules with the same longest prefix remain candidates; declaration order is diagnostic,
+not a tie-breaker. Duplicate physical locators are deduplicated only by exact resolved locator
+string plus verified bytes, never by basename or casefold.
 
 Before returning `RESOLVED`, the resolver reads the candidate bytes and verifies exact byte
 length and SHA-256 from `SourceRef`. It returns all exact candidates for ambiguity, reports
@@ -514,13 +640,56 @@ work and may not be added in RF-004.
 exactly those in `HSX-D-002`; there are no branches, loops, recursive recipe calls, host-endian
 reads, implicit casts, masks or wrapping.
 
-`Recipe`, `cfa_recipe`, `caller_*_recipe`, `register_recipes` and `location_form` above are the
-canonical immutable records from `HSX-D-002`: ordered postfix opcode tuples using only
-`reg_value`, `special_value`, `const_u`, `const_s`, `static_address`, `to_address`, `cfa`,
-`frame_base`, `add_sconst_checked`, `deref_u`, and `bit_slice`; or the exact structural
-`same`, `undefined`, `unavailable(reason)`, `optimized_out(reason)` and bounded-piece terminal
-forms. Their operands use the referenced register/special/space IDs and explicit widths; an
-unknown or extra operand/opcode is `UNSUPPORTED`, and a malformed operand is `CORRUPT`.
+The Debugger Python projection is frozen as this closed union; each record rejects unknown
+fields and wrong/missing operands:
+
+```text
+RegValueOp { opcode: "reg_value", register_id: str }
+SpecialValueOp { opcode: "special_value", special: PC | SP | PSW }
+ConstUOp { opcode: "const_u", value: int >= 0, bit_width: int >= 1 }
+ConstSOp { opcode: "const_s", value: int, bit_width: int >= 1 }
+StaticAddressOp { opcode: "static_address", address: HsxAddress }
+ToAddressOp { opcode: "to_address", space: AddressSpaceId }
+CfaOp { opcode: "cfa" }
+FrameBaseOp { opcode: "frame_base" }
+AddSConstCheckedOp { opcode: "add_sconst_checked", signed_delta: int }
+DerefUOp { opcode: "deref_u", byte_length: 1 | 2 | 4 | 8 | 16,
+           byte_order: LITTLE | BIG }
+BitSliceOp { opcode: "bit_slice", source_bit_offset: int >= 0,
+             bit_size: int >= 1 }
+RecipeOpcode = the closed union above
+RecipeExpression { opcodes: tuple[RecipeOpcode, ...],
+                   required_result: ADDRESS | UNSIGNED_SCALAR | SIGNED_SCALAR | REGISTER,
+                   required_bit_width: int >= 1 | None }
+RecipeRule { kind: EXPRESSION | SAME | UNDEFINED | UNAVAILABLE | OPTIMIZED_OUT,
+             expression: RecipeExpression | None, reason: str | None }
+LocationPieceRule { destination_bit_offset: int >= 0, bit_size: int >= 1,
+                    expression: RecipeExpression, source_bit_offset: int >= 0 }
+LocationForm { kind: ADDRESS | VALUE | PIECES | OPTIMIZED_OUT | UNAVAILABLE,
+               expression: RecipeExpression | None,
+               pieces: tuple[LocationPieceRule, ...], reason: str | None }
+RecipeScalar { signed: bool, bit_width: int >= 1, value: int }
+RecipeAddress { address: HsxAddress }
+RecipeRegister { register_id: str, bit_width: int >= 1, unsigned_value: int }
+RecipeValue = RecipeScalar | RecipeAddress | RecipeRegister
+RecipeEvaluationContext { context: InspectionContext, frame_index: int >= 0,
+                          pc: HsxAddress, sp: HsxAddress,
+                          recovered_registers: RegisterSet,
+                          cfa: HsxAddress | None, frame_base: HsxAddress | None }
+RecipeBudget { opcodes_remaining: int >= 0, dereferences_remaining: int >= 0,
+               bytes_remaining: int >= 0 }
+RecipeEvaluationResult { status: COMPLETE | UNAVAILABLE | UNSUPPORTED | CORRUPT |
+                                STALE | LIMIT_EXCEEDED,
+                         context: InspectionContext, value: RecipeValue | None,
+                         budget_after: RecipeBudget,
+                         diagnostics: tuple[Diagnostic, ...] }
+```
+
+Rule validity is exact: EXPRESSION alone has an expression and no reason; UNAVAILABLE and
+OPTIMIZED_OUT alone have a reason; SAME/UNDEFINED have neither. ADDRESS/VALUE forms have one
+expression, PIECES has 1..16 pieces, and terminal location forms have only a reason. Piece
+destinations are non-overlapping and within declared result size. Unknown opcode/field is
+`UNSUPPORTED`; wrong arity/type/width/stack/address/piece coverage is `CORRUPT`.
 
 ```text
 RecipeLimits {
@@ -535,11 +704,21 @@ RecipeLimits {
   location_declared_result_bits: 4096,
   location_total_dereferenced_bytes: 512,
 }
+RecipeRequestLimits { max_frames: int in 1..64, max_pieces: int in 1..16 }
+
+RecipeEvaluator.evaluate(evaluation: RecipeEvaluationContext,
+                         expression: RecipeExpression,
+                         read_port: SnapshotReadPort,
+                         limits: RecipeLimits,
+                         budget: RecipeBudget) -> RecipeEvaluationResult
 ```
 
-The caller supplies the exact accepted profile limits and may only lower them; attempts to
-widen a field are `UNSUPPORTED`. `StackService.unwind(context: InspectionContext,
-index: DebugArtifactIndex, read_port: SnapshotReadPort, limits: RecipeLimits) ->
+`RecipeLimits` is the exact immutable accepted profile; an implementation with lower limits
+must advertise a different degraded profile and cannot claim this one. A caller may lower only
+the request's frame/piece maxima through `RecipeRequestLimits`; attempts to exceed the profile
+are `UNSUPPORTED`. `StackService.unwind(context: InspectionContext,
+index: DebugArtifactIndex, read_port: SnapshotReadPort, profile_limits: RecipeLimits,
+request_limits: RecipeRequestLimits) ->
 InspectionResult[tuple[UnwindFrame, ...]]` returns handle-free immutable frames bound to the
 same context. Each frame has typed PC/SP/CFA/frame-base values,
 function/source metadata where resolved, resume PC distinct from checked call-site PC, and
@@ -549,7 +728,8 @@ a fixed R7 chain or invents a caller.
 
 `LocationEvaluator.evaluate(context: InspectionContext, frame: UnwindFrame,
 variable: SymbolRecord, row: LocationRow, read_port: SnapshotReadPort,
-limits: RecipeLimits) -> InspectionResult[VariableValue]` selects the exact
+profile_limits: RecipeLimits, request_limits: RecipeRequestLimits) ->
+InspectionResult[EvaluatedValue]` selects the exact
 half-open PC row for the selected frame and returns register, address, value, bounded pieces,
 optimized-out or unavailable results with declared width/endian/type preserved. A non-top-frame
 local is evaluated from that frame/context, never current live registers.
@@ -565,7 +745,7 @@ scopes(context: InspectionContext, frame_handle: DomainHandle) -> InspectionResu
 variables(context: InspectionContext, scope_handle: DomainHandle,
           page: PageRequest) -> InspectionResult[VariablePage]
 evaluate_snapshot(context: InspectionContext, frame_handle: DomainHandle,
-                  expression: SnapshotExpression) -> InspectionResult[VariableValue]
+                  expression: SnapshotExpression) -> InspectionResult[EvaluatedValue]
 memory(context: InspectionContext, address: HsxAddress,
        byte_length: int) -> InspectionResult[MemoryBlock]
 disassemble(context: InspectionContext, address: HsxAddress,
@@ -580,6 +760,12 @@ allocate more handles without invalidating earlier handles in the same epoch. Un
 return `UNKNOWN_HANDLE`; invalidated or different-epoch handles return `STALE`; neither falls back
 to a current/top/first frame. DAP integer IDs are outside this interface and later map to domain
 handles without owning their lifetime.
+
+Within one epoch the store interns exact object keys: FRAME uses frame_index; SCOPE uses
+`(frame_handle.serial, scope_kind)`; VARIABLE uses
+`(scope_handle.serial, declaration_order, variable_id)`. Repeating the same query returns the
+same handle; a new exact key receives the next never-reused serial. A handle kind/key mismatch
+is `UNKNOWN_HANDLE`; a known serial from an invalidated epoch is `STALE`.
 
 `SnapshotExpression` is a typed, side-effect-free AST over registers, selected-frame variables,
 symbols/constants and explicit typed memory dereference. String parsing and DAP Watch policy

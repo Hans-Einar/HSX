@@ -76,7 +76,8 @@ track IDs rather than silently renamed in historical documents.
 - `DBG-SL-001-005-006` — epoch-bound inspection integration
 - `DBG-RVW-001-005-001..DBG-RVW-001-005-006` — exact-head Slice reviews
 - `DBG-RVW-001-005-007` — first `dbg.resolver-inspection/1` review, REWORK
-- `DBG-RVW-001-005-008` — fresh corrected interface re-review
+- `DBG-RVW-001-005-008` — corrected interface re-review, REWORK
+- `DBG-RVW-001-005-009` — fresh interface review attempt 3
 - `DBG-VER-001-005-001..DBG-VER-001-005-006` — formal Slice verifications
 - `DBG-RVW-004-001-001` / `DBG-VER-004-001-001` — RF-004 parent review/verification
 

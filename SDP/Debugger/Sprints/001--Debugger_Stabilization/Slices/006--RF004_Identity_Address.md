@@ -27,6 +27,8 @@ Existing `contracts.py`, controller/model/epochs/gateway/runtime files are read-
 ## Required behavior
 
 - all values and nested payloads are deeply immutable and validate exact portable fields;
+- ArtifactRef/bundle identity/ref/binding Python projections reproduce the frozen canonical
+  key/digest model and golden vectors without folding component fields into a ref;
 - `InspectionContext` rejects any target/image/epoch/stop/snapshot mismatch;
 - `ControllerEpochAdapter` consumes RF-002 `contracts.StopEpoch` read-only and binds only
   already-typed portable StopToken/SnapshotRef values with an exact GenerationStamp match;
@@ -54,6 +56,7 @@ interface `dbg.resolver-inspection/1`.
 ## Verification and completion signal
 
 Test exact mismatch matrices, immutability, digest/logical-ID validation, multiple widths and
-spaces, every checked arithmetic/range/alignment failure, explicit wrap selection, result
+spaces, the frozen StopEpoch binding status/code matrix, every checked
+arithmetic/range/alignment failure, explicit wrap selection, result
 cardinality and degraded coherence guards. Run earlier RF-002/RF-003 contract/epoch regressions.
 Close only after exact-head review, formal verification and Master sign-off.

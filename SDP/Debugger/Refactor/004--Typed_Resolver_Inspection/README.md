@@ -1,6 +1,6 @@
 # DBG-RF-004 — Typed Artifact, Source, Address, Stack, and Inspection
 
-- Status: **ACTIVE — REVIEW 007 REWORK CORRECTED / REVIEW 008 PENDING / PRODUCT NOT STARTED**
+- Status: **ACTIVE — REVIEWS 007/008 REWORK CORRECTED / REVIEW 009 PENDING**
 - Steering authority: issue #38 comment `5362514094`
 - Dependency clarification: issue #42 comment `5362515750`
 - Sprint/iteration: `DBG-SPR-001` / `DBG-IT-001-005`
@@ -12,8 +12,8 @@
   `DBG-D-004`, `DBG-D-009`
 - Portable inputs: `HSX-D-001..HSX-D-003`, especially `HSX-D-002`
 - Frozen interface: `dbg.resolver-inspection/1`
-- Interface review: `DBG-RVW-001-005-007` REWORK at `82154c614…`; fresh
-  `DBG-RVW-001-005-008` pending
+- Interface reviews: `DBG-RVW-001-005-007` / `...008` REWORK; fresh
+  `DBG-RVW-001-005-009` pending
 - Product base: `69a54aeb3394d3cd4792bce620748e15bab69f1f`
 
 ## Objective
@@ -120,18 +120,19 @@ At minimum, evidence across the six Slices covers:
   snapshot refs;
 - multiple address widths/spaces, checked overflow/alignment/range and no hidden mask;
 - canonical valid/mismatch/malformed/unsupported bundle and legacy `.sym` cases, duplicate
-  symbols/basenames and multiple line addresses;
+  symbols/basenames and multiple line addresses; exact HSX bundle/ref/binding golden vectors;
 - NFC/case collisions, content digest/length, prefix/relocation/symlink/override, missing and
   ambiguous source candidates;
 - frozen recipe opcodes/limits, corrupt/unsupported/stale/partial outcomes, entry/body/epilogue
-  unwind rows, top-level termination and selected non-top-frame locations;
+  unwind rows, top-level termination, structured partial pieces and selected non-top-frame
+  locations;
 - repeated/paged handle stability, stale/unknown rejection, registers/stack/scopes/variables/snapshot expressions/
   memory/disassembly, exact context matching and cross-service snapshot consistency;
 - existing RF-002/RF-003/controller/gateway regression suites remain green;
 - YAML/NDJSON/Markdown/diff validation and protected-path diff guards.
 
 Formal verification records are `DBG-VER-001-005-001..006`. Planned Slice reviews are
-`DBG-RVW-001-005-001..006`; interface review 007 is REWORK and fresh review 008 is pending.
+`DBG-RVW-001-005-001..006`; interface reviews 007/008 are REWORK and fresh review 009 is pending.
 Parent final review and
 verification are `DBG-RVW-004-001-001` and `DBG-VER-004-001-001`.
 

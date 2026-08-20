@@ -27,6 +27,8 @@ are read-only.
 
 - validate and execute only frozen `hsx.unwind-recipe/1` and
   `hsx.location-recipe/1` opcodes, terminals and piece forms;
+- implement the exact frozen opcode/rule/location-piece/evaluation-context/budget/result DTOs
+  and RecipeEvaluator signature from `dbg.resolver-inspection/1`;
 - enforce exact opcode/stack/deref/byte/frame/total/location-piece/result-bit bounds;
 - use descriptor byte order, declared widths and checked typed-address operations only;
 - select non-overlapping half-open rows by exact image/ABI/function/scope/frame/PC;
@@ -54,6 +56,7 @@ interface `dbg.resolver-inspection/1`.
 
 Test every opcode/terminal class, corrupt operands/rows, unsupported schema/opcode, every
 bound, endian/width/address failures, current ABI entry/body/epilogue rows, cycles/top-level,
-partial reads, stale context, selected non-top-frame locals and no fixed-R7 fallback. Run
+partial scalar vs structured piece-only results, stale context, selected non-top-frame locals
+and no fixed-R7 fallback. Run
 legacy stack diagnostics as an oracle. Close only after exact-head review, formal verification
 and Master sign-off.

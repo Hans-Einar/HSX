@@ -1,6 +1,6 @@
 # DBG-SPR-001 — Debugger Stabilization
 
-- Status: ITERATION 005 ACTIVE — RF-004 REVIEW 007 REWORK CORRECTED / REVIEW 008 PENDING
+- Status: ITERATION 005 ACTIVE — RF-004 REVIEWS 007/008 REWORK / REVIEW 009 PENDING
 - Owning track: Debugger
 - Owning GapAnalysis: `DBG-GAP-001`
 
@@ -72,7 +72,7 @@ Steering accepted `DBG-A-001..DBG-A-008` as target architecture direction in com
 - Frozen interface: `dbg.resolver-inspection/1`
 - Frozen Slices: `DBG-SL-001-005-001..DBG-SL-001-005-006`
 - Interface review: `DBG-RVW-001-005-007` REWORK at `82154c614…`; corrected candidate awaits
-  fresh `DBG-RVW-001-005-008`
+  review 008 also REWORK at `8d6c0f571…`; corrected candidate awaits review 009
 - Exact product base: `69a54aeb3394d3cd4792bce620748e15bab69f1f`
 - Authority: issue #38 comment `5362514094`
 - Dependency clarification: issue #42 comment `5362515750`
