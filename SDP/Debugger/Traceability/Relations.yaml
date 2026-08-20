@@ -170,7 +170,7 @@ relations:
       - DBG-SL-001-004-002
       - DBG-SL-001-004-003
     interface: dbg.controller-gateway/1.1
-    status: refrozen_pending_review
+    status: refrozen_review_pass
   - from: DBG-SL-001-004-001
     type: prerequisite_for
     to:
@@ -211,13 +211,16 @@ relations:
     type: reviewed_by
     to:
       - DBG-RVW-001-004-004
+    status: pass
+    reviewed_head: 0cf52fcf69d11f254b957cfc52605a8be3114955
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/005--Controller_Gateway_Interface_v1_1_Review.md
   - from: dbg.controller-gateway/1.1
     type: prerequisite_for
     to:
       - DBG-SL-001-004-001
       - DBG-SL-001-004-002
       - DBG-SL-001-004-003
-    status: pending_independent_interface_review
+    status: interface_review_pass_foundations_resume_eligible_integration_parent_signoffs_pending
   - from: DBG-RF-001
     type: implemented_by
     to:

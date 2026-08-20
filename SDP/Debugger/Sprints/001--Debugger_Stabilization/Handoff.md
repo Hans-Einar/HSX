@@ -1,13 +1,14 @@
 # DBG-SPR-001 Handoff
 
-Status: `interface_v1_1_refrozen_implementation_and_review_active`
+Status: `interface_v1_1_review_pass_foundations_resume_ready`
 
 ## Current objective
 
-Implement only the refrozen `dbg.controller-gateway/1.1` shared records/reservation helpers and
-the Steering-mandated contract fixtures from a clean head. Implementation head
-`0cf52fcf69d11f254b957cfc52605a8be3114955` is complete; obtain fresh
-`DBG-RVW-001-004-004`. RF-002/RF-003 WIP remains stashed/unreviewed until that PASS.
+Resume fresh RF-002/RF-003 foundation workers from the reviewed
+`dbg.controller-gateway/1.1` implementation head
+`0cf52fcf69d11f254b957cfc52605a8be3114955`. Independent interface review
+`DBG-RVW-001-004-004` passed. Pre-refreeze WIP remains candidate-only and must be restored
+selectively with fresh Slice evidence.
 
 ## Authority
 
@@ -125,14 +126,16 @@ the Steering-mandated contract fixtures from a clean head. Implementation head
 
 ## Not done
 
-- `DBG-SL-001-004-001` and `DBG-SL-001-004-002` are paused with no product commit/review/sign-off.
+- `DBG-SL-001-004-001` and `DBG-SL-001-004-002` have no foundation product commit,
+  Slice review, verification, or sign-off; they are only eligible for fresh worker resume.
 - `DBG-SL-001-004-003` remains blocked on both parent Slice sign-offs.
 - `DBG-RF-004..DBG-RF-009` remain blocked.
 
 ## Exact next step
 
-Fresh interface reviewer inspects exact implementation head
-`0cf52fcf69d11f254b957cfc52605a8be3114955`; resume foundations only on PASS.
+Master assigns fresh bounded RF-002/RF-003 foundation workers from reviewed interface head
+`0cf52fcf69d11f254b957cfc52605a8be3114955`. Candidate WIP may be applied only selectively;
+both workers rerun their full Slice evidence before independent Slice review.
 
 ## Traceability state
 
@@ -177,13 +180,17 @@ Fresh interface reviewer inspects exact implementation head
 - Publication blocker: #47 comment `5356183884`, #38 comment `5356186692`
 - Fresh remote verification: PASS at `89cb74a10ce36d8b0f4d0cc60332d3070c2c635f`
 - Resynthesized supplemental Studies: `HSX-ST-007`, `HSX-ST-008`
-- Active gate: interface v1.1 implementation and `DBG-RVW-001-004-004`
+- Interface review `DBG-RVW-001-004-004`: PASS at
+  `0cf52fcf69d11f254b957cfc52605a8be3114955`
+- Active gate: fresh RF-002/RF-003 foundation worker resume; integration remains blocked on
+  both parent review/verification/sign-off chains
 
 ## Agents and worktree
 
-The prior design/portable-contract chain is complete. Steering authorized the v1.1 refreeze;
-RF-002/RF-003 remain paused while a fresh interface worker/reviewer establishes a clean exact
-head. Controlled work is on `codex/dbg-rf-002-003`;
+The prior design/portable-contract chain is complete. Steering authorized the v1.1 refreeze,
+and its exact implementation passed fresh review. RF-002/RF-003 are eligible for fresh worker
+resume; no worker was resumed by the interface reviewer. Controlled work is on
+`codex/dbg-rf-002-003`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.
 

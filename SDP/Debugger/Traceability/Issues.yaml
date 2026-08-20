@@ -19,7 +19,7 @@ issues:
     master_signoff: pass
   DBG-DA-001:
     issue: 38
-    status: debugger_v1_design_frozen_interface_v1_1_review_active
+    status: debugger_v1_design_frozen_foundation_resume_ready
     decision_package_comment: 5346421143
     architecture_acceptance_comment: 5348190806
     steering_start_comment: 5345600066
@@ -97,21 +97,25 @@ issues:
     first_wave_refrozen_interface: dbg.controller-gateway/1.1
     first_wave_interface_review: DBG-RVW-001-004-004
     first_wave_interface_implementation_head: 0cf52fcf69d11f254b957cfc52605a8be3114955
-    first_wave_interface_review_status: assigned
-    portable_contract_current_gate: independent_interface_review_DBG-RVW-001-004-004
+    first_wave_interface_review_status: pass
+    first_wave_interface_reviewed_head: 0cf52fcf69d11f254b957cfc52605a8be3114955
+    first_wave_interface_review_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/005--Controller_Gateway_Interface_v1_1_Review.md
+    portable_contract_current_gate: fresh_foundation_worker_resume
   DBG-RF-002:
     issue: 39
-    status: paused_pending_interface_review
+    status: ready_for_fresh_resume
     iteration: DBG-IT-001-004
     slice: DBG-SL-001-004-001
     shared_interface: dbg.controller-gateway/1.1
+    resume_base: 0cf52fcf69d11f254b957cfc52605a8be3114955
     steering_comment: 5356484309
   DBG-RF-003:
     issue: 40
-    status: paused_pending_interface_review
+    status: ready_for_fresh_resume
     iteration: DBG-IT-001-004
     slice: DBG-SL-001-004-002
     shared_interface: dbg.controller-gateway/1.1
+    resume_base: 0cf52fcf69d11f254b957cfc52605a8be3114955
     steering_comment: 5356484309
   DBG-RF-004:
     issue: 41
