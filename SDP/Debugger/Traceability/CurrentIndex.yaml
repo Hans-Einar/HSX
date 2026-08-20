@@ -119,7 +119,7 @@ active_gate:
     hsx_coordinator: HSX-ST-001
     hsx_issue: 47
     hsx_studies: HSX-ST-002..HSX-ST-006
-    status: supplemental_HSX_studies_active
+    status: supplemental_studies_complete_pending_master_resynthesis
     review: HSX-RVW-001-001-001
     review_status: rework
     reviewed_head: 5fff403f6668f794b760caf64ef34b4d1ecb4ae3
@@ -134,7 +134,7 @@ active_gate:
     review_attempt_4_head: cbddfa24d3cbb25bf7a17c63a0146ee8d0600883
     supplemental_studies: HSX-ST-007,HSX-ST-008
     review_attempt_5: HSX-RVW-001-001-005
-    current_gate: HSX-ST-007,HSX-ST-008
+    current_gate: master_supplemental_synthesis
     hsx_requirements: HSX-R-001..HSX-R-036
     hsx_architecture: HSX-A-001..HSX-A-005
     hsx_design: HSX-D-001..HSX-D-005

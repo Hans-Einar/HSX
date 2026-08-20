@@ -1,10 +1,10 @@
 # DBG-SPR-001 Handoff
 
-Status: `portable_contract_supplemental_studies_active`
+Status: `portable_contract_supplemental_studies_complete_resynthesis_active`
 
 ## Current objective
 
-Complete `HSX-ST-007`/`HSX-ST-008`, resynthesize, obtain fresh
+Resynthesize completed `HSX-ST-007`/`HSX-ST-008`, obtain fresh
 `HSX-RVW-001-001-005`, and return to issues #47/#38. No structural product or AVR work may be
 dispatched.
 
@@ -103,7 +103,7 @@ dispatched.
 ## Not done
 
 - `DBG-D-001..DBG-D-010` remain proposed and have no implementation authority.
-- `HSX-ST-007` and `HSX-ST-008` are not complete or synthesized.
+- `HSX-ST-007` and `HSX-ST-008` are complete but not yet synthesized.
 - The final portable contract package has not passed `HSX-RVW-001-001-005`.
 
 ## Exact next step

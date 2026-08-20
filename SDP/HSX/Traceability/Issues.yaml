@@ -57,9 +57,9 @@ issues:
     role: resource_provenance_revisions
   HSX-ST-007:
     issue: 47
-    status: active
+    status: complete_for_synthesis
     role: abi_profile_recipe_register_semantics
   HSX-ST-008:
     issue: 47
-    status: active
+    status: complete_for_synthesis
     role: debug_bundle_source_identity_canonicalization

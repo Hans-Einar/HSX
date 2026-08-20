@@ -1,6 +1,6 @@
 # HSX Portable Debug Contract Handoff
 
-- Status: SUPPLEMENTAL STUDIES ACTIVE
+- Status: SUPPLEMENTAL STUDIES COMPLETE — MASTER RESYNTHESIS ACTIVE
 - Coordinator: `HSX-ST-001`, issue #47
 - Debugger dependency: `DBG-ST-006`, issue #38
 - Iteration: `DBG-IT-001-003`
@@ -8,8 +8,8 @@
 
 ## Current objective
 
-Complete `HSX-ST-007` and `HSX-ST-008`, synthesize their decisions into the portable contract
-package/`DBG-ST-006`, then obtain fresh review before any Debugger design freeze or product work.
+Synthesize completed `HSX-ST-007`/`HSX-ST-008` decisions into the portable contract package
+and `DBG-ST-006`, then obtain fresh review before any Debugger design freeze or product work.
 
 ## Authority
 
@@ -20,8 +20,7 @@ package/`DBG-ST-006`, then obtain fresh review before any Debugger design freeze
 
 ## Exact next step
 
-Dispatch bounded workers for `HSX-ST-007` and `HSX-ST-008` with disjoint ownership. Master
-then synthesizes and assigns `HSX-RVW-001-001-005` to the exact complete head.
+Master resynthesizes and assigns `HSX-RVW-001-001-005` to the exact complete head.
 
 ## Review history
 

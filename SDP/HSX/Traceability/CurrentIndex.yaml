@@ -26,10 +26,10 @@ active:
       status: complete_for_synthesis
     - id: HSX-ST-007
       path: SDP/HSX/02--Study/007--ABI_Profile_Recipe_Schema.md
-      status: active
+      status: complete_for_synthesis
     - id: HSX-ST-008
       path: SDP/HSX/02--Study/008--Debug_Bundle_Source_Identity.md
-      status: active
+      status: complete_for_synthesis
   coordinated_debugger_study:
     id: DBG-ST-006
     issue: 38
@@ -57,7 +57,7 @@ active:
   review_attempt_5:
     id: HSX-RVW-001-001-005
     status: planned_after_supplemental_studies
-  current_gate: HSX-ST-007,HSX-ST-008
+  current_gate: master_supplemental_synthesis
 proposed_contract_baseline:
   requirements:
     range: HSX-R-001..HSX-R-036
