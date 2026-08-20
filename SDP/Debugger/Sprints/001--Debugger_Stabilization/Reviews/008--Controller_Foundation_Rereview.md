@@ -13,4 +13,3 @@ atomic subscribe/close, and one correlated terminal reconcile result.
 Evidence: `93 passed`; five repeated controller runs; 500 gap/loss, 1,000 deadline, 400
 reconcile and 300 subscribe/close adversarial schedules; compile/import, four-file rework scope,
 shared hashes and diff checks PASS. Formal `DBG-VER-001-004-001` remains required.
-

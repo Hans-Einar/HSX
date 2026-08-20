@@ -134,12 +134,12 @@ Run fresh final parent RF-002/RF-003 reviews against the complete signed chain.
 - RF-002 parent review's general terminal-result High and the follow-up saturated-inbox edge
   are corrected at `a064020…`; fresh `DBG-RVW-001-004-008` returned PASS. RF-003 has no
   product finding and remains signed.
-- Prior RF-003/integration sign-offs are historical dependency evidence pending revalidation.
+- Corrected RF-002, RF-003 and dependent integration sign-offs all PASS.
 - `DBG-RF-004..DBG-RF-009` remain blocked.
 
 ## Exact next step
 
-Run `DBG-RVW-002-001-003` and `DBG-RVW-003-001-003`.
+Run `DBG-RVW-002-001-004` and `DBG-RVW-003-001-003`.
 
 ## Traceability state
 
@@ -207,8 +207,8 @@ Run `DBG-RVW-002-001-003` and `DBG-RVW-003-001-003`.
 
 The prior design/portable-contract chain is complete. Steering authorized the v1.1 refreeze,
 and its exact implementation passed fresh review. Foundation rework and fresh re-reviews are
-complete; RF-002 product is PASS. RF-003 requires bounded implicit-reopen rework and dependent
-integration revalidation. Controlled work is on
+complete; the corrected complete signed chain is PASS. Fresh parent final reviews are active.
+Controlled work is on
 `codex/dbg-rf-002-003`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.

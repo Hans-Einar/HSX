@@ -1,6 +1,6 @@
 # DBG-RF-002 — Debugger Controller, State Machine, and Stop-Epoch Foundation
 
-- Status: **CORRECTED SLICE SIGNED — PRODUCT PASS / DEPENDENCY REWORK ACTIVE**
+- Status: **COMPLETE SIGNED CHAIN — FINAL PARENT REVIEW ACTIVE**
 - Steering authority: issue #38 comment `5356484309`
 - Iteration: `DBG-IT-001-004`
 - Owning Slice: `DBG-SL-001-004-001`
@@ -83,4 +83,5 @@ returning initial `ACCEPTED`; that path was corrected at `1586bb8…`. Fresh rev
 `DBG-RVW-001-004-007` then found that an effect-sink failure could still lose its terminal
 message under saturated actor-inbox pressure. Actor-only correction at `a064020…` passed fresh
 `DBG-RVW-001-004-008`, formal `DBG-VER-001-004-004` and exact-head v2 sign-off at
-`a064020…`. Integration Slice 003 is the next separate gate.
+`a064020…`. Dependent integration revalidation/sign-off also passed at combined `1e47953…`;
+fresh parent final review is the only remaining RF-002 gate.

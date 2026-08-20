@@ -7,7 +7,7 @@
   `89d95de2d944179219a93895f1ab956f2786a232`
 - Portable dependency evidence: `DBG-ST-006`, `HSX-ST-001..HSX-ST-008`
 - Review 005: REWORK at `84df21d763b73209efd0292990799f469283460a`
-- Planned fresh cross-track review: `HSX-RVW-001-001-006`
+- Final cross-track review: `HSX-RVW-001-001-006` — PASS
 - Steering acceptance: issue #38 comment `5356484309`
 - State: implementation-authoritative only through explicitly authorized Refactor/Slice contracts
 

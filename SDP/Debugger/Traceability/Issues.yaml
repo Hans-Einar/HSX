@@ -134,6 +134,8 @@ issues:
     rf003_parent_review_status: rework_gate_order_only
     rf002_parent_review_attempt_2: DBG-RVW-002-001-002
     rf002_parent_review_attempt_2_status: rework_trace_only
+    rf002_parent_review_attempt_3: DBG-RVW-002-001-003
+    rf002_parent_review_attempt_3_status: rework_trace_only
     rf003_parent_review_attempt_2: DBG-RVW-003-001-002
     rf003_parent_review_attempt_2_status: rework
     rf003_implicit_reopen_review: DBG-RVW-001-004-009
@@ -150,10 +152,10 @@ issues:
     dependent_integration_verification: DBG-VER-001-004-006
     dependent_integration_verification_status: pass
     dependent_integration_signed_head: 1e479536ce5e746e1b06a53b1039b1af84adaed6
-    portable_contract_current_gate: fresh_parent_final_reviews_DBG-RVW-002-001-003_and_DBG-RVW-003-001-003
+    portable_contract_current_gate: fresh_parent_final_reviews_DBG-RVW-002-001-004_and_DBG-RVW-003-001-003
   DBG-RF-002:
     issue: 39
-    status: corrected_slice_product_pass_dependency_rework_active
+    status: complete_signed_chain_parent_final_review_active
     iteration: DBG-IT-001-004
     slice: DBG-SL-001-004-001
     shared_interface: dbg.controller-gateway/1.1
@@ -161,7 +163,7 @@ issues:
     steering_comment: 5356484309
   DBG-RF-003:
     issue: 40
-    status: corrected_slice_signed_integration_revalidation_pending
+    status: complete_signed_chain_parent_final_review_active
     iteration: DBG-IT-001-004
     slice: DBG-SL-001-004-002
     shared_interface: dbg.controller-gateway/1.1

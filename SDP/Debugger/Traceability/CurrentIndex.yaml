@@ -223,17 +223,19 @@ first_structural_wave:
   refactors:
     - id: DBG-RF-002
       path: SDP/Debugger/Refactor/002--Debugger_Controller_State_Epoch/README.md
-      status: corrected_slice_product_pass_dependency_rework_active
+      status: complete_signed_chain_parent_final_review_active
       slice: DBG-SL-001-004-001
       prior_parent_review: DBG-RVW-002-001-001
       prior_parent_review_status: rework
       parent_review_attempt_2: DBG-RVW-002-001-002
       parent_review_attempt_2_status: rework_trace_only
-      final_review: DBG-RVW-002-001-003
+      parent_review_attempt_3: DBG-RVW-002-001-003
+      parent_review_attempt_3_status: rework_trace_only
+      final_review: DBG-RVW-002-001-004
       final_verification: DBG-VER-002-001-001
     - id: DBG-RF-003
       path: SDP/Debugger/Refactor/003--Executive_Gateway_Health_Recovery/README.md
-      status: corrected_slice_signed_integration_revalidation_pending
+      status: complete_signed_chain_parent_final_review_active
       slice: DBG-SL-001-004-002
       prior_parent_review: DBG-RVW-003-001-001
       prior_parent_review_status: rework_gate_order_only
@@ -333,7 +335,7 @@ first_structural_wave:
   runtime_profile: hsx.python-debug-legacy/1
   still_blocked: DBG-RF-004..DBG-RF-009
   partial_product_wip_stash: efc91f2640647402bc92c69bde1c57685cfaa1f1
-  current_gate: fresh_parent_final_reviews_DBG-RVW-002-001-003_and_DBG-RVW-003-001-003
+  current_gate: fresh_parent_final_reviews_DBG-RVW-002-001-004_and_DBG-RVW-003-001-003
 structural_gate:
   rule: Only Steering-authorized Refactors with frozen Slice/interface contracts may execute.
   authorized_refactors:

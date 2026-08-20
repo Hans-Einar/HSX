@@ -33,8 +33,8 @@ started; structural product-code work remains blocked pending accepted design co
 
 - Frozen `dbg.controller-gateway/1.1` interface review PASS at `0cf52fcf…`.
 - Corrected RF-002 Slice review/verification/sign-off PASS at `a064020…`.
-- RF-003 prior Slice review/verification/sign-off at `cf4d8a6…` is historical; final parent
-  review found an implicit-reopen false-HEALTHY path requiring bounded RF-003 rework.
-- Integration review/verification/sign-off at `860a98a…` is historical dependency evidence and
-  must be revalidated after RF-003 correction.
+- Corrected RF-003 Slice review/verification/sign-off PASS at `1e47953…`.
+- Unchanged integration code at `860a98a…` passed dependent review/verification/re-sign-off
+  against combined head `1e47953…`.
+- Fresh final parent reviews are the only remaining first-wave gate.
 - No Executive/VM/frontend/AVR change and no RF-004..009 authority.

@@ -165,7 +165,8 @@ relations:
     to:
       - DBG-RVW-002-001-001
       - DBG-RVW-002-001-002
-    status: rework
+      - DBG-RVW-002-001-003
+    status: rework_trace_only
   - from: DBG-SL-001-004-001
     type: reviewed_by
     to:
@@ -212,7 +213,8 @@ relations:
     type: signed_at
     to:
       - cf4d8a6665e9a6ebf35d425b227bc7a5c7bd3fa9
-    status: pass
+      - 1e479536ce5e746e1b06a53b1039b1af84adaed6
+    status: corrected_pass
   - from: DBG-SL-001-004-001
     type: freezes_shared_interface_for
     to:
@@ -244,7 +246,8 @@ relations:
     type: signed_at
     to:
       - 860a98a68440b8e22b67f03fbdbb93d2dd33ab7a
-    status: pass
+      - 1e479536ce5e746e1b06a53b1039b1af84adaed6
+    status: dependency_revalidated_pass
   - from: dbg.controller-gateway/1
     type: blocked_by
     to:
@@ -286,7 +289,7 @@ relations:
       - DBG-SL-001-004-001
       - DBG-SL-001-004-002
       - DBG-SL-001-004-003
-    status: interface_review_pass_foundations_resume_eligible_integration_parent_signoffs_pending
+    status: complete_signed_chain_parent_final_reviews_active
   - from: DBG-RF-001
     type: implemented_by
     to:
