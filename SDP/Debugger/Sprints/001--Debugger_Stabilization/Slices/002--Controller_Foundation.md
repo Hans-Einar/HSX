@@ -7,7 +7,7 @@
 - Frozen interface: `dbg.controller-gateway/1`
 - Review: `DBG-RVW-001-004-001`
 - Verification: `DBG-VER-001-004-001`
-- Implementation base: assigned after contract-freeze commit
+- Implementation base: `97d8c5bda717ce285b5c01c94c2fe19a714121ac`
 
 ## Bounded outcome
 

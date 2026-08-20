@@ -200,6 +200,7 @@ first_structural_wave:
   status: contracts_frozen_worker_dispatch_ready
   steering_comment: 5356484309
   branch: codex/dbg-rf-002-003
+  contract_head: 97d8c5bda717ce285b5c01c94c2fe19a714121ac
   shared_interface:
     version: dbg.controller-gateway/1
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/001--Controller_Gateway_Envelope_Set.md
@@ -223,16 +224,19 @@ first_structural_wave:
     - id: DBG-SL-001-004-001
       path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/002--Controller_Foundation.md
       status: frozen_ready_for_worker
+      implementation_base: 97d8c5bda717ce285b5c01c94c2fe19a714121ac
       review: DBG-RVW-001-004-001
       verification: DBG-VER-001-004-001
     - id: DBG-SL-001-004-002
       path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/003--Gateway_Foundation.md
       status: frozen_ready_for_worker
+      implementation_base: 97d8c5bda717ce285b5c01c94c2fe19a714121ac
       review: DBG-RVW-001-004-002
       verification: DBG-VER-001-004-002
     - id: DBG-SL-001-004-003
       path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/004--Controller_Gateway_Integration.md
       status: blocked_pending_parent_slice_signoff
+      contract_base: 97d8c5bda717ce285b5c01c94c2fe19a714121ac
       review: DBG-RVW-001-004-003
       verification: DBG-VER-001-004-003
   runtime_profile: hsx.python-debug-legacy/1

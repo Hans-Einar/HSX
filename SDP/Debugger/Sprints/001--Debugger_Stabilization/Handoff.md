@@ -133,6 +133,9 @@ or RF-004..009 work is allowed.
 Commit the frozen iteration/refactor/slice/interface contracts, then spawn fresh bounded
 RF-002/RF-003 workers only within disjoint file ownership.
 
+Contract head `97d8c5bda717ce285b5c01c94c2fe19a714121ac` is the exact implementation
+base for both parallel foundation Slices.
+
 ## Traceability state
 
 - Active evidence: `DBG-ST-001`, `DBG-CR-001`, `DBG-GAP-001`
