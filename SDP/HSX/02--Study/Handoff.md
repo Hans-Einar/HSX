@@ -1,6 +1,6 @@
 # HSX Portable Debug Contract Handoff
 
-- Status: ACTIVE CROSS-TRACK STUDIES
+- Status: STUDIES COMPLETE — MASTER SYNTHESIS ACTIVE
 - Coordinator: `HSX-ST-001`, issue #47
 - Debugger dependency: `DBG-ST-006`, issue #38
 - Iteration: `DBG-IT-001-003`
@@ -8,8 +8,8 @@
 
 ## Current objective
 
-Complete `HSX-ST-001..HSX-ST-006`, synthesize stable portable contract proposals and
-conformance fixtures, review the exact package, and return to Steering before any Debugger
+Synthesize stable portable contract proposals and conformance fixtures from completed
+`HSX-ST-001..HSX-ST-006`, review the exact package, and return to Steering before any Debugger
 design freeze or product work.
 
 ## Authority
@@ -21,8 +21,8 @@ design freeze or product work.
 
 ## Exact next step
 
-Dispatch fresh bounded Study workers with disjoint document ownership. Master owns legacy
-provenance synthesis, stable ID allocation, shared traceability, and decision packages.
+Master allocates stable IDs and synthesizes Requirements/Architecture/Design plus the
+`DBG-ST-006` cross-track matrix. Then a fresh reviewer inspects the exact complete package.
 
 ## Guards
 

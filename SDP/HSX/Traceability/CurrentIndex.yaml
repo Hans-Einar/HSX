@@ -6,24 +6,24 @@ active:
   coordinating_study:
     id: HSX-ST-001
     path: SDP/HSX/02--Study/001--Legacy_Traceability_Migration.md
-    status: active
+    status: complete_for_portable_contract_synthesis
     issue: 47
   studies:
     - id: HSX-ST-002
       path: SDP/HSX/02--Study/002--Runtime_Identity_Lifecycle.md
-      status: active
+      status: complete_for_synthesis
     - id: HSX-ST-003
       path: SDP/HSX/02--Study/003--Address_ABI_Unwind.md
-      status: active
+      status: complete_for_synthesis
     - id: HSX-ST-004
       path: SDP/HSX/02--Study/004--Execution_Snapshot_Blocked_States.md
-      status: active
+      status: complete_for_synthesis
     - id: HSX-ST-005
       path: SDP/HSX/02--Study/005--Event_Stream_Continuity.md
-      status: active
+      status: complete_for_synthesis
     - id: HSX-ST-006
       path: SDP/HSX/02--Study/006--Resource_Provenance_Revisions.md
-      status: active
+      status: complete_for_synthesis
   coordinated_debugger_study:
     id: DBG-ST-006
     issue: 38

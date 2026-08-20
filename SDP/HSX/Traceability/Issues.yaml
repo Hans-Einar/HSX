@@ -3,7 +3,7 @@ track: HSX
 issues:
   HSX-ST-001:
     issue: 47
-    status: active_coordinator
+    status: complete_for_portable_contract_synthesis
     steering_comment: 5348192567
     spawned_studies:
       - HSX-ST-002
@@ -16,21 +16,21 @@ issues:
     review: HSX-RVW-001-001-001
   HSX-ST-002:
     issue: 47
-    status: active
+    status: complete_for_synthesis
     role: runtime_identity_lifecycle
   HSX-ST-003:
     issue: 47
-    status: active
+    status: complete_for_synthesis
     role: address_abi_unwind
   HSX-ST-004:
     issue: 47
-    status: active
+    status: complete_for_synthesis
     role: execution_snapshot_blocked_states
   HSX-ST-005:
     issue: 47
-    status: active
+    status: complete_for_synthesis
     role: event_stream_continuity
   HSX-ST-006:
     issue: 47
-    status: active
+    status: complete_for_synthesis
     role: resource_provenance_revisions

@@ -276,3 +276,21 @@ No product/runtime/extension/test/package/AVR file may be modified.
 - reviewed decision packages are posted to #47 and #38;
 - status becomes `awaiting_steering_acceptance`, with every `DBG-D-*` and RF product gate still
   closed.
+
+### Study work-package result
+
+`HSX-ST-001..HSX-ST-006` are complete for Master synthesis:
+
+- ST-001 classified the legacy DR/DG/DO catalogue and current Python oracle while routing
+  broader HSX migration separately;
+- ST-002 defined composite runtime/stream/target/image identity and explicit lifecycle leases;
+- ST-003 defined typed address/architecture/ABI/debug-bundle/unwind/location concepts;
+- ST-004 defined causal transition evidence, inspection revisions/snapshots, exact stepping,
+  breakpoint precedence and blocked-state capability;
+- ST-005 defined stream-scoped cursors, ACK-after-apply, typed gaps/resume profiles and event
+  health/reconciliation;
+- ST-006 defined owner/provenance/revision-aware remote resources and conservative legacy mode.
+
+Read-only evidence totals include 90, 40, 106, 77 and 114 passing targeted tests across the
+five technical Studies. All workers changed only their assigned Study. Master contract
+synthesis is now active.

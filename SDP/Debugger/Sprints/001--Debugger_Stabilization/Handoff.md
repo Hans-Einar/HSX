@@ -86,17 +86,19 @@ or AVR work may be dispatched.
   portable-runtime Study phase.
 - Master activated coordinated iteration `DBG-IT-001-003`, `DBG-ST-006`, `HSX-ST-001`, and
   the five bounded HSX domain Studies.
+- Fresh bounded workers completed `HSX-ST-001..HSX-ST-006` with disjoint document ownership,
+  complete provenance/technical evidence and no product/AVR/shared-traceability writes.
 
 ## Not done
 
 - `DBG-D-001..DBG-D-010` remain proposed and have no implementation authority.
-- `DBG-ST-006` and `HSX-ST-001..HSX-ST-006` are not yet complete or reviewed.
+- `DBG-ST-006` mapping and the Master-synthesized HSX contracts are not yet complete or reviewed.
 - Required stable HSX contract proposals and conformance fixtures do not yet exist.
 
 ## Exact next step
 
-Run the bounded HSX Studies, synthesize the stable portable contract proposal and Debugger
-mapping, obtain exact-head independent review, post decision packages to #47 and #38, then
+Synthesize the stable portable HSX contract proposal and `DBG-ST-006` mapping, obtain
+exact-head independent review, post decision packages to #47 and #38, then
 stop before any design freeze or implementation authorization.
 
 ## Traceability state
