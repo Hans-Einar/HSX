@@ -38,6 +38,8 @@ track IDs rather than silently renamed in historical documents.
 - `DBG-SL-001-004-003` — early controller/gateway integration
 - `DBG-RVW-001-004-001..DBG-RVW-001-004-003` — independent Slice reviews
 - `DBG-RVW-001-004-004` — fresh independent `dbg.controller-gateway/1.1` refreeze review
+- `DBG-RVW-001-004-005` — RF-002 fresh exact-head re-review after Slice findings
+- `DBG-RVW-001-004-006` — RF-003 fresh exact-head re-review after Slice findings
 - `DBG-VER-001-004-001..DBG-VER-001-004-003` — formal Slice verifications
 - `DBG-RVW-002-001-001` / `DBG-VER-002-001-001` — RF-002 parent final review/verification
 - `DBG-RVW-003-001-001` / `DBG-VER-003-001-001` — RF-003 parent final review/verification

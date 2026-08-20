@@ -1,11 +1,12 @@
 # DBG-SL-001-004-001 — Controller / State / Stop-Epoch Foundation
 
-- Status: **PAUSED — v1.1 INTERFACE REVIEW REQUIRED BEFORE FRESH RESUME**
+- Status: **REWORK REQUIRED — REVIEW `DBG-RVW-001-004-001`**
 - Parent: `DBG-RF-002`
 - Iteration: `DBG-IT-001-004`
 - Steering: issue #38 comment `5356484309`
 - Frozen interface: `dbg.controller-gateway/1.1`
 - Review: `DBG-RVW-001-004-001`
+- Re-review: `DBG-RVW-001-004-005`
 - Verification: `DBG-VER-001-004-001`
 - Implementation base: `97d8c5b8d62d56dcfcab59c97c516d83f68c7075`
 

@@ -1,14 +1,12 @@
 # DBG-SPR-001 Handoff
 
-Status: `interface_v1_1_review_pass_foundations_resume_ready`
+Status: `rf002_rf003_slice_review_rework_active`
 
 ## Current objective
 
-Resume fresh RF-002/RF-003 foundation workers from the reviewed
-`dbg.controller-gateway/1.1` implementation head
-`0cf52fcf69d11f254b957cfc52605a8be3114955`. Independent interface review
-`DBG-RVW-001-004-004` passed. Pre-refreeze WIP remains candidate-only and must be restored
-selectively with fresh Slice evidence.
+Correct the independently reviewed RF-002/RF-003 Slice findings with fresh bounded rework
+workers, then obtain fresh exact-head `DBG-RVW-001-004-005` / `...006`. No formal verification
+or sign-off begins before both re-reviews PASS.
 
 ## Authority
 
@@ -126,16 +124,15 @@ selectively with fresh Slice evidence.
 
 ## Not done
 
-- `DBG-SL-001-004-001` and `DBG-SL-001-004-002` have no foundation product commit,
-  Slice review, verification, or sign-off; they are only eligible for fresh worker resume.
+- `DBG-SL-001-004-001` and `DBG-SL-001-004-002` have implementation commits but REWORK
+  reviews; no verification or sign-off exists.
 - `DBG-SL-001-004-003` remains blocked on both parent Slice sign-offs.
 - `DBG-RF-004..DBG-RF-009` remain blocked.
 
 ## Exact next step
 
-Master assigns fresh bounded RF-002/RF-003 foundation workers from reviewed interface head
-`0cf52fcf69d11f254b957cfc52605a8be3114955`. Candidate WIP may be applied only selectively;
-both workers rerun their full Slice evidence before independent Slice review.
+Assign fresh disjoint rework workers against exact implementation heads `a0e986c…` and
+`1f492d8…`; close only recorded findings and rerun full Slice evidence before fresh re-review.
 
 ## Traceability state
 
@@ -182,14 +179,14 @@ both workers rerun their full Slice evidence before independent Slice review.
 - Resynthesized supplemental Studies: `HSX-ST-007`, `HSX-ST-008`
 - Interface review `DBG-RVW-001-004-004`: PASS at
   `0cf52fcf69d11f254b957cfc52605a8be3114955`
-- Active gate: fresh RF-002/RF-003 foundation worker resume; integration remains blocked on
-  both parent review/verification/sign-off chains
+- Active gate: fresh RF-002/RF-003 rework workers then `DBG-RVW-001-004-005/006`; integration
+  remains blocked
 
 ## Agents and worktree
 
 The prior design/portable-contract chain is complete. Steering authorized the v1.1 refreeze,
-and its exact implementation passed fresh review. RF-002/RF-003 are eligible for fresh worker
-resume; no worker was resumed by the interface reviewer. Controlled work is on
+and its exact implementation passed fresh review. Initial foundation heads received REWORK;
+fresh rework workers are the next roles. Controlled work is on
 `codex/dbg-rf-002-003`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.

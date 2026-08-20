@@ -85,7 +85,7 @@ issues:
     debugger_design_freeze_comment: 5356484309
     first_wave_iteration: DBG-IT-001-004
     first_wave_slices: DBG-SL-001-004-001..DBG-SL-001-004-003
-    first_wave_shared_interface: dbg.controller-gateway/1
+    first_wave_shared_interface: dbg.controller-gateway/1.1
     first_wave_activation_comment: 5356712010
     first_wave_activation_correction_comment: 5356745504
     first_wave_interface_blocker: generation_handshake_open_subscribe
@@ -100,10 +100,16 @@ issues:
     first_wave_interface_review_status: pass
     first_wave_interface_reviewed_head: 0cf52fcf69d11f254b957cfc52605a8be3114955
     first_wave_interface_review_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/005--Controller_Gateway_Interface_v1_1_Review.md
-    portable_contract_current_gate: fresh_foundation_worker_resume
+    rf002_slice_review: DBG-RVW-001-004-001
+    rf002_slice_review_status: rework
+    rf002_slice_next_review: DBG-RVW-001-004-005
+    rf003_slice_review: DBG-RVW-001-004-002
+    rf003_slice_review_status: rework
+    rf003_slice_next_review: DBG-RVW-001-004-006
+    portable_contract_current_gate: fresh_foundation_rework_workers_then_rereview
   DBG-RF-002:
     issue: 39
-    status: ready_for_fresh_resume
+    status: slice_review_rework_required
     iteration: DBG-IT-001-004
     slice: DBG-SL-001-004-001
     shared_interface: dbg.controller-gateway/1.1
@@ -111,7 +117,7 @@ issues:
     steering_comment: 5356484309
   DBG-RF-003:
     issue: 40
-    status: ready_for_fresh_resume
+    status: slice_review_rework_required
     iteration: DBG-IT-001-004
     slice: DBG-SL-001-004-002
     shared_interface: dbg.controller-gateway/1.1
