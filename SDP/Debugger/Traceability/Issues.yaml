@@ -118,12 +118,15 @@ issues:
     rf002_parent_review_status: rework
     rf002_terminal_result_review: DBG-RVW-001-004-007
     rf002_terminal_result_review_status: rework
+    rf002_corrected_review: DBG-RVW-001-004-008
+    rf002_corrected_review_status: pass
+    rf002_corrected_reviewed_head: a0640203a1a87c7acb080c75286ef09808e5195c
     rf003_parent_review: DBG-RVW-003-001-001
     rf003_parent_review_status: rework_gate_order_only
-    portable_contract_current_gate: fresh_RF002_saturated_internal_failure_delivery_rework
+    portable_contract_current_gate: formal_DBG-VER-001-004-004
   DBG-RF-002:
     issue: 39
-    status: parent_review_rework_required
+    status: corrected_slice_review_pass_pending_verification
     iteration: DBG-IT-001-004
     slice: DBG-SL-001-004-001
     shared_interface: dbg.controller-gateway/1.1

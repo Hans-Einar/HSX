@@ -1,6 +1,6 @@
 # DBG-RF-002 — Debugger Controller, State Machine, and Stop-Epoch Foundation
 
-- Status: **REWORK REQUIRED — PUBLIC TERMINAL COMMAND RESULT DELIVERY**
+- Status: **FRESH SLICE REVIEW PASS — FORMAL VERIFICATION PENDING**
 - Steering authority: issue #38 comment `5356484309`
 - Iteration: `DBG-IT-001-004`
 - Owning Slice: `DBG-SL-001-004-001`
@@ -81,5 +81,5 @@ owned by later authorized Refactors.
 Parent review `DBG-RVW-002-001-001` found that the actor dropped terminal reducer results after
 returning initial `ACCEPTED`; that path was corrected at `1586bb8…`. Fresh review
 `DBG-RVW-001-004-007` then found that an effect-sink failure could still lose its terminal
-message under saturated actor-inbox pressure. Actor-only correction plus fresh
-`DBG-RVW-001-004-008` / `DBG-VER-001-004-004` / exact-head Slice re-sign-off are required.
+message under saturated actor-inbox pressure. Actor-only correction at `a064020…` passed fresh
+`DBG-RVW-001-004-008`; `DBG-VER-001-004-004` and exact-head Slice re-sign-off remain.

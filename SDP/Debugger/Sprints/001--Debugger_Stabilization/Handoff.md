@@ -1,12 +1,12 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf002_terminal_result_rework_active_integration_blocked`
+Status: `rf002_corrected_review_pass_formal_verification_active`
 
 ## Current objective
 
-Correct RF-002 internal effect-failure delivery under saturated actor-inbox pressure with a
-fresh bounded worker, then obtain fresh Slice review, verification and exact-head re-sign-off.
-RF-003 remains signed and unchanged; integration is blocked only on corrected RF-002 sign-off.
+Formally verify exact corrected RF-002 head `a064020…` under `DBG-VER-001-004-004`, then
+exact-head re-sign the Slice. RF-003 remains signed and unchanged; integration is blocked only
+on corrected RF-002 sign-off.
 
 ## Authority
 
@@ -133,17 +133,16 @@ RF-003 remains signed and unchanged; integration is blocked only on corrected RF
 
 ## Not done
 
-- RF-002 parent review's general terminal-result High was corrected at `1586bb8…`, but fresh
-  `DBG-RVW-001-004-007` found a saturated-inbox terminal effect-failure edge. RF-003 has no
+- RF-002 parent review's general terminal-result High and the follow-up saturated-inbox edge
+  are corrected at `a064020…`; fresh `DBG-RVW-001-004-008` returned PASS. RF-003 has no
   product finding and remains signed.
 - `DBG-SL-001-004-003` remains blocked on both parent Slice sign-offs.
 - `DBG-RF-004..DBG-RF-009` remain blocked.
 
 ## Exact next step
 
-Assign a fresh bounded RF-002 worker to guarantee actor-owned delivery of effect-sink failure
-without blocking the actor or dropping terminal evidence when the public inbox is full; then
-run `DBG-RVW-001-004-008`, `DBG-VER-001-004-004`, and Slice re-sign-off.
+Run fresh formal `DBG-VER-001-004-004` against exact `a064020…`, then reconcile the new
+exact-head RF-002 Slice sign-off before integration.
 
 ## Traceability state
 
@@ -195,8 +194,8 @@ run `DBG-RVW-001-004-008`, `DBG-VER-001-004-004`, and Slice re-sign-off.
 - Slice verifications: `DBG-VER-001-004-001/002` PASS
 - Slice sign-offs: PASS at `232e20a6…` and `cf4d8a6…`
 - Parent review attempts `DBG-RVW-002-001-001` / `DBG-RVW-003-001-001`: REWORK
-- Review `DBG-RVW-001-004-007`: REWORK at `1586bb8…`
-- Active gate: fresh RF-002 saturated-inbox rework; integration remains blocked
+- Review `DBG-RVW-001-004-008`: PASS at `a064020…`
+- Active gate: `DBG-VER-001-004-004`; integration remains blocked
 
 ## Agents and worktree
 
