@@ -1,7 +1,7 @@
 schema_version: 1
 track: HSX
 namespace: HSX
-status: portable_contract_review6_assigned
+status: reviewed_package_pending_master_verification_and_issue_decision_packages
 active:
   coordinating_study:
     id: HSX-ST-001
@@ -33,7 +33,7 @@ active:
   coordinated_debugger_study:
     id: DBG-ST-006
     issue: 38
-    status: review6_assigned
+    status: reviewed_package_pending_master_verification_and_issue_decision_packages
   review:
     id: HSX-RVW-001-001-001
     status: rework
@@ -61,32 +61,34 @@ active:
     path: SDP/HSX/Reviews/005--Portable_Debug_Contract_Review_Attempt5.md
   review_attempt_6:
     id: HSX-RVW-001-001-006
-    status: assigned_exact_proposal_content
+    status: pass
     proposal_content_head: b57e368f77bb533b09397d633fc92565655e1668
-  current_gate: independent_review_HSX-RVW-001-001-006
+    trace_assignment_head: 24beb825b40ccafb9391019f7bd7530e388cd675
+    path: SDP/HSX/Reviews/006--Portable_Debug_Contract_Final_Review.md
+  current_gate: reviewed_package_pending_master_verification_and_issue_decision_packages
 proposed_contract_baseline:
   requirements:
     range: HSX-R-001..HSX-R-036
     path: SDP/HSX/03--Requirements/001--Portable_Debug_Runtime_Requirements.md
-    status: review6_assigned
+    status: reviewed_package_pending_master_verification_and_issue_decision_packages
     state: target
   architecture:
     range: HSX-A-001..HSX-A-005
     path: SDP/HSX/04--Architecture/001--Portable_Debug_Runtime_Architecture.md
-    status: review6_assigned
+    status: reviewed_package_pending_master_verification_and_issue_decision_packages
     state: target
   design:
     range: HSX-D-001..HSX-D-005
     path: SDP/HSX/06--Design/001--Portable_Debug_Runtime_Contracts.md
-    status: review6_assigned
+    status: reviewed_package_pending_master_verification_and_issue_decision_packages
     state: target
     appendix:
       path: SDP/HSX/06--Design/002--Canonical_Digest_Golden_Vectors.md
-      status: review6_assigned
+      status: reviewed_package_pending_master_verification_and_issue_decision_packages
   debugger_mapping:
     id: DBG-ST-006
     path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
-    status: review6_assigned
+    status: reviewed_package_pending_master_verification_and_issue_decision_packages
 legacy_sources:
   - main/02--Study
   - main/03--Architecture

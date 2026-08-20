@@ -1,13 +1,13 @@
 # DBG-SPR-001 Handoff
 
-Status: `portable_contract_review6_assigned_exact_content_b57e368`
+Status: `reviewed_package_pending_master_verification_and_issue_decision_packages`
 
 ## Current objective
 
-Obtain fresh `HSX-RVW-001-001-006` against exact proposal-content head
-`b57e368f77bb533b09397d633fc92565655e1668`, then return reviewed decision packages to issues
-#47/#38. The current assignment delta is trace/Handoff only. No structural product or AVR work
-may be dispatched.
+Master verifies `HSX-RVW-001-001-006` against exact proposal-content head
+`b57e368f77bb533b09397d633fc92565655e1668` and trace assignment head
+`24beb825b40ccafb9391019f7bd7530e388cd675`, then returns reviewed decision packages to issues
+#47/#38. No structural product or AVR work may be dispatched.
 
 ## Authority
 
@@ -111,18 +111,21 @@ may be dispatched.
   `84df21d763b73209efd0292990799f469283460a` and returned three Medium findings. Durable
   coordination is in issue #47 comment `5354906185` and #38 comment `5354906338`; fresh
   review after corrections is `HSX-RVW-001-001-006`.
+- Fresh `HSX-RVW-001-001-006` reviewed exact proposal content `b57e368f…` plus trace-only
+  assignment head `24beb82…` and returned PASS with no Blocking/High/Medium findings. Python
+  and Node reproduced all four canonical hashes; representative oracle and structural suites
+  passed. Master verification remains pending.
 
 ## Not done
 
 - `DBG-D-001..DBG-D-010` remain proposed and have no implementation authority.
-- Review 005 is REWORK; the corrected package has not passed `HSX-RVW-001-001-006`.
+- Master verification and durable issue #47/#38 decision packages are not complete.
 
 ## Exact next step
 
-Fresh reviewer reviews exact proposal-content head
-`b57e368f77bb533b09397d633fc92565655e1668` plus the trace-only assignment state. On PASS,
-Master verifies the review record, posts packages to #47/#38, and stops before design freeze or
-implementation authorization.
+Master verifies the review record and exact review-record commit, posts packages to #47/#38,
+and stops before design freeze or implementation authorization unless Steering records a later
+decision.
 
 ## Traceability state
 
@@ -134,7 +137,7 @@ implementation authorization.
   `208063e344b767f82790ce579eba6327e2cdd0ce` and repository head tested
   `fefd4b0c427dfa71d637e4f4cce9e4a345912591`.
 - CurrentIndex, Issues, sprint records, Relations, Ledger, and Handoff are current through
-  review attempt 5 REWORK and the active Master-correction gate.
+  review attempt 6 PASS and the pending Master-verification/issue-package gate.
 - Accepted architecture direction: `DBG-DA-001`, `DBG-A-001..DBG-A-008`
 - Completed Design Studies: `DBG-ST-002..DBG-ST-005`
 - Architecture review: `DBG-RVW-001-002-001` — REWORK at `f8b8097`
@@ -155,15 +158,16 @@ implementation authorization.
 - Review `HSX-RVW-001-001-003`: REWORK at `efd43d2`
 - Review `HSX-RVW-001-001-004`: REWORK at `cbddfa2`
 - Review `HSX-RVW-001-001-005`: REWORK at `84df21d`
+- Review `HSX-RVW-001-001-006`: PASS on proposal content `b57e368…` and trace assignment
+  `24beb82…`
 - Resynthesized supplemental Studies: `HSX-ST-007`, `HSX-ST-008`
-- Active gate: fresh `HSX-RVW-001-001-006` on proposal content `b57e368…`
+- Active gate: `reviewed_package_pending_master_verification_and_issue_decision_packages`
 
 ## Agents and worktree
 
-The prior product/design chain and all bounded HSX Study workers are complete. Master validated
-the review-005 corrections and anchored exact proposal content. The active agent role is fresh
-independent reviewer
-`HSX-RVW-001-001-006`. The controlled branch is `codex/dbg-st-006`;
+The prior product/design chain, all bounded HSX Study workers, and independent review
+`HSX-RVW-001-001-006` are complete. The next active role is Master verification and issue
+decision-package preparation. The controlled branch is `codex/dbg-st-006`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.
 

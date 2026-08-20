@@ -30,10 +30,10 @@ no product or AVR work.
 
 `HSX-ST-001..HSX-ST-008` are complete for this portable debugger-contract scope. Master has
 synthesized stable proposed `HSX-R-001..036`, `HSX-A-001..005`, and `HSX-D-001..005`; the
-five independent reviews required rework. Review 005 anchored exact head `84df21d…` and found
-current f16 conformance, canonical digest bytes and gate-reconstruction issues. Master
-validated corrections at exact proposal-content head `b57e368…`; fresh
-`HSX-RVW-001-001-006` is assigned, followed by decision packages in issues #47/#38.
+first five independent reviews required rework. Final fresh review
+`HSX-RVW-001-001-006` passed exact proposal content `b57e368…` with no
+Blocking/High/Medium findings. The active gate is now
+`reviewed_package_pending_master_verification_and_issue_decision_packages` for issues #47/#38.
 
 Target-specific implementations such as AVR belong in `SDP/AVR` and reference HSX core
 requirements rather than duplicating them.

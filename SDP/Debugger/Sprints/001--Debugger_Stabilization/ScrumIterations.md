@@ -213,7 +213,7 @@ implementation remains blocked.
 
 ## DBG-IT-001-003 — Portable Debug Runtime Contracts
 
-Status: REVIEW 006 ASSIGNED — EXACT PROPOSAL CONTENT `b57e368…`
+Status: REVIEW 006 PASS — PENDING MASTER VERIFICATION AND ISSUE DECISION PACKAGES
 
 ### Goal
 
@@ -270,7 +270,8 @@ No product/runtime/extension/test/package/AVR file may be modified.
 
 - Debugger: `DBG-ST-006`, `DBG-D-002..DBG-D-006`, `DBG-IT-001-003`
 - HSX: `HSX-ST-001..HSX-ST-008`, proposed stable `HSX-R-*`, `HSX-A-*`, `HSX-D-*`
-- Reviews: `HSX-RVW-001-001-001..005` REWORK; `...006` planned after corrections
+- Reviews: `HSX-RVW-001-001-001..005` REWORK; `...006` PASS on exact proposal content
+  `b57e368…` plus trace-only assignment `24beb82…`
 - Issues: #47 coordination and #38 Steering gate
 
 ### Completion signal
@@ -381,3 +382,16 @@ All other technical, traceability, scope and evidence checks passed. Master comp
 validated documentation-only corrections at exact proposal-content head
 `b57e368f77bb533b09397d633fc92565655e1668`; fresh `HSX-RVW-001-001-006` is assigned. Every
 design/RF/product/AVR gate remains closed.
+
+### Cross-track review attempt 6
+
+`HSX-RVW-001-001-006` reviewed exact proposal-content head
+`b57e368f77bb533b09397d633fc92565655e1668` plus trace-only assignment head
+`24beb825b40ccafb9391019f7bd7530e388cd675` and returned PASS with no Blocking/High/Medium
+findings. It independently reproduced all four canonical hashes in Python and Node, repeated
+the current f16 allocator-reuse nonconformance, re-ran the representative oracle suites, and
+validated YAML/NDJSON, Markdown, IDs/mappings, guards, SDP-only scope and diff cleanliness.
+
+The active gate is now `reviewed_package_pending_master_verification_and_issue_decision_packages`.
+All contracts remain target/proposed and every DBG-D/RF/product/AVR implementation gate stays
+closed.

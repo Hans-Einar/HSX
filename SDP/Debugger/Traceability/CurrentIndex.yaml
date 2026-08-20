@@ -28,7 +28,7 @@ active:
   design_analysis:
     id: DBG-DA-001
     path: SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md
-    status: architecture_direction_accepted_portable_contract_review_active
+    status: architecture_direction_accepted_portable_contract_review_pass_pending_master_verification_and_issue_decision_packages
     issue: 38
     steering_start_comment: 5345600066
     architecture_review: DBG-RVW-001-002-003
@@ -51,7 +51,7 @@ active:
       status: complete_for_synthesis
     - id: DBG-ST-006
       path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
-      status: review6_assigned
+      status: reviewed_package_pending_master_verification_and_issue_decision_packages
 completed:
   refactor:
     id: DBG-RF-001
@@ -89,11 +89,11 @@ active_gate:
     id: DBG-DA-001
     issue: 38
     path: SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md
-    status: architecture_direction_accepted_portable_contract_review_active
+    status: architecture_direction_accepted_portable_contract_review_pass_pending_master_verification_and_issue_decision_packages
   iteration:
     id: DBG-IT-001-003
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/ScrumIterations.md
-    status: contract_review6_assigned
+    status: reviewed_package_pending_master_verification_and_issue_decision_packages
   architecture_review:
     id: DBG-RVW-001-002-001
     status: rework
@@ -119,7 +119,7 @@ active_gate:
     hsx_coordinator: HSX-ST-001
     hsx_issue: 47
     hsx_studies: HSX-ST-002..HSX-ST-008
-    status: review6_assigned
+    status: reviewed_package_pending_master_verification_and_issue_decision_packages
     review: HSX-RVW-001-001-001
     review_status: rework
     reviewed_head: 5fff403f6668f794b760caf64ef34b4d1ecb4ae3
@@ -138,9 +138,11 @@ active_gate:
     review_attempt_5_head: 84df21d763b73209efd0292990799f469283460a
     review_attempt_5_record: SDP/HSX/Reviews/005--Portable_Debug_Contract_Review_Attempt5.md
     review_attempt_6: HSX-RVW-001-001-006
-    review_attempt_6_status: assigned_exact_proposal_content
+    review_attempt_6_status: pass
     review_attempt_6_proposal_content_head: b57e368f77bb533b09397d633fc92565655e1668
-    current_gate: independent_review_HSX-RVW-001-001-006
+    review_attempt_6_trace_assignment_head: 24beb825b40ccafb9391019f7bd7530e388cd675
+    review_attempt_6_record: SDP/HSX/Reviews/006--Portable_Debug_Contract_Final_Review.md
+    current_gate: reviewed_package_pending_master_verification_and_issue_decision_packages
     hsx_requirements: HSX-R-001..HSX-R-036
     hsx_architecture: HSX-A-001..HSX-A-005
     hsx_design: HSX-D-001..HSX-D-005
@@ -153,7 +155,7 @@ proposed:
   design:
     range: DBG-D-001..DBG-D-010
     path: SDP/Debugger/06--Design/001--Debugger_Design_Contracts.md
-    status: portable_dependency_review6_assigned
+    status: portable_dependency_reviewed_pending_master_verification_and_issue_decision_packages
     state: target
     gates:
       - range: DBG-D-002..DBG-D-006
@@ -163,7 +165,7 @@ proposed:
   study:
     id: DBG-ST-006
     path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
-    status: review6_assigned
+    status: reviewed_package_pending_master_verification_and_issue_decision_packages
 structural_gate:
   rule: No structural product-code refactor starts before DBG-DA-001 and relevant DBG-D contracts are accepted.
   blocked_refactors:

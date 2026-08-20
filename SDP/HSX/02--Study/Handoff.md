@@ -1,18 +1,20 @@
 # HSX Portable Debug Contract Handoff
 
-- Status: REVIEW 006 ASSIGNED — EXACT PROPOSAL CONTENT ANCHORED
+- Status: REVIEW 006 PASS — PENDING MASTER VERIFICATION AND ISSUE DECISION PACKAGES
 - Coordinator: `HSX-ST-001`, issue #47
 - Debugger dependency: `DBG-ST-006`, issue #38
 - Iteration: `DBG-IT-001-003`
 - Completed review: `HSX-RVW-001-001-005` — REWORK at
   `84df21d763b73209efd0292990799f469283460a`
-- Planned fresh review: `HSX-RVW-001-001-006`
+- Final fresh review: `HSX-RVW-001-001-006` — PASS
+- Active gate: `reviewed_package_pending_master_verification_and_issue_decision_packages`
 
 ## Current objective
 
-Obtain fresh `HSX-RVW-001-001-006` against exact proposal-content head
-`b57e368f77bb533b09397d633fc92565655e1668`. The assignment commit changes trace/Handoff only;
-no proposal-content change is permitted before review.
+Master verifies `HSX-RVW-001-001-006` against exact proposal-content head
+`b57e368f77bb533b09397d633fc92565655e1668` and trace assignment head
+`24beb825b40ccafb9391019f7bd7530e388cd675`, then prepares issue #47/#38 decision packages.
+No proposal-content change is permitted before that verification.
 
 ## Authority
 
@@ -23,8 +25,9 @@ no proposal-content change is permitted before review.
 
 ## Exact next step
 
-Fresh reviewer independently reviews exact proposal-content head
-`b57e368f77bb533b09397d633fc92565655e1668` and the current trace-only assignment state.
+Master verifies the review record and exact review-record commit, posts the reviewed decision
+packages to issues #47/#38, and stops before contract acceptance, design freeze, or
+implementation authorization unless Steering records a later decision.
 
 ## Master verification
 
@@ -52,6 +55,9 @@ DBG mappings, Markdown fences and `git diff --check` passed. This is not indepen
   and returned three Medium findings: undeclared current f16 upper-bit nonconformance,
   non-unique canonical digest bytes, and stale exact-head/Handoff reconstruction. Findings are
   durable in issue #47 comment `5354906185` and issue #38 comment `5354906338`.
+- `HSX-RVW-001-001-006` independently reviewed exact proposal content `b57e368f…` plus
+  trace-only assignment head `24beb82…` and returned PASS with no Blocking/High/Medium
+  findings. Master verification and issue decision packages remain pending.
 - No contract acceptance or implementation authority resulted.
 
 ## Guards
