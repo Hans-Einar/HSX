@@ -38,3 +38,5 @@ started; structural product-code work remains blocked pending accepted design co
   against combined head `1e47953…`.
 - Fresh final parent reviews are the only remaining first-wave gate.
 - No Executive/VM/frontend/AVR change and no RF-004..009 authority.
+- Parent final reviews and formal verifications PASS; RF-002 and RF-003 parent exact-head
+  sign-offs complete. The first wave is awaiting Steering after the issue #38 decision package.

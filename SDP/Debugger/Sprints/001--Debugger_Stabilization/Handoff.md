@@ -1,10 +1,10 @@
 # DBG-SPR-001 Handoff
 
-Status: `parent_verifications_pass_master_signoffs_pending`
+Status: `first_structural_wave_complete_awaiting_steering`
 
 ## Current objective
 
-Perform Master exact-head parent sign-offs for RF-002 and RF-003.
+Post the first-wave decision package to issue #38 and stop for Steering.
 
 ## Authority
 
@@ -139,7 +139,8 @@ Perform Master exact-head parent sign-offs for RF-002 and RF-003.
 
 ## Exact next step
 
-Reconcile parent sign-offs against `DBG-VER-002-001-001` and `DBG-VER-003-001-002`.
+Post public interfaces, exact heads, review/verification evidence, residuals and next-wave
+recommendation to issue #38. Do not start RF-004..009.
 
 ## Traceability state
 
@@ -201,8 +202,8 @@ Reconcile parent sign-offs against `DBG-VER-002-001-001` and `DBG-VER-003-001-00
 - Dependent integration review `DBG-RVW-001-004-010`: PASS at `1e47953…`
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
-- Parent final reviews and both parent verifications: PASS
-- Active gate: Master parent exact-head sign-offs
+- RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
+- Active gate: issue #38 decision package, then Steering stop
 
 ## Agents and worktree
 

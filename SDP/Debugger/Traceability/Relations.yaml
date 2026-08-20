@@ -297,7 +297,7 @@ relations:
       - DBG-SL-001-004-001
       - DBG-SL-001-004-002
       - DBG-SL-001-004-003
-    status: parent_verifications_pass_pending_master_signoffs
+    status: first_wave_complete_awaiting_steering
   - from: DBG-RF-001
     type: implemented_by
     to:

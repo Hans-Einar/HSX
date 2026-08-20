@@ -1,6 +1,6 @@
 # DBG-SPR-001 — Debugger Stabilization
 
-- Status: ITERATION 004 PARENT VERIFICATIONS PASS / MASTER SIGN-OFF ACTIVE
+- Status: ITERATION 004 FIRST WAVE COMPLETE / AWAITING STEERING
 - Owning track: Debugger
 - Owning GapAnalysis: `DBG-GAP-001`
 
