@@ -316,6 +316,28 @@ def test_open_echoes_controller_reserved_stamp_before_health_and_exposes_only_le
     assert session.configurations == [{"pid_lock": 7, "heartbeat_s": 12}]
 
 
+def test_explicit_initial_open_is_authoritative_not_an_implicit_reopen():
+    initial = initial_legacy_generation(display_pid=7)
+    reserved = _open_stamp(initial, 1)
+    session = StubLegacySession([{"status": "ok", "tasks": []}])
+    notices = []
+    gateway = LegacyExecutiveGateway(session, initial_generation=initial)
+    gateway.start(notices.append)
+
+    completion = _open(gateway, notices, reserved, operation_id="explicit-open")
+    snapshot = gateway.health.snapshot()
+    gateway.close()
+
+    assert completion.status is CompletionStatus.OK
+    assert completion.authority is CompletionAuthority.AUTHORITATIVE_RESOURCE_ESTABLISHED
+    assert completion.generation is reserved
+    assert snapshot.generation is reserved
+    assert snapshot.rpc_health is RpcHealth.HEALTHY
+    assert snapshot.event_health is EventHealth.DISABLED
+    assert "implicitly reopened" not in snapshot.reason
+    assert "reconciliation required" not in snapshot.reason
+
+
 def test_failed_open_does_not_promote_and_burns_stamp_for_new_operation():
     active = initial_legacy_generation(display_pid=7)
     failed_stamp = _open_stamp(active, 4)
@@ -530,6 +552,187 @@ def test_non_idempotent_transport_failure_is_typed_exact_and_not_retryable():
         and item.rpc_health is RpcHealth.LOST
     )
     assert loss.event_health is EventHealth.DISABLED
+
+
+def test_background_loss_none_to_new_request_is_degraded_and_loses_event_continuity():
+    initial = initial_legacy_generation(display_pid=7)
+    session_stamp = _open_stamp(initial, 1)
+    stream_stamp = _stream_stamp(session_stamp, 1)
+    session = StubLegacySession([{"status": "ok", "tasks": []}])
+    notices = []
+    gateway = LegacyExecutiveGateway(session, initial_generation=initial)
+    gateway.start(notices.append)
+    _open(gateway, notices, session_stamp)
+    gateway.submit(
+        _effect("subscribe", EffectKind.SUBSCRIBE_EVENTS, stream_stamp, idempotent=True)
+    )
+    _wait_for(lambda: _has_completion(notices, "subscribe"))
+    old_callback = session.event_callbacks[-1]
+
+    # Model ExecutiveSession._handle_connection_loss running outside the adapter: the
+    # physical session and stream disappear before the next foreground gateway effect.
+    session.session_id = None
+    session.stop_event_stream()
+    session.responses.append({"status": "ok", "tasks": []})
+    gateway.submit(
+        _effect(
+            "implicit-reopen",
+            EffectKind.REQUEST,
+            stream_stamp,
+            payload={"request": {"cmd": "ps"}},
+            idempotent=True,
+        )
+    )
+    _wait_for(lambda: _has_completion(notices, "implicit-reopen"))
+
+    completion = _completion(notices, "implicit-reopen")
+    snapshot = gateway.health.snapshot()
+    assert completion.status is CompletionStatus.OK
+    assert completion.generation is stream_stamp
+    assert snapshot.generation is stream_stamp
+    assert snapshot.rpc_health is RpcHealth.DEGRADED
+    assert snapshot.event_health is EventHealth.LOST
+    assert "implicitly reopened after background loss" in snapshot.reason
+    assert "reconciliation required" in snapshot.reason
+    assert old_callback({"seq": 1, "type": "task_state", "pid": 7}) is False
+    gateway.close()
+
+
+def test_background_loss_none_to_new_request_without_event_stream_is_still_degraded():
+    initial = initial_legacy_generation(display_pid=7)
+    session_stamp = _open_stamp(initial, 1)
+    session = StubLegacySession([{"status": "ok", "tasks": []}])
+    notices = []
+    gateway = LegacyExecutiveGateway(session, initial_generation=initial)
+    gateway.start(notices.append)
+    _open(gateway, notices, session_stamp)
+
+    session.session_id = None
+    session.responses.append({"status": "ok", "tasks": []})
+    gateway.submit(
+        _effect(
+            "implicit-reopen-no-events",
+            EffectKind.REQUEST,
+            session_stamp,
+            payload={"request": {"cmd": "ps"}},
+            idempotent=True,
+        )
+    )
+    _wait_for(lambda: _has_completion(notices, "implicit-reopen-no-events"))
+
+    snapshot = gateway.health.snapshot()
+    assert _completion(notices, "implicit-reopen-no-events").generation is session_stamp
+    assert snapshot.generation is session_stamp
+    assert snapshot.rpc_health is RpcHealth.DEGRADED
+    assert snapshot.event_health is EventHealth.DISABLED
+    assert "implicitly reopened after background loss" in snapshot.reason
+    assert "reconciliation required" in snapshot.reason
+    gateway.close()
+
+
+def test_failed_request_after_implicit_reopen_stays_degraded_with_exact_generation():
+    initial = initial_legacy_generation(display_pid=7)
+    session_stamp = _open_stamp(initial, 1)
+    session = StubLegacySession([{"status": "ok", "tasks": []}])
+    notices = []
+    gateway = LegacyExecutiveGateway(session, initial_generation=initial)
+    gateway.start(notices.append)
+    _open(gateway, notices, session_stamp)
+
+    session.session_id = None
+    session.responses.append({"status": "error", "error": "request denied"})
+    gateway.submit(
+        _effect(
+            "implicit-reopen-failed-request",
+            EffectKind.REQUEST,
+            session_stamp,
+            payload={"request": {"cmd": "ps"}},
+            idempotent=True,
+        )
+    )
+    _wait_for(lambda: _has_completion(notices, "implicit-reopen-failed-request"))
+
+    completion = _completion(notices, "implicit-reopen-failed-request")
+    snapshot = gateway.health.snapshot()
+    assert completion.status is CompletionStatus.REJECTED
+    assert completion.authority is CompletionAuthority.ACK_ONLY
+    assert completion.generation is session_stamp
+    assert snapshot.generation is session_stamp
+    assert snapshot.rpc_health is RpcHealth.DEGRADED
+    assert "reconciliation required" in snapshot.reason
+    gateway.close()
+
+
+def test_repeated_request_and_reconcile_cannot_heal_implicit_reopen_without_explicit_open():
+    initial = initial_legacy_generation(display_pid=7)
+    session_stamp = _open_stamp(initial, 1)
+    replacement_stamp = _open_stamp(session_stamp, 2)
+    session = StubLegacySession([{"status": "ok", "tasks": []}])
+    notices = []
+    gateway = LegacyExecutiveGateway(session, initial_generation=initial)
+    gateway.start(notices.append)
+    _open(gateway, notices, session_stamp)
+
+    session.session_id = None
+    session.responses.extend(
+        [
+            {"status": "ok", "tasks": []},
+            {"status": "ok", "tasks": []},
+            {"status": "ok", "tasks": [{"pid": 7, "state": "paused"}]},
+            {"status": "ok", "tasks": []},
+        ]
+    )
+    for operation_id in ("implicit-reopen", "repeat-request"):
+        gateway.submit(
+            _effect(
+                operation_id,
+                EffectKind.REQUEST,
+                session_stamp,
+                payload={"request": {"cmd": "ps"}},
+                idempotent=True,
+            )
+        )
+        _wait_for(lambda operation_id=operation_id: _has_completion(notices, operation_id))
+
+    repeated_health = gateway.health.snapshot()
+    assert repeated_health.generation is session_stamp
+    assert repeated_health.rpc_health is RpcHealth.DEGRADED
+    assert "reconciliation required" in repeated_health.reason
+
+    gateway.submit(
+        _effect(
+            "reconcile-after-reopen",
+            EffectKind.RECONCILE,
+            session_stamp,
+            payload={"request": {"cmd": "ps"}},
+            idempotent=True,
+        )
+    )
+    _wait_for(lambda: any(isinstance(item, ReconcileResult) for item in notices))
+    reconcile = next(item for item in notices if isinstance(item, ReconcileResult))
+    reconcile_health = gateway.health.snapshot()
+    assert reconcile.status is ReconcileStatus.LEGACY_UNPROVEN
+    assert reconcile.generation is session_stamp
+    assert reconcile_health.generation is session_stamp
+    assert reconcile_health.rpc_health is RpcHealth.DEGRADED
+    assert "reconciliation required" in reconcile_health.reason
+
+    # A controller-reserved explicit OPEN is the authority that can establish a fresh
+    # debugger-local generation and clear the conservative latch.
+    promoted = _open(
+        gateway,
+        notices,
+        replacement_stamp,
+        operation_id="explicit-replacement-open",
+    )
+    promoted_health = gateway.health.snapshot()
+    gateway.close()
+    assert promoted.status is CompletionStatus.OK
+    assert promoted.authority is CompletionAuthority.AUTHORITATIVE_RESOURCE_ESTABLISHED
+    assert promoted.generation is replacement_stamp
+    assert promoted_health.generation is replacement_stamp
+    assert promoted_health.rpc_health is RpcHealth.HEALTHY
+    assert "reconciliation required" not in promoted_health.reason
 
 
 def test_successful_hidden_session_reopen_loses_old_event_continuity_before_open_completion():

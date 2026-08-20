@@ -152,6 +152,12 @@ class LegacyExecutiveAdapter:
         self._completed_effects: dict[str, tuple[GatewayNotice, ...]] = {}
         self._session_watermark = health.generation.session_generation
         self._stream_watermark = health.generation.stream_generation
+        # ``ExecutiveSession`` may clear its physical session token from a background
+        # keepalive/event path that this side-by-side adapter cannot observe directly.
+        # Once the next foreground effect exposes that loss, ordinary RPC success must not
+        # silently heal the debugger-local continuity.  Only an explicit, authoritative
+        # OPEN_SESSION establishes a new continuity domain.
+        self._continuity_reconcile_required = threading.Event()
 
     def __call__(self, effect: GatewayEffect, publish: NoticePublisher) -> EffectResult:
         if not isinstance(effect, GatewayEffect):
@@ -183,7 +189,10 @@ class LegacyExecutiveAdapter:
                 cause=exc,
             ) from exc
         except ProtocolVersionError as exc:
-            if self._transport_disruption_reasons(transport_before):
+            if self._transport_disruption_reasons(
+                transport_before,
+                allow_session_establishment=effect.kind is EffectKind.OPEN_SESSION,
+            ):
                 self._invalidate_event_continuity(
                     rpc_health=RpcHealth.DEGRADED,
                     reason="legacy protocol failure followed hidden transport replacement",
@@ -195,7 +204,10 @@ class LegacyExecutiveAdapter:
                 cause=exc,
             ) from exc
         except (ExecutiveSessionError, json.JSONDecodeError, TypeError, ValueError) as exc:
-            if self._transport_disruption_reasons(transport_before):
+            if self._transport_disruption_reasons(
+                transport_before,
+                allow_session_establishment=effect.kind is EffectKind.OPEN_SESSION,
+            ):
                 self._invalidate_event_continuity(
                     rpc_health=RpcHealth.DEGRADED,
                     reason="legacy protocol failure followed hidden transport replacement",
@@ -413,7 +425,10 @@ class LegacyExecutiveAdapter:
             },
             authoritative_resource=True,
         )
-        disruption_reasons = self._transport_disruption_reasons(transport_before)
+        disruption_reasons = self._transport_disruption_reasons(
+            transport_before,
+            allow_session_establishment=True,
+        )
         if completion.status is not CompletionStatus.OK:
             if disruption_reasons:
                 failed_health = self._invalidate_event_continuity(
@@ -447,6 +462,7 @@ class LegacyExecutiveAdapter:
             )
         else:
             self._stop_active_event_transport()
+        self._continuity_reconcile_required.clear()
         healthy = self.health.establish(
             effect.generation,
             rpc_health=RpcHealth.HEALTHY,
@@ -476,6 +492,7 @@ class LegacyExecutiveAdapter:
             event_health=EventHealth.DISABLED,
             reason="legacy Executive session closed",
         )
+        self._continuity_reconcile_required.clear()
         return completion, notice
 
     def _request(self, effect: GatewayEffect) -> tuple[GatewayNotice, ...]:
@@ -489,6 +506,14 @@ class LegacyExecutiveAdapter:
                 reason=(
                     "legacy session/stream changed during RPC: "
                     f"{'; '.join(disruption_reasons)}"
+                ),
+            )
+        elif self._continuity_reconcile_required.is_set():
+            health_notice = self.health.transition(
+                rpc_health=RpcHealth.DEGRADED,
+                reason=(
+                    "legacy Executive RPC completed but prior session continuity remains "
+                    "unproven; reconciliation required"
                 ),
             )
         else:
@@ -677,6 +702,14 @@ class LegacyExecutiveAdapter:
                     f"{'; '.join(disruption_reasons)}"
                 ),
             )
+        elif self._continuity_reconcile_required.is_set():
+            notice = self.health.transition(
+                rpc_health=RpcHealth.DEGRADED,
+                reason=(
+                    "legacy reconciliation completed but prior session continuity remains "
+                    "unproven; reconciliation required"
+                ),
+            )
         else:
             notice = self.health.transition(
                 rpc_health=RpcHealth.HEALTHY,
@@ -711,10 +744,22 @@ class LegacyExecutiveAdapter:
     def _transport_disruption_reasons(
         self,
         before: _LegacyTransportSnapshot,
+        *,
+        allow_session_establishment: bool = False,
     ) -> tuple[str, ...]:
         reasons: list[str] = []
         session_after = getattr(self._session, "session_id", None)
-        if before.session_id is not None and session_after != before.session_id:
+        active_session_exists = self.health.generation.session_generation > 0
+        if before.session_id is None:
+            if session_after is not None and not allow_session_establishment:
+                reasons.append("wrapped session implicitly reopened after background loss")
+            elif (
+                session_after is None
+                and active_session_exists
+                and not allow_session_establishment
+            ):
+                reasons.append("wrapped session was absent before RPC")
+        elif session_after != before.session_id:
             reasons.append("wrapped session_id changed")
 
         state = before.active_event_state
@@ -744,6 +789,7 @@ class LegacyExecutiveAdapter:
         rpc_health: RpcHealth,
         reason: str,
     ) -> HealthNotice:
+        self._continuity_reconcile_required.set()
         with self._event_lock:
             had_event_state = (
                 self._active_event_state is not None
