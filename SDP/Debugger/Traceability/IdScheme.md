@@ -41,6 +41,7 @@ track IDs rather than silently renamed in historical documents.
 - `DBG-RVW-001-004-005` — RF-002 fresh exact-head re-review after Slice findings
 - `DBG-RVW-001-004-006` — RF-003 fresh exact-head re-review after Slice findings
 - `DBG-RVW-001-004-007` — RF-002 fresh exact-head review after parent terminal-result finding
+- `DBG-RVW-001-004-008` — RF-002 fresh exact-head review after saturated-inbox finding
 - `DBG-VER-001-004-001..DBG-VER-001-004-003` — formal Slice verifications
 - `DBG-VER-001-004-004` — RF-002 fresh formal Slice verification after parent finding
 - `DBG-RVW-002-001-001` — RF-002 premature parent review, REWORK

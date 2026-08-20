@@ -11,7 +11,8 @@
 - Verification: `DBG-VER-001-004-001`
 - Verification status: **PASS**
 - Signed product head: `232e20a6ffe737d609171c311410fbb901b57ddf`
-- Next review: `DBG-RVW-001-004-007`
+- Review `DBG-RVW-001-004-007`: **REWORK** at `1586bb84359aa7ed334dde70bdfd9baa128dd99d`
+- Next review: `DBG-RVW-001-004-008`
 - Next verification: `DBG-VER-001-004-004`
 - Implementation base: `97d8c5b8d62d56dcfcab59c97c516d83f68c7075`
 

@@ -4,9 +4,9 @@ Status: `rf002_terminal_result_rework_active_integration_blocked`
 
 ## Current objective
 
-Correct RF-002 public terminal `CommandResult` delivery with a fresh bounded worker, then obtain
-fresh Slice review, verification and exact-head re-sign-off. RF-003 remains signed and unchanged;
-integration is blocked only on corrected RF-002 Slice sign-off.
+Correct RF-002 internal effect-failure delivery under saturated actor-inbox pressure with a
+fresh bounded worker, then obtain fresh Slice review, verification and exact-head re-sign-off.
+RF-003 remains signed and unchanged; integration is blocked only on corrected RF-002 sign-off.
 
 ## Authority
 
@@ -133,16 +133,17 @@ integration is blocked only on corrected RF-002 Slice sign-off.
 
 ## Not done
 
-- RF-002 parent review found one product High and invalidated integration authority from the
-  prior RF-002 Slice sign-off. RF-003 has no product finding and remains signed.
+- RF-002 parent review's general terminal-result High was corrected at `1586bb8…`, but fresh
+  `DBG-RVW-001-004-007` found a saturated-inbox terminal effect-failure edge. RF-003 has no
+  product finding and remains signed.
 - `DBG-SL-001-004-003` remains blocked on both parent Slice sign-offs.
 - `DBG-RF-004..DBG-RF-009` remain blocked.
 
 ## Exact next step
 
-Assign a fresh bounded RF-002 worker to preserve the initial ACCEPTED observation internally
-while resolving the public command Future exactly once on correlated terminal reducer result;
-then run `DBG-RVW-001-004-007`, `DBG-VER-001-004-004`, and Slice re-sign-off.
+Assign a fresh bounded RF-002 worker to guarantee actor-owned delivery of effect-sink failure
+without blocking the actor or dropping terminal evidence when the public inbox is full; then
+run `DBG-RVW-001-004-008`, `DBG-VER-001-004-004`, and Slice re-sign-off.
 
 ## Traceability state
 
@@ -194,7 +195,8 @@ then run `DBG-RVW-001-004-007`, `DBG-VER-001-004-004`, and Slice re-sign-off.
 - Slice verifications: `DBG-VER-001-004-001/002` PASS
 - Slice sign-offs: PASS at `232e20a6…` and `cf4d8a6…`
 - Parent review attempts `DBG-RVW-002-001-001` / `DBG-RVW-003-001-001`: REWORK
-- Active gate: fresh RF-002 terminal-result rework; integration remains blocked
+- Review `DBG-RVW-001-004-007`: REWORK at `1586bb8…`
+- Active gate: fresh RF-002 saturated-inbox rework; integration remains blocked
 
 ## Agents and worktree
 

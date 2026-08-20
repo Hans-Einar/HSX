@@ -116,9 +116,11 @@ issues:
     rf003_slice_signed_head: cf4d8a6665e9a6ebf35d425b227bc7a5c7bd3fa9
     rf002_parent_review: DBG-RVW-002-001-001
     rf002_parent_review_status: rework
+    rf002_terminal_result_review: DBG-RVW-001-004-007
+    rf002_terminal_result_review_status: rework
     rf003_parent_review: DBG-RVW-003-001-001
     rf003_parent_review_status: rework_gate_order_only
-    portable_contract_current_gate: fresh_RF002_terminal_result_rework_worker
+    portable_contract_current_gate: fresh_RF002_saturated_internal_failure_delivery_rework
   DBG-RF-002:
     issue: 39
     status: parent_review_rework_required

@@ -257,7 +257,10 @@ first_structural_wave:
       rereview_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/008--Controller_Foundation_Rereview.md
       parent_review: DBG-RVW-002-001-001
       parent_review_status: rework
-      next_review: DBG-RVW-001-004-007
+      terminal_result_review: DBG-RVW-001-004-007
+      terminal_result_review_status: rework
+      terminal_result_reviewed_head: 1586bb84359aa7ed334dde70bdfd9baa128dd99d
+      next_review: DBG-RVW-001-004-008
       next_verification: DBG-VER-001-004-004
     - id: DBG-SL-001-004-002
       path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/003--Gateway_Foundation.md
@@ -285,7 +288,7 @@ first_structural_wave:
   runtime_profile: hsx.python-debug-legacy/1
   still_blocked: DBG-RF-004..DBG-RF-009
   partial_product_wip_stash: efc91f2640647402bc92c69bde1c57685cfaa1f1
-  current_gate: fresh_RF002_terminal_result_rework_worker
+  current_gate: fresh_RF002_saturated_internal_failure_delivery_rework
 structural_gate:
   rule: Only Steering-authorized Refactors with frozen Slice/interface contracts may execute.
   authorized_refactors:

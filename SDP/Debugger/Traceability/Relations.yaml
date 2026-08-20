@@ -170,6 +170,7 @@ relations:
     to:
       - DBG-RVW-001-004-001
       - DBG-RVW-001-004-005
+      - DBG-RVW-001-004-007
   - from: DBG-SL-001-004-001
     type: verified_by
     to:

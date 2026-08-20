@@ -78,6 +78,8 @@ identical to the frozen envelope document, and later integration Slice 003 passe
 moving frontend or runtime ownership. This sign-off does not claim DAP/CLI adoption; that is
 owned by later authorized Refactors.
 
-Parent review `DBG-RVW-002-001-001` found that the actor drops terminal reducer results after
-returning initial `ACCEPTED`. Fresh bounded correction and `DBG-RVW-001-004-007` /
-`DBG-VER-001-004-004` / exact-head Slice re-sign-off are required before integration.
+Parent review `DBG-RVW-002-001-001` found that the actor dropped terminal reducer results after
+returning initial `ACCEPTED`; that path was corrected at `1586bb8…`. Fresh review
+`DBG-RVW-001-004-007` then found that an effect-sink failure could still lose its terminal
+message under saturated actor-inbox pressure. Actor-only correction plus fresh
+`DBG-RVW-001-004-008` / `DBG-VER-001-004-004` / exact-head Slice re-sign-off are required.
