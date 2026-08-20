@@ -96,7 +96,9 @@ issues:
     first_wave_interface_refreeze_comment: 5357146230
     first_wave_refrozen_interface: dbg.controller-gateway/1.1
     first_wave_interface_review: DBG-RVW-001-004-004
-    portable_contract_current_gate: interface_v1_1_implementation_then_independent_review
+    first_wave_interface_implementation_head: 0cf52fcf69d11f254b957cfc52605a8be3114955
+    first_wave_interface_review_status: assigned
+    portable_contract_current_gate: independent_interface_review_DBG-RVW-001-004-004
   DBG-RF-002:
     issue: 39
     status: paused_pending_interface_review

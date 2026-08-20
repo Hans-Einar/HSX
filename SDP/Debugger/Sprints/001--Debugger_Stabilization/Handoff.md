@@ -5,7 +5,8 @@ Status: `interface_v1_1_refrozen_implementation_and_review_active`
 ## Current objective
 
 Implement only the refrozen `dbg.controller-gateway/1.1` shared records/reservation helpers and
-the Steering-mandated contract fixtures from a clean head, then obtain fresh
+the Steering-mandated contract fixtures from a clean head. Implementation head
+`0cf52fcf69d11f254b957cfc52605a8be3114955` is complete; obtain fresh
 `DBG-RVW-001-004-004`. RF-002/RF-003 WIP remains stashed/unreviewed until that PASS.
 
 ## Authority
@@ -130,9 +131,8 @@ the Steering-mandated contract fixtures from a clean head, then obtain fresh
 
 ## Exact next step
 
-Assign a fresh bounded interface worker for only `__init__.py`, `contracts.py` and
-`test_hsx_debugger_contracts.py`; commit exact refreeze implementation head; assign fresh
-interface reviewer. Resume foundations only on PASS.
+Fresh interface reviewer inspects exact implementation head
+`0cf52fcf69d11f254b957cfc52605a8be3114955`; resume foundations only on PASS.
 
 ## Traceability state
 

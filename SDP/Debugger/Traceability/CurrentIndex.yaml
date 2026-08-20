@@ -208,12 +208,15 @@ first_structural_wave:
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/003--Controller_Gateway_Envelope_Set_v1_1.md
     supersedes: dbg.controller-gateway/1
     historical_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/001--Controller_Gateway_Envelope_Set.md
-    status: refrozen_pending_interface_implementation_and_review
+    status: implementation_complete_review_assigned
     implementation_owner: DBG-SL-001-004-001
     read_only_consumer: DBG-SL-001-004-002
     blocker_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/002--Generation_Handshake_Refreeze_Proposal.md
     steering_refreeze_comment: 5357146230
     review: DBG-RVW-001-004-004
+    implementation_head: 0cf52fcf69d11f254b957cfc52605a8be3114955
+    implementation_status: complete_pending_independent_review
+    review_status: assigned
     steering_blocker_comment: 5357088729
   refactors:
     - id: DBG-RF-002
@@ -250,7 +253,7 @@ first_structural_wave:
   runtime_profile: hsx.python-debug-legacy/1
   still_blocked: DBG-RF-004..DBG-RF-009
   partial_product_wip_stash: efc91f2640647402bc92c69bde1c57685cfaa1f1
-  current_gate: interface_v1_1_implementation_then_independent_review
+  current_gate: independent_interface_review_DBG-RVW-001-004-004
 structural_gate:
   rule: Only Steering-authorized Refactors with frozen Slice/interface contracts may execute.
   authorized_refactors:
