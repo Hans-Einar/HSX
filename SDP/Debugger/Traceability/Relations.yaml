@@ -170,6 +170,11 @@ relations:
     to:
       - DBG-VER-001-004-001
     status: pass
+  - from: DBG-SL-001-004-001
+    type: signed_at
+    to:
+      - 232e20a6ffe737d609171c311410fbb901b57ddf
+    status: pass
   - from: DBG-RF-003
     type: implemented_by
     to:
@@ -183,6 +188,11 @@ relations:
     type: verified_by
     to:
       - DBG-VER-001-004-002
+    status: pass
+  - from: DBG-SL-001-004-002
+    type: signed_at
+    to:
+      - cf4d8a6665e9a6ebf35d425b227bc7a5c7bd3fa9
     status: pass
   - from: DBG-SL-001-004-001
     type: freezes_shared_interface_for

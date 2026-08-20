@@ -1,12 +1,11 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf002_rf003_slice_verification_pass_master_signoff_pending`
+Status: `rf002_rf003_slices_signed_parent_refactor_reviews_pending`
 
 ## Current objective
 
-Master-sign exact verified RF-002 head `232e20a6…` and RF-003 head `cf4d8a6…`, then perform
-the separate parent Refactor review/verification gates. Integration remains blocked until both
-parent Refactors are signed.
+Perform separate fresh parent Refactor reviews and formal verifications for RF-002 and RF-003.
+Integration remains blocked until both parent Refactors are exact-head signed.
 
 ## Authority
 
@@ -128,18 +127,20 @@ parent Refactors are signed.
   Blocking/High/Medium findings. Their formal Slice verifications remain the active gate.
 - Fresh formal `DBG-VER-001-004-001` and `DBG-VER-001-004-002` returned PASS at the exact
   reviewed product heads with no product finding and no protected-path change.
+- Master signed both foundation Slices at their exact verified product heads; the parent
+  Refactor gates remain distinct and are not implied by Slice completion.
 
 ## Not done
 
-- `DBG-SL-001-004-001` and `DBG-SL-001-004-002` have exact-head re-review and verification
-  PASS; Slice sign-off and parent Refactor gates are not yet complete.
+- `DBG-SL-001-004-001` and `DBG-SL-001-004-002` are exact-head signed; parent Refactor gates
+  are not yet complete.
 - `DBG-SL-001-004-003` remains blocked on both parent Slice sign-offs.
 - `DBG-RF-004..DBG-RF-009` remain blocked.
 
 ## Exact next step
 
-Reconcile exact-head Slice sign-offs, then run separate parent Refactor review and verification
-before unblocking integration Slice 003.
+Run fresh `DBG-RVW-002-001-001` and `DBG-RVW-003-001-001`, then separate parent formal
+verification and exact-head sign-off before unblocking integration Slice 003.
 
 ## Traceability state
 
@@ -189,14 +190,15 @@ before unblocking integration Slice 003.
 - Slice re-reviews: `DBG-RVW-001-004-005` PASS at `232e20a6…` and
   `DBG-RVW-001-004-006` PASS at `cf4d8a6…`
 - Slice verifications: `DBG-VER-001-004-001/002` PASS
-- Active gate: Master exact-head Slice sign-off; integration remains blocked
+- Slice sign-offs: PASS at `232e20a6…` and `cf4d8a6…`
+- Active gate: independent parent Refactor reviews; integration remains blocked
 
 ## Agents and worktree
 
 The prior design/portable-contract chain is complete. Steering authorized the v1.1 refreeze,
 and its exact implementation passed fresh review. Foundation rework and fresh re-reviews are
-complete; formal verification passed and Master Slice reconciliation is the active role.
-Controlled work is on
+complete; formal verification and exact-head Slice sign-offs passed. Fresh parent Refactor
+reviewers are the active roles. Controlled work is on
 `codex/dbg-rf-002-003`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.

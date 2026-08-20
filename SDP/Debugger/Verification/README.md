@@ -20,5 +20,7 @@ Completed records:
 
 - `DBG-VER-001-001-001.md` — Windows PASS for signed implementation head `208063e`.
 - `DBG-RF-001--Master_Signoff.md` — Master exact-head reconciliation and completion decision.
-- `DBG-VER-001-004-001.md` — RF-002 foundation Slice PASS at `232e20a6…`, sign-off pending.
-- `DBG-VER-001-004-002.md` — RF-003 foundation Slice PASS at `cf4d8a6…`, sign-off pending.
+- `DBG-VER-001-004-001.md` and `DBG-SL-001-004-001--Master_Signoff.md` — RF-002 Slice PASS
+  and exact-head sign-off at `232e20a6…`.
+- `DBG-VER-001-004-002.md` and `DBG-SL-001-004-002--Master_Signoff.md` — RF-003 Slice PASS
+  and exact-head sign-off at `cf4d8a6…`.

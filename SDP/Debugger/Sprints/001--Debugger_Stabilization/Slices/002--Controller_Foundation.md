@@ -1,6 +1,6 @@
 # DBG-SL-001-004-001 — Controller / State / Stop-Epoch Foundation
 
-- Status: **RE-REVIEW + FORMAL VERIFICATION PASS — MASTER SIGN-OFF PENDING**
+- Status: **PASS / EXACT-HEAD SIGNED**
 - Parent: `DBG-RF-002`
 - Iteration: `DBG-IT-001-004`
 - Steering: issue #38 comment `5356484309`
@@ -10,6 +10,7 @@
 - Exact reviewed head: `232e20a6ffe737d609171c311410fbb901b57ddf`
 - Verification: `DBG-VER-001-004-001`
 - Verification status: **PASS**
+- Signed product head: `232e20a6ffe737d609171c311410fbb901b57ddf`
 - Implementation base: `97d8c5b8d62d56dcfcab59c97c516d83f68c7075`
 
 ## Bounded outcome
