@@ -1,6 +1,6 @@
 # DBG-SL-001-004-003 — Early Controller/Gateway Integration
 
-- Status: **BLOCKED — CORRECTED RF-002 SLICE RE-SIGN-OFF REQUIRED**
+- Status: **READY FOR FRESH INTEGRATION WORKER**
 - Parents: `DBG-RF-002`, `DBG-RF-003`
 - Iteration: `DBG-IT-001-004`
 - Steering: issue #38 comment `5356484309`

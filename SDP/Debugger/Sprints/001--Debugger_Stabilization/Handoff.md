@@ -1,11 +1,11 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf002_corrected_verification_pass_resignoff_pending`
+Status: `foundation_slices_signed_integration_worker_ready`
 
 ## Current objective
 
-Exact-head re-sign corrected RF-002 head `a064020…` after `DBG-VER-001-004-004` PASS. RF-003
-remains signed and unchanged; integration is blocked only on corrected RF-002 sign-off.
+Run fresh bounded integration Slice 003 against corrected signed RF-002 head `a064020…` and
+unchanged signed RF-003 head `cf4d8a6…`, then fresh review, formal verification and sign-off.
 
 ## Authority
 
@@ -135,13 +135,13 @@ remains signed and unchanged; integration is blocked only on corrected RF-002 si
 - RF-002 parent review's general terminal-result High and the follow-up saturated-inbox edge
   are corrected at `a064020…`; fresh `DBG-RVW-001-004-008` returned PASS. RF-003 has no
   product finding and remains signed.
-- `DBG-SL-001-004-003` remains blocked on both parent Slice sign-offs.
+- `DBG-SL-001-004-003` is ready for its fresh bounded worker.
 - `DBG-RF-004..DBG-RF-009` remain blocked.
 
 ## Exact next step
 
-Run fresh formal `DBG-VER-001-004-004` against exact `a064020…`, then reconcile the new
-exact-head RF-002 Slice sign-off before integration.
+Assign a fresh integration worker with write scope limited to `python/hsx_debugger/runtime.py`
+and `python/tests/test_hsx_debugger_controller_gateway.py`.
 
 ## Traceability state
 
@@ -194,8 +194,8 @@ exact-head RF-002 Slice sign-off before integration.
 - Slice sign-offs: PASS at `232e20a6…` and `cf4d8a6…`
 - Parent review attempts `DBG-RVW-002-001-001` / `DBG-RVW-003-001-001`: REWORK
 - Review `DBG-RVW-001-004-008`: PASS at `a064020…`
-- Verification `DBG-VER-001-004-004`: PASS at `a064020…`
-- Active gate: Master RF-002 exact-head re-sign-off; integration remains blocked
+- Corrected RF-002 sign-off: PASS at `a064020…`; RF-003 remains PASS at `cf4d8a6…`
+- Active gate: fresh integration Slice 003 worker
 
 ## Agents and worktree
 

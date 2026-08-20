@@ -182,7 +182,8 @@ relations:
     type: signed_at
     to:
       - 232e20a6ffe737d609171c311410fbb901b57ddf
-    status: pass
+      - a0640203a1a87c7acb080c75286ef09808e5195c
+    status: corrected_pass
   - from: DBG-RF-003
     type: implemented_by
     to:
