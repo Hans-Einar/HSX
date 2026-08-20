@@ -19,7 +19,7 @@ issues:
     master_signoff: pass
   DBG-DA-001:
     issue: 38
-    status: debugger_v1_design_frozen_first_wave_active
+    status: debugger_v1_design_frozen_first_wave_interface_blocked
     decision_package_comment: 5346421143
     architecture_acceptance_comment: 5348190806
     steering_start_comment: 5345600066
@@ -88,17 +88,21 @@ issues:
     first_wave_shared_interface: dbg.controller-gateway/1
     first_wave_activation_comment: 5356712010
     first_wave_activation_correction_comment: 5356745504
-    portable_contract_current_gate: first_structural_wave_active
+    first_wave_interface_blocker: generation_handshake_open_subscribe
+    first_wave_interface_blocker_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/002--Generation_Handshake_Refreeze_Proposal.md
+    first_wave_recommended_interface: dbg.controller-gateway/1.1
+    first_wave_wip_stash: efc91f2640647402bc92c69bde1c57685cfaa1f1
+    portable_contract_current_gate: steering_generation_handshake_refreeze_decision
   DBG-RF-002:
     issue: 39
-    status: authorized_contract_and_slice_frozen
+    status: paused_uncommitted_interface_blocker
     iteration: DBG-IT-001-004
     slice: DBG-SL-001-004-001
     shared_interface: dbg.controller-gateway/1
     steering_comment: 5356484309
   DBG-RF-003:
     issue: 40
-    status: authorized_contract_and_slice_frozen
+    status: paused_uncommitted_interface_blocker
     iteration: DBG-IT-001-004
     slice: DBG-SL-001-004-002
     shared_interface: dbg.controller-gateway/1

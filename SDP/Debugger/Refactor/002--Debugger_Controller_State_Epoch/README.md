@@ -1,6 +1,6 @@
 # DBG-RF-002 — Debugger Controller, State Machine, and Stop-Epoch Foundation
 
-- Status: **CONTRACT FROZEN / FIRST-WAVE IMPLEMENTATION AUTHORIZED**
+- Status: **PAUSED — SHARED GENERATION HANDSHAKE REFREEZE REQUIRED**
 - Steering authority: issue #38 comment `5356484309`
 - Iteration: `DBG-IT-001-004`
 - Owning Slice: `DBG-SL-001-004-001`

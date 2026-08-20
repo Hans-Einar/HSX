@@ -1,6 +1,6 @@
 # DBG-SL-001-004-003 — Early Controller/Gateway Integration
 
-- Status: **FROZEN / BLOCKED UNTIL RF-002 AND RF-003 SLICE SIGN-OFF**
+- Status: **BLOCKED — SHARED INTERFACE REFREEZE AND BOTH PARENT SIGN-OFFS REQUIRED**
 - Parents: `DBG-RF-002`, `DBG-RF-003`
 - Iteration: `DBG-IT-001-004`
 - Steering: issue #38 comment `5356484309`

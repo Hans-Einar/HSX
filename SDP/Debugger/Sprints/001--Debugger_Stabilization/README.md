@@ -1,6 +1,6 @@
 # DBG-SPR-001 — Debugger Stabilization
 
-- Status: ITERATION 004 FIRST STRUCTURAL WAVE — CONTRACTS FROZEN
+- Status: ITERATION 004 BLOCKED — SHARED GENERATION HANDSHAKE REFREEZE
 - Owning track: Debugger
 - Owning GapAnalysis: `DBG-GAP-001`
 

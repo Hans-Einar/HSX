@@ -399,7 +399,7 @@ publication passed. Steering froze the HSX portable target contracts in #47 comm
 
 ## DBG-IT-001-004 — Controller/Gateway First Structural Wave
 
-Status: CONTRACTS FROZEN — RF-002/RF-003 WORKER DISPATCH READY
+Status: BLOCKED — SHARED GENERATION HANDSHAKE REFREEZE REQUIRED
 
 ### Authority and scope
 
@@ -446,3 +446,18 @@ frozen in `Interfaces/001--Controller_Gateway_Envelope_Set.md` before worker dis
 RF-002 foundation, RF-003 foundation and integration Slice all have independent exact-head
 PASS, formal verification and Master sign-off; public interfaces/deviations/evidence/residuals
 are durable and the next wave remains Steering-controlled.
+
+### Interface blocker discovered before product commit
+
+The parallel workers stopped on an exact-generation contradiction in
+`dbg.controller-gateway/1`: gateway OPEN/SUBSCRIBE must advance local session/stream
+generation, while controller exact-fencing rejects the first resulting `N+1` notice and has no
+authorized adoption transition. No product file was staged/committed and no Slice review or
+verification began.
+
+Master recommends `dbg.controller-gateway/1.1`: the controller preallocates/atomically adopts
+the next generation before dispatch, and the gateway validates/echoes that exact effect stamp.
+Alternatives and rejection rationale are in
+`Interfaces/002--Generation_Handshake_Refreeze_Proposal.md`. Workers and integration remain
+blocked pending issue #38 Steering direction. Partial owned-file WIP is recoverably stashed at
+`efc91f2640647402bc92c69bde1c57685cfaa1f1` and has no implementation authority.

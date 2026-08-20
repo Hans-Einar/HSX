@@ -170,6 +170,7 @@ relations:
       - DBG-SL-001-004-002
       - DBG-SL-001-004-003
     interface: dbg.controller-gateway/1
+    status: blocked_pending_refreeze
   - from: DBG-SL-001-004-001
     type: prerequisite_for
     to:
@@ -178,6 +179,25 @@ relations:
     type: prerequisite_for
     to:
       - DBG-SL-001-004-003
+  - from: dbg.controller-gateway/1
+    type: blocked_by
+    to:
+      - generation_handshake_open_subscribe
+  - from: generation_handshake_open_subscribe
+    type: documented_by
+    to:
+      - SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/002--Generation_Handshake_Refreeze_Proposal.md
+  - from: generation_handshake_open_subscribe
+    type: blocks
+    to:
+      - DBG-SL-001-004-001
+      - DBG-SL-001-004-002
+      - DBG-SL-001-004-003
+  - from: generation_handshake_open_subscribe
+    type: routed_to_steering
+    to:
+      - issue-38
+    recommended_resolution: dbg.controller-gateway/1.1_controller_preallocated_generation
   - from: DBG-RF-001
     type: implemented_by
     to:

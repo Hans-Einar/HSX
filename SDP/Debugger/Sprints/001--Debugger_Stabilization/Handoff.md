@@ -1,13 +1,13 @@
 # DBG-SPR-001 Handoff
 
-Status: `iteration_004_contracts_frozen_worker_dispatch_ready`
+Status: `iteration_004_blocked_pending_generation_handshake_refreeze`
 
 ## Current objective
 
-Execute the frozen RF-002/RF-003 foundation Slices with disjoint fresh workers, independent
-review/verification/sign-off, then execute the blocked integration Slice. Existing Executive
-behavior is consumed only through `hsx.python-debug-legacy/1`; no runtime/VM/frontend migration
-or RF-004..009 work is allowed.
+Await Steering/Design decision on the shared OPEN/SUBSCRIBE generation handshake. Both workers
+stopped before staging/committing product code; partial owned-file work is preserved in
+recoverable stash `efc91f2640647402bc92c69bde1c57685cfaa1f1`. Integration and RF-004..009
+remain blocked.
 
 ## Authority
 
@@ -125,17 +125,14 @@ or RF-004..009 work is allowed.
 
 ## Not done
 
-- `DBG-SL-001-004-001` and `DBG-SL-001-004-002` are not implemented/reviewed/signed.
+- `DBG-SL-001-004-001` and `DBG-SL-001-004-002` are paused with no product commit/review/sign-off.
 - `DBG-SL-001-004-003` remains blocked on both parent Slice sign-offs.
 - `DBG-RF-004..DBG-RF-009` remain blocked.
 
 ## Exact next step
 
-Commit the frozen iteration/refactor/slice/interface contracts, then spawn fresh bounded
-RF-002/RF-003 workers only within disjoint file ownership.
-
-Contract head `97d8c5b8d62d56dcfcab59c97c516d83f68c7075` is the exact implementation
-base for both parallel foundation Slices.
+Post the generation-handshake alternatives/recommendation to issue #38 and stop. On Steering
+authorization, re-freeze `dbg.controller-gateway/1.1` before restoring/reassigning any WIP.
 
 ## Traceability state
 
@@ -180,12 +177,13 @@ base for both parallel foundation Slices.
 - Publication blocker: #47 comment `5356183884`, #38 comment `5356186692`
 - Fresh remote verification: PASS at `89cb74a10ce36d8b0f4d0cc60332d3070c2c635f`
 - Resynthesized supplemental Studies: `HSX-ST-007`, `HSX-ST-008`
-- Active gate: RF-002/RF-003 Slice worker dispatch
+- Active gate: Steering generation-handshake refreeze decision
 
 ## Agents and worktree
 
-The prior design/portable-contract chain is complete. Fresh RF-002/RF-003 workers are the next
-roles after this contract-freeze commit. Controlled work is on `codex/dbg-rf-002-003`;
+The prior design/portable-contract chain is complete. RF-002/RF-003 workers stopped on the
+frozen-interface contradiction; no worker is active until refreeze authority. Controlled work
+is on `codex/dbg-rf-002-003`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.
 
