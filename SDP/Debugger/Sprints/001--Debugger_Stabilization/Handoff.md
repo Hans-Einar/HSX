@@ -4,7 +4,7 @@ Status: `first_structural_wave_complete_awaiting_steering`
 
 ## Current objective
 
-Post the first-wave decision package to issue #38 and stop for Steering.
+First-wave decision package posted to issue #38 comment `5361796061`; stop for Steering.
 
 ## Authority
 
@@ -139,8 +139,7 @@ Post the first-wave decision package to issue #38 and stop for Steering.
 
 ## Exact next step
 
-Post public interfaces, exact heads, review/verification evidence, residuals and next-wave
-recommendation to issue #38. Do not start RF-004..009.
+Await Steering. Do not start RF-004..009.
 
 ## Traceability state
 
@@ -203,7 +202,7 @@ recommendation to issue #38. Do not start RF-004..009.
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: issue #38 decision package, then Steering stop
+- Active gate: awaiting Steering after issue #38 comment `5361796061`
 
 ## Agents and worktree
 

@@ -162,7 +162,8 @@ issues:
     dependent_integration_verification: DBG-VER-001-004-006
     dependent_integration_verification_status: pass
     dependent_integration_signed_head: 1e479536ce5e746e1b06a53b1039b1af84adaed6
-    first_wave_current_gate: issue_38_first_wave_decision_package_then_stop
+    first_wave_decision_package_comment: 5361796061
+    first_wave_current_gate: awaiting_steering
     portable_contract_gate: complete_accepted_frozen
     rf002_parent_review_attempt_6: DBG-RVW-002-001-006
     rf002_parent_review_attempt_6_status: rework_trace_only

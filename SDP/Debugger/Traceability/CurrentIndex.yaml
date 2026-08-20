@@ -199,6 +199,7 @@ proposed:
 first_structural_wave:
   status: complete_awaiting_steering
   steering_comment: 5356484309
+  decision_package_comment: 5361796061
   activation_comment: 5356712010
   activation_correction_comment: 5356745504
   branch: codex/dbg-rf-002-003
@@ -349,7 +350,7 @@ first_structural_wave:
   runtime_profile: hsx.python-debug-legacy/1
   still_blocked: DBG-RF-004..DBG-RF-009
   partial_product_wip_stash: efc91f2640647402bc92c69bde1c57685cfaa1f1
-  current_gate: issue_38_first_wave_decision_package_then_stop
+  current_gate: awaiting_steering_after_issue_38_comment_5361796061
 structural_gate:
   rule: Only Steering-authorized Refactors with frozen Slice/interface contracts may execute.
   authorized_refactors:
