@@ -94,6 +94,12 @@ relations:
       - HSX-RVW-001-001-002
       - HSX-RVW-001-001-003
       - HSX-RVW-001-001-004
+      - HSX-RVW-001-001-005
+  - from: DBG-ST-006
+    type: requires_outputs_from
+    to:
+      - HSX-ST-007
+      - HSX-ST-008
   - from: DBG-ST-006
     type: satisfied_by_proposed_contracts
     to:

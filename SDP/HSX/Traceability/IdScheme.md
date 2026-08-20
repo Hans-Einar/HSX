@@ -15,6 +15,9 @@ The existing DR, DG, and DO identifiers remain legacy provenance identifiers unt
 - `HSX-RVW-001-001-002` — fresh exact-head re-review after required corrections
 - `HSX-RVW-001-001-003` — fresh exact-head review after stage-coherence correction
 - `HSX-RVW-001-001-004` — fresh exact-head review after final current-gate correction
+- `HSX-ST-007` — ABI profile/recipe/register semantics follow-up
+- `HSX-ST-008` — debug bundle/source identity canonicalization follow-up
+- `HSX-RVW-001-001-005` — fresh exact-head review after supplemental Studies
 
 These IDs are stable but their artifacts remain target/proposed pending review and Steering
 acceptance. Stable numbering is not implementation authority.

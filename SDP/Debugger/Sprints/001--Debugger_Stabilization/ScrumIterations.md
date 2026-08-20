@@ -212,7 +212,7 @@ implementation remains blocked.
 
 ## DBG-IT-001-003 — Portable Debug Runtime Contracts
 
-Status: CONTRACT REWORK COMPLETE — PENDING `HSX-RVW-001-001-004`
+Status: SUPPLEMENTAL CONTRACT STUDIES ACTIVE
 
 ### Goal
 
@@ -246,7 +246,7 @@ portable runtime semantics required by `DBG-D-002..DBG-D-006`.
 - `SDP/HSX/02--Study/005--Event_Stream_Continuity.md`
 - `SDP/HSX/02--Study/006--Resource_Provenance_Revisions.md`
 - proposed HSX Requirements/Architecture/Design contract documents and both track traceability
-- independent review records `HSX-RVW-001-001-001..HSX-RVW-001-001-004`
+- independent review records `HSX-RVW-001-001-001..HSX-RVW-001-001-005`
 
 No product/runtime/extension/test/package/AVR file may be modified.
 
@@ -305,8 +305,8 @@ Master allocated and synthesized:
 - full `DBG-ST-006` dependency closure matrix;
 - named full/degraded capability profiles and reusable conformance fixtures.
 
-All artifacts remain target/proposed. The active action is fresh independent exact-head
-review `HSX-RVW-001-001-004`; no design freeze or implementation authority exists.
+At initial synthesis, all artifacts remained target/proposed and the first exact-head review
+was `HSX-RVW-001-001-001`; no design freeze or implementation authority resulted.
 
 ### Cross-track review attempt 1
 
@@ -337,3 +337,11 @@ current review-stage references. Master synchronized every next-gate surface. Fr
 REWORK because HSX README, Debugger CurrentIndex and Debugger Handoff still exposed stale
 current-stage claims. Master corrected every current gate to point solely to
 `HSX-RVW-001-001-004`; prior review IDs remain history.
+
+### Cross-track review attempt 4
+
+`HSX-RVW-001-001-004` reviewed exact head
+`cbddfa24d3cbb25bf7a17c63a0146ee8d0600883`. It confirmed all prior closures but found
+unrouted address/ABI decisions and a recursive/underspecified debug-bundle identity. Master
+activated first-class `HSX-ST-007` and `HSX-ST-008`. Fresh review after synthesis is
+`HSX-RVW-001-001-005`.

@@ -1,15 +1,15 @@
 # HSX Portable Debug Contract Handoff
 
-- Status: REVIEW REWORK COMPLETE — FRESH REVIEW PENDING
+- Status: SUPPLEMENTAL STUDIES ACTIVE
 - Coordinator: `HSX-ST-001`, issue #47
 - Debugger dependency: `DBG-ST-006`, issue #38
 - Iteration: `DBG-IT-001-003`
-- Planned fresh review: `HSX-RVW-001-001-004`
+- Planned fresh review: `HSX-RVW-001-001-005`
 
 ## Current objective
 
-Obtain fresh exact-head review of the corrected portable contract package and `DBG-ST-006`
-mapping, then return to Steering before any Debugger design freeze or product work.
+Complete `HSX-ST-007` and `HSX-ST-008`, synthesize their decisions into the portable contract
+package/`DBG-ST-006`, then obtain fresh review before any Debugger design freeze or product work.
 
 ## Authority
 
@@ -20,8 +20,8 @@ mapping, then return to Steering before any Debugger design freeze or product wo
 
 ## Exact next step
 
-Commit the stage-coherent corrected package, then assign fresh `HSX-RVW-001-001-004` to the
-exact complete head.
+Dispatch bounded workers for `HSX-ST-007` and `HSX-ST-008` with disjoint ownership. Master
+then synthesizes and assigns `HSX-RVW-001-001-005` to the exact complete head.
 
 ## Review history
 
@@ -33,6 +33,8 @@ exact complete head.
   current review-stage references. Master synchronized them and reserved review attempt 3.
 - `HSX-RVW-001-001-003` confirmed the contract package but found three remaining stale
   current-gate statements. Master synchronized them and reserved review attempt 4.
+- `HSX-RVW-001-001-004` confirmed prior closure but required routing of unresolved ABI/recipe/
+  register and bundle/source canonicalization questions. Master activated ST-007/ST-008.
 - No contract acceptance or implementation authority resulted.
 
 ## Guards

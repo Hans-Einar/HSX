@@ -28,6 +28,27 @@ relations:
     to:
       - HSX-ST-001
       - DBG-ST-006
+  - from: HSX-ST-003
+    type: spawns
+    to:
+      - HSX-ST-007
+      - HSX-ST-008
+  - from: HSX-ST-007
+    type: informs
+    to:
+      - HSX-ST-001
+      - HSX-R-016..HSX-R-018
+      - HSX-D-002
+      - DBG-ST-006
+  - from: HSX-ST-008
+    type: informs
+    to:
+      - HSX-ST-001
+      - HSX-R-004
+      - HSX-R-015
+      - HSX-D-001
+      - HSX-D-002
+      - DBG-ST-006
   - from: HSX-ST-004
     type: informs
     to:
@@ -50,6 +71,7 @@ relations:
       - HSX-RVW-001-001-002
       - HSX-RVW-001-001-003
       - HSX-RVW-001-001-004
+      - HSX-RVW-001-001-005
   - from: HSX-ST-001
     type: provides_provenance_for
     to:

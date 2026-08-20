@@ -1,7 +1,7 @@
 schema_version: 1
 track: HSX
 namespace: HSX
-status: portable_debug_contracts_rework_complete_pending_fresh_review
+status: supplemental_portable_contract_studies_active
 active:
   coordinating_study:
     id: HSX-ST-001
@@ -24,10 +24,16 @@ active:
     - id: HSX-ST-006
       path: SDP/HSX/02--Study/006--Resource_Provenance_Revisions.md
       status: complete_for_synthesis
+    - id: HSX-ST-007
+      path: SDP/HSX/02--Study/007--ABI_Profile_Recipe_Schema.md
+      status: active
+    - id: HSX-ST-008
+      path: SDP/HSX/02--Study/008--Debug_Bundle_Source_Identity.md
+      status: active
   coordinated_debugger_study:
     id: DBG-ST-006
     issue: 38
-    status: complete_pending_fresh_review
+    status: rework_pending_supplemental_studies
   review:
     id: HSX-RVW-001-001-001
     status: rework
@@ -45,28 +51,33 @@ active:
     path: SDP/HSX/Reviews/003--Portable_Debug_Contract_Final_Review.md
   review_attempt_4:
     id: HSX-RVW-001-001-004
-    status: planned
-  current_review: HSX-RVW-001-001-004
+    status: rework
+    reviewed_head: cbddfa24d3cbb25bf7a17c63a0146ee8d0600883
+    path: SDP/HSX/Reviews/004--Portable_Debug_Contract_Review_Attempt4.md
+  review_attempt_5:
+    id: HSX-RVW-001-001-005
+    status: planned_after_supplemental_studies
+  current_gate: HSX-ST-007,HSX-ST-008
 proposed_contract_baseline:
   requirements:
     range: HSX-R-001..HSX-R-036
     path: SDP/HSX/03--Requirements/001--Portable_Debug_Runtime_Requirements.md
-    status: rework_complete_pending_fresh_review
+    status: rework_pending_supplemental_studies
     state: target
   architecture:
     range: HSX-A-001..HSX-A-005
     path: SDP/HSX/04--Architecture/001--Portable_Debug_Runtime_Architecture.md
-    status: rework_complete_pending_fresh_review
+    status: rework_pending_supplemental_studies
     state: target
   design:
     range: HSX-D-001..HSX-D-005
     path: SDP/HSX/06--Design/001--Portable_Debug_Runtime_Contracts.md
-    status: rework_complete_pending_fresh_review
+    status: rework_pending_supplemental_studies
     state: target
   debugger_mapping:
     id: DBG-ST-006
     path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
-    status: rework_complete_pending_fresh_review
+    status: rework_pending_supplemental_studies
 legacy_sources:
   - main/02--Study
   - main/03--Architecture

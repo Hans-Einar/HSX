@@ -1,6 +1,6 @@
 # Portable Debug Runtime Requirements
 
-- Status: REWORKED PROPOSAL / PENDING FRESH INDEPENDENT REVIEW
+- Status: REWORK / SUPPLEMENTAL STUDIES ACTIVE
 - Range: `HSX-R-001..HSX-R-036`
 - Studies: `HSX-ST-001..HSX-ST-006`
 - Debugger dependency: `DBG-ST-006`

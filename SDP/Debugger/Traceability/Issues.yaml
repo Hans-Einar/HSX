@@ -50,7 +50,10 @@ issues:
     portable_contract_review_attempt_3: HSX-RVW-001-001-003
     portable_contract_review_attempt_3_status: rework
     portable_contract_review_attempt_4: HSX-RVW-001-001-004
-    portable_contract_current_review: HSX-RVW-001-001-004
+    portable_contract_review_attempt_4_status: rework
+    portable_contract_review_attempt_5: HSX-RVW-001-001-005
+    portable_contract_supplemental_studies: HSX-ST-007,HSX-ST-008
+    portable_contract_current_gate: HSX-ST-007,HSX-ST-008
   DBG-RF-002:
     issue: 39
     status: blocked_by_DBG-DA-001

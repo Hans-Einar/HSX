@@ -1,6 +1,6 @@
 # DBG-SPR-001 — Debugger Stabilization
 
-- Status: ITERATION 003 CONTRACT REWORK COMPLETE / FRESH REVIEW PENDING
+- Status: ITERATION 003 SUPPLEMENTAL CONTRACT STUDIES ACTIVE
 - Owning track: Debugger
 - Owning GapAnalysis: `DBG-GAP-001`
 
@@ -39,7 +39,9 @@ Steering accepted `DBG-A-001..DBG-A-008` as target architecture direction in com
 - Review `HSX-RVW-001-001-001`: REWORK
 - Review `HSX-RVW-001-001-002`: REWORK
 - Review `HSX-RVW-001-001-003`: REWORK
-- Planned fresh review: `HSX-RVW-001-001-004`
+- Review `HSX-RVW-001-001-004`: REWORK
+- Active supplemental Studies: `HSX-ST-007`, `HSX-ST-008`
+- Planned fresh review: `HSX-RVW-001-001-005`
 - Stop gate: issues #47 and #38 before any `DBG-D-*` freeze
 
 ## Non-goals for this iteration

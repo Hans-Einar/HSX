@@ -30,8 +30,8 @@ no product or AVR work.
 
 `HSX-ST-001..HSX-ST-006` are complete for this portable debugger-contract scope. Master has
 synthesized stable proposed `HSX-R-001..036`, `HSX-A-001..005`, and `HSX-D-001..005`; the
-three independent reviews required rework; the sole active gate is fresh review
-`HSX-RVW-001-001-004` followed by issues #47/#38.
+four independent reviews required rework. The active gate is supplemental
+`HSX-ST-007`/`HSX-ST-008`, followed by fresh `HSX-RVW-001-001-005` and issues #47/#38.
 
 Target-specific implementations such as AVR belong in `SDP/AVR` and reference HSX core
 requirements rather than duplicating them.

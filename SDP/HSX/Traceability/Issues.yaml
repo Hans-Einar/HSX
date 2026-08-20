@@ -28,6 +28,13 @@ issues:
     review_attempt_3_head: efd43d2be9e4db1646419fe5036ec1f5b22c8deb
     review_attempt_4: HSX-RVW-001-001-004
     current_review: HSX-RVW-001-001-004
+    review_attempt_4: HSX-RVW-001-001-004
+    review_attempt_4_status: rework
+    review_attempt_4_head: cbddfa24d3cbb25bf7a17c63a0146ee8d0600883
+    review_attempt_5: HSX-RVW-001-001-005
+    supplemental_studies:
+      - HSX-ST-007
+      - HSX-ST-008
   HSX-ST-002:
     issue: 47
     status: complete_for_synthesis
@@ -48,3 +55,11 @@ issues:
     issue: 47
     status: complete_for_synthesis
     role: resource_provenance_revisions
+  HSX-ST-007:
+    issue: 47
+    status: active
+    role: abi_profile_recipe_register_semantics
+  HSX-ST-008:
+    issue: 47
+    status: active
+    role: debug_bundle_source_identity_canonicalization
