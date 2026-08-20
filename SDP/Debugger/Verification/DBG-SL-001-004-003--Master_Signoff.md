@@ -1,6 +1,6 @@
 # DBG-SL-001-004-003 — Master Exact-Head Sign-Off
 
-- Status: **PASS / INTEGRATION SLICE COMPLETE**
+- Status: **HISTORICAL PASS — SUPERSEDED BY DEPENDENCY v2 SIGN-OFF**
 - Decision date: 2026-08-20
 - Signed product head: `860a98a68440b8e22b67f03fbdbb93d2dd33ab7a`
 - Signed RF-002 dependency: `a0640203a1a87c7acb080c75286ef09808e5195c`

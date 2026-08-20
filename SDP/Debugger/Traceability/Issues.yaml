@@ -149,7 +149,8 @@ issues:
     dependent_integration_reviewed_head: 1e479536ce5e746e1b06a53b1039b1af84adaed6
     dependent_integration_verification: DBG-VER-001-004-006
     dependent_integration_verification_status: pass
-    portable_contract_current_gate: master_dependent_integration_resignoff
+    dependent_integration_signed_head: 1e479536ce5e746e1b06a53b1039b1af84adaed6
+    portable_contract_current_gate: fresh_parent_final_reviews_DBG-RVW-002-001-003_and_DBG-RVW-003-001-003
   DBG-RF-002:
     issue: 39
     status: corrected_slice_product_pass_dependency_rework_active

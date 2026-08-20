@@ -1,10 +1,10 @@
 # DBG-SPR-001 Handoff
 
-Status: `dependent_integration_verification_pass_resignoff_pending`
+Status: `complete_chain_signed_parent_final_reviews_pending`
 
 ## Current objective
 
-Re-sign combined integration dependency head `1e47953…` after `DBG-VER-001-004-006` PASS.
+Run fresh final parent RF-002/RF-003 reviews against the complete signed chain.
 
 ## Authority
 
@@ -139,7 +139,7 @@ Re-sign combined integration dependency head `1e47953…` after `DBG-VER-001-004
 
 ## Exact next step
 
-Reconcile Master dependent integration exact-head sign-off.
+Run `DBG-RVW-002-001-003` and `DBG-RVW-003-001-003`.
 
 ## Traceability state
 
@@ -200,7 +200,8 @@ Reconcile Master dependent integration exact-head sign-off.
 - Verification `DBG-VER-001-004-005`: PASS at `1e47953…`
 - Dependent integration review `DBG-RVW-001-004-010`: PASS at `1e47953…`
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
-- Active gate: Master dependent integration re-sign-off
+- Dependent integration v2 sign-off: PASS at `1e47953…`
+- Active gate: fresh parent final reviews
 
 ## Agents and worktree
 

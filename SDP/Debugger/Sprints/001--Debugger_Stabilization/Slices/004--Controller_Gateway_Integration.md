@@ -5,6 +5,8 @@
 - Exact reviewed head: `860a98a68440b8e22b67f03fbdbb93d2dd33ab7a`
 - Verification `DBG-VER-001-004-003`: **PASS**
 - Signed product head: `860a98a68440b8e22b67f03fbdbb93d2dd33ab7a`
+- Dependency-revalidated signed head: `1e479536ce5e746e1b06a53b1039b1af84adaed6`
+- Dependency review/verification: `DBG-RVW-001-004-010` / `DBG-VER-001-004-006` — PASS
 - Parents: `DBG-RF-002`, `DBG-RF-003`
 - Iteration: `DBG-IT-001-004`
 - Steering: issue #38 comment `5356484309`
