@@ -1,6 +1,6 @@
 # DBG-SPR-001 — Debugger Stabilization
 
-- Status: ITERATION 003 REMOTE PUBLICATION VERIFIED — AWAITING STEERING
+- Status: ITERATION 004 FIRST STRUCTURAL WAVE — CONTRACTS FROZEN
 - Owning track: Debugger
 - Owning GapAnalysis: `DBG-GAP-001`
 
@@ -28,9 +28,9 @@ authorized pre-design product activity is `DBG-RF-001`.
 - Stop gate: issue #38 Steering acceptance
 
 Steering accepted `DBG-A-001..DBG-A-008` as target architecture direction in comment
-`5348190806`; all `DBG-D-*` remain proposed.
+`5348190806` and froze `DBG-D-001..DBG-D-010` in comment `5356484309`.
 
-## Active cross-track iteration
+## Completed cross-track iteration
 
 - `DBG-IT-001-003` — portable debug runtime contract Studies
 - Debugger umbrella: `DBG-ST-006`
@@ -45,14 +45,25 @@ Steering accepted `DBG-A-001..DBG-A-008` as target architecture direction in com
 - Review `HSX-RVW-001-001-006`: PASS on exact proposal content `b57e368…` plus trace-only
   assignment head `24beb82…`
 - Verification `HSX-VER-001-001-001`: PASS
-- Stop gate: Master exact-content sign-off and reviewed/verified decision packages in issues
-  #47/#38 before any `DBG-D-*` freeze
+- Steering froze the portable HSX target baseline in #47 comment `5356480919` and accepted
+  `DBG-ST-006` complete in #38 comment `5356484309`.
 
-## Non-goals for this iteration
+## Active structural iteration
 
-- no `DBG-DA-001` analysis before `DBG-RF-001` exact-head sign-off;
-- no structural debugger product refactor;
-- no work on `DBG-RF-002..DBG-RF-009`.
+- `DBG-IT-001-004` — controller/gateway first structural wave
+- Authorized Refactors: `DBG-RF-002`, `DBG-RF-003`
+- Frozen Slices: `DBG-SL-001-004-001`, `DBG-SL-001-004-002`,
+  `DBG-SL-001-004-003`
+- Frozen shared interface: `dbg.controller-gateway/1`
+- Existing Executive profile: `hsx.python-debug-legacy/1`
+- Still blocked: `DBG-RF-004..DBG-RF-009`
+
+## Non-goals for iteration 004
+
+- no portable HSX runtime/Executive/VM implementation;
+- no production DAP/CLI/VS Code migration;
+- no artifact/inspection/resource/lifecycle/source-step work;
+- no work on `DBG-RF-004..DBG-RF-009`.
 
 ## Completed iteration 001 exit
 

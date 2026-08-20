@@ -1,6 +1,6 @@
 # Proposed Debugger Design Contracts
 
-- Status: PORTABLE DEPENDENCY REVIEW 005 CORRECTED / NOT FROZEN / NO IMPLEMENTATION AUTHORITY
+- Status: ACCEPTED / FROZEN DEBUGGER V1 DESIGN BASELINE
 - DesignAnalysis: `DBG-DA-001`
 - Architecture: `DBG-A-001..DBG-A-008`
 - Architecture-direction review: `DBG-RVW-001-002-003` — PASS at
@@ -8,10 +8,11 @@
 - Portable dependency evidence: `DBG-ST-006`, `HSX-ST-001..HSX-ST-008`
 - Review 005: REWORK at `84df21d763b73209efd0292990799f469283460a`
 - Planned fresh cross-track review: `HSX-RVW-001-001-006`
-- Target state: not implemented
+- Steering acceptance: issue #38 comment `5356484309`
+- State: implementation-authoritative only through explicitly authorized Refactor/Slice contracts
 
-The contracts below are design proposals, not accepted implementation authority. A later
-Steering decision must accept or revise them before their statuses can change from proposed.
+The contracts below are the frozen Debugger v1 design baseline. Only RF-002, RF-003 and their
+early integration Slice are authorized in the first structural wave.
 
 ## Contract registry
 
@@ -28,11 +29,10 @@ Steering decision must accept or revise them before their statuses can change fr
 | `DBG-D-009` | Compatibility registry, oracle classification, and strangler migration contract | A-008 | RF-002..RF-008 |
 | `DBG-D-010` | Immutable artifact verification and Windows/Linux release sign-off contract | A-008 | RF-009 |
 
-All contracts are `proposed_pending_steering`.
+All contracts are `accepted_frozen_debugger_v1`.
 
-`DBG-D-002..DBG-D-006` are additionally blocked from design freeze by `DBG-ST-006` and its
-required stable HSX inputs. This does not weaken the existing implementation block on any
-structural Refactor.
+The `DBG-ST-006` dependency gate is satisfied by the frozen portable HSX target contracts.
+Implementation remains bounded by the Steering-authorized Refactor/Slice wave.
 
 ## DBG-D-001 — Serialized controller contract
 
@@ -328,5 +328,5 @@ The current ordering remains structurally sound with these proposed refinements:
 - RF-009 consumes RF-002..RF-008 and owns final immutable-artifact/platform convergence, while
   every earlier Refactor still owns fast portable tests.
 
-These changes are proposals. Current issue statuses and implementation blocks remain in force
-until Steering accepts the design package.
+These dependency refinements are part of the accepted baseline. RF-004..RF-009 remain blocked
+until later Steering decisions.

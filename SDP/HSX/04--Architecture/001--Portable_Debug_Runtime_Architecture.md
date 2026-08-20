@@ -1,12 +1,12 @@
 # Portable Debug Runtime Architecture
 
-- Status: REVIEW 005 REWORK CORRECTED — PENDING FRESH REVIEW 006
+- Status: ACCEPTED / FROZEN PORTABLE TARGET BASELINE
 - Range: `HSX-A-001..HSX-A-005`
 - Requirements: `HSX-R-001..HSX-R-036`
 - Studies: `HSX-ST-001..HSX-ST-008`
-- State: target; not implemented
+- State: accepted target; semantic baseline `b57e368f77bb533b09397d633fc92565655e1668`; not implemented
 
-These stable architecture IDs remain proposed until Steering accepts them. They describe
+Steering froze these architecture IDs in issue #47 comment `5356480919`. They describe
 portable HSX evidence and authority, not Debugger UI/controller policy or AVR realization.
 
 ## Proposed architecture decisions

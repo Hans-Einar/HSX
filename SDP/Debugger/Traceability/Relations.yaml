@@ -75,6 +75,7 @@ relations:
     to:
       - DBG-IT-001-002
       - DBG-IT-001-003
+      - DBG-IT-001-004
   - from: DBG-IT-001-002
     type: analyzes
     to:
@@ -113,7 +114,7 @@ relations:
     to:
       - origin/codex/dbg-st-006@89cb74a10ce36d8b0f4d0cc60332d3070c2c635f
   - from: DBG-ST-006
-    type: satisfied_by_proposed_contracts
+    type: satisfied_by_frozen_contracts
     to:
       - HSX-R-001..HSX-R-036
       - HSX-A-001..HSX-A-005
@@ -122,10 +123,61 @@ relations:
     type: required_before_freeze
     to:
       - DBG-D-002..DBG-D-006
+    status: satisfied_by_issue_47_comment_5356480919
   - from: DBG-A-001..DBG-A-008
     type: refined_by
     to:
       - DBG-D-001..DBG-D-010
+  - from: DBG-D-001..DBG-D-010
+    type: accepted_frozen_by_steering
+    to:
+      - issue-38-comment-5356484309
+  - from: DBG-D-001
+    type: implemented_by_authorized_refactor
+    to:
+      - DBG-RF-002
+  - from: DBG-D-002
+    type: implemented_by_authorized_refactor
+    to:
+      - DBG-RF-003
+  - from: DBG-D-003
+    type: implemented_by_authorized_refactor
+    to:
+      - DBG-RF-002
+  - from: DBG-D-009
+    type: constrains
+    to:
+      - DBG-RF-002
+      - DBG-RF-003
+      - DBG-SL-001-004-003
+  - from: DBG-IT-001-004
+    type: executes
+    to:
+      - DBG-SL-001-004-001
+      - DBG-SL-001-004-002
+      - DBG-SL-001-004-003
+  - from: DBG-RF-002
+    type: implemented_by
+    to:
+      - DBG-SL-001-004-001
+  - from: DBG-RF-003
+    type: implemented_by
+    to:
+      - DBG-SL-001-004-002
+  - from: DBG-SL-001-004-001
+    type: freezes_shared_interface_for
+    to:
+      - DBG-SL-001-004-002
+      - DBG-SL-001-004-003
+    interface: dbg.controller-gateway/1
+  - from: DBG-SL-001-004-001
+    type: prerequisite_for
+    to:
+      - DBG-SL-001-004-003
+  - from: DBG-SL-001-004-002
+    type: prerequisite_for
+    to:
+      - DBG-SL-001-004-003
   - from: DBG-RF-001
     type: implemented_by
     to:
@@ -253,20 +305,13 @@ cross_track_dependencies:
       - HSX-ST-007
       - HSX-ST-008
     required_contract: portable_debug_runtime_semantics
-    blocks:
+    status: satisfied_by_issue_47_comment_5356480919
+    unblocks_authorized_wave:
+      - DBG-RF-002
       - DBG-RF-003
-      - DBG-RF-004
-      - DBG-RF-005
-      - DBG-RF-006
-    blocked_scopes:
-      - refactor: DBG-RF-002
-        scopes:
-          - target_identity
-          - stop_epoch
-          - snapshot
-          - reference_lifetime
+    implementation_guard: current_executive_legacy_degraded_only
 proposed_dependency_changes:
-  status: accepted_direction_contracts_unfrozen
+  status: accepted_frozen_debugger_v1
   relations:
     - from: DBG-RF-004
       type: prerequisite_for

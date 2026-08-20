@@ -29,3 +29,14 @@ IDs are never recycled after use in traceability, a GitHub issue/PR, or the ledg
 Cross-track references retain their own namespace (`HSX-*`, `AVR-*`).
 Legacy `DR-*`/`DG-*` references remain provenance IDs and are mapped to the new stable
 track IDs rather than silently renamed in historical documents.
+
+## Allocated first structural wave IDs
+
+- `DBG-IT-001-004` — RF-002/RF-003 controller/gateway first wave
+- `DBG-SL-001-004-001` — controller/state/epoch foundation
+- `DBG-SL-001-004-002` — typed legacy gateway/health/recovery foundation
+- `DBG-SL-001-004-003` — early controller/gateway integration
+- `DBG-RVW-001-004-001..DBG-RVW-001-004-003` — independent Slice reviews
+- `DBG-VER-001-004-001..DBG-VER-001-004-003` — formal Slice verifications
+- `DBG-RVW-002-001-001` / `DBG-VER-002-001-001` — RF-002 parent final review/verification
+- `DBG-RVW-003-001-001` / `DBG-VER-003-001-001` — RF-003 parent final review/verification

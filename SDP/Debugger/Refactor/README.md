@@ -6,8 +6,8 @@ worker -> reviewer -> verification -> exact-head sign-off loop.
 | ID | Name | Status | Primary dependency |
 |---|---|---|---|
 | `DBG-RF-001` | DAP Protocol Baseline Stabilization | COMPLETE at `208063e` | DBG-GAP-001 |
-| `DBG-RF-002` | Debugger Controller, State Machine, Stop Epochs | BLOCKED | DBG-DA-001 |
-| `DBG-RF-003` | Session/Transport/Event Health/Recovery | BLOCKED | DBG-DA-001 + controller contract |
+| `DBG-RF-002` | Debugger Controller, State Machine, Stop Epochs | FIRST WAVE — FROZEN SLICE AUTHORIZED | frozen DBG-D-001/D-003 + shared interface |
+| `DBG-RF-003` | Session/Transport/Event Health/Recovery | FIRST WAVE — FROZEN SLICE AUTHORIZED | frozen DBG-D-002 + shared interface |
 | `DBG-RF-004` | Symbol/Source/Address/Inspection Model | BLOCKED | DBG-DA-001 + HSX address contract |
 | `DBG-RF-005` | Breakpoint/Watch Ownership/Reconciliation | BLOCKED | DBG-RF-002 + DBG-RF-003 |
 | `DBG-RF-006` | Lifecycle and Execution/Stepping Semantics | BLOCKED | DBG-RF-002 + DBG-RF-003 + DBG-RF-004 |
@@ -26,5 +26,5 @@ recorded in issue #36 against PR #49 head
 implementation head `208063e344b767f82790ce579eba6327e2cdd0ce`, passed independent
 review `DBG-RVW-001-001-001`, and passed verification `DBG-VER-001-001-001`.
 
-No other Refactor may start product-code implementation until `DBG-DA-001` and the relevant
-`DBG-D-*` contracts are accepted and referenced from the workstream's GitHub issue.
+Steering froze `DBG-D-001..010` and authorized only RF-002, RF-003 and one early integration
+Slice in issue #38 comment `5356484309`. RF-004..RF-009 remain blocked.

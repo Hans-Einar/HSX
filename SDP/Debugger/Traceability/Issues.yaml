@@ -19,7 +19,7 @@ issues:
     master_signoff: pass
   DBG-DA-001:
     issue: 38
-    status: architecture_direction_accepted_portable_contract_package_awaiting_steering
+    status: debugger_v1_design_frozen_first_wave_active
     decision_package_comment: 5346421143
     architecture_acceptance_comment: 5348190806
     steering_start_comment: 5345600066
@@ -43,7 +43,7 @@ issues:
     hsx_studies: HSX-ST-001..HSX-ST-008
     cross_track_review: HSX-RVW-001-001-001
     portable_contracts: HSX-R-001..HSX-R-036,HSX-A-001..HSX-A-005,HSX-D-001..HSX-D-005
-    portable_contract_status: awaiting_steering_acceptance
+    portable_contract_status: accepted_frozen_target_baseline
     portable_contract_review_status: rework
     portable_contract_rereview: HSX-RVW-001-001-002
     portable_contract_rereview_status: rework
@@ -75,19 +75,32 @@ issues:
     portable_contract_remote_proposal_content_head_resolvable: b57e368f77bb533b09397d633fc92565655e1668
     portable_contract_remote_fresh_checkout_status: pass
     portable_contract_remote_product_runtime_extension_avr_diff: none
-    portable_contract_remote_publication_status: pass_awaiting_steering_acceptance
+    portable_contract_remote_publication_status: pass_complete
     portable_contract_remote_hsx_steering_comment: 5356183884
     portable_contract_remote_debugger_steering_comment: 5356186692
     portable_contract_supplemental_studies: HSX-ST-007,HSX-ST-008
     portable_contract_hsx_decision_package_comment: 5355340420
     portable_contract_debugger_decision_package_comment: 5355340598
-    portable_contract_current_gate: steering_decision_issues_47_38
+    portable_contract_acceptance_comment: 5356480919
+    debugger_design_freeze_comment: 5356484309
+    first_wave_iteration: DBG-IT-001-004
+    first_wave_slices: DBG-SL-001-004-001..DBG-SL-001-004-003
+    first_wave_shared_interface: dbg.controller-gateway/1
+    portable_contract_current_gate: first_structural_wave_active
   DBG-RF-002:
     issue: 39
-    status: blocked_by_DBG-DA-001
+    status: authorized_contract_and_slice_frozen
+    iteration: DBG-IT-001-004
+    slice: DBG-SL-001-004-001
+    shared_interface: dbg.controller-gateway/1
+    steering_comment: 5356484309
   DBG-RF-003:
     issue: 40
-    status: blocked_by_DBG-DA-001_and_controller_contract
+    status: authorized_contract_and_slice_frozen
+    iteration: DBG-IT-001-004
+    slice: DBG-SL-001-004-002
+    shared_interface: dbg.controller-gateway/1
+    steering_comment: 5356484309
   DBG-RF-004:
     issue: 41
     status: blocked_by_DBG-DA-001_and_stop_epoch_contract

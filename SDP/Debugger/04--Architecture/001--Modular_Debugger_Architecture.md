@@ -1,6 +1,6 @@
 # Proposed Modular Debugger Architecture
 
-- Status: ACCEPTED TARGET DIRECTION / NOT IMPLEMENTED
+- Status: ACCEPTED DEBUGGER V1 TARGET ARCHITECTURE / NOT IMPLEMENTED
 - DesignAnalysis: `DBG-DA-001`
 - Independent review: `DBG-RVW-001-002-003` — PASS at
   `89d95de2d944179219a93895f1ab956f2786a232`
@@ -8,9 +8,9 @@
 - Requirements: `DBG-R-001..DBG-R-036`
 - Target state: not implemented
 
-Steering accepted `DBG-A-001..DBG-A-008` conceptually as target architecture direction in
-issue #38 comment `5348190806`. This acceptance does not implement the architecture, freeze
-the proposed `DBG-D-*`, or authorize product work.
+Steering accepted `DBG-A-001..DBG-A-008` as target architecture direction in comment
+`5348190806` and froze `DBG-D-001..DBG-D-010` as the Debugger v1 design baseline in comment
+`5356484309`. Product work still requires an explicitly authorized Refactor/Slice.
 
 ## Proposed architecture decisions
 
@@ -25,7 +25,7 @@ the proposed `DBG-D-*`, or authorize product work.
 | `DBG-A-007` | CLI and DAP are thin peer frontends; VS Code is standard-DAP-first presentation, and the VSIX launches an immutable version-coherent Python distribution. | R-001..R-003, R-026..R-032, R-034 |
 | `DBG-A-008` | Migration is strangler-style through classified regression oracles, a named compatibility registry, immutable release artifacts, Windows/Linux evidence, and exact-head gates. | R-031..R-036 |
 
-All IDs above remain proposed until issue #38 records Steering acceptance.
+Steering accepted all IDs above as the Debugger v1 target architecture in issue #38.
 
 ## Context and dependency diagram
 
@@ -231,5 +231,5 @@ mode, but may not invent portable answers.
 - `DBG-RF-008`: modular VS Code presentation and version-coherent runtime package.
 - `DBG-RF-009`: immutable artifact, Windows/Linux, live-executive, and final exact-head oracle.
 
-These ownership statements remain proposed until Steering accepts `DBG-DA-001` and the
-relevant detailed contracts.
+These ownership statements are part of the accepted Debugger v1 baseline. Only explicitly
+authorized Refactor/Slice scopes may implement them.

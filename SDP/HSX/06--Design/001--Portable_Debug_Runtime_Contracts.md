@@ -1,14 +1,14 @@
 # Portable Debug Runtime Contracts
 
-- Status: REVIEW 005 REWORK CORRECTED — PENDING FRESH REVIEW 006
+- Status: ACCEPTED / FROZEN PORTABLE TARGET BASELINE
 - Range: `HSX-D-001..HSX-D-005`
 - Architecture: `HSX-A-001..HSX-A-005`
 - Requirements: `HSX-R-001..HSX-R-036`
 - Debugger dependency: `DBG-ST-006`, `DBG-D-002..DBG-D-006`
-- State: target; not implemented or frozen
+- State: accepted/frozen target; semantic baseline `b57e368f77bb533b09397d633fc92565655e1668`; not implemented
 
-These contracts define proposed portable wire/domain evidence. They remain non-authoritative
-until Steering accepts them in #47/#38.
+Steering froze these portable wire/domain target contracts in issue #47 comment `5356480919`.
+Current legacy behavior remains degraded evidence and does not redefine this target baseline.
 
 ## HSX-D-001 — Runtime identity, lifecycle, and ownership
 

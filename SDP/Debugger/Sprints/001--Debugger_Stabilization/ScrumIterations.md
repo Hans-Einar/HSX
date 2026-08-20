@@ -392,6 +392,57 @@ findings. It independently reproduced all four canonical hashes in Python and No
 the current f16 allocator-reuse nonconformance, re-ran the representative oracle suites, and
 validated YAML/NDJSON, Markdown, IDs/mappings, guards, SDP-only scope and diff cleanliness.
 
-Verification `HSX-VER-001-001-001` passed. The active gate is now Master exact-content
-sign-off and reviewed/verified issue #47/#38 decision packages. All contracts remain
-target/proposed and every DBG-D/RF/product/AVR implementation gate stays closed.
+Verification `HSX-VER-001-001-001`, Master exact-content sign-off and remote fresh-checkout
+publication passed. Steering froze the HSX portable target contracts in #47 comment
+`5356480919`, accepted `DBG-ST-006` complete and froze `DBG-D-001..010` in #38 comment
+`5356484309`. `DBG-IT-001-003` is closed. The freeze grants no HSX runtime/AVR implementation.
+
+## DBG-IT-001-004 — Controller/Gateway First Structural Wave
+
+Status: CONTRACTS FROZEN — RF-002/RF-003 WORKER DISPATCH READY
+
+### Authority and scope
+
+- Steering: issue #38 comment `5356484309`.
+- Authorized: `DBG-RF-002`, `DBG-RF-003`, then `DBG-SL-001-004-003` integration.
+- Frozen designs: `DBG-D-001..DBG-D-010`.
+- Frozen portable target baseline: `HSX-R-001..036`, `HSX-A-001..005`, `HSX-D-001..005`.
+- Runtime boundary: current Executive only through `hsx.python-debug-legacy/1`; no
+  `execd.py`/VM/portable-runtime implementation.
+- Still blocked: `DBG-RF-004..DBG-RF-009`.
+
+### Frozen execution units
+
+1. `DBG-SL-001-004-001` — RF-002 controller/state/epoch foundation.
+2. `DBG-SL-001-004-002` — RF-003 typed legacy gateway/health/recovery foundation.
+3. `DBG-SL-001-004-003` — early controller/gateway integration, blocked until both parent
+   Slices are independently signed off.
+
+Shared `dbg.controller-gateway/1` envelopes, generations, health, recovery and public ports are
+frozen in `Interfaces/001--Controller_Gateway_Envelope_Set.md` before worker dispatch.
+
+### Parallel ownership
+
+- RF-002 owns shared contracts plus controller/model/reducer/epoch files and their tests.
+- RF-003 owns only gateway/health/legacy adapter files and their tests; shared contracts are
+  read-only.
+- No existing ExecutiveSession/backend/DAP/CLI/VS Code/runtime/AVR file is worker-owned.
+- Discovery requiring an interface or accepted-design change stops both workers and returns to
+  Master/Steering.
+
+### Execution loop
+
+1. Fresh bounded RF-002/RF-003 workers may overlap after the contracts module exists; file
+   ownership remains disjoint and workers commit only owned files.
+2. `DBG-RVW-001-004-001` / `...002` independently review exact Slice heads.
+3. `DBG-VER-001-004-001` / `...002` formally verify each Slice; Master exact-head signs each
+   Slice and reconciles each parent Refactor.
+4. Fresh integration worker implements only Slice 003 on the signed combined foundation.
+5. `DBG-RVW-001-004-003`, `DBG-VER-001-004-003` and Master sign-off close integration.
+6. Master posts a concise result package to issue #38 and stops before RF-004..009.
+
+### Exit signal
+
+RF-002 foundation, RF-003 foundation and integration Slice all have independent exact-head
+PASS, formal verification and Master sign-off; public interfaces/deviations/evidence/residuals
+are durable and the next wave remains Steering-controlled.

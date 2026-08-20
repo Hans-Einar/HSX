@@ -1,12 +1,12 @@
 schema_version: 1
 track: HSX
 namespace: HSX
-status: awaiting_steering_acceptance
+status: accepted_frozen_portable_target_baseline
 active:
   coordinating_study:
     id: HSX-ST-001
     path: SDP/HSX/02--Study/001--Legacy_Traceability_Migration.md
-    status: complete_for_portable_contract_synthesis
+    status: complete_portable_contract_gate_closed
     issue: 47
   studies:
     - id: HSX-ST-002
@@ -33,7 +33,7 @@ active:
   coordinated_debugger_study:
     id: DBG-ST-006
     issue: 38
-    status: awaiting_steering_acceptance
+    status: complete_accepted_dependency
   review:
     id: HSX-RVW-001-001-001
     status: rework
@@ -88,7 +88,7 @@ active:
     master_signoff_status: pass
     fresh_checkout_status: pass
     product_runtime_extension_avr_diff: none
-    status: pass_awaiting_steering_acceptance
+    status: pass_complete
     steering_hsx_blocker_comment: 5356183884
     steering_debugger_blocker_comment: 5356186692
   decision_packages:
@@ -96,31 +96,32 @@ active:
     hsx_comment: 5355340420
     debugger_issue: 38
     debugger_comment: 5355340598
-    status: posted_awaiting_steering
-  current_gate: steering_decision_issues_47_38
+    status: accepted
+    steering_acceptance_comment: 5356480919
+  current_gate: closed_handoff_to_debugger_first_structural_wave
 proposed_contract_baseline:
   requirements:
     range: HSX-R-001..HSX-R-036
     path: SDP/HSX/03--Requirements/001--Portable_Debug_Runtime_Requirements.md
-    status: awaiting_steering_acceptance
-    state: target
+    status: accepted_frozen_target_baseline
+    state: accepted_target
   architecture:
     range: HSX-A-001..HSX-A-005
     path: SDP/HSX/04--Architecture/001--Portable_Debug_Runtime_Architecture.md
-    status: awaiting_steering_acceptance
-    state: target
+    status: accepted_frozen_target_baseline
+    state: accepted_target
   design:
     range: HSX-D-001..HSX-D-005
     path: SDP/HSX/06--Design/001--Portable_Debug_Runtime_Contracts.md
-    status: awaiting_steering_acceptance
-    state: target
+    status: accepted_frozen_target_baseline
+    state: accepted_target
     appendix:
       path: SDP/HSX/06--Design/002--Canonical_Digest_Golden_Vectors.md
-      status: awaiting_steering_acceptance
+      status: accepted_frozen_target_baseline
   debugger_mapping:
     id: DBG-ST-006
     path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
-    status: awaiting_steering_acceptance
+    status: complete_accepted_dependency
 legacy_sources:
   - main/02--Study
   - main/03--Architecture
@@ -142,6 +143,8 @@ coordination:
   debugger_decision_package_comment: 5355340598
   remote_publication_steering_comment: 5356183884
   remote_publication_debugger_comment: 5356186692
+  steering_acceptance_comment: 5356480919
+  debugger_design_freeze_comment: 5356484309
 guards:
   product_code_authorized: false
   debugger_refactor_authorized: false

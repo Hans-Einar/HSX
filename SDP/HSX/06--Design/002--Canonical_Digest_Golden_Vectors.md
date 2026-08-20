@@ -1,6 +1,6 @@
 # HSX-D-002 Appendix — Canonical Structured-Digest Golden Vectors
 
-- Status: REVIEW 005 REWORK CORRECTION / PENDING FRESH REVIEW 006
+- Status: ACCEPTED / FROZEN `HSX-D-002` TARGET APPENDIX
 - Parent contract: `HSX-D-002`
 - Evidence: `HSX-ST-008`, `HSX-RVW-001-001-005`
 - State: target; not implemented or frozen

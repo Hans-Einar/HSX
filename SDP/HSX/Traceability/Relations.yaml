@@ -166,6 +166,23 @@ relations:
     to:
       - DBG-D-005
       - DBG-D-006
+  - from: HSX-R-001..HSX-R-036
+    type: accepted_frozen_by_steering
+    to:
+      - issue-47-comment-5356480919
+  - from: HSX-A-001..HSX-A-005
+    type: accepted_frozen_by_steering
+    to:
+      - issue-47-comment-5356480919
+  - from: HSX-D-001..HSX-D-005
+    type: accepted_frozen_by_steering
+    to:
+      - issue-47-comment-5356480919
+  - from: HSX-D-001..HSX-D-005
+    type: accepted_dependency_for
+    to:
+      - DBG-D-002..DBG-D-006
+      - DBG-IT-001-004
 coordination:
   - from: HSX-ST-001
     type: coordinated_with

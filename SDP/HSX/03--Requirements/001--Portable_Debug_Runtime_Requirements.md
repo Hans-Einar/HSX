@@ -1,13 +1,13 @@
 # Portable Debug Runtime Requirements
 
-- Status: REVIEW 005 REWORK CORRECTED — PENDING FRESH REVIEW 006
+- Status: ACCEPTED / FROZEN PORTABLE TARGET BASELINE
 - Range: `HSX-R-001..HSX-R-036`
 - Studies: `HSX-ST-001..HSX-ST-008`
 - Debugger dependency: `DBG-ST-006`
-- State: target; not implemented
+- State: accepted target; semantic baseline `b57e368f77bb533b09397d633fc92565655e1668`; not implemented
 
-These stable IDs are permanent traceability handles. The requirements remain proposed until
-Steering accepts them in issues #47/#38. They authorize no product or AVR work.
+These stable IDs are permanent traceability handles. Steering froze them in issue #47 comment
+`5356480919`. This target baseline authorizes no runtime/native/AVR implementation by itself.
 
 ## Identity, generations, lifecycle, and authority
 

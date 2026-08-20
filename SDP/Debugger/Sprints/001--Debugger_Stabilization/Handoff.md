@@ -1,18 +1,20 @@
 # DBG-SPR-001 Handoff
 
-Status: `remote_publication_verified_awaiting_steering`
+Status: `iteration_004_contracts_frozen_worker_dispatch_ready`
 
 ## Current objective
 
-The final HSX/DBG-ST-006 chain is published on `origin/codex/dbg-st-006`; proposal content
-`b57e368f77bb533b09397d633fc92565655e1668` is GitHub-resolvable and remote head
-`89cb74a10ce36d8b0f4d0cc60332d3070c2c635f` passed fresh-checkout verification. Stop and
-await Steering in issues #47/#38. No structural product or AVR work may be dispatched.
+Execute the frozen RF-002/RF-003 foundation Slices with disjoint fresh workers, independent
+review/verification/sign-off, then execute the blocked integration Slice. Existing Executive
+behavior is consumed only through `hsx.python-debug-legacy/1`; no runtime/VM/frontend migration
+or RF-004..009 work is allowed.
 
 ## Authority
 
 - issue #38 comment `5348190806` — accepted architecture direction and authorized `DBG-ST-006`
 - issue #47 comment `5348192567` — activated `HSX-ST-001` and numbered HSX Studies
+- issue #47 comment `5356480919` — froze `HSX-R/A/D` portable target baseline
+- issue #38 comment `5356484309` — froze `DBG-D-001..010` and authorized first wave
 - `SDP/Debugger/Traceability/CurrentIndex.yaml`
 - `SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md`
 - `SDP/Debugger/04--Architecture/001--Modular_Debugger_Architecture.md`
@@ -122,13 +124,14 @@ await Steering in issues #47/#38. No structural product or AVR work may be dispa
 
 ## Not done
 
-- `DBG-D-001..DBG-D-010` remain proposed and have no implementation authority.
-- Steering acceptance/rework decision is not recorded.
+- `DBG-SL-001-004-001` and `DBG-SL-001-004-002` are not implemented/reviewed/signed.
+- `DBG-SL-001-004-003` remains blocked on both parent Slice sign-offs.
+- `DBG-RF-004..DBG-RF-009` remain blocked.
 
 ## Exact next step
 
-Wait for Steering. Reconstruct any next action from CurrentIndex and issues #47/#38 before
-design freeze, Slice planning or implementation authorization.
+Commit the frozen iteration/refactor/slice/interface contracts, then spawn fresh bounded
+RF-002/RF-003 workers only within disjoint file ownership.
 
 ## Traceability state
 
@@ -149,13 +152,15 @@ design freeze, Slice planning or implementation authorization.
   `89d95de2d944179219a93895f1ab956f2786a232`
 - Steering decision package: issue #38 comment `5346421143`
 - Architecture-direction acceptance: issue #38 comment `5348190806`
-- Proposed architecture: `DBG-A-001..DBG-A-008`
-- Proposed detailed design: `DBG-D-001..DBG-D-010`
-- Completed Debugger Study pending fresh review: `DBG-ST-006`
+- Accepted architecture: `DBG-A-001..DBG-A-008`
+- Frozen Debugger v1 design: `DBG-D-001..DBG-D-010`
+- Completed Debugger Study: `DBG-ST-006`
 - Completed HSX coordinator scope: `HSX-ST-001`, issue #47
 - Completed HSX Studies: `HSX-ST-002..HSX-ST-008`
-- Proposed contracts: `HSX-R-001..036`, `HSX-A-001..005`, `HSX-D-001..005`
-- Active iteration: `DBG-IT-001-003`
+- Frozen HSX target contracts: `HSX-R-001..036`, `HSX-A-001..005`, `HSX-D-001..005`
+- Active iteration: `DBG-IT-001-004`
+- Frozen Slices: `DBG-SL-001-004-001..003`
+- Frozen shared interface: `dbg.controller-gateway/1`
 - Review `HSX-RVW-001-001-001`: REWORK at `5fff403`
 - Review `HSX-RVW-001-001-002`: REWORK at `ffd0a42`
 - Review `HSX-RVW-001-001-003`: REWORK at `efd43d2`
@@ -171,26 +176,24 @@ design freeze, Slice planning or implementation authorization.
 - Publication blocker: #47 comment `5356183884`, #38 comment `5356186692`
 - Fresh remote verification: PASS at `89cb74a10ce36d8b0f4d0cc60332d3070c2c635f`
 - Resynthesized supplemental Studies: `HSX-ST-007`, `HSX-ST-008`
-- Active gate: `steering_decision_issues_47_38`
+- Active gate: RF-002/RF-003 Slice worker dispatch
 
 ## Agents and worktree
 
-The prior product/design chain, all bounded HSX Study workers, independent review
-`HSX-RVW-001-001-006`, verification `HSX-VER-001-001-001`, and Master exact-content sign-off
-are complete. The task is stopped at the Steering gate. The controlled branch is
-`codex/dbg-st-006`;
+The prior design/portable-contract chain is complete. Fresh RF-002/RF-003 workers are the next
+roles after this contract-freeze commit. Controlled work is on `codex/dbg-rf-002-003`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.
 
 ## Risks
 
-- `DBG-RF-004` and `DBG-RF-006` remain blocked on stable HSX cross-track contracts to be
-  produced from `HSX-ST-001`.
-- Structural debugger work remains blocked by `DBG-DA-001` and accepted `DBG-D-*` contracts.
-- `DBG-D-002..DBG-D-006`, RF-003..RF-006, and RF-002 target-identity/epoch/snapshot scopes are
-  additionally blocked by `DBG-ST-006` and its stable HSX inputs.
-- Steering also conservatively blocks all RF-002 work until the portable contract phase
-  returns to issue #38.
+- `DBG-RF-004..DBG-RF-009` remain explicitly blocked by the first-wave Steering boundary.
+- Any shared envelope/generation/health/recovery interface change stops both workers and
+  returns to Master/Steering rather than creating an implementation-only contract.
+- Existing Executive evidence remains legacy/degraded; this wave must not claim target-contract
+  runtime conformance or edit Executive/VM code.
+- Parallel RF-002/RF-003 work is safe only while owned files remain disjoint and RF-003 treats
+  `contracts.py` as read-only.
 - WSL2 was reachable, but only Python 3.6.15 without pytest was available; no suitable Linux
   project test environment existed. No Linux PASS is claimed, and the remaining
   cross-platform product-wrapper obligation stays assigned to `DBG-RF-009`.

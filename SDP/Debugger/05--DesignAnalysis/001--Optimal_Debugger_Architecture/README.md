@@ -1,13 +1,13 @@
 # DBG-DA-001 — Optimal Modular Debugger Architecture
 
-- Status: TARGET ARCHITECTURE DIRECTION ACCEPTED / DETAILED CONTRACTS PROPOSED
+- Status: DEBUGGER V1 ARCHITECTURE AND DESIGN BASELINE ACCEPTED
 - Started by Steering: issue #38 comment `5345600066`
 - Active iteration: `DBG-IT-001-002`
 - Evidence head for completed Studies: `a8eae871537cb70ea78502f7d34fbdbe68d837fa`
 - Final independent review: `DBG-RVW-001-002-003` — PASS at
   `89d95de2d944179219a93895f1ab956f2786a232`
 - Steering architecture acceptance: issue #38 comment `5348190806`
-- Implementation authority: none
+- Implementation authority: first-wave frozen Slices only
 
 ## Objective and decision boundary
 
@@ -15,10 +15,10 @@ Design the debugger from accepted `DBG-R-001..DBG-R-036`, without treating the l
 monoliths as required structure. The output is one recommended architecture, proposed
 architecture/design contracts, migration sequencing, and a reuse/adapt/replace matrix.
 
-`DBG-A-001..DBG-A-008` are accepted as target architecture direction. Detailed
-`DBG-D-001..DBG-D-010` remain proposed and have no implementation authority.
-`DBG-RF-002..DBG-RF-009` remain blocked until a later Steering decision freezes the required
-contracts and authorizes explicit Slices.
+`DBG-A-001..DBG-A-008` are accepted as target architecture direction. Steering froze
+`DBG-D-001..DBG-D-010` in issue #38 comment `5356484309`. Only frozen first-wave Slices under
+`DBG-RF-002`, `DBG-RF-003`, and their early integration are implementation-authorized;
+`DBG-RF-004..DBG-RF-009` remain blocked.
 
 ## Evidence synthesized
 
@@ -244,18 +244,17 @@ The current DAG remains the baseline until Steering accepts these changes:
 - RF-008 consumes the canonical packaged entrypoint and namespaced presentation contract.
 - RF-009 remains final convergence; all earlier Refactors still own their fast portable tests.
 
-No issue body or active dependency relation is changed by this proposal before Steering
-acceptance.
+Steering subsequently accepted/froze the proposal as recorded in issue #38 comment
+`5356484309`; current execution authority remains Slice-bounded.
 
-## Material open questions and first-class follow-up
+## Resolved first-class portable follow-up
 
 ### `DBG-ST-006` technical dependency
 
-`DBG-ST-006` records unresolved target/image/stream identity, address/ABI, stop token/snapshot,
-event cursor, exact step, lifecycle authority, resource provenance, and stable blocked-state
-contracts. The Debugger design defines ports but cannot invent HSX answers. Until the Study
-and its stable HSX inputs are complete, `DBG-D-002..DBG-D-006`, all product implementation in
-RF-003..RF-006, and RF-002 target-identity/epoch/snapshot slices remain blocked.
+`DBG-ST-006` resolved target/image/stream identity, address/ABI, stop token/snapshot, event
+cursor, exact step, lifecycle authority, resource provenance, and stable blocked-state target
+contracts through the frozen HSX baseline. The first wave consumes current Executive behavior
+only through `hsx.python-debug-legacy/1`; target-runtime implementation remains separate.
 
 ### Steering choices requested
 

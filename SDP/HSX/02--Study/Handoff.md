@@ -1,6 +1,6 @@
 # HSX Portable Debug Contract Handoff
 
-- Status: REMOTE PUBLICATION VERIFIED — AWAITING STEERING
+- Status: PORTABLE TARGET BASELINE ACCEPTED / FROZEN — GATE CLOSED
 - Coordinator: `HSX-ST-001`, issue #47
 - Debugger dependency: `DBG-ST-006`, issue #38
 - Iteration: `DBG-IT-001-003`
@@ -15,13 +15,14 @@
 - Remote branch: `origin/codex/dbg-st-006`
 - Fresh-checkout verified remote head: `89cb74a10ce36d8b0f4d0cc60332d3070c2c635f`
 - Remote-resolvable proposal content: `b57e368f77bb533b09397d633fc92565655e1668`
-- Active gate: `steering_decision_issues_47_38`
+- Steering acceptance: issue #47 comment `5356480919`
+- Active gate: `closed_handoff_to_debugger_first_structural_wave`
 
 ## Current objective
 
-The final reviewed/verified/sign-off chain is published and fresh-checkout verified.
-Stop and await Steering decisions in issues #47/#38. No proposal-content change, acceptance,
-design freeze or implementation dispatch is permitted before a later durable decision.
+The exact reviewed/verified portable target contracts are frozen. The Debugger may consume
+them in the Steering-authorized RF-002/RF-003 wave through the frozen typed boundary and
+`hsx.python-debug-legacy/1`. No HSX runtime/native/AVR implementation is authorized.
 
 ## Authority
 
@@ -32,8 +33,8 @@ design freeze or implementation dispatch is permitted before a later durable dec
 
 ## Exact next step
 
-Wait for Steering. If Steering accepts or requests rework, reconstruct the next gate from the
-issue comments and CurrentIndex before any design freeze or implementation authorization.
+Keep the portable baseline immutable. Any implementation needed to make Executive/VM conform
+requires a separate HSX Feature/Refactor and Steering authority.
 
 ## Remote publication verification
 

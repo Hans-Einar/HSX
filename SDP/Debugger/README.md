@@ -19,9 +19,9 @@ The current product baseline originated on `Implementation/vscode`. `DBG-RF-001`
 the production-path protocol baseline. Steering accepted the reviewed `DBG-A-001..DBG-A-008`
 target direction. Coordinated `DBG-ST-006` / `HSX-ST-001..008` portable-runtime contract
 work is reviewed and verified. `HSX-RVW-001-001-006` and `HSX-VER-001-001-001` passed exact
-proposal content `b57e368…`, and Master exact-content sign-off passed; the active gate is issue
-decision comments `5355340420` (#47) / `5355340598` (#38) and Steering wait. Every `DBG-D-*`
-remains proposed and no structural product implementation is authorized.
+proposal content `b57e368…`, and Master exact-content sign-off passed. Steering froze the
+portable HSX target baseline and `DBG-D-001..010`, then authorized only RF-002, RF-003 and one
+early integration Slice in #38 comment `5356484309`. RF-004..009 remain blocked.
 
 Read in this order:
 
@@ -36,7 +36,6 @@ Read in this order:
 9. for `DBG-DA-001`, Studies `DBG-ST-002..DBG-ST-005`, the proposed Architecture and Design
    documents, and `DBG-ST-006`
 
-`DBG-ST-006` remains the Debugger dependency umbrella. `DBG-RF-002..DBG-RF-009` remain
-blocked until Master verification and issue decision packages complete, portable HSX
-contracts are accepted, the relevant `DBG-D-*` contracts are frozen by Steering, and explicit
-implementation Slices are authorized.
+`DBG-ST-006` is complete. Active work is `DBG-IT-001-004` with the frozen
+`dbg.controller-gateway/1` interface and Slices `DBG-SL-001-004-001..003`. Existing Executive
+behavior remains `hsx.python-debug-legacy/1`; RF-004..009 remain blocked.
