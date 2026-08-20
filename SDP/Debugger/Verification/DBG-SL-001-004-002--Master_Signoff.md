@@ -1,6 +1,6 @@
 # DBG-SL-001-004-002 — Master Exact-Head Sign-Off
 
-- Status: **PASS / SLICE COMPLETE**
+- Status: **HISTORICAL PASS — SUPERSEDED BY CORRECTED v2 SIGN-OFF**
 - Decision date: 2026-08-20
 - Signed product head: `cf4d8a6665e9a6ebf35d425b227bc7a5c7bd3fa9`
 - Frozen interface: `dbg.controller-gateway/1.1` at `0cf52fcf69d11f254b957cfc52605a8be3114955`

@@ -143,7 +143,8 @@ issues:
     rf003_corrected_reviewed_head: 1e479536ce5e746e1b06a53b1039b1af84adaed6
     rf003_corrected_verification: DBG-VER-001-004-005
     rf003_corrected_verification_status: pass
-    portable_contract_current_gate: master_exact_head_RF003_slice_resignoff
+    rf003_corrected_signed_head: 1e479536ce5e746e1b06a53b1039b1af84adaed6
+    portable_contract_current_gate: dependent_integration_rereview_DBG-RVW-001-004-010
   DBG-RF-002:
     issue: 39
     status: corrected_slice_product_pass_dependency_rework_active
@@ -154,7 +155,7 @@ issues:
     steering_comment: 5356484309
   DBG-RF-003:
     issue: 40
-    status: corrected_slice_verified_pending_resignoff
+    status: corrected_slice_signed_integration_revalidation_pending
     iteration: DBG-IT-001-004
     slice: DBG-SL-001-004-002
     shared_interface: dbg.controller-gateway/1.1

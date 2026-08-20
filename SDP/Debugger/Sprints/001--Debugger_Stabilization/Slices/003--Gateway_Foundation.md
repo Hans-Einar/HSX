@@ -1,6 +1,6 @@
 # DBG-SL-001-004-002 — Typed Legacy Executive Gateway / Health Foundation
 
-- Status: **CORRECTED REVIEW + VERIFICATION PASS — RE-SIGN-OFF PENDING**
+- Status: **PASS / CORRECTED EXACT-HEAD SIGNED**
 - Parent: `DBG-RF-003`
 - Iteration: `DBG-IT-001-004`
 - Steering: issue #38 comment `5356484309`
@@ -14,6 +14,7 @@
 - Corrected reviewed/verified head: `1e479536ce5e746e1b06a53b1039b1af84adaed6`
 - Corrected review: `DBG-RVW-001-004-011` — PASS
 - Corrected verification: `DBG-VER-001-004-005` — PASS
+- Corrected signed head: `1e479536ce5e746e1b06a53b1039b1af84adaed6`
 - Implementation base: `97d8c5b8d62d56dcfcab59c97c516d83f68c7075`
 
 ## Bounded outcome
