@@ -1,6 +1,6 @@
 # DBG-RF-002 — Debugger Controller, State Machine, and Stop-Epoch Foundation
 
-- Status: **SLICE RE-REVIEW PASS — FORMAL VERIFICATION PENDING**
+- Status: **REWORK REQUIRED — PUBLIC TERMINAL COMMAND RESULT DELIVERY**
 - Steering authority: issue #38 comment `5356484309`
 - Iteration: `DBG-IT-001-004`
 - Owning Slice: `DBG-SL-001-004-001`
@@ -77,3 +77,7 @@ RF-002 foundation is complete when Slice 001 is exact-head signed, its public in
 identical to the frozen envelope document, and later integration Slice 003 passes without
 moving frontend or runtime ownership. This sign-off does not claim DAP/CLI adoption; that is
 owned by later authorized Refactors.
+
+Parent review `DBG-RVW-002-001-001` found that the actor drops terminal reducer results after
+returning initial `ACCEPTED`. Fresh bounded correction and `DBG-RVW-001-004-007` /
+`DBG-VER-001-004-004` / exact-head Slice re-sign-off are required before integration.

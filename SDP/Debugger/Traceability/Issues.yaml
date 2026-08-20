@@ -114,10 +114,14 @@ issues:
     rf003_slice_verification_status: pass
     rf002_slice_signed_head: 232e20a6ffe737d609171c311410fbb901b57ddf
     rf003_slice_signed_head: cf4d8a6665e9a6ebf35d425b227bc7a5c7bd3fa9
-    portable_contract_current_gate: independent_parent_refactor_reviews_DBG-RVW-002-001-001_and_DBG-RVW-003-001-001
+    rf002_parent_review: DBG-RVW-002-001-001
+    rf002_parent_review_status: rework
+    rf003_parent_review: DBG-RVW-003-001-001
+    rf003_parent_review_status: rework_gate_order_only
+    portable_contract_current_gate: fresh_RF002_terminal_result_rework_worker
   DBG-RF-002:
     issue: 39
-    status: slice_signed_parent_review_pending
+    status: parent_review_rework_required
     iteration: DBG-IT-001-004
     slice: DBG-SL-001-004-001
     shared_interface: dbg.controller-gateway/1.1
@@ -125,7 +129,7 @@ issues:
     steering_comment: 5356484309
   DBG-RF-003:
     issue: 40
-    status: slice_signed_parent_review_pending
+    status: slice_signed_integration_pending_parent_final_deferred
     iteration: DBG-IT-001-004
     slice: DBG-SL-001-004-002
     shared_interface: dbg.controller-gateway/1.1

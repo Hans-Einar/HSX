@@ -1,11 +1,12 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf002_rf003_slices_signed_parent_refactor_reviews_pending`
+Status: `rf002_terminal_result_rework_active_integration_blocked`
 
 ## Current objective
 
-Perform separate fresh parent Refactor reviews and formal verifications for RF-002 and RF-003.
-Integration remains blocked until both parent Refactors are exact-head signed.
+Correct RF-002 public terminal `CommandResult` delivery with a fresh bounded worker, then obtain
+fresh Slice review, verification and exact-head re-sign-off. RF-003 remains signed and unchanged;
+integration is blocked only on corrected RF-002 Slice sign-off.
 
 ## Authority
 
@@ -124,7 +125,7 @@ Integration remains blocked until both parent Refactors are exact-head signed.
   the frozen `dbg.controller-gateway/1.1` interface or protected Executive/frontend/runtime
   paths. Exact rework heads are `232e20a6…` and `cf4d8a6…`.
 - Fresh independent `DBG-RVW-001-004-005` and `DBG-RVW-001-004-006` returned PASS with no
-  Blocking/High/Medium findings. Their formal Slice verifications remain the active gate.
+  Blocking/High/Medium findings. Their formal Slice verifications subsequently passed.
 - Fresh formal `DBG-VER-001-004-001` and `DBG-VER-001-004-002` returned PASS at the exact
   reviewed product heads with no product finding and no protected-path change.
 - Master signed both foundation Slices at their exact verified product heads; the parent
@@ -132,15 +133,16 @@ Integration remains blocked until both parent Refactors are exact-head signed.
 
 ## Not done
 
-- `DBG-SL-001-004-001` and `DBG-SL-001-004-002` are exact-head signed; parent Refactor gates
-  are not yet complete.
+- RF-002 parent review found one product High and invalidated integration authority from the
+  prior RF-002 Slice sign-off. RF-003 has no product finding and remains signed.
 - `DBG-SL-001-004-003` remains blocked on both parent Slice sign-offs.
 - `DBG-RF-004..DBG-RF-009` remain blocked.
 
 ## Exact next step
 
-Run fresh `DBG-RVW-002-001-001` and `DBG-RVW-003-001-001`, then separate parent formal
-verification and exact-head sign-off before unblocking integration Slice 003.
+Assign a fresh bounded RF-002 worker to preserve the initial ACCEPTED observation internally
+while resolving the public command Future exactly once on correlated terminal reducer result;
+then run `DBG-RVW-001-004-007`, `DBG-VER-001-004-004`, and Slice re-sign-off.
 
 ## Traceability state
 
@@ -191,14 +193,15 @@ verification and exact-head sign-off before unblocking integration Slice 003.
   `DBG-RVW-001-004-006` PASS at `cf4d8a6…`
 - Slice verifications: `DBG-VER-001-004-001/002` PASS
 - Slice sign-offs: PASS at `232e20a6…` and `cf4d8a6…`
-- Active gate: independent parent Refactor reviews; integration remains blocked
+- Parent review attempts `DBG-RVW-002-001-001` / `DBG-RVW-003-001-001`: REWORK
+- Active gate: fresh RF-002 terminal-result rework; integration remains blocked
 
 ## Agents and worktree
 
 The prior design/portable-contract chain is complete. Steering authorized the v1.1 refreeze,
 and its exact implementation passed fresh review. Foundation rework and fresh re-reviews are
-complete; formal verification and exact-head Slice sign-offs passed. Fresh parent Refactor
-reviewers are the active roles. Controlled work is on
+complete; RF-003 remains exact-head signed. RF-002 requires bounded product rework and a fresh
+Slice chain before integration. Controlled work is on
 `codex/dbg-rf-002-003`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.

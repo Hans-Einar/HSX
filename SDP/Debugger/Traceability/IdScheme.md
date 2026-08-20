@@ -40,6 +40,12 @@ track IDs rather than silently renamed in historical documents.
 - `DBG-RVW-001-004-004` — fresh independent `dbg.controller-gateway/1.1` refreeze review
 - `DBG-RVW-001-004-005` — RF-002 fresh exact-head re-review after Slice findings
 - `DBG-RVW-001-004-006` — RF-003 fresh exact-head re-review after Slice findings
+- `DBG-RVW-001-004-007` — RF-002 fresh exact-head review after parent terminal-result finding
 - `DBG-VER-001-004-001..DBG-VER-001-004-003` — formal Slice verifications
-- `DBG-RVW-002-001-001` / `DBG-VER-002-001-001` — RF-002 parent final review/verification
-- `DBG-RVW-003-001-001` / `DBG-VER-003-001-001` — RF-003 parent final review/verification
+- `DBG-VER-001-004-004` — RF-002 fresh formal Slice verification after parent finding
+- `DBG-RVW-002-001-001` — RF-002 premature parent review, REWORK
+- `DBG-RVW-002-001-002` / `DBG-VER-002-001-001` — RF-002 final parent review/verification
+  after integration
+- `DBG-RVW-003-001-001` — RF-003 premature parent review, REWORK on gate order
+- `DBG-RVW-003-001-002` / `DBG-VER-003-001-001` — RF-003 final parent review/verification
+  after integration

@@ -1,7 +1,7 @@
 schema_version: 1
 track: Debugger
 namespace: DBG
-status: debugger_foundation_slices_signed_parent_refactor_gates_pending
+status: debugger_rf002_terminal_result_rework_active
 baseline:
   repository: Hans-Einar/HSX
   implementation_branch: Implementation/vscode
@@ -197,7 +197,7 @@ proposed:
     path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
     status: complete_accepted_dependency
 first_structural_wave:
-  status: foundation_slices_signed_parent_refactor_gates_pending
+  status: rf002_parent_review_rework_required
   steering_comment: 5356484309
   activation_comment: 5356712010
   activation_correction_comment: 5356745504
@@ -223,20 +223,24 @@ first_structural_wave:
   refactors:
     - id: DBG-RF-002
       path: SDP/Debugger/Refactor/002--Debugger_Controller_State_Epoch/README.md
-      status: slice_signed_parent_review_pending
+      status: parent_review_rework_required
       slice: DBG-SL-001-004-001
-      final_review: DBG-RVW-002-001-001
+      prior_parent_review: DBG-RVW-002-001-001
+      prior_parent_review_status: rework
+      final_review: DBG-RVW-002-001-002
       final_verification: DBG-VER-002-001-001
     - id: DBG-RF-003
       path: SDP/Debugger/Refactor/003--Executive_Gateway_Health_Recovery/README.md
-      status: slice_signed_parent_review_pending
+      status: slice_signed_integration_pending_parent_final_deferred
       slice: DBG-SL-001-004-002
-      final_review: DBG-RVW-003-001-001
+      prior_parent_review: DBG-RVW-003-001-001
+      prior_parent_review_status: rework_gate_order_only
+      final_review: DBG-RVW-003-001-002
       final_verification: DBG-VER-003-001-001
   slices:
     - id: DBG-SL-001-004-001
       path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/002--Controller_Foundation.md
-      status: complete_exact_head_signed
+      status: rework_required_terminal_result_delivery
       implementation_base: 97d8c5b8d62d56dcfcab59c97c516d83f68c7075
       resume_base: 0cf52fcf69d11f254b957cfc52605a8be3114955
       review: DBG-RVW-001-004-001
@@ -248,9 +252,13 @@ first_structural_wave:
       implementation_head: a0e986c46d741ee46ba7f21615811723630414d0
       review_status: pass
       review_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/006--Controller_Foundation_Review.md
-      next_review: DBG-RVW-001-004-005
+      prior_rereview: DBG-RVW-001-004-005
       rereviewed_head: 232e20a6ffe737d609171c311410fbb901b57ddf
       rereview_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/008--Controller_Foundation_Rereview.md
+      parent_review: DBG-RVW-002-001-001
+      parent_review_status: rework
+      next_review: DBG-RVW-001-004-007
+      next_verification: DBG-VER-001-004-004
     - id: DBG-SL-001-004-002
       path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/003--Gateway_Foundation.md
       status: complete_exact_head_signed
@@ -265,19 +273,19 @@ first_structural_wave:
       implementation_head: 1f492d8f5b4f4bf5abe237dd4cb87259f809f6d0
       review_status: pass
       review_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/007--Gateway_Foundation_Review.md
-      next_review: DBG-RVW-001-004-006
+      prior_rereview: DBG-RVW-001-004-006
       rereviewed_head: cf4d8a6665e9a6ebf35d425b227bc7a5c7bd3fa9
       rereview_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/009--Gateway_Foundation_Rereview.md
     - id: DBG-SL-001-004-003
       path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/004--Controller_Gateway_Integration.md
-      status: blocked_pending_parent_review_verification_and_signoff
+      status: blocked_pending_corrected_RF002_slice_resignoff
       contract_base: 97d8c5b8d62d56dcfcab59c97c516d83f68c7075
       review: DBG-RVW-001-004-003
       verification: DBG-VER-001-004-003
   runtime_profile: hsx.python-debug-legacy/1
   still_blocked: DBG-RF-004..DBG-RF-009
   partial_product_wip_stash: efc91f2640647402bc92c69bde1c57685cfaa1f1
-  current_gate: independent_parent_refactor_reviews_DBG-RVW-002-001-001_and_DBG-RVW-003-001-001
+  current_gate: fresh_RF002_terminal_result_rework_worker
 structural_gate:
   rule: Only Steering-authorized Refactors with frozen Slice/interface contracts may execute.
   authorized_refactors:

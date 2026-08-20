@@ -1,6 +1,6 @@
 # DBG-SL-001-004-003 — Early Controller/Gateway Integration
 
-- Status: **BLOCKED — v1.1 REVIEW AND BOTH PARENT SIGN-OFFS REQUIRED**
+- Status: **BLOCKED — CORRECTED RF-002 SLICE RE-SIGN-OFF REQUIRED**
 - Parents: `DBG-RF-002`, `DBG-RF-003`
 - Iteration: `DBG-IT-001-004`
 - Steering: issue #38 comment `5356484309`
@@ -35,7 +35,7 @@ interfaces; it does not migrate DAP/CLI production ownership.
 - `python/hsx_debugger/runtime.py`
 - `python/tests/test_hsx_debugger_controller_gateway.py`
 
-The Slice may import signed RF-002/RF-003 modules but may not edit them. No existing
+The Slice may import exact-head signed RF-002/RF-003 modules but may not edit them. No existing
 Executive/backend/DAP/CLI/VS Code/runtime/AVR file may change.
 
 ## Required evidence
@@ -51,3 +51,5 @@ Executive/backend/DAP/CLI/VS Code/runtime/AVR file may change.
 
 The integration head proves the frozen public interface without design deviation, records any
 explicit residual/degraded behavior, and is ready for the issue #38 first-wave decision package.
+Both parent final Refactor reviews/verification/sign-offs follow this integration sign-off;
+they are not prerequisites for starting it.

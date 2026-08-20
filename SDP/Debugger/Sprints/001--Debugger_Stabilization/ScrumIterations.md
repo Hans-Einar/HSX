@@ -399,7 +399,7 @@ publication passed. Steering froze the HSX portable target contracts in #47 comm
 
 ## DBG-IT-001-004 — Controller/Gateway First Structural Wave
 
-Status: FOUNDATION SLICE RE-REVIEWS PASS / FORMAL VERIFICATION ACTIVE
+Status: RF-002 TERMINAL-RESULT REWORK ACTIVE / INTEGRATION BLOCKED
 
 ### Authority and scope
 
@@ -436,11 +436,11 @@ interface review and both foundation Slice re-reviews passed before formal verif
 1. Fresh bounded RF-002/RF-003 workers may overlap after the contracts module exists; file
    ownership remains disjoint and workers commit only owned files.
 2. `DBG-RVW-001-004-001` / `...002` independently review exact Slice heads.
-3. `DBG-VER-001-004-001` / `...002` formally verify each Slice; Master exact-head signs each
-   Slice and reconciles each parent Refactor.
+3. Formal verification and Master exact-head sign-off close each foundation Slice.
 4. Fresh integration worker implements only Slice 003 on the signed combined foundation.
 5. `DBG-RVW-001-004-003`, `DBG-VER-001-004-003` and Master sign-off close integration.
-6. Master posts a concise result package to issue #38 and stops before RF-004..009.
+6. Fresh parent final reviewers/verifiers reconcile RF-002/RF-003 after integration PASS.
+7. Master posts a concise result package to issue #38 and stops before RF-004..009.
 
 ### Exit signal
 

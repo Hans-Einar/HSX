@@ -1,6 +1,6 @@
 # DBG-RF-003 — Typed Executive Gateway, Health, and Recovery Foundation
 
-- Status: **SLICE RE-REVIEW PASS — FORMAL VERIFICATION PENDING**
+- Status: **SLICE SIGNED — INTEGRATION ELIGIBLE AFTER RF-002 RE-SIGN-OFF**
 - Steering authority: issue #38 comment `5356484309`
 - Iteration: `DBG-IT-001-004`
 - Owning Slice: `DBG-SL-001-004-002`
@@ -75,3 +75,7 @@ It may read/import `python/hsx_debugger/contracts.py` but may not edit RF-002 fi
 RF-003 foundation is complete when Slice 002 is exact-head signed, the shared envelope module
 is consumed without duplicate DTOs, the current Executive is truthfully degraded, and
 integration Slice 003 passes without Executive/runtime or frontend mutation.
+
+Parent review `DBG-RVW-003-001-001` found no product defect but correctly rejected the
+circular gate that attempted parent final sign-off before integration. Fresh parent final
+review/verification/sign-off follows the separately signed integration Slice.

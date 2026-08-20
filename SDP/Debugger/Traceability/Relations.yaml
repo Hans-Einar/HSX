@@ -160,6 +160,11 @@ relations:
     type: implemented_by
     to:
       - DBG-SL-001-004-001
+  - from: DBG-RF-002
+    type: reviewed_by
+    to:
+      - DBG-RVW-002-001-001
+    status: rework
   - from: DBG-SL-001-004-001
     type: reviewed_by
     to:
@@ -179,6 +184,11 @@ relations:
     type: implemented_by
     to:
       - DBG-SL-001-004-002
+  - from: DBG-RF-003
+    type: reviewed_by
+    to:
+      - DBG-RVW-003-001-001
+    status: rework_gate_order_only
   - from: DBG-SL-001-004-002
     type: reviewed_by
     to:

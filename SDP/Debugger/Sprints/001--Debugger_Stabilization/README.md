@@ -1,6 +1,6 @@
 # DBG-SPR-001 — Debugger Stabilization
 
-- Status: ITERATION 004 INTERFACE v1.1 REFREEZE REVIEW ACTIVE
+- Status: ITERATION 004 RF-002 TERMINAL-RESULT REWORK ACTIVE
 - Owning track: Debugger
 - Owning GapAnalysis: `DBG-GAP-001`
 
@@ -54,7 +54,7 @@ Steering accepted `DBG-A-001..DBG-A-008` as target architecture direction in com
 - Authorized Refactors: `DBG-RF-002`, `DBG-RF-003`
 - Frozen Slices: `DBG-SL-001-004-001`, `DBG-SL-001-004-002`,
   `DBG-SL-001-004-003`
-- Frozen shared interface: `dbg.controller-gateway/1`
+- Frozen shared interface: `dbg.controller-gateway/1.1`
 - Existing Executive profile: `hsx.python-debug-legacy/1`
 - Still blocked: `DBG-RF-004..DBG-RF-009`
 
