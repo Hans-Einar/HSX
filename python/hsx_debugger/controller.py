@@ -340,20 +340,25 @@ class ControllerActor:
     def subscribe(self, callback: Callable[[ControllerEvent], None]) -> ControllerSubscription:
         if not callable(callback):
             raise TypeError("callback must be callable")
-        with self._subscribers_lock:
-            if self._closed:
+        # Admission and the close boundary share the lifecycle lock.  Lock order is always
+        # lifecycle -> subscribers here; the actor releases subscribers before publishing
+        # final lifecycle state, so an accepted registration is necessarily visible to the
+        # close snapshot and a post-boundary registration is necessarily rejected.
+        with self._lifecycle_lock:
+            if self._close_future is not None or self._closed:
                 raise RuntimeError("controller is closed")
-            if len(self._subscribers) >= self._subscriber_limit:
-                raise ControllerInboxFullError("controller subscriber limit reached")
-            subscription = ControllerSubscription(
-                callback,
-                capacity=self._subscriber_capacity,
-                close_timeout=self._close_timeout,
-                name=f"hsx-debugger-subscriber-{uuid.uuid4().hex[:8]}",
-                on_close=self._remove_subscription,
-            )
-            self._subscribers.append(subscription)
-            return subscription
+            with self._subscribers_lock:
+                if len(self._subscribers) >= self._subscriber_limit:
+                    raise ControllerInboxFullError("controller subscriber limit reached")
+                subscription = ControllerSubscription(
+                    callback,
+                    capacity=self._subscriber_capacity,
+                    close_timeout=self._close_timeout,
+                    name=f"hsx-debugger-subscriber-{uuid.uuid4().hex[:8]}",
+                    on_close=self._remove_subscription,
+                )
+                self._subscribers.append(subscription)
+                return subscription
 
     def close(self) -> Future[CommandResult]:
         with self._lifecycle_lock:
@@ -433,7 +438,13 @@ class ControllerActor:
             if isinstance(message, _CommandMessage):
                 try:
                     operation_id = self._new_id("operation")
-                    reduction = reduce_command(self._model, message.command, operation_id)
+                    deadline_id = self._new_id("deadline")
+                    reduction = reduce_command(
+                        self._model,
+                        message.command,
+                        operation_id,
+                        deadline_id,
+                    )
                     self._apply(reduction)
                     if reduction.results and not message.future.done():
                         message.future.set_result(reduction.results[0])

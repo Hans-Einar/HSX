@@ -32,6 +32,7 @@ class PendingOperation:
 
     command: ControllerCommand
     effect: GatewayEffect
+    deadline_id: str
     prior_target_state: TargetRunState
     reservation: GenerationReservation | None = None
 
@@ -42,6 +43,8 @@ class PendingOperation:
             raise TypeError("effect must be GatewayEffect")
         if self.effect.command_id != self.command.command_id:
             raise ValueError("effect command_id must match the accepted command")
+        if not isinstance(self.deadline_id, str) or not self.deadline_id.strip():
+            raise ValueError("deadline_id must be a non-empty string")
         if not isinstance(self.prior_target_state, TargetRunState):
             raise TypeError("prior_target_state must be TargetRunState")
         if self.reservation is not None:
@@ -86,6 +89,7 @@ class ControllerModel:
     epoch_store: StopEpochStore = field(default_factory=StopEpochStore)
     pending_operations: Mapping[str, PendingOperation] = field(default_factory=dict)
     retired_operation_ids: frozenset[str] = field(default_factory=frozenset)
+    retired_deadline_ids: frozenset[str] = field(default_factory=frozenset)
     active_stream_id: str | None = None
     last_event_sequence: int | None = None
     closed: bool = False
@@ -145,11 +149,21 @@ class ControllerModel:
         ):
             raise ValueError("retired operation IDs must be non-empty strings")
         pending = dict(self.pending_operations)
+        retired_deadlines = frozenset(self.retired_deadline_ids)
+        if any(
+            not isinstance(deadline_id, str) or not deadline_id.strip()
+            for deadline_id in retired_deadlines
+        ):
+            raise ValueError("retired deadline IDs must be non-empty strings")
+        active_deadlines: set[str] = set()
         for operation_id, operation in pending.items():
             if not isinstance(operation, PendingOperation):
                 raise TypeError("pending operation values must be PendingOperation")
             if operation_id != operation.operation_id:
                 raise ValueError("pending operation key must match operation_id")
+            if operation.deadline_id in active_deadlines:
+                raise ValueError("pending deadline IDs must be unique")
+            active_deadlines.add(operation.deadline_id)
             reservation = operation.reservation
             if reservation is None:
                 if operation.generation != self.generation:
@@ -171,10 +185,13 @@ class ControllerModel:
                 raise ValueError("allocation watermark cannot trail a pending reservation")
         if retired.intersection(pending):
             raise ValueError("an operation cannot be both pending and retired")
+        if retired_deadlines.intersection(active_deadlines):
+            raise ValueError("a deadline cannot be both pending and retired")
         if self.closed and pending:
             raise ValueError("closed controller cannot retain pending operations")
         object.__setattr__(self, "pending_operations", MappingProxyType(pending))
         object.__setattr__(self, "retired_operation_ids", retired)
+        object.__setattr__(self, "retired_deadline_ids", retired_deadlines)
 
     def snapshot(self) -> ControllerSnapshot:
         return ControllerSnapshot(

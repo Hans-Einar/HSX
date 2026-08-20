@@ -159,7 +159,10 @@ def _reject_command(
 
 
 def reduce_command(
-    model: ControllerModel, command: ControllerCommand, operation_id: str
+    model: ControllerModel,
+    command: ControllerCommand,
+    operation_id: str,
+    deadline_id: str,
 ) -> Reduction:
     """Accept/reject a frontend command and reserve generation before effect dispatch."""
 
@@ -169,6 +172,8 @@ def reduce_command(
         raise TypeError("command must be ControllerCommand")
     if not isinstance(operation_id, str) or not operation_id.strip():
         raise ValueError("operation_id must be a non-empty string")
+    if not isinstance(deadline_id, str) or not deadline_id.strip():
+        raise ValueError("deadline_id must be a non-empty string")
 
     existing = model.pending_operations.get(operation_id)
     if existing is not None:
@@ -196,21 +201,44 @@ def reduce_command(
             )
             assert watermarks is model.generation_watermarks
             assert reservation is existing.reservation
+        if deadline_id in model.retired_deadline_ids:
+            raise ValueError("deadline_id has already been retired")
+        if any(
+            operation.deadline_id == deadline_id
+            for pending_id, operation in model.pending_operations.items()
+            if pending_id != operation_id
+        ):
+            raise ValueError("deadline_id is already bound to another operation")
+        next_model = model
+        if deadline_id != existing.deadline_id:
+            pending = dict(model.pending_operations)
+            pending[operation_id] = replace(existing, deadline_id=deadline_id)
+            next_model = _with_revision(
+                model,
+                pending_operations=pending,
+                retired_deadline_ids=(
+                    model.retired_deadline_ids | {existing.deadline_id}
+                ),
+            )
         return Reduction(
-            model,
+            next_model,
             effects=(existing.effect,),
             events=(
                 _event(
-                    model,
+                    next_model,
                     "operation_retried",
-                    {"operation_id": operation_id, "command_id": command.command_id},
+                    {
+                        "operation_id": operation_id,
+                        "command_id": command.command_id,
+                        "deadline_id": deadline_id,
+                    },
                 ),
             ),
             results=(
                 _result(
                     command.command_id,
                     CommandStatus.ACCEPTED,
-                    model.revision,
+                    next_model.revision,
                     operation_id=operation_id,
                 ),
             ),
@@ -223,6 +251,11 @@ def reduce_command(
             "StaleOperation",
             "operation ID has already been retired",
         )
+    if deadline_id in model.retired_deadline_ids or any(
+        operation.deadline_id == deadline_id
+        for operation in model.pending_operations.values()
+    ):
+        raise ValueError("deadline_id has already been allocated")
 
     if model.closed:
         return _reject_command(
@@ -244,6 +277,16 @@ def reduce_command(
             command,
             "DuplicateCommand",
             "command ID is already pending under another operation",
+        )
+    if command.kind == "reconcile" and any(
+        operation.command_kind == "reconcile"
+        for operation in model.pending_operations.values()
+    ):
+        return _reject_command(
+            model,
+            command,
+            "RecoveryInProgress",
+            "one reconciliation barrier is already pending",
         )
 
     target_state, invalid = _accepted_target_state(model, command)
@@ -271,6 +314,7 @@ def reduce_command(
     operation = PendingOperation(
         command=command,
         effect=effect,
+        deadline_id=deadline_id,
         prior_target_state=model.target_state,
         reservation=reservation,
     )
@@ -299,6 +343,7 @@ def reduce_command(
     event_payload: dict[str, Any] = {
         "command_id": command.command_id,
         "operation_id": operation_id,
+        "deadline_id": deadline_id,
         "command_kind": command.kind,
     }
     if reservation is not None:
@@ -394,6 +439,9 @@ def _promote_reserved(
                 retired_operation_ids=(
                     model.retired_operation_ids | {operation.operation_id}
                 ),
+                retired_deadline_ids=(
+                    model.retired_deadline_ids | {operation.deadline_id}
+                ),
             )
             failed = _result(
                 operation.command_id,
@@ -480,6 +528,10 @@ def _promote_reserved(
         retired_operation_ids=(
             model.retired_operation_ids | frozenset(model.pending_operations)
         ),
+        retired_deadline_ids=(
+            model.retired_deadline_ids
+            | {pending.deadline_id for pending in model.pending_operations.values()}
+        ),
         active_stream_id=active_stream_id,
         last_event_sequence=None,
     )
@@ -561,6 +613,7 @@ def _reduce_reserved_completion(
         model,
         pending_operations=pending,
         retired_operation_ids=model.retired_operation_ids | {operation.operation_id},
+        retired_deadline_ids=model.retired_deadline_ids | {operation.deadline_id},
     )
     payload: dict[str, Any] = {
         "operation_id": completion.operation_id,
@@ -616,10 +669,20 @@ def _reduce_completion(model: ControllerModel, completion: GatewayCompletion) ->
         target_state = TargetRunState.UNKNOWN
         recovery = RecoveryStatus.REQUIRED
         epoch_store = epoch_store.invalidate()
+    elif completion.status is not CompletionStatus.OK and operation.command_kind == "reconcile":
+        target_state = (
+            model.target_state
+            if model.target_state
+            in {TargetRunState.NONE, TargetRunState.TERMINATED, TargetRunState.LOST}
+            else TargetRunState.UNKNOWN
+        )
+        recovery = RecoveryStatus.REQUIRED
+        epoch_store = epoch_store.invalidate()
     next_model = _with_revision(
         model,
         pending_operations=pending,
         retired_operation_ids=model.retired_operation_ids | {operation.operation_id},
+        retired_deadline_ids=model.retired_deadline_ids | {operation.deadline_id},
         target_state=target_state,
         recovery_status=recovery,
         epoch_store=epoch_store,
@@ -689,10 +752,6 @@ def _event_gap(
     event: GatewayEvent,
     gap: EventGap,
 ) -> Reduction:
-    observed = event.sequence or gap.observed_sequence
-    last_sequence = model.last_event_sequence
-    if observed > 0 and (last_sequence is None or observed > last_sequence):
-        last_sequence = observed
     next_model = _with_revision(
         model,
         event_health=EventHealth.GAP,
@@ -707,7 +766,10 @@ def _event_gap(
             else TargetRunState.UNKNOWN
         ),
         epoch_store=model.epoch_store.invalidate(),
-        last_event_sequence=last_sequence,
+        # The observed event was not applied.  Keep the resumable cursor at the last event
+        # whose state mutation was authoritative; reconciliation may later establish a new
+        # baseline, but merely observing a later sequence can never advance application.
+        last_event_sequence=model.last_event_sequence,
     )
     return Reduction(
         next_model,
@@ -749,6 +811,20 @@ def _reduce_event(
             model,
             "stale_gateway_event",
             {"stream_id": event.stream_id, "sequence": event.sequence},
+        )
+    if model.event_health in {EventHealth.GAP, EventHealth.LOST} or model.recovery_status not in {
+        RecoveryStatus.IDLE,
+        RecoveryStatus.RETAINED,
+    }:
+        return _stale(
+            model,
+            "event_awaiting_reconcile",
+            {
+                "stream_id": event.stream_id,
+                "sequence": event.sequence,
+                "event_health": model.event_health.value,
+                "recovery_status": model.recovery_status.value,
+            },
         )
     if event.sequence is not None and model.last_event_sequence is not None:
         if event.sequence <= model.last_event_sequence:
@@ -849,6 +925,10 @@ def _reduce_event(
         retired_operation_ids=(
             model.retired_operation_ids
             | {operation.operation_id for operation in completed}
+        ),
+        retired_deadline_ids=(
+            model.retired_deadline_ids
+            | {operation.deadline_id for operation in completed}
         ),
         last_event_sequence=last_sequence,
     )
@@ -952,6 +1032,19 @@ def _reduce_reconcile(
     if result.generation != model.generation:
         return _stale(model, "stale_reconcile_result", {"status": result.status.value})
 
+    reconciled_operations = tuple(
+        operation
+        for operation in model.pending_operations.values()
+        if operation.command_kind == "reconcile"
+    )
+    if len(reconciled_operations) != 1:
+        return _stale(
+            model,
+            "uncorrelated_reconcile_result",
+            {"status": result.status.value},
+        )
+    operation = reconciled_operations[0]
+
     epoch_store = model.epoch_store
     target_state = model.target_state
     recovery_map = {
@@ -994,11 +1087,6 @@ def _reduce_reconcile(
             else TargetRunState.UNKNOWN
         )
 
-    reconciled_operations = tuple(
-        operation
-        for operation in model.pending_operations.values()
-        if operation.command_kind == "reconcile"
-    )
     pending = {
         operation_id: operation
         for operation_id, operation in model.pending_operations.items()
@@ -1012,18 +1100,59 @@ def _reduce_reconcile(
         pending_operations=pending,
         retired_operation_ids=(
             model.retired_operation_ids
-            | {operation.operation_id for operation in reconciled_operations}
+            | {operation.operation_id}
+        ),
+        retired_deadline_ids=model.retired_deadline_ids | {operation.deadline_id},
+        event_health=(
+            EventHealth.HEALTHY
+            if recovery is RecoveryStatus.RETAINED
+            and model.event_health in {EventHealth.GAP, EventHealth.LOST}
+            else model.event_health
         ),
     )
+    if recovery is RecoveryStatus.RETAINED:
+        command_result = _result(
+            operation.command_id,
+            CommandStatus.COMPLETED,
+            next_model.revision,
+            operation_id=operation.operation_id,
+        )
+    else:
+        errors = {
+            ReconcileStatus.RETAINED: "RecoveryFailed",
+            ReconcileStatus.TARGET_LOST: "TargetLost",
+            ReconcileStatus.OWNERSHIP_LOST: "OwnershipLost",
+            ReconcileStatus.INCOMPATIBLE: "CapabilityUnavailable",
+            ReconcileStatus.EXHAUSTED: "RecoveryFailed",
+            ReconcileStatus.LEGACY_UNPROVEN: "RecoveryFailed",
+        }
+        command_result = _result(
+            operation.command_id,
+            CommandStatus.FAILED,
+            next_model.revision,
+            operation_id=operation.operation_id,
+            error=errors[result.status],
+            diagnostic=(
+                result.diagnostics[0]
+                if result.diagnostics
+                else f"reconciliation ended with {result.status.value}"
+            ),
+        )
     return Reduction(
         next_model,
         events=(
             _event(
                 next_model,
                 "reconciled",
-                {"status": result.status.value, "target_state": target_state.value},
+                {
+                    "status": result.status.value,
+                    "target_state": target_state.value,
+                    "command_id": operation.command_id,
+                    "operation_id": operation.operation_id,
+                },
             ),
         ),
+        results=(command_result,),
     )
 
 
@@ -1059,7 +1188,10 @@ def reduce_deadline(model: ControllerModel, expired: DeadlineExpired) -> Reducti
             "unknown_deadline",
             {"deadline_id": expired.deadline_id, "operation_id": expired.operation_id},
         )
-    if expired.generation != operation.generation:
+    if (
+        expired.generation != operation.generation
+        or expired.deadline_id != operation.deadline_id
+    ):
         return _stale(
             model,
             "stale_deadline",
@@ -1075,10 +1207,20 @@ def reduce_deadline(model: ControllerModel, expired: DeadlineExpired) -> Reducti
         target_state = TargetRunState.UNKNOWN
         recovery_status = RecoveryStatus.REQUIRED
         epoch_store = epoch_store.invalidate()
+    elif operation.command_kind == "reconcile":
+        target_state = (
+            model.target_state
+            if model.target_state
+            in {TargetRunState.NONE, TargetRunState.TERMINATED, TargetRunState.LOST}
+            else TargetRunState.UNKNOWN
+        )
+        recovery_status = RecoveryStatus.REQUIRED
+        epoch_store = epoch_store.invalidate()
     next_model = _with_revision(
         model,
         pending_operations=pending,
         retired_operation_ids=model.retired_operation_ids | {operation.operation_id},
+        retired_deadline_ids=model.retired_deadline_ids | {operation.deadline_id},
         target_state=target_state,
         recovery_status=recovery_status,
         epoch_store=epoch_store,
@@ -1143,6 +1285,10 @@ def close_model(model: ControllerModel) -> Reduction:
         pending_operations={},
         retired_operation_ids=(
             model.retired_operation_ids | frozenset(model.pending_operations)
+        ),
+        retired_deadline_ids=(
+            model.retired_deadline_ids
+            | {operation.deadline_id for operation in model.pending_operations.values()}
         ),
         closed=True,
     )

@@ -112,7 +112,10 @@ def test_open_reserves_before_dispatch_and_ack_only_keeps_old_continuity_pending
     active = generation()
     model = initial_legacy_model(active)
     accepted = reduce_command(
-        model, ControllerCommand("connect-1", "open_session"), "open-op"
+        model,
+        ControllerCommand("connect-1", "open_session"),
+        "open-op",
+        "deadline-open",
     )
     operation = accepted.model.pending_operations["open-op"]
     effect = accepted.effects[0]
@@ -136,7 +139,10 @@ def test_authoritative_open_promotes_exact_reservation_and_invalidates_old_epoch
         initial_legacy_model(active), event(active, "stopped"), epoch_id="epoch-old"
     ).model
     accepted = reduce_command(
-        stopped, ControllerCommand("connect-1", "open_session"), "open-op"
+        stopped,
+        ControllerCommand("connect-1", "open_session"),
+        "open-op",
+        "deadline-open",
     )
     effect = accepted.effects[0]
     promoted = reduce_notice(
@@ -172,7 +178,10 @@ def test_authoritative_open_promotes_exact_reservation_and_invalidates_old_epoch
 def test_failed_open_burns_then_new_operation_advances_without_promoting() -> None:
     active = generation()
     first = reduce_command(
-        initial_legacy_model(active), ControllerCommand("connect-1", "open_session"), "open-1"
+        initial_legacy_model(active),
+        ControllerCommand("connect-1", "open_session"),
+        "open-1",
+        "deadline-open-1",
     )
     failed = reduce_notice(
         first.model,
@@ -184,7 +193,10 @@ def test_failed_open_burns_then_new_operation_advances_without_promoting() -> No
     assert failed.model.pending_operations == {}
 
     second = reduce_command(
-        failed.model, ControllerCommand("connect-2", "open_session"), "open-2"
+        failed.model,
+        ControllerCommand("connect-2", "open_session"),
+        "open-2",
+        "deadline-open-2",
     )
     assert second.effects[0].generation.session_generation == 5
     assert second.model.generation_watermarks.session == 5
@@ -193,23 +205,29 @@ def test_failed_open_burns_then_new_operation_advances_without_promoting() -> No
 def test_failed_subscribe_burns_stream_only_and_same_operation_retry_reuses() -> None:
     active = generation()
     command = ControllerCommand("subscribe-1", "subscribe_events")
-    first = reduce_command(initial_legacy_model(active), command, "sub-op")
-    retried = reduce_command(first.model, command, "sub-op")
+    first = reduce_command(
+        initial_legacy_model(active), command, "sub-op", "deadline-sub-1"
+    )
+    retried = reduce_command(first.model, command, "sub-op", "deadline-sub-2")
 
-    assert retried.model is first.model
+    assert retried.model is not first.model
+    assert retried.model.pending_operations["sub-op"].deadline_id == "deadline-sub-2"
+    assert "deadline-sub-1" in retried.model.retired_deadline_ids
     assert retried.effects[0] is first.effects[0]
     assert first.model.generation_watermarks.session == 3
     assert first.model.generation_watermarks.stream == 5
 
     failed = reduce_notice(
-        first.model,
+        retried.model,
         completion(first.effects[0], status=CompletionStatus.CANCELLED),
     )
     assert failed.model.generation == active
     assert failed.model.generation_watermarks.session == 3
     assert failed.model.generation_watermarks.stream == 5
 
-    retired_retry = reduce_command(failed.model, command, "sub-op")
+    retired_retry = reduce_command(
+        failed.model, command, "sub-op", "deadline-sub-3"
+    )
     assert retired_retry.model is failed.model
     assert retired_retry.effects == ()
     assert retired_retry.results[0].error == "StaleOperation"
@@ -218,6 +236,7 @@ def test_failed_subscribe_burns_stream_only_and_same_operation_retry_reuses() ->
         failed.model,
         ControllerCommand("subscribe-2", "subscribe_events"),
         "sub-op-2",
+        "deadline-sub-4",
     )
     assert next_operation.effects[0].generation.stream_generation == 6
 
@@ -228,6 +247,7 @@ def test_pending_subscribe_keeps_old_events_and_fences_premature_new_events() ->
         initial_legacy_model(active),
         ControllerCommand("subscribe-1", "subscribe_events"),
         "sub-op",
+        "deadline-sub",
     )
     effect = pending.effects[0]
 
@@ -270,13 +290,40 @@ def test_pending_subscribe_keeps_old_events_and_fences_premature_new_events() ->
         event(effect.generation, "running", sequence=1, stream_id="stream-new"),
         epoch_id="unused",
     )
+    assert accepted_new.model is promoted.model
+    assert accepted_new.events[0].kind == "event_awaiting_reconcile"
+
+    reconciling = reduce_command(
+        promoted.model,
+        ControllerCommand("reconcile-1", "reconcile"),
+        "reconcile-op",
+        "deadline-reconcile",
+    )
+    reconciled = reduce_notice(
+        reconciling.model,
+        ReconcileResult(
+            generation=effect.generation,
+            status=ReconcileStatus.RETAINED,
+            evidence_grade=effect.generation.evidence_grade,
+            baseline={"target_state": "unknown"},
+        ),
+        epoch_id="unused",
+    )
+    accepted_new = reduce_notice(
+        reconciled.model,
+        event(effect.generation, "running", sequence=1, stream_id="stream-new"),
+        epoch_id="unused",
+    )
     assert accepted_new.model.target_state is TargetRunState.RUNNING
 
 
 def test_wrong_operation_parent_stamp_and_numeric_higher_completion_never_adopt() -> None:
     active = generation()
     accepted = reduce_command(
-        initial_legacy_model(active), ControllerCommand("connect-1", "open_session"), "open-right"
+        initial_legacy_model(active),
+        ControllerCommand("connect-1", "open_session"),
+        "open-right",
+        "deadline-open",
     )
     effect = accepted.effects[0]
     wrong_operation = completion(
@@ -305,11 +352,13 @@ def test_session_promotion_retires_pending_old_parent_stream_reservation() -> No
         initial_legacy_model(active),
         ControllerCommand("subscribe-1", "subscribe_events"),
         "sub-op",
+        "deadline-sub",
     )
     open_pending = reduce_command(
         stream_pending.model,
         ControllerCommand("connect-1", "open_session"),
         "open-op",
+        "deadline-open",
     )
     open_effect = open_pending.effects[0]
     promoted = reduce_notice(
@@ -339,7 +388,9 @@ def test_rpc_ok_for_control_waits_for_authoritative_event_and_keeps_deadline_liv
     stopped = reduce_notice(
         initial_legacy_model(stamp), event(stamp, "stopped"), epoch_id="epoch-1"
     ).model
-    accepted = reduce_command(stopped, ControllerCommand("c1", "continue"), "op-1")
+    accepted = reduce_command(
+        stopped, ControllerCommand("c1", "continue"), "op-1", "deadline-1"
+    )
 
     assert accepted.model.target_state is TargetRunState.RUN_PENDING
     assert accepted.model.epoch_store.active is None
@@ -362,9 +413,11 @@ def test_matching_reserved_deadline_burns_without_promoting_and_wrong_deadline_i
         initial_legacy_model(active),
         ControllerCommand("subscribe-1", "subscribe_events"),
         "sub-op",
+        "deadline-right",
     )
     wrong = reduce_deadline(
-        accepted.model, DeadlineExpired("deadline-wrong", "sub-op", active)
+        accepted.model,
+        DeadlineExpired("deadline-wrong", "sub-op", accepted.effects[0].generation),
     )
     assert wrong.model is accepted.model
 
@@ -378,11 +431,53 @@ def test_matching_reserved_deadline_burns_without_promoting_and_wrong_deadline_i
     assert expired.results[0].error == "OperationTimeout"
 
 
+def test_retry_replaces_exact_deadline_and_cancel_retires_the_live_deadline() -> None:
+    stamp = generation()
+    command = ControllerCommand("inspect-1", "inspect")
+    first = reduce_command(
+        initial_legacy_model(stamp), command, "inspect-op", "deadline-old"
+    )
+    retried = reduce_command(
+        first.model, command, "inspect-op", "deadline-current"
+    )
+
+    assert retried.model.pending_operations["inspect-op"].deadline_id == "deadline-current"
+    assert "deadline-old" in retried.model.retired_deadline_ids
+    for index in range(64):
+        deadline_id = "deadline-old" if index % 2 else f"deadline-wrong-{index}"
+        stale = reduce_deadline(
+            retried.model,
+            DeadlineExpired(deadline_id, "inspect-op", stamp),
+        )
+        assert stale.model is retried.model
+        assert "inspect-op" in stale.model.pending_operations
+
+    with pytest.raises(ValueError, match="already been retired"):
+        reduce_command(retried.model, command, "inspect-op", "deadline-old")
+
+    cancelled = reduce_notice(
+        retried.model,
+        completion(retried.effects[0], status=CompletionStatus.CANCELLED),
+    )
+    assert cancelled.results[0].command_id == "inspect-1"
+    assert cancelled.results[0].operation_id == "inspect-op"
+    assert cancelled.results[0].status is CommandStatus.CANCELLED
+    assert "deadline-current" in cancelled.model.retired_deadline_ids
+    late_current = reduce_deadline(
+        cancelled.model,
+        DeadlineExpired("deadline-current", "inspect-op", stamp),
+    )
+    assert late_current.model is cancelled.model
+
+
 def test_stale_active_completion_event_and_deadline_never_mutate() -> None:
     current = generation()
     stale = generation(session=2)
     accepted = reduce_command(
-        initial_legacy_model(current), ControllerCommand("c1", "request"), "op-1"
+        initial_legacy_model(current),
+        ControllerCommand("c1", "request"),
+        "op-1",
+        "deadline-1",
     ).model
 
     completion_result = reduce_notice(
@@ -438,6 +533,107 @@ def test_stop_event_opens_one_epoch_duplicate_sequence_is_ignored_and_gap_invali
     assert gap.model.epoch_store.active is None
 
 
+def test_gap_and_required_recovery_fence_all_later_events_until_reconcile() -> None:
+    stamp = generation()
+    stopped = reduce_notice(
+        initial_legacy_model(stamp),
+        event(stamp, "stopped", sequence=5),
+        epoch_id="epoch-before-gap",
+    ).model
+    gap = reduce_notice(
+        stopped,
+        event(stamp, "running", sequence=8),
+        epoch_id="unused",
+    )
+
+    assert gap.model.event_health is EventHealth.GAP
+    assert gap.model.recovery_status is RecoveryStatus.REQUIRED
+    assert gap.model.last_event_sequence == 5
+    assert gap.model.epoch_store.active is None
+
+    for index in range(64):
+        late = reduce_notice(
+            gap.model,
+            event(
+                stamp,
+                "stopped" if index % 2 else "running",
+                sequence=6 + index,
+            ),
+            epoch_id=f"forbidden-epoch-{index}",
+        )
+        assert late.model is gap.model
+        assert late.events[0].kind == "event_awaiting_reconcile"
+        assert late.model.last_event_sequence == 5
+        assert late.model.epoch_store.active is None
+
+    transport_healthy = reduce_notice(
+        gap.model,
+        HealthNotice(stamp, RpcHealth.HEALTHY, EventHealth.HEALTHY, "stream resumed"),
+    )
+    assert transport_healthy.model.recovery_status is RecoveryStatus.REQUIRED
+    still_fenced = reduce_notice(
+        transport_healthy.model,
+        event(stamp, "stopped", sequence=6),
+        epoch_id="still-forbidden",
+    )
+    assert still_fenced.model is transport_healthy.model
+
+    reconciling = reduce_command(
+        transport_healthy.model,
+        ControllerCommand("reconcile-gap", "reconcile"),
+        "reconcile-gap-op",
+        "reconcile-gap-deadline",
+    )
+    reconciled = reduce_notice(
+        reconciling.model,
+        ReconcileResult(
+            generation=stamp,
+            status=ReconcileStatus.RETAINED,
+            evidence_grade=stamp.evidence_grade,
+            baseline={"target_state": "running"},
+        ),
+        epoch_id="unused",
+    )
+    assert reconciled.model.recovery_status is RecoveryStatus.RETAINED
+    assert reconciled.model.last_event_sequence == 5
+    assert len(reconciled.results) == 1
+    assert reconciled.results[0].command_id == "reconcile-gap"
+    assert reconciled.results[0].operation_id == "reconcile-gap-op"
+    assert reconciled.results[0].status is CommandStatus.COMPLETED
+
+    authoritative_stop = reduce_notice(
+        reconciled.model,
+        event(stamp, "stopped", sequence=6),
+        epoch_id="epoch-after-reconcile",
+    )
+    assert authoritative_stop.model.target_state is TargetRunState.STOPPED
+    assert authoritative_stop.model.last_event_sequence == 6
+    assert authoritative_stop.model.epoch_store.active is not None
+    assert authoritative_stop.model.epoch_store.active.epoch_id == "epoch-after-reconcile"
+
+
+def test_lost_health_fences_late_stop_events_without_opening_epochs() -> None:
+    stamp = generation()
+    running = reduce_notice(
+        initial_legacy_model(stamp), event(stamp, "running", sequence=1)
+    ).model
+    lost = reduce_notice(
+        running,
+        HealthNotice(stamp, RpcHealth.HEALTHY, EventHealth.LOST, "event eof"),
+    ).model
+
+    for index in range(64):
+        late = reduce_notice(
+            lost,
+            event(stamp, "stopped", sequence=2 + index),
+            epoch_id=f"late-lost-{index}",
+        )
+        assert late.model is lost
+        assert late.model.target_state is TargetRunState.UNKNOWN
+        assert late.model.last_event_sequence == 1
+        assert late.model.epoch_store.active is None
+
+
 def test_rpc_and_event_health_are_independent_and_candidate_health_is_rejected() -> None:
     active = generation()
     stopped = reduce_notice(
@@ -447,6 +643,7 @@ def test_rpc_and_event_health_are_independent_and_candidate_health_is_rejected()
         stopped,
         ControllerCommand("subscribe-1", "subscribe_events"),
         "sub-op",
+        "deadline-sub",
     )
     candidate_health = reduce_notice(
         pending.model,
@@ -480,7 +677,10 @@ def test_rpc_and_event_health_are_independent_and_candidate_health_is_rejected()
 def test_invalid_open_capability_evidence_burns_reservation_without_adoption() -> None:
     active = generation()
     accepted = reduce_command(
-        initial_legacy_model(active), ControllerCommand("connect-1", "open_session"), "open-op"
+        initial_legacy_model(active),
+        ControllerCommand("connect-1", "open_session"),
+        "open-op",
+        "deadline-open",
     )
     invalid_profile = replace(
         profile(accepted.effects[0].generation),
@@ -510,9 +710,16 @@ def test_legacy_unproven_recovery_invalidates_epoch_without_cancelling_reservati
         stopped,
         ControllerCommand("subscribe-1", "subscribe_events"),
         "sub-op",
+        "deadline-sub",
+    ).model
+    reconciling = reduce_command(
+        pending,
+        ControllerCommand("reconcile-1", "reconcile"),
+        "reconcile-op",
+        "deadline-reconcile",
     ).model
     recovered = reduce_notice(
-        pending,
+        reconciling,
         ReconcileResult(
             generation=stamp,
             status=ReconcileStatus.LEGACY_UNPROVEN,
@@ -520,12 +727,147 @@ def test_legacy_unproven_recovery_invalidates_epoch_without_cancelling_reservati
             baseline={"target_state": "stopped", "stop_token": "not-authoritative"},
         ),
         epoch_id="epoch-2",
-    ).model
+    )
 
-    assert recovered.target_state is TargetRunState.UNKNOWN
-    assert recovered.recovery_status is RecoveryStatus.REQUIRED
-    assert recovered.epoch_store.active is None
-    assert "sub-op" in recovered.pending_operations
+    assert recovered.model.target_state is TargetRunState.UNKNOWN
+    assert recovered.model.recovery_status is RecoveryStatus.REQUIRED
+    assert recovered.model.epoch_store.active is None
+    assert "sub-op" in recovered.model.pending_operations
+    assert recovered.results[0].command_id == "reconcile-1"
+    assert recovered.results[0].operation_id == "reconcile-op"
+    assert recovered.results[0].status is CommandStatus.FAILED
+
+
+@pytest.mark.parametrize(
+    ("status", "error"),
+    [
+        (ReconcileStatus.TARGET_LOST, "TargetLost"),
+        (ReconcileStatus.OWNERSHIP_LOST, "OwnershipLost"),
+        (ReconcileStatus.INCOMPATIBLE, "CapabilityUnavailable"),
+        (ReconcileStatus.EXHAUSTED, "RecoveryFailed"),
+        (ReconcileStatus.LEGACY_UNPROVEN, "RecoveryFailed"),
+    ],
+)
+def test_reconcile_failure_returns_one_exact_correlated_command_result(
+    status: ReconcileStatus, error: str
+) -> None:
+    stamp = generation()
+    command_id = f"reconcile-{status.value}"
+    operation_id = f"operation-{status.value}"
+    accepted = reduce_command(
+        initial_legacy_model(stamp),
+        ControllerCommand(command_id, "reconcile"),
+        operation_id,
+        f"deadline-{status.value}",
+    )
+    completed = reduce_notice(
+        accepted.model,
+        ReconcileResult(
+            generation=stamp,
+            status=status,
+            evidence_grade=stamp.evidence_grade,
+            diagnostics=("adversarial recovery outcome",),
+        ),
+        epoch_id="unused",
+    )
+
+    assert len(completed.results) == 1
+    result = completed.results[0]
+    assert result.command_id == command_id
+    assert result.operation_id == operation_id
+    assert result.status is CommandStatus.FAILED
+    assert result.error == error
+    assert operation_id not in completed.model.pending_operations
+
+
+def test_reconcile_cancel_is_correlated_and_late_result_cannot_restore_authority() -> None:
+    stamp = generation()
+    stopped = reduce_notice(
+        initial_legacy_model(stamp),
+        event(stamp, "stopped", sequence=1),
+        epoch_id="epoch-before-recovery",
+    ).model
+    accepted = reduce_command(
+        stopped,
+        ControllerCommand("reconcile-cancel", "reconcile"),
+        "reconcile-cancel-op",
+        "reconcile-cancel-deadline",
+    )
+    cancelled = reduce_notice(
+        accepted.model,
+        completion(accepted.effects[0], status=CompletionStatus.CANCELLED),
+    )
+
+    assert len(cancelled.results) == 1
+    result = cancelled.results[0]
+    assert result.command_id == "reconcile-cancel"
+    assert result.operation_id == "reconcile-cancel-op"
+    assert result.status is CommandStatus.CANCELLED
+    assert cancelled.model.recovery_status is RecoveryStatus.REQUIRED
+    assert cancelled.model.target_state is TargetRunState.UNKNOWN
+    assert cancelled.model.epoch_store.active is None
+
+    late = reduce_notice(
+        cancelled.model,
+        ReconcileResult(
+            generation=stamp,
+            status=ReconcileStatus.RETAINED,
+            evidence_grade=stamp.evidence_grade,
+            baseline={"target_state": "stopped", "stop_token": "too-late"},
+        ),
+        epoch_id="forbidden-late-epoch",
+    )
+    assert late.model is cancelled.model
+    assert late.events[0].kind == "uncorrelated_reconcile_result"
+
+
+def test_retained_reconcile_with_invalid_stop_evidence_fails_correlated_operation() -> None:
+    stamp = generation()
+    accepted = reduce_command(
+        initial_legacy_model(stamp),
+        ControllerCommand("reconcile-invalid-stop", "reconcile"),
+        "reconcile-invalid-stop-op",
+        "reconcile-invalid-stop-deadline",
+    )
+    invalid = reduce_notice(
+        accepted.model,
+        ReconcileResult(
+            generation=stamp,
+            status=ReconcileStatus.RETAINED,
+            evidence_grade=stamp.evidence_grade,
+            baseline={"target_state": "stopped"},
+        ),
+        epoch_id="never-opened",
+    )
+
+    assert len(invalid.results) == 1
+    assert invalid.results[0].command_id == "reconcile-invalid-stop"
+    assert invalid.results[0].operation_id == "reconcile-invalid-stop-op"
+    assert invalid.results[0].status is CommandStatus.FAILED
+    assert invalid.results[0].error == "RecoveryFailed"
+    assert invalid.model.recovery_status is RecoveryStatus.REQUIRED
+    assert invalid.model.epoch_store.active is None
+
+
+def test_only_one_reconcile_barrier_can_be_live() -> None:
+    stamp = generation()
+    first = reduce_command(
+        initial_legacy_model(stamp),
+        ControllerCommand("reconcile-1", "reconcile"),
+        "reconcile-op-1",
+        "reconcile-deadline-1",
+    )
+    second = reduce_command(
+        first.model,
+        ControllerCommand("reconcile-2", "reconcile"),
+        "reconcile-op-2",
+        "reconcile-deadline-2",
+    )
+
+    assert second.model is first.model
+    assert second.results[0].status is CommandStatus.REJECTED
+    assert second.results[0].error == "RecoveryInProgress"
+    assert tuple(second.model.pending_operations) == ("reconcile-op-1",)
 
 
 def test_actor_effect_observes_reservation_already_committed_and_only_actor_mutates() -> None:
@@ -655,6 +997,60 @@ def test_subscription_can_close_itself_without_self_join() -> None:
 
     assert callback_returned.wait(1)
     controller.close().result(timeout=1)
+
+
+def test_subscribe_and_close_share_one_atomic_admission_boundary() -> None:
+    for iteration in range(32):
+        controller = ControllerActor(
+            initial_generation=generation(),
+            close_timeout=0.2,
+        )
+        controller.start()
+        registered: list[object] = []
+        registration_errors: list[BaseException] = []
+        close_results: list[object] = []
+
+        def register() -> None:
+            try:
+                registered.append(controller.subscribe(lambda _event: None))
+            except BaseException as exc:  # pragma: no cover - assertion captures any failure
+                registration_errors.append(exc)
+
+        def close_controller() -> None:
+            close_results.append(controller.close().result(timeout=1))
+
+        # Hold subscriber publication while registration owns the lifecycle boundary.  Close
+        # is then forced to arrive second: the accepted subscriber must be in the actor's
+        # cleanup snapshot, closed, and joined before close completes.
+        controller._subscribers_lock.acquire()
+        register_thread = threading.Thread(target=register)
+        register_thread.start()
+        acquisition_deadline = time.monotonic() + 1
+        while time.monotonic() < acquisition_deadline:
+            if not controller._lifecycle_lock.acquire(blocking=False):
+                break
+            controller._lifecycle_lock.release()
+            time.sleep(0.001)
+        else:
+            controller._subscribers_lock.release()
+            pytest.fail("registration did not acquire the lifecycle boundary")
+
+        close_thread = threading.Thread(target=close_controller)
+        close_thread.start()
+        controller._subscribers_lock.release()
+        register_thread.join(1)
+        close_thread.join(1)
+
+        assert not registration_errors
+        assert len(registered) == 1
+        subscription = registered[0]
+        assert subscription.closed
+        subscription.join(1)
+        assert not subscription._thread.is_alive()
+        assert len(close_results) == 1
+        assert close_results[0].status is CommandStatus.COMPLETED
+        with pytest.raises(RuntimeError, match="closed"):
+            controller.subscribe(lambda _event: None)
 
 
 def test_bounded_inbox_reports_saturation_without_secondary_state_writer() -> None:
