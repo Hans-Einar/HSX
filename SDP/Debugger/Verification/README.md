@@ -30,3 +30,4 @@ Completed records:
   PASS and exact-head sign-off at `860a98a…`.
 - `DBG-VER-001-004-005.md` and `DBG-SL-001-004-002--Master_Signoff_v2.md` — corrected RF-003
   Slice PASS and exact-head sign-off at `1e47953…`.
+- `DBG-VER-001-004-006.md` — dependent integration PASS at combined `1e47953…`, re-sign-off pending.

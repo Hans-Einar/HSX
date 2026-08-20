@@ -1,11 +1,10 @@
 # DBG-SPR-001 Handoff
 
-Status: `dependent_integration_review_pass_formal_verification_active`
+Status: `dependent_integration_verification_pass_resignoff_pending`
 
 ## Current objective
 
-Formally verify combined integration dependency head `1e47953…` under
-`DBG-VER-001-004-006`, then re-sign the integration dependency chain.
+Re-sign combined integration dependency head `1e47953…` after `DBG-VER-001-004-006` PASS.
 
 ## Authority
 
@@ -140,7 +139,7 @@ Formally verify combined integration dependency head `1e47953…` under
 
 ## Exact next step
 
-Run fresh formal `DBG-VER-001-004-006`; no product edit is planned.
+Reconcile Master dependent integration exact-head sign-off.
 
 ## Traceability state
 
@@ -200,7 +199,8 @@ Run fresh formal `DBG-VER-001-004-006`; no product edit is planned.
 - Review `DBG-RVW-001-004-011`: PASS at `1e47953…`
 - Verification `DBG-VER-001-004-005`: PASS at `1e47953…`
 - Dependent integration review `DBG-RVW-001-004-010`: PASS at `1e47953…`
-- Active gate: formal `DBG-VER-001-004-006`
+- Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
+- Active gate: Master dependent integration re-sign-off
 
 ## Agents and worktree
 
