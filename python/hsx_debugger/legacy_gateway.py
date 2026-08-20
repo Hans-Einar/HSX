@@ -69,6 +69,7 @@ PORTABLE_RESOURCE_CAPABILITY = "hsx.debug.resource-revision/1"
 _RESOURCE_EFFECTS = (EffectKind.OPEN_SESSION, EffectKind.SUBSCRIBE_EVENTS)
 _CACHE_MISS = object()
 _UNOBSERVED_EVENT_TRANSPORT = object()
+_NO_PHYSICAL_SESSION_EVIDENCE = object()
 
 
 def initial_legacy_generation(*, display_pid: int | None = None) -> GenerationStamp:
@@ -152,6 +153,13 @@ class LegacyExecutiveAdapter:
         self._completed_effects: dict[str, tuple[GatewayNotice, ...]] = {}
         self._session_watermark = health.generation.session_generation
         self._stream_watermark = health.generation.stream_generation
+        initial_physical_session = getattr(session, "session_id", None)
+        self._active_physical_session_id: Any = (
+            initial_physical_session
+            if health.generation.session_generation > 0
+            and initial_physical_session is not None
+            else _NO_PHYSICAL_SESSION_EVIDENCE
+        )
         # ``ExecutiveSession`` may clear its physical session token from a background
         # keepalive/event path that this side-by-side adapter cannot observe directly.
         # Once the next foreground effect exposes that loss, ordinary RPC success must not
@@ -164,14 +172,18 @@ class LegacyExecutiveAdapter:
             raise TypeError("effect must be GatewayEffect")
         if not callable(publish):
             raise TypeError("publish must be callable")
+        replacement_loss = self._observe_replacement_session_loss(effect)
         if not self._is_legacy_effect(effect):
-            return self._unsupported_identity(effect)
+            unsupported = self._unsupported_identity(effect)
+            return (replacement_loss, unsupported) if replacement_loss is not None else unsupported
 
         validation = self._validate_and_record_effect(effect)
         if isinstance(validation, GatewayCompletion):
-            return validation
+            return (replacement_loss, validation) if replacement_loss is not None else validation
         if validation is not _CACHE_MISS:
-            return validation
+            if replacement_loss is None:
+                return validation
+            return (replacement_loss, *self._normalise_result(validation))
 
         transport_before = self._transport_snapshot()
         try:
@@ -181,6 +193,16 @@ class LegacyExecutiveAdapter:
                 rpc_health=RpcHealth.LOST,
                 reason="legacy RPC transport lost",
             )
+            if self._is_physical_replacement_open(effect):
+                return self._replacement_open_error_result(
+                    effect,
+                    status=CompletionStatus.TRANSPORT_ERROR,
+                    rpc_health=RpcHealth.LOST,
+                    code="legacy_rpc_transport_lost",
+                    message="legacy Executive RPC transport was lost",
+                    retryable=effect.idempotent,
+                    cause=exc,
+                )
             raise GatewayEffectError(
                 "legacy_rpc_transport_lost",
                 "legacy Executive RPC transport was lost",
@@ -189,13 +211,26 @@ class LegacyExecutiveAdapter:
                 cause=exc,
             ) from exc
         except ProtocolVersionError as exc:
-            if self._transport_disruption_reasons(
+            disruption_reasons = self._transport_disruption_reasons(
                 transport_before,
                 allow_session_establishment=effect.kind is EffectKind.OPEN_SESSION,
-            ):
+            )
+            if disruption_reasons:
                 self._invalidate_event_continuity(
                     rpc_health=RpcHealth.DEGRADED,
                     reason="legacy protocol failure followed hidden transport replacement",
+                )
+            if (
+                self._is_physical_replacement_open(effect)
+                and self._continuity_reconcile_required.is_set()
+            ):
+                return self._replacement_open_error_result(
+                    effect,
+                    status=CompletionStatus.PROTOCOL_ERROR,
+                    rpc_health=RpcHealth.DEGRADED,
+                    code="legacy_protocol_incompatible",
+                    message="legacy Executive protocol is incompatible",
+                    cause=exc,
                 )
             raise GatewayEffectError(
                 "legacy_protocol_incompatible",
@@ -204,13 +239,26 @@ class LegacyExecutiveAdapter:
                 cause=exc,
             ) from exc
         except (ExecutiveSessionError, json.JSONDecodeError, TypeError, ValueError) as exc:
-            if self._transport_disruption_reasons(
+            disruption_reasons = self._transport_disruption_reasons(
                 transport_before,
                 allow_session_establishment=effect.kind is EffectKind.OPEN_SESSION,
-            ):
+            )
+            if disruption_reasons:
                 self._invalidate_event_continuity(
                     rpc_health=RpcHealth.DEGRADED,
                     reason="legacy protocol failure followed hidden transport replacement",
+                )
+            if (
+                self._is_physical_replacement_open(effect)
+                and self._continuity_reconcile_required.is_set()
+            ):
+                return self._replacement_open_error_result(
+                    effect,
+                    status=CompletionStatus.PROTOCOL_ERROR,
+                    rpc_health=RpcHealth.DEGRADED,
+                    code="legacy_protocol_error",
+                    message="legacy Executive request or response was malformed",
+                    cause=exc,
                 )
             raise GatewayEffectError(
                 "legacy_protocol_error",
@@ -223,6 +271,16 @@ class LegacyExecutiveAdapter:
                 rpc_health=RpcHealth.LOST,
                 reason="legacy RPC transport lost",
             )
+            if self._is_physical_replacement_open(effect):
+                return self._replacement_open_error_result(
+                    effect,
+                    status=CompletionStatus.TRANSPORT_ERROR,
+                    rpc_health=RpcHealth.LOST,
+                    code="legacy_rpc_transport_lost",
+                    message="legacy Executive RPC transport was lost",
+                    retryable=effect.idempotent,
+                    cause=exc,
+                )
             raise GatewayEffectError(
                 "legacy_rpc_transport_lost",
                 "legacy Executive RPC transport was lost",
@@ -232,6 +290,8 @@ class LegacyExecutiveAdapter:
             ) from exc
 
         notices = self._normalise_result(result)
+        if replacement_loss is not None:
+            notices = (replacement_loss, *notices)
         self._completed_effects[effect.operation_id] = notices
         return notices
 
@@ -261,6 +321,7 @@ class LegacyExecutiveAdapter:
             self._closed = True
         self._mark_event_states_stopped()
         self._session.close()
+        self._active_physical_session_id = _NO_PHYSICAL_SESSION_EVIDENCE
         self.health.transition(
             rpc_health=RpcHealth.CLOSED,
             event_health=EventHealth.DISABLED,
@@ -441,6 +502,11 @@ class LegacyExecutiveAdapter:
                 # The request has already disproved the pre-call HEALTHY snapshot.  Do not
                 # emit that stale connecting notice after the wrapped session changed.
                 return failed_health, completion
+            elif self._continuity_reconcile_required.is_set():
+                failed_health = self._retain_replacement_open_loss(
+                    rpc_health=RpcHealth.DEGRADED,
+                    reason="legacy replacement OPEN failed after physical session loss",
+                )
             else:
                 failed_health = self.health.transition(
                     rpc_health=before.rpc_health,
@@ -462,6 +528,21 @@ class LegacyExecutiveAdapter:
             )
         else:
             self._stop_active_event_transport()
+        if (
+            completion.authority
+            is not CompletionAuthority.AUTHORITATIVE_RESOURCE_ESTABLISHED
+        ):
+            raise GatewayEffectError(
+                "missing_resource_establishment_authority",
+                "successful replacement OPEN lacked authoritative resource evidence",
+                status=CompletionStatus.PROTOCOL_ERROR,
+            )
+        established_physical_session = getattr(self._session, "session_id", None)
+        self._active_physical_session_id = (
+            established_physical_session
+            if established_physical_session is not None
+            else _NO_PHYSICAL_SESSION_EVIDENCE
+        )
         self._continuity_reconcile_required.clear()
         healthy = self.health.establish(
             effect.generation,
@@ -492,6 +573,7 @@ class LegacyExecutiveAdapter:
             event_health=EventHealth.DISABLED,
             reason="legacy Executive session closed",
         )
+        self._active_physical_session_id = _NO_PHYSICAL_SESSION_EVIDENCE
         self._continuity_reconcile_required.clear()
         return completion, notice
 
@@ -727,6 +809,91 @@ class LegacyExecutiveAdapter:
             evidence_grade=effect.generation.evidence_grade,
         )
         return notice, result
+
+    def _is_physical_replacement_open(self, effect: GatewayEffect) -> bool:
+        return (
+            effect.kind is EffectKind.OPEN_SESSION
+            and self.health.generation.session_generation > 0
+            and self._active_physical_session_id is not _NO_PHYSICAL_SESSION_EVIDENCE
+        )
+
+    def _observe_replacement_session_loss(
+        self,
+        effect: GatewayEffect,
+    ) -> HealthNotice | None:
+        """Latch physical loss before a replacement OPEN is allowed to establish anew.
+
+        ``ExecutiveSession.request`` may recreate a cleared local session token before it
+        returns.  Looking only at the post-request token therefore cannot distinguish a
+        legitimate first OPEN from a replacement that started after the active physical
+        session was already lost.  Remember the token from the last authoritative OPEN and
+        observe the loss before dispatch; only a later authoritative OPEN success clears it.
+        """
+
+        if not self._is_physical_replacement_open(effect):
+            return None
+        physical_session = getattr(self._session, "session_id", None)
+        if physical_session == self._active_physical_session_id:
+            return None
+        if physical_session is None:
+            reason = "active legacy physical session token was absent before replacement OPEN"
+        else:
+            reason = "active legacy physical session token changed before replacement OPEN"
+        if self._continuity_reconcile_required.is_set():
+            return self._retain_replacement_open_loss(
+                rpc_health=RpcHealth.DEGRADED,
+                reason=reason,
+            )
+        return self._invalidate_event_continuity(
+            rpc_health=RpcHealth.DEGRADED,
+            reason=reason,
+        )
+
+    def _retain_replacement_open_loss(
+        self,
+        *,
+        rpc_health: RpcHealth,
+        reason: str,
+    ) -> HealthNotice:
+        self._continuity_reconcile_required.set()
+        previous = self.health.snapshot()
+        detail = f"{reason}; reconciliation required"
+        if previous.event_health is EventHealth.LOST:
+            detail += "; event continuity lost"
+        return self.health.transition(
+            rpc_health=rpc_health,
+            event_health=previous.event_health,
+            reason=detail,
+        )
+
+    def _replacement_open_error_result(
+        self,
+        effect: GatewayEffect,
+        *,
+        status: CompletionStatus,
+        rpc_health: RpcHealth,
+        code: str,
+        message: str,
+        retryable: bool = False,
+        cause: BaseException | None = None,
+    ) -> tuple[GatewayNotice, ...]:
+        health = self._retain_replacement_open_loss(
+            rpc_health=rpc_health,
+            reason=f"replacement OPEN failed: {code}",
+        )
+        completion = GatewayCompletion(
+            operation_id=effect.operation_id,
+            generation=effect.generation,
+            status=status,
+            failure=GatewayFailure(
+                code=code,
+                message=message,
+                retryable=bool(retryable and effect.idempotent),
+                cause=type(cause).__name__ if cause is not None else None,
+            ),
+            evidence_grade=effect.generation.evidence_grade,
+        )
+        return health, completion
 
     def _transport_snapshot(self) -> _LegacyTransportSnapshot:
         with self._event_lock:

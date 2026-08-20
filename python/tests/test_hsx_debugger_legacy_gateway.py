@@ -5,7 +5,7 @@ import threading
 import time
 from types import SimpleNamespace
 
-from python.executive_session import ConnectionLostError
+from python.executive_session import ConnectionLostError, ProtocolVersionError
 from python.hsx_debugger.contracts import (
     CompletionAuthority,
     CompletionStatus,
@@ -844,6 +844,294 @@ def test_failed_replacement_open_cannot_restore_changed_wrapped_session_healthy(
     assert all(item.event_health is EventHealth.LOST for item in attempt_health)
     assert old_callback({"seq": 1, "type": "task_state", "pid": 7}) is False
     gateway.close()
+
+
+def test_failed_replacement_open_latches_preexisting_none_to_new_physical_loss():
+    initial = initial_legacy_generation(display_pid=7)
+    session_stamp = _open_stamp(initial, 1)
+    failed_replacement = _open_stamp(session_stamp, 2)
+    session = StubLegacySession([{"status": "ok", "tasks": []}])
+    notices = []
+    gateway = LegacyExecutiveGateway(session, initial_generation=initial)
+    gateway.start(notices.append)
+    _open(gateway, notices, session_stamp)
+
+    session.session_id = None
+    attempt_notice_start = len(notices)
+    session.responses.append({"status": "error", "error": "session denied"})
+    failed = _open(
+        gateway,
+        notices,
+        failed_replacement,
+        operation_id="open-none-to-new-failed",
+    )
+
+    snapshot = gateway.health.snapshot()
+    attempt_health = [
+        item
+        for item in notices[attempt_notice_start:]
+        if isinstance(item, HealthNotice) and item.generation == session_stamp
+    ]
+    assert session.session_id == "legacy-session-local-token"
+    assert failed.status is CompletionStatus.REJECTED
+    assert failed.authority is CompletionAuthority.ACK_ONLY
+    assert failed.generation is failed_replacement
+    assert snapshot.generation is session_stamp
+    assert snapshot.rpc_health is RpcHealth.DEGRADED
+    assert snapshot.event_health is EventHealth.DISABLED
+    assert "reconciliation required" in snapshot.reason
+    assert attempt_health
+    assert all(item.rpc_health is not RpcHealth.HEALTHY for item in attempt_health)
+    gateway.close()
+
+
+def test_unsupported_replacement_open_latches_preexisting_none_to_none_physical_loss():
+    initial = initial_legacy_generation(display_pid=7)
+    session_stamp = _open_stamp(initial, 1)
+    failed_replacement = _open_stamp(session_stamp, 2)
+    session = StubLegacySession([{"status": "ok", "tasks": []}])
+    notices = []
+    gateway = LegacyExecutiveGateway(session, initial_generation=initial)
+    gateway.start(notices.append)
+    _open(gateway, notices, session_stamp)
+
+    session.session_id = None
+    session.session_disabled = True
+    session.responses.append({"status": "error", "error": "unknown_cmd:session.open"})
+    failed = _open(
+        gateway,
+        notices,
+        failed_replacement,
+        operation_id="open-none-to-none-unsupported",
+    )
+
+    snapshot = gateway.health.snapshot()
+    assert session.session_id is None
+    assert failed.status is CompletionStatus.UNSUPPORTED
+    assert failed.authority is CompletionAuthority.ACK_ONLY
+    assert failed.generation is failed_replacement
+    assert snapshot.generation is session_stamp
+    assert snapshot.rpc_health is RpcHealth.DEGRADED
+    assert snapshot.event_health is EventHealth.DISABLED
+    assert "reconciliation required" in snapshot.reason
+    gateway.close()
+
+
+def test_stale_replacement_open_still_surfaces_preexisting_physical_loss():
+    initial = initial_legacy_generation(display_pid=7)
+    session_stamp = _open_stamp(initial, 1)
+    stale_replacement = _open_stamp(session_stamp, 1)
+    session = StubLegacySession([{"status": "ok", "tasks": []}])
+    notices = []
+    gateway = LegacyExecutiveGateway(session, initial_generation=initial)
+    gateway.start(notices.append)
+    _open(gateway, notices, session_stamp)
+    request_count = len(session.requests)
+
+    session.session_id = None
+    failed = _open(
+        gateway,
+        notices,
+        stale_replacement,
+        operation_id="open-stale-after-loss",
+    )
+
+    snapshot = gateway.health.snapshot()
+    assert len(session.requests) == request_count
+    assert failed.status is CompletionStatus.STALE
+    assert failed.generation is stale_replacement
+    assert snapshot.generation is session_stamp
+    assert snapshot.rpc_health is RpcHealth.DEGRADED
+    assert snapshot.event_health is EventHealth.DISABLED
+    assert "reconciliation required" in snapshot.reason
+    gateway.close()
+
+
+def test_failed_replacement_open_transport_and_protocol_paths_retain_loss_latch():
+    cases = (
+        (ConnectionLostError("connection reset"), CompletionStatus.TRANSPORT_ERROR, RpcHealth.LOST),
+        (ProtocolVersionError("unsupported version"), CompletionStatus.PROTOCOL_ERROR, RpcHealth.DEGRADED),
+    )
+    for index, (failure, expected_status, expected_health) in enumerate(cases, start=1):
+        initial = initial_legacy_generation(display_pid=7)
+        session_stamp = _open_stamp(initial, 1)
+        failed_replacement = _open_stamp(session_stamp, 1 + index)
+        session = StubLegacySession([{"status": "ok", "tasks": []}])
+        notices = []
+        gateway = LegacyExecutiveGateway(session, initial_generation=initial)
+        gateway.start(notices.append)
+        _open(gateway, notices, session_stamp, operation_id=f"initial-{index}")
+
+        session.session_id = None
+        session.responses.append(failure)
+        failed = _open(
+            gateway,
+            notices,
+            failed_replacement,
+            operation_id=f"open-error-{index}",
+        )
+
+        snapshot = gateway.health.snapshot()
+        assert failed.status is expected_status
+        assert failed.authority is CompletionAuthority.ACK_ONLY
+        assert failed.generation is failed_replacement
+        assert snapshot.generation is session_stamp
+        assert snapshot.rpc_health is expected_health
+        assert snapshot.event_health is EventHealth.DISABLED
+        assert "reconciliation required" in snapshot.reason
+        gateway.close()
+
+
+def test_replacement_open_failure_latch_survives_retry_and_reconcile_until_success():
+    initial = initial_legacy_generation(display_pid=7)
+    session_stamp = _open_stamp(initial, 1)
+    failed_stamp = _open_stamp(session_stamp, 2)
+    promoted_stamp = _open_stamp(session_stamp, 3)
+    session = StubLegacySession([{"status": "ok", "tasks": []}])
+    notices = []
+    gateway = LegacyExecutiveGateway(session, initial_generation=initial)
+    gateway.start(notices.append)
+    _open(gateway, notices, session_stamp)
+
+    session.session_id = None
+    session.responses.extend(
+        [
+            {"status": "error", "error": "session denied"},
+            {"status": "ok", "tasks": [{"pid": 7, "state": "paused"}]},
+            {"status": "ok", "tasks": []},
+        ]
+    )
+    failed_effect = _effect(
+        "replacement-failed",
+        EffectKind.OPEN_SESSION,
+        failed_stamp,
+        payload={"pid_lock": 7},
+        idempotent=True,
+    )
+    gateway.submit(failed_effect)
+    _wait_for(lambda: _has_completion(notices, "replacement-failed"))
+    first_completion_count = len(
+        [
+            item
+            for item in notices
+            if isinstance(item, GatewayCompletion)
+            and item.operation_id == "replacement-failed"
+        ]
+    )
+    gateway.submit(failed_effect)
+    _wait_for(
+        lambda: len(
+            [
+                item
+                for item in notices
+                if isinstance(item, GatewayCompletion)
+                and item.operation_id == "replacement-failed"
+            ]
+        )
+        == first_completion_count + 1
+    )
+    retry_health = gateway.health.snapshot()
+    assert retry_health.generation is session_stamp
+    assert retry_health.rpc_health is RpcHealth.DEGRADED
+    assert "reconciliation required" in retry_health.reason
+
+    gateway.submit(
+        _effect(
+            "reconcile-after-replacement-failure",
+            EffectKind.RECONCILE,
+            session_stamp,
+            payload={"request": {"cmd": "ps"}},
+            idempotent=True,
+        )
+    )
+    _wait_for(
+        lambda: any(
+            isinstance(item, ReconcileResult)
+            and item.generation == session_stamp
+            for item in notices
+        )
+    )
+    reconcile_health = gateway.health.snapshot()
+    assert reconcile_health.generation is session_stamp
+    assert reconcile_health.rpc_health is RpcHealth.DEGRADED
+    assert "reconciliation required" in reconcile_health.reason
+
+    promoted = _open(
+        gateway,
+        notices,
+        promoted_stamp,
+        operation_id="replacement-success",
+    )
+    promoted_health = gateway.health.snapshot()
+    assert promoted.status is CompletionStatus.OK
+    assert promoted.authority is CompletionAuthority.AUTHORITATIVE_RESOURCE_ESTABLISHED
+    assert promoted.generation is promoted_stamp
+    assert promoted_health.generation is promoted_stamp
+    assert promoted_health.rpc_health is RpcHealth.HEALTHY
+    assert promoted_health.event_health is EventHealth.DISABLED
+    assert "reconciliation required" not in promoted_health.reason
+    gateway.close()
+
+
+def test_cancelled_queued_replacement_cannot_promote_or_restore_prior_healthy():
+    initial = initial_legacy_generation(display_pid=7)
+    session_stamp = _open_stamp(initial, 1)
+    replacement_stamp = _open_stamp(session_stamp, 2)
+    session = StubLegacySession([{"status": "ok", "tasks": []}])
+    notices = []
+    gateway = LegacyExecutiveGateway(session, initial_generation=initial)
+    gateway.start(notices.append)
+    _open(gateway, notices, session_stamp)
+
+    request_entered = threading.Event()
+    request_release = threading.Event()
+
+    def block_after_hidden_reopen(_current):
+        request_entered.set()
+        request_release.wait(1.0)
+
+    session.session_id = None
+    session.request_actions.append(block_after_hidden_reopen)
+    session.responses.append({"status": "ok", "tasks": []})
+    gateway.submit(
+        _effect(
+            "blocking-request",
+            EffectKind.REQUEST,
+            session_stamp,
+            payload={"request": {"cmd": "ps"}},
+            idempotent=True,
+        )
+    )
+    assert request_entered.wait(1.0)
+    gateway.submit(
+        _effect(
+            "cancelled-replacement",
+            EffectKind.OPEN_SESSION,
+            replacement_stamp,
+            idempotent=True,
+        )
+    )
+    close_thread = threading.Thread(target=gateway.close)
+    close_thread.start()
+    request_release.set()
+    close_thread.join(timeout=2.0)
+
+    cancelled = _completion(notices, "cancelled-replacement")
+    loss = next(
+        item
+        for item in notices
+        if isinstance(item, HealthNotice)
+        and item.generation == session_stamp
+        and item.rpc_health is RpcHealth.DEGRADED
+        and "reconciliation required" in item.reason
+    )
+    assert close_thread.is_alive() is False
+    assert cancelled.status is CompletionStatus.CANCELLED
+    assert cancelled.authority is CompletionAuthority.ACK_ONLY
+    assert cancelled.generation is replacement_stamp
+    assert loss.event_health is EventHealth.DISABLED
+    assert gateway.health.generation is session_stamp
+    assert gateway.health.snapshot().rpc_health is RpcHealth.CLOSED
 
 
 def test_rpc_transport_loss_also_loses_active_event_stream_and_requires_reconcile():
