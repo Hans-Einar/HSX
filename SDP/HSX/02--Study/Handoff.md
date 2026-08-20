@@ -4,7 +4,7 @@
 - Coordinator: `HSX-ST-001`, issue #47
 - Debugger dependency: `DBG-ST-006`, issue #38
 - Iteration: `DBG-IT-001-003`
-- Planned fresh review: `HSX-RVW-001-001-003`
+- Planned fresh review: `HSX-RVW-001-001-004`
 
 ## Current objective
 
@@ -20,7 +20,7 @@ mapping, then return to Steering before any Debugger design freeze or product wo
 
 ## Exact next step
 
-Commit the stage-coherent corrected package, then assign fresh `HSX-RVW-001-001-003` to the
+Commit the stage-coherent corrected package, then assign fresh `HSX-RVW-001-001-004` to the
 exact complete head.
 
 ## Review history
@@ -31,6 +31,8 @@ exact complete head.
   semantics, one canonical capability registry, and synchronized cross-track status/Handoff.
 - `HSX-RVW-001-001-002` confirmed all technical closures but required rework for stale
   current review-stage references. Master synchronized them and reserved review attempt 3.
+- `HSX-RVW-001-001-003` confirmed the contract package but found three remaining stale
+  current-gate statements. Master synchronized them and reserved review attempt 4.
 - No contract acceptance or implementation authority resulted.
 
 ## Guards

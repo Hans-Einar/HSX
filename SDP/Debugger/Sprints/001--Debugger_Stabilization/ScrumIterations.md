@@ -212,7 +212,7 @@ implementation remains blocked.
 
 ## DBG-IT-001-003 — Portable Debug Runtime Contracts
 
-Status: CONTRACT REWORK COMPLETE — PENDING `HSX-RVW-001-001-003`
+Status: CONTRACT REWORK COMPLETE — PENDING `HSX-RVW-001-001-004`
 
 ### Goal
 
@@ -246,7 +246,7 @@ portable runtime semantics required by `DBG-D-002..DBG-D-006`.
 - `SDP/HSX/02--Study/005--Event_Stream_Continuity.md`
 - `SDP/HSX/02--Study/006--Resource_Provenance_Revisions.md`
 - proposed HSX Requirements/Architecture/Design contract documents and both track traceability
-- independent review records `HSX-RVW-001-001-001..HSX-RVW-001-001-003`
+- independent review records `HSX-RVW-001-001-001..HSX-RVW-001-001-004`
 
 No product/runtime/extension/test/package/AVR file may be modified.
 
@@ -264,7 +264,7 @@ No product/runtime/extension/test/package/AVR file may be modified.
 
 - Debugger: `DBG-ST-006`, `DBG-D-002..DBG-D-006`, `DBG-IT-001-003`
 - HSX: `HSX-ST-001..HSX-ST-006`, proposed stable `HSX-R-*`, `HSX-A-*`, `HSX-D-*`
-- Reviews: `HSX-RVW-001-001-001` REWORK, `...002` REWORK, `...003` planned
+- Reviews: `HSX-RVW-001-001-001` REWORK, `...002` REWORK, `...003` REWORK, `...004` planned
 - Issues: #47 coordination and #38 Steering gate
 
 ### Completion signal
@@ -306,7 +306,7 @@ Master allocated and synthesized:
 - named full/degraded capability profiles and reusable conformance fixtures.
 
 All artifacts remain target/proposed. The active action is fresh independent exact-head
-review `HSX-RVW-001-001-003`; no design freeze or implementation authority exists.
+review `HSX-RVW-001-001-004`; no design freeze or implementation authority exists.
 
 ### Cross-track review attempt 1
 
@@ -329,3 +329,11 @@ remain closed.
 phase-linearized exact-step and capability-registry closure, then returned REWORK for stale
 current review-stage references. Master synchronized every next-gate surface. Fresh review is
 `HSX-RVW-001-001-003`.
+
+### Cross-track review attempt 3
+
+`HSX-RVW-001-001-003` reviewed exact head
+`efd43d2be9e4db1646419fe5036ec1f5b22c8deb`. Technical contracts passed, but it returned
+REWORK because HSX README, Debugger CurrentIndex and Debugger Handoff still exposed stale
+current-stage claims. Master corrected every current gate to point solely to
+`HSX-RVW-001-001-004`; prior review IDs remain history.

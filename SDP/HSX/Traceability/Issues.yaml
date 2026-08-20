@@ -24,6 +24,10 @@ issues:
     rereview_status: rework
     rereviewed_head: ffd0a4254751dea2692eb8e2f3d66cb6e68f7d5a
     review_attempt_3: HSX-RVW-001-001-003
+    review_attempt_3_status: rework
+    review_attempt_3_head: efd43d2be9e4db1646419fe5036ec1f5b22c8deb
+    review_attempt_4: HSX-RVW-001-001-004
+    current_review: HSX-RVW-001-001-004
   HSX-ST-002:
     issue: 47
     status: complete_for_synthesis

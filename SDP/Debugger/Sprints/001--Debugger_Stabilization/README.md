@@ -38,7 +38,8 @@ Steering accepted `DBG-A-001..DBG-A-008` as target architecture direction in com
 - HSX domain Studies: `HSX-ST-002..HSX-ST-006`
 - Review `HSX-RVW-001-001-001`: REWORK
 - Review `HSX-RVW-001-001-002`: REWORK
-- Planned fresh review: `HSX-RVW-001-001-003`
+- Review `HSX-RVW-001-001-003`: REWORK
+- Planned fresh review: `HSX-RVW-001-001-004`
 - Stop gate: issues #47 and #38 before any `DBG-D-*` freeze
 
 ## Non-goals for this iteration

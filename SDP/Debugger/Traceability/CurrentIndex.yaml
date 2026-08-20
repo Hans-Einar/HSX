@@ -28,7 +28,7 @@ active:
   design_analysis:
     id: DBG-DA-001
     path: SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md
-    status: architecture_direction_accepted_contract_study_active
+    status: architecture_direction_accepted_portable_contract_review_active
     issue: 38
     steering_start_comment: 5345600066
     architecture_review: DBG-RVW-001-002-003
@@ -89,11 +89,11 @@ active_gate:
     id: DBG-DA-001
     issue: 38
     path: SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md
-    status: architecture_direction_accepted_contract_study_active
+    status: architecture_direction_accepted_portable_contract_review_active
   iteration:
     id: DBG-IT-001-003
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/ScrumIterations.md
-    status: active_cross_track_studies
+    status: contract_rework_complete_pending_fresh_review
   architecture_review:
     id: DBG-RVW-001-002-001
     status: rework
@@ -127,6 +127,10 @@ active_gate:
     rereview_status: rework
     rereviewed_head: ffd0a4254751dea2692eb8e2f3d66cb6e68f7d5a
     review_attempt_3: HSX-RVW-001-001-003
+    review_attempt_3_status: rework
+    review_attempt_3_head: efd43d2be9e4db1646419fe5036ec1f5b22c8deb
+    review_attempt_4: HSX-RVW-001-001-004
+    current_review: HSX-RVW-001-001-004
     hsx_requirements: HSX-R-001..HSX-R-036
     hsx_architecture: HSX-A-001..HSX-A-005
     hsx_design: HSX-D-001..HSX-D-005

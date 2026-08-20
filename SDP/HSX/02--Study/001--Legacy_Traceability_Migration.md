@@ -360,6 +360,6 @@ After all domain Studies completed, Master allocated stable proposed IDs:
 - `HSX-D-001..HSX-D-005`.
 
 The contract package and `DBG-ST-006` mapping are complete. Review attempts
-`HSX-RVW-001-001-001` and `...002` required rework; fresh
-`HSX-RVW-001-001-003` is the active gate. Broader HSX migration remains open exactly as routed
+`HSX-RVW-001-001-001`, `...002`, and `...003` required rework; fresh
+`HSX-RVW-001-001-004` is the sole active gate. Broader HSX migration remains open exactly as routed
 above. No ID is accepted or implementation-authoritative merely because it is stable.

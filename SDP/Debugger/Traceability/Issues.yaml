@@ -19,7 +19,7 @@ issues:
     master_signoff: pass
   DBG-DA-001:
     issue: 38
-    status: architecture_direction_accepted_DBG-ST-006_active
+    status: architecture_direction_accepted_portable_contract_review_active
     decision_package_comment: 5346421143
     architecture_acceptance_comment: 5348190806
     steering_start_comment: 5345600066
@@ -48,6 +48,9 @@ issues:
     portable_contract_rereview: HSX-RVW-001-001-002
     portable_contract_rereview_status: rework
     portable_contract_review_attempt_3: HSX-RVW-001-001-003
+    portable_contract_review_attempt_3_status: rework
+    portable_contract_review_attempt_4: HSX-RVW-001-001-004
+    portable_contract_current_review: HSX-RVW-001-001-004
   DBG-RF-002:
     issue: 39
     status: blocked_by_DBG-DA-001
