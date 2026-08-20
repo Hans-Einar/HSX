@@ -64,3 +64,21 @@ track IDs rather than silently renamed in historical documents.
 - `DBG-RVW-003-001-006` / `DBG-VER-003-001-001` — RF-003 final parent review/verification
 - `DBG-VER-003-001-001` — RF-003 parent verification attempt, FAIL trace-only
 - `DBG-VER-003-001-002` — RF-003 fresh parent verification after current-state correction
+
+## Allocated RF-004 wave IDs
+
+- `DBG-IT-001-005` — typed artifact/source/address/stack/inspection iteration
+- `DBG-SL-001-005-001` — classified legacy symbol/source/stack oracle
+- `DBG-SL-001-005-002` — immutable identity/binding/address/result foundation
+- `DBG-SL-001-005-003` — verified artifact index and legacy `.sym` adapter
+- `DBG-SL-001-005-004` — exact content-verified source resolver
+- `DBG-SL-001-005-005` — bounded recipes, locations and stack
+- `DBG-SL-001-005-006` — epoch-bound inspection integration
+- `DBG-RVW-001-005-001..DBG-RVW-001-005-006` — exact-head Slice reviews
+- `DBG-RVW-001-005-007` — frozen `dbg.resolver-inspection/1` interface review
+- `DBG-VER-001-005-001..DBG-VER-001-005-006` — formal Slice verifications
+- `DBG-RVW-004-001-001` / `DBG-VER-004-001-001` — RF-004 parent review/verification
+
+Public interface string `dbg.resolver-inspection/1` is a versioned contract identifier rather
+than a numeric execution ID. It is produced by `DBG-RF-004` and becomes a satisfied dependency
+for RF-005 only after RF-004 parent sign-off and remote publication.

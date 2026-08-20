@@ -20,8 +20,9 @@ the production-path protocol baseline. Steering accepted the reviewed `DBG-A-001
 target direction. Coordinated `DBG-ST-006` / `HSX-ST-001..008` portable-runtime contract
 work is reviewed and verified. `HSX-RVW-001-001-006` and `HSX-VER-001-001-001` passed exact
 proposal content `b57e368…`, and Master exact-content sign-off passed. Steering froze the
-portable HSX target baseline and `DBG-D-001..010`, then authorized only RF-002, RF-003 and one
-early integration Slice in #38 comment `5356484309`. RF-004..009 remain blocked.
+portable HSX target baseline and `DBG-D-001..010`, then authorized RF-002, RF-003 and one
+early integration Slice in #38 comment `5356484309`. Steering accepted that published first
+wave complete and authorized RF-004 only in #38 comment `5362514094`.
 
 Read in this order:
 
@@ -36,6 +37,8 @@ Read in this order:
 9. for `DBG-DA-001`, Studies `DBG-ST-002..DBG-ST-005`, the proposed Architecture and Design
    documents, and `DBG-ST-006`
 
-`DBG-ST-006` is complete. Active work is `DBG-IT-001-004` with the frozen
-`dbg.controller-gateway/1.1` interface and Slices `DBG-SL-001-004-001..003`. Existing Executive
-behavior remains `hsx.python-debug-legacy/1`; RF-004..009 remain blocked.
+`DBG-ST-006` and `DBG-IT-001-004` are complete. Active work is `DBG-IT-001-005` /
+`DBG-RF-004` with frozen Slices `DBG-SL-001-005-001..006` and public interface
+`dbg.resolver-inspection/1`. Existing Executive behavior remains
+`hsx.python-debug-legacy/1`; RF-005..009, Executive/VM/AVR and frontend migration remain
+blocked.

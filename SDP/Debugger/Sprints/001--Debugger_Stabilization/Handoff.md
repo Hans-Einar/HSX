@@ -1,12 +1,13 @@
 # DBG-SPR-001 Handoff
 
-Status: `first_structural_wave_publication_pass_awaiting_steering`
+Status: `rf004_activation_contracts_frozen_product_not_started`
 
 ## Current objective
 
-Signed history published on `origin/codex/dbg-rf-002-003`; fresh remote checkout PASS at
-`b0a9e8161bebac6b9eb1a0bba9003c82fd21fa8c`. Publish this final trace reconciliation,
-post the durability closeout to issue #38, then stop for Steering.
+The accepted first-wave gate is closed. Execute only `DBG-RF-004` through the six frozen
+`DBG-SL-001-005-001..006` contracts and public `dbg.resolver-inspection/1` interface. Product
+dispatch waits for publication and fresh independent review of this activation/interface
+head. RF-005..009 and Executive/VM/AVR/frontend migration remain blocked.
 
 ## Authority
 
@@ -15,11 +16,15 @@ post the durability closeout to issue #38, then stop for Steering.
 - issue #47 comment `5356480919` — froze `HSX-R/A/D` portable target baseline
 - issue #38 comment `5356484309` — froze `DBG-D-001..010` and authorized first wave
 - issue #38 comment `5356745504` — corrected exact contract head before product edits
+- issue #38 comment `5362514094` — accepted first wave complete and authorized RF-004 only
+- issue #42 comment `5362515750` — RF-005 depends on RF-004's accepted typed interface
 - `SDP/Debugger/Traceability/CurrentIndex.yaml`
 - `SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md`
 - `SDP/Debugger/04--Architecture/001--Modular_Debugger_Architecture.md`
 - `SDP/Debugger/06--Design/001--Debugger_Design_Contracts.md`
 - `SDP/Debugger/Sprints/001--Debugger_Stabilization/ScrumIterations.md`
+- `SDP/Debugger/Refactor/004--Typed_Resolver_Inspection/README.md`
+- `SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/004--Typed_Resolver_Inspection_Interface_v1.md`
 - issues #36/#37 and `DBG-RF-001` records are completed provenance only
 
 ## Done
@@ -130,18 +135,26 @@ post the durability closeout to issue #38, then stop for Steering.
   reviewed product heads with no product finding and no protected-path change.
 - Master signed both foundation Slices at their exact verified product heads; the parent
   Refactor gates remain distinct and are not implied by Slice completion.
+- RF-002, RF-003 and dependent integration subsequently passed parent review, verification and
+  sign-off; remote publication/fresh-checkout PASS completed at `69a54aeb…`.
+- Steering accepted iteration 004 complete and authorized RF-004 only in issue #38 comment
+  `5362514094`; issue #42 comment `5362515750` clarifies the RF-005 dependency.
+- Master opened `DBG-IT-001-005`, froze six bounded RF-004 Slice contracts and froze
+  `dbg.resolver-inspection/1`. These are planning/authority records, not verified product.
 
 ## Not done
 
-- RF-002 parent review's general terminal-result High and the follow-up saturated-inbox edge
-  are corrected at `a064020…`; fresh `DBG-RVW-001-004-008` returned PASS. RF-003 has no
-  product finding and remains signed.
-- Corrected RF-002, RF-003 and dependent integration sign-offs all PASS.
-- `DBG-RF-004..DBG-RF-009` remain blocked.
+- No RF-004 product Slice has started.
+- `DBG-RVW-001-005-007` has not yet independently reviewed the frozen activation/interface
+  head.
+- All six RF-004 worker/review/verification/sign-off loops and the parent gate remain open.
+- RF-005..009 remain blocked; no Executive/VM/AVR or DAP/CLI/VS Code migration is authorized.
 
 ## Exact next step
 
-Await Steering. Do not start RF-004..009.
+Commit and publish the Master-only activation/interface freeze, dispatch a fresh independent
+interface reviewer against that exact head, reconcile any documentation-only findings, then
+start only `DBG-SL-001-005-001` with a fresh bounded worker.
 
 ## Traceability state
 
@@ -168,7 +181,12 @@ Await Steering. Do not start RF-004..009.
 - Completed HSX coordinator scope: `HSX-ST-001`, issue #47
 - Completed HSX Studies: `HSX-ST-002..HSX-ST-008`
 - Frozen HSX target contracts: `HSX-R-001..036`, `HSX-A-001..005`, `HSX-D-001..005`
-- Active iteration: `DBG-IT-001-004`
+- Completed/Steering-accepted iteration: `DBG-IT-001-004`
+- Active iteration: `DBG-IT-001-005`
+- Active Refactor: `DBG-RF-004`
+- Frozen Slices: `DBG-SL-001-005-001..006`
+- Frozen interface: `dbg.resolver-inspection/1`
+- Planned interface review: `DBG-RVW-001-005-007`
 - Frozen Slices: `DBG-SL-001-004-001..003`
 - Refrozen shared interface: `dbg.controller-gateway/1.1`
 - Review `HSX-RVW-001-001-001`: REWORK at `5fff403`
@@ -204,22 +222,26 @@ Await Steering. Do not start RF-004..009.
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: final publication closeout comment in issue #38, then awaiting Steering
+- Active gate: publish and independently review RF-004 activation/interface head before the
+  first product worker
 
 ## Agents and worktree
 
-The prior design/portable-contract chain is complete. Steering authorized the v1.1 refreeze,
-and its exact implementation passed fresh review. Foundation rework and fresh re-reviews are
-complete; corrected RF-002/RF-003/integration parent review, verification and sign-off are
-PASS. Fresh remote checkout publication verification is PASS.
-Controlled work is on
-`codex/dbg-rf-002-003`;
+The prior design/portable-contract chain and RF-002/RF-003/integration wave are complete,
+Steering-accepted and remotely reconstructable. RF-004 contracts are Master-frozen but no
+worker/reviewer is intentionally open yet. Controlled work is on
+`codex/dbg-rf-004` from exact base `69a54aeb3394d3cd4792bce620748e15bab69f1f`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.
 
 ## Risks
 
-- `DBG-RF-004..DBG-RF-009` remain explicitly blocked by the first-wave Steering boundary.
+- `DBG-RF-005..DBG-RF-009` remain explicitly blocked; RF-005 additionally requires accepted
+  `dbg.resolver-inspection/1` plus later Steering authorization.
+- A frozen identity/result/address/public-method contradiction is a Steering stop, not worker
+  discretion.
+- Legacy `.sym`/SourceMap reuse is prohibited until Slice 001 produces classified golden
+  evidence; known masks/lowercase/basename/current-live-state behavior is not preservable.
 - Any shared envelope/generation/health/recovery interface change stops both workers and
   returns to Master/Steering rather than creating an implementation-only contract.
 - Existing Executive evidence remains legacy/degraded; this wave must not claim target-contract

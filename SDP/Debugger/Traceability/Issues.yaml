@@ -19,7 +19,7 @@ issues:
     master_signoff: pass
   DBG-DA-001:
     issue: 38
-    status: debugger_v1_design_frozen_first_wave_complete_awaiting_steering
+    status: debugger_v1_design_frozen_rf004_authorized_active
     decision_package_comment: 5346421143
     architecture_acceptance_comment: 5348190806
     steering_start_comment: 5345600066
@@ -167,13 +167,22 @@ issues:
     first_wave_remote_branch: codex/dbg-rf-002-003
     first_wave_published_head: b0a9e8161bebac6b9eb1a0bba9003c82fd21fa8c
     first_wave_publication_verification_status: pass
-    first_wave_current_gate: final_publication_closeout_then_await_steering
+    first_wave_final_remote_head: 69a54aeb3394d3cd4792bce620748e15bab69f1f
+    first_wave_acceptance_comment: 5362514094
+    first_wave_current_gate: closed_steering_accepted
+    next_authorized_refactor: DBG-RF-004
+    rf004_iteration: DBG-IT-001-005
+    rf004_slices: DBG-SL-001-005-001..DBG-SL-001-005-006
+    rf004_interface: dbg.resolver-inspection/1
+    rf004_interface_review: DBG-RVW-001-005-007
+    rf005_dependency_clarification_issue: 42
+    rf005_dependency_clarification_comment: 5362515750
     portable_contract_gate: complete_accepted_frozen
     rf002_parent_review_attempt_6: DBG-RVW-002-001-006
     rf002_parent_review_attempt_6_status: rework_trace_only
   DBG-RF-002:
     issue: 39
-    status: complete_parent_signed
+    status: complete_steering_accepted
     final_review: DBG-RVW-002-001-007
     final_review_status: pass
     final_verification: DBG-VER-002-001-001
@@ -183,9 +192,10 @@ issues:
     shared_interface: dbg.controller-gateway/1.1
     resume_base: 0cf52fcf69d11f254b957cfc52605a8be3114955
     steering_comment: 5356484309
+    steering_completion_comment: 5362514094
   DBG-RF-003:
     issue: 40
-    status: complete_parent_signed
+    status: complete_steering_accepted
     final_review: DBG-RVW-003-001-006
     final_review_status: pass
     parent_verification_attempt_1: DBG-VER-003-001-001
@@ -197,12 +207,21 @@ issues:
     shared_interface: dbg.controller-gateway/1.1
     resume_base: 0cf52fcf69d11f254b957cfc52605a8be3114955
     steering_comment: 5356484309
+    steering_completion_comment: 5362514094
   DBG-RF-004:
     issue: 41
-    status: blocked_pending_later_steering_authorization_and_dependencies
+    status: active_contracts_frozen_product_not_started
+    iteration: DBG-IT-001-005
+    slices: DBG-SL-001-005-001..DBG-SL-001-005-006
+    public_interface: dbg.resolver-inspection/1
+    interface_review: DBG-RVW-001-005-007
+    steering_authority_comment: 5362514094
   DBG-RF-005:
     issue: 42
-    status: blocked_pending_later_steering_authorization_and_dependencies
+    status: blocked_pending_rf004_accepted_interface_and_later_steering_authorization
+    depends_on_refactor: DBG-RF-004
+    depends_on_interface: dbg.resolver-inspection/1
+    dependency_clarification_comment: 5362515750
   DBG-RF-006:
     issue: 43
     status: blocked_pending_later_steering_authorization_and_dependencies

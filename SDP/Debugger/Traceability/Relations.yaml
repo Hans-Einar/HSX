@@ -76,6 +76,7 @@ relations:
       - DBG-IT-001-002
       - DBG-IT-001-003
       - DBG-IT-001-004
+      - DBG-IT-001-005
   - from: DBG-IT-001-002
     type: analyzes
     to:
@@ -144,18 +145,122 @@ relations:
     type: implemented_by_authorized_refactor
     to:
       - DBG-RF-002
+      - DBG-RF-004
+  - from: DBG-D-004
+    type: implemented_by_authorized_refactor
+    to:
+      - DBG-RF-004
   - from: DBG-D-009
     type: constrains
     to:
       - DBG-RF-002
       - DBG-RF-003
       - DBG-SL-001-004-003
+      - DBG-RF-004
   - from: DBG-IT-001-004
     type: executes
     to:
       - DBG-SL-001-004-001
       - DBG-SL-001-004-002
       - DBG-SL-001-004-003
+  - from: DBG-IT-001-005
+    type: executes
+    to:
+      - DBG-SL-001-005-001
+      - DBG-SL-001-005-002
+      - DBG-SL-001-005-003
+      - DBG-SL-001-005-004
+      - DBG-SL-001-005-005
+      - DBG-SL-001-005-006
+  - from: DBG-RF-004
+    type: implemented_by
+    to:
+      - DBG-SL-001-005-001
+      - DBG-SL-001-005-002
+      - DBG-SL-001-005-003
+      - DBG-SL-001-005-004
+      - DBG-SL-001-005-005
+      - DBG-SL-001-005-006
+  - from: DBG-RF-004
+    type: produces_interface
+    to:
+      - dbg.resolver-inspection/1
+    status: frozen_pending_review_and_implementation
+  - from: DBG-SL-001-005-001
+    type: reviewed_by
+    to: [DBG-RVW-001-005-001]
+    status: planned
+  - from: DBG-SL-001-005-001
+    type: verified_by
+    to: [DBG-VER-001-005-001]
+    status: planned
+  - from: DBG-SL-001-005-002
+    type: reviewed_by
+    to: [DBG-RVW-001-005-002]
+    status: planned
+  - from: DBG-SL-001-005-002
+    type: verified_by
+    to: [DBG-VER-001-005-002]
+    status: planned
+  - from: DBG-SL-001-005-003
+    type: reviewed_by
+    to: [DBG-RVW-001-005-003]
+    status: planned
+  - from: DBG-SL-001-005-003
+    type: verified_by
+    to: [DBG-VER-001-005-003]
+    status: planned
+  - from: DBG-SL-001-005-004
+    type: reviewed_by
+    to: [DBG-RVW-001-005-004]
+    status: planned
+  - from: DBG-SL-001-005-004
+    type: verified_by
+    to: [DBG-VER-001-005-004]
+    status: planned
+  - from: DBG-SL-001-005-005
+    type: reviewed_by
+    to: [DBG-RVW-001-005-005]
+    status: planned
+  - from: DBG-SL-001-005-005
+    type: verified_by
+    to: [DBG-VER-001-005-005]
+    status: planned
+  - from: DBG-SL-001-005-006
+    type: reviewed_by
+    to: [DBG-RVW-001-005-006]
+    status: planned
+  - from: DBG-SL-001-005-006
+    type: verified_by
+    to: [DBG-VER-001-005-006]
+    status: planned
+  - from: DBG-SL-001-005-001
+    type: prerequisite_for
+    to: [DBG-SL-001-005-002]
+  - from: DBG-SL-001-005-002
+    type: prerequisite_for
+    to: [DBG-SL-001-005-003]
+  - from: DBG-SL-001-005-003
+    type: prerequisite_for
+    to: [DBG-SL-001-005-004]
+  - from: DBG-SL-001-005-004
+    type: prerequisite_for
+    to: [DBG-SL-001-005-005]
+  - from: DBG-SL-001-005-005
+    type: prerequisite_for
+    to: [DBG-SL-001-005-006]
+  - from: dbg.resolver-inspection/1
+    type: reviewed_by
+    to:
+      - DBG-RVW-001-005-007
+    status: planned
+  - from: DBG-RF-005
+    type: depends_on_accepted_interface
+    to:
+      - dbg.resolver-inspection/1
+    status: blocked_pending_rf004_parent_signoff_and_steering
+    authority_issue: 42
+    authority_comment: 5362515750
   - from: DBG-RF-002
     type: implemented_by
     to:
@@ -182,6 +287,10 @@ relations:
       - f52447ab7dcf6b1ddcca5934be0c8516d5255a14
     product_head: a0640203a1a87c7acb080c75286ef09808e5195c
     status: pass
+  - from: DBG-RF-002
+    type: steering_accepted_complete
+    to: [issue-38-comment-5362514094]
+    status: complete
   - from: DBG-SL-001-004-001
     type: reviewed_by
     to:
@@ -226,6 +335,10 @@ relations:
       - f52447ab7dcf6b1ddcca5934be0c8516d5255a14
     product_head: 1e479536ce5e746e1b06a53b1039b1af84adaed6
     status: pass
+  - from: DBG-RF-003
+    type: steering_accepted_complete
+    to: [issue-38-comment-5362514094]
+    status: complete
   - from: DBG-SL-001-004-002
     type: reviewed_by
     to:
@@ -278,6 +391,10 @@ relations:
       - 860a98a68440b8e22b67f03fbdbb93d2dd33ab7a
       - 1e479536ce5e746e1b06a53b1039b1af84adaed6
     status: dependency_revalidated_pass
+  - from: DBG-SL-001-004-003
+    type: steering_accepted_complete
+    to: [issue-38-comment-5362514094]
+    status: complete
   - from: dbg.controller-gateway/1
     type: blocked_by
     to:
@@ -323,13 +440,18 @@ relations:
   - from: DBG-IT-001-004
     type: published_on_remote_branch
     to:
-      - origin/codex/dbg-rf-002-003@b0a9e8161bebac6b9eb1a0bba9003c82fd21fa8c
+      - origin/codex/dbg-rf-002-003@69a54aeb3394d3cd4792bce620748e15bab69f1f
     status: pass
   - from: DBG-IT-001-004
     type: fresh_remote_checkout_verified_at
     to:
-      - origin/codex/dbg-rf-002-003@b0a9e8161bebac6b9eb1a0bba9003c82fd21fa8c
+      - origin/codex/dbg-rf-002-003@69a54aeb3394d3cd4792bce620748e15bab69f1f
     status: pass
+  - from: DBG-IT-001-004
+    type: steering_accepted_complete
+    to:
+      - issue-38-comment-5362514094
+    status: complete
   - from: DBG-RF-001
     type: implemented_by
     to:
@@ -386,6 +508,7 @@ relations:
   - from: DBG-RF-004
     type: prerequisite_for
     to:
+      - DBG-RF-005
       - DBG-RF-006
       - DBG-RF-007
   - from: DBG-RF-005
@@ -469,6 +592,8 @@ proposed_dependency_changes:
       type: prerequisite_for
       to:
         - DBG-RF-005
+      required_interface: dbg.resolver-inspection/1
+      acceptance_gate: rf004_parent_signoff_remote_publication_and_later_steering_authorization
     - from: DBG-RF-005
       type: prerequisite_for
       to:

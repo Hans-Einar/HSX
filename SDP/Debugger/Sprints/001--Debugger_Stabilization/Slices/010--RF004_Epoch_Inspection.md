@@ -1,0 +1,68 @@
+# DBG-SL-001-005-006 — RF-004 Epoch-Bound Inspection Integration
+
+- Status: **FROZEN / PLANNED**
+- Parent: `DBG-RF-004`
+- Iteration: `DBG-IT-001-005`
+- Depends on signed: `DBG-SL-001-005-001..005`
+- Review: `DBG-RVW-001-005-006`
+- Verification: `DBG-VER-001-005-006`
+
+## Goal and why now
+
+Compose the signed identity/address/artifact/source/stack services into one frontend-neutral
+InspectionService covering registers, stack, scopes, variables, side-effect-free snapshot
+expressions, memory and disassembly for an
+exact coherent epoch/snapshot, with stable domain handles and explicit partial/unavailable
+results.
+
+## Owned files
+
+- `python/hsx_debugger/handles.py`
+- `python/hsx_debugger/inspection.py`
+- relevant additive exports in `python/hsx_debugger/__init__.py`
+- `python/tests/test_hsx_debugger_inspection.py`
+
+All earlier RF-004 product modules are read-only consumers. Existing controller/epochs,
+gateway, Executive, DAP/CLI and VS Code modules are read-only.
+
+## Required behavior
+
+- every result carries exact TargetRef, LoadedImageRef, StopEpochId, StopToken and
+  InspectionSnapshotRef evidence;
+- registers/stack/scopes/variables/memory/disassembly use one exact snapshot or explicitly
+  identified immutable image bytes;
+- SnapshotReadPort rejects target/image/token/snapshot/revision mismatches and late data;
+- repeated/paged stack/scope/variable queries retain earlier handles in the same epoch;
+- unknown handle is explicit `UNKNOWN_HANDLE` and stale/different epoch is explicit `STALE`;
+- no fallback to current/top/first frame and no handle reuse across epochs;
+- variables use exact selected frame and location row; partial pieces stay partial;
+- snapshot expressions are typed/side-effect-free, selected-frame-bound, and never create a
+  persistent live watch or delegate a raw string to runtime;
+- memory/disassembly validate typed spaces/ranges/permissions and preserve unavailable bytes;
+- best-effort live evidence cannot create coherent results or stable handles;
+- bounded concurrent fixture calls are deterministic and immutable.
+
+## Invariants and non-goals
+
+- no run control, raw RPC, transport retries, snapshot capture, runtime adapter or frontend
+  mapping;
+- no DAP integer IDs, VS Code policy, breakpoint/watch/lifecycle/source-step ownership;
+- no Executive/VM/AVR edits and no RF-005..009 work;
+- no change to any frozen public interface discovered during implementation.
+
+## Traceability
+
+`DBG-R-004`, `DBG-R-021..DBG-R-028`, `DBG-R-034..DBG-R-036`;
+`DBG-F-007`, `DBG-F-015`, `DBG-F-017`, inspection portion of `DBG-F-026`;
+`DBG-D-003`, `DBG-D-004`, `DBG-D-009`; `HSX-D-001..HSX-D-003`;
+interface `dbg.resolver-inspection/1`.
+
+## Verification and completion signal
+
+Test registers/stack/scopes/variables/snapshot-expression/memory/disassembly surfaces,
+selected-frame variables, repeated/paged/out-of-order and
+concurrent queries, unknown/stale handles, resume/new-stop invalidation model, exact mismatch
+matrix, partial/unavailable paths, multiple address spaces/widths, cross-service snapshot
+consistency and injected late responses. Re-run all signed RF-004 and RF-002/RF-003 regression
+suites plus protected-path guards. Close only after exact-head review, formal verification and
+Master sign-off.

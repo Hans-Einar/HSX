@@ -399,7 +399,7 @@ publication passed. Steering froze the HSX portable target contracts in #47 comm
 
 ## DBG-IT-001-004 — Controller/Gateway First Structural Wave
 
-Status: FIRST STRUCTURAL WAVE COMPLETE / AWAITING STEERING
+Status: CLOSED — STEERING ACCEPTED / REMOTE PUBLICATION PASS
 
 ### Authority and scope
 
@@ -462,3 +462,85 @@ promote semantics in issue #38 comment `5357146230`. The frozen successor is
 implementation, all nine specified fixtures and fresh `DBG-RVW-001-004-004` are required
 before RF-002/RF-003 resume. Partial stash `efc91f2640647402bc92c69bde1c57685cfaa1f1`
 remains candidate-only and integration/RF-004..009 remain blocked.
+
+### Final closeout
+
+RF-002, RF-003 and dependent integration passed their complete worker/review/verification/
+sign-off chains. The signed ancestry through final publication head
+`69a54aeb3394d3cd4792bce620748e15bab69f1f` is remote-resolvable on
+`origin/codex/dbg-rf-002-003`; fresh-checkout contracted evidence reported `121 passed`, clean
+traceability and no product drift after the combined signed head. Steering accepted iteration
+004 and the three first-wave units complete in issue #38 comment `5362514094`.
+
+## DBG-IT-001-005 — Typed Resolver and Inspection
+
+Status: ACTIVE — CONTRACTS FROZEN / PRODUCT NOT STARTED
+
+### Authority and goal
+
+- Steering authority: issue #38 comment `5362514094`.
+- Dependency clarification: issue #42 comment `5362515750`.
+- Authorized product domain: `DBG-RF-004` only.
+- Goal: frontend-neutral artifact/source/address/stack/variables/memory/disassembly services
+  under `DBG-D-003`, `DBG-D-004`, `DBG-D-009` and frozen portable HSX contracts.
+- Branch/base: `codex/dbg-rf-004` from
+  `69a54aeb3394d3cd4792bce620748e15bab69f1f`.
+- Still blocked: `DBG-RF-005..DBG-RF-009`, Executive/VM/AVR, DAP/CLI/VS Code migration.
+
+### Frozen public interface
+
+`Interfaces/004--Typed_Resolver_Inspection_Interface_v1.md` freezes
+`dbg.resolver-inspection/1`. Every successful/partial inspection result carries the exact
+TargetRef, LoadedImageRef, StopEpochId, StopToken and InspectionSnapshotRef. Typed HSX
+addresses use descriptor-checked spaces/ranges; best-effort live reads are explicitly degraded
+and cannot be coherent. Artifact index, source resolver, recipes/stack, epoch inspection and
+frontend mapping remain separate responsibilities.
+
+Planned independent interface review: `DBG-RVW-001-005-007`. Product dispatch waits until the
+activation/interface head is published and that fresh review passes. A finding requiring a
+frozen interface/design change returns to Steering.
+
+### Frozen execution units
+
+1. `DBG-SL-001-005-001` — classified legacy oracle/golden evidence; tests/fixtures only.
+2. `DBG-SL-001-005-002` — immutable identities, binding, typed addresses and result algebra.
+3. `DBG-SL-001-005-003` — verified immutable artifact index and explicit legacy `.sym` adapter.
+4. `DBG-SL-001-005-004` — exact content-verified SourceResolver.
+5. `DBG-SL-001-005-005` — bounded recipe/location evaluator and snapshot-bound stack.
+6. `DBG-SL-001-005-006` — domain handles and integrated epoch-bound InspectionService.
+
+Slices are sequential because each later worker consumes prior signed interfaces. Each uses a
+fresh worker, fresh exact-head reviewer, formal `DBG-VER-001-005-00N` evidence and Master
+exact-head sign-off before the next Slice starts.
+
+### Invariants
+
+- no hidden `0xFFFF`/`0xFFFFFFFF`, modulo/truncation or implicit wrap;
+- no unconditional lowercase/casefold identity, basename guessing or first-candidate choice;
+- no unknown-frame fallback, fixed-R7 guess or invented/padded partial values;
+- no independent live reads represented as one coherent stop snapshot;
+- legacy algorithms are adapted only after Slice 001 classifies executable evidence;
+- no module owns artifact parsing, source resolution, unwind/stack, epoch inspection and
+  frontend policy together;
+- prior signed controller/gateway modules and `dbg.controller-gateway/1.1` remain unchanged.
+
+### Traceability and dependency graph
+
+- Parent: `DBG-RF-004`; iteration `DBG-IT-001-005`; Slices
+  `DBG-SL-001-005-001..006`.
+- Requirements: `DBG-R-004`, `DBG-R-021..DBG-R-028`, `DBG-R-034..DBG-R-036`.
+- Design: `DBG-D-003`, `DBG-D-004`, `DBG-D-009`; portable `HSX-D-001..003`.
+- Reviews: `DBG-RVW-001-005-001..007`; verifications `DBG-VER-001-005-001..006`.
+- Parent final: `DBG-RVW-004-001-001`, `DBG-VER-004-001-001`.
+- RF-005 explicitly depends on RF-004's accepted `dbg.resolver-inspection/1`; partial/frozen
+  implementation does not satisfy the dependency and no RF-005 worker is authorized.
+
+### Verification and exit signal
+
+Each Slice runs its frozen focused matrix, prior signed RF-004 tests and applicable
+RF-002/RF-003 regressions, plus YAML/NDJSON/diff/protected-path checks. Iteration 005 closes
+only after all six exact-head Slice sign-offs, fresh combined parent review/verification,
+parent Master sign-off, remote publication/fresh reconstruction and issue #38 decision
+package. The package must cover interfaces, address/source/stack/variables/memory/disassembly,
+legacy status, degraded behavior, exact heads and RF-005 recommendation. Master then stops for
+Steering.

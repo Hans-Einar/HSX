@@ -1,7 +1,7 @@
 schema_version: 1
 track: Debugger
 namespace: DBG
-status: debugger_first_structural_wave_complete_awaiting_steering
+status: debugger_rf004_active_contracts_frozen_product_not_started
 baseline:
   repository: Hans-Einar/HSX
   implementation_branch: Implementation/vscode
@@ -92,9 +92,9 @@ active_gate:
     path: SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md
     status: debugger_v1_architecture_and_design_baseline_frozen
   iteration:
-    id: DBG-IT-001-004
+    id: DBG-IT-001-005
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/ScrumIterations.md
-    status: first_structural_wave_complete_awaiting_steering
+    status: active_contracts_frozen_product_not_started
   architecture_review:
     id: DBG-RVW-001-002-001
     status: rework
@@ -121,7 +121,12 @@ active_gate:
     portable_contract_acceptance_comment: 5356480919
     debugger_design_status: accepted_frozen_v1_baseline
     debugger_design_freeze_comment: 5356484309
-    first_wave_status: authorized
+    first_wave_status: complete_steering_accepted
+    first_wave_acceptance_comment: 5362514094
+    next_authorized_refactor: DBG-RF-004
+    next_wave_status: rf004_only_contracts_frozen_product_not_started
+    rf004_authorization_comment: 5362514094
+    rf005_dependency_clarification_comment: 5362515750
   portable_contract_study:
     debugger_study: DBG-ST-006
     hsx_coordinator: HSX-ST-001
@@ -189,29 +194,31 @@ proposed:
       - range: DBG-D-001..DBG-D-010
         status: frozen_debugger_v1_baseline
       - ids: DBG-D-001,DBG-D-002,DBG-D-003,DBG-D-009
-        status: first_wave_implementation_authority_through_frozen_slices_only
-      - ids: DBG-D-004..DBG-D-008,DBG-D-010
-        status: frozen_but_not_implementation_authorized_in_this_wave
+        status: first_wave_complete_steering_accepted
+      - ids: DBG-D-003,DBG-D-004,DBG-D-009
+        status: rf004_implementation_authority_through_frozen_slices_only
+      - ids: DBG-D-005..DBG-D-008,DBG-D-010
+        status: frozen_but_not_implementation_authorized
   study:
     id: DBG-ST-006
     path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
     status: complete_accepted_dependency
 first_structural_wave:
-  status: publication_pass_awaiting_steering
+  status: complete_steering_accepted
   steering_comment: 5356484309
   decision_package_comment: 5361796061
   activation_comment: 5356712010
   activation_correction_comment: 5356745504
   branch: codex/dbg-rf-002-003
   remote_branch: origin/codex/dbg-rf-002-003
-  published_signed_history_head: b0a9e8161bebac6b9eb1a0bba9003c82fd21fa8c
+  published_signed_history_head: 69a54aeb3394d3cd4792bce620748e15bab69f1f
   publication_steering_comment: 5361993826
   publication_verification:
     status: pass
-    fresh_checkout_head: b0a9e8161bebac6b9eb1a0bba9003c82fd21fa8c
+    fresh_checkout_head: 69a54aeb3394d3cd4792bce620748e15bab69f1f
     contracted_debugger: 121_passed
     unchanged_regressions: 121_passed
-    traceability: CurrentIndex_Issues_Relations_YAML_and_110_Ledger_records_PASS
+    traceability: CurrentIndex_Issues_Relations_YAML_and_112_Ledger_records_PASS
     scope: no_non_SDP_diff_after_1e479536_and_no_Executive_VM_frontend_AVR_change
   contract_head: 97d8c5b8d62d56dcfcab59c97c516d83f68c7075
   shared_interface:
@@ -234,7 +241,7 @@ first_structural_wave:
   refactors:
     - id: DBG-RF-002
       path: SDP/Debugger/Refactor/002--Debugger_Controller_State_Epoch/README.md
-      status: complete_parent_signed
+      status: complete_steering_accepted
       slice: DBG-SL-001-004-001
       prior_parent_review: DBG-RVW-002-001-001
       prior_parent_review_status: rework
@@ -252,7 +259,7 @@ first_structural_wave:
       final_verification: DBG-VER-002-001-001
     - id: DBG-RF-003
       path: SDP/Debugger/Refactor/003--Executive_Gateway_Health_Recovery/README.md
-      status: complete_parent_signed
+      status: complete_steering_accepted
       slice: DBG-SL-001-004-002
       prior_parent_review: DBG-RVW-003-001-001
       prior_parent_review_status: rework_gate_order_only
@@ -336,7 +343,7 @@ first_structural_wave:
       corrected_signoff_record: SDP/Debugger/Verification/DBG-SL-001-004-002--Master_Signoff_v2.md
     - id: DBG-SL-001-004-003
       path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/004--Controller_Gateway_Integration.md
-      status: complete_dependency_revalidated_signed
+      status: complete_steering_accepted
       contract_base: 97d8c5b8d62d56dcfcab59c97c516d83f68c7075
       review: DBG-RVW-001-004-003
       verification: DBG-VER-001-004-003
@@ -358,16 +365,68 @@ first_structural_wave:
       dependent_signed_product_head: 1e479536ce5e746e1b06a53b1039b1af84adaed6
       dependent_signoff_record: SDP/Debugger/Verification/DBG-SL-001-004-003--Master_Signoff_v2.md
   runtime_profile: hsx.python-debug-legacy/1
-  still_blocked: DBG-RF-004..DBG-RF-009
+  steering_acceptance_comment: 5362514094
+  still_blocked: none_in_first_wave_closed_scope
   partial_product_wip_stash: efc91f2640647402bc92c69bde1c57685cfaa1f1
-  current_gate: final_issue_38_publication_closeout_then_await_steering
+  current_gate: closed
+active_rf004:
+  refactor:
+    id: DBG-RF-004
+    path: SDP/Debugger/Refactor/004--Typed_Resolver_Inspection/README.md
+    status: active_contracts_frozen_product_not_started
+    steering_authority_comment: 5362514094
+  iteration:
+    id: DBG-IT-001-005
+    path: SDP/Debugger/Sprints/001--Debugger_Stabilization/ScrumIterations.md
+    status: active_contracts_frozen_product_not_started
+  interface:
+    id: dbg.resolver-inspection/1
+    path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/004--Typed_Resolver_Inspection_Interface_v1.md
+    status: frozen_pending_independent_review
+    planned_review: DBG-RVW-001-005-007
+    implementation_owner: DBG-RF-004
+    blocked_consumer: DBG-RF-005
+  slices:
+    - id: DBG-SL-001-005-001
+      path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/005--RF004_Legacy_Oracle.md
+      status: planned
+      review: DBG-RVW-001-005-001
+      verification: DBG-VER-001-005-001
+    - id: DBG-SL-001-005-002
+      path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/006--RF004_Identity_Address.md
+      status: planned
+      review: DBG-RVW-001-005-002
+      verification: DBG-VER-001-005-002
+    - id: DBG-SL-001-005-003
+      path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/007--RF004_Artifact_Index.md
+      status: planned
+      review: DBG-RVW-001-005-003
+      verification: DBG-VER-001-005-003
+    - id: DBG-SL-001-005-004
+      path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/008--RF004_Source_Resolver.md
+      status: planned
+      review: DBG-RVW-001-005-004
+      verification: DBG-VER-001-005-004
+    - id: DBG-SL-001-005-005
+      path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/009--RF004_Recipes_Stack.md
+      status: planned
+      review: DBG-RVW-001-005-005
+      verification: DBG-VER-001-005-005
+    - id: DBG-SL-001-005-006
+      path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/010--RF004_Epoch_Inspection.md
+      status: planned
+      review: DBG-RVW-001-005-006
+      verification: DBG-VER-001-005-006
+  parent_review: DBG-RVW-004-001-001
+  parent_verification: DBG-VER-004-001-001
+  product_base: 69a54aeb3394d3cd4792bce620748e15bab69f1f
+  runtime_profile: hsx.python-debug-legacy/1
+  current_gate: publish_and_independently_review_interface_before_slice_001_worker
 structural_gate:
   rule: Only Steering-authorized Refactors with frozen Slice/interface contracts may execute.
   authorized_refactors:
-    - DBG-RF-002
-    - DBG-RF-003
-  blocked_refactors:
     - DBG-RF-004
+  blocked_refactors:
     - DBG-RF-005
     - DBG-RF-006
     - DBG-RF-007

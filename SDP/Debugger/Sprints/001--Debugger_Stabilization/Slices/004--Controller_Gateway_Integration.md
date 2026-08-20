@@ -1,6 +1,6 @@
 # DBG-SL-001-004-003 — Early Controller/Gateway Integration
 
-- Status: **PASS / EXACT-HEAD SIGNED**
+- Status: **COMPLETE / STEERING ACCEPTED FOR STABILIZATION STAGE**
 
 - Exact reviewed head: `860a98a68440b8e22b67f03fbdbb93d2dd33ab7a`
 - Verification `DBG-VER-001-004-003`: **PASS**
@@ -10,6 +10,7 @@
 - Parents: `DBG-RF-002`, `DBG-RF-003`
 - Iteration: `DBG-IT-001-004`
 - Steering: issue #38 comment `5356484309`
+- Steering completion acceptance: issue #38 comment `5362514094`
 - Interface: refrozen `dbg.controller-gateway/1.1`
 - Review: `DBG-RVW-001-004-003`
 - Verification: `DBG-VER-001-004-003`

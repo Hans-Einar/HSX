@@ -8,9 +8,9 @@
 - Owning issue/gate: #38, Steering activation comment `5348190806`
 
 Current authoritative state: `HSX-R-001..036`, `HSX-A-001..005`, and `HSX-D-001..005`
-are accepted/frozen target contracts; `DBG-D-001..010` is frozen, and Steering authorized
-only the completed RF-002/RF-003/integration first wave. Pre-acceptance gate prose below is
-retained as historical rationale and does not override this state.
+are accepted/frozen target contracts; `DBG-D-001..010` is frozen, and Steering later accepted
+the RF-002/RF-003/integration first wave and authorized RF-004 only. Pre-acceptance gate prose
+below is retained as historical rationale and does not override this state.
 
 ## Question and scope
 
@@ -191,5 +191,6 @@ return reviewed mappings and contracts to #47/#38; it still cannot freeze
 ## Conclusion
 
 The dependency questions map to the complete frozen HSX contract set and conformance plan.
-`DBG-ST-006` is complete and accepted as a dependency. The first structural wave is separately
-authorized and signed; RF-004..009 and AVR work remain blocked pending later Steering decisions.
+`DBG-ST-006` is complete and accepted as a dependency. The first structural wave is signed and
+Steering-accepted; later issue #38 comment `5362514094` authorizes RF-004 only. RF-005..009,
+Executive/VM/AVR and frontend migration remain blocked.
