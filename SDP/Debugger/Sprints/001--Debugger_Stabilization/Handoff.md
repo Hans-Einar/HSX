@@ -1,11 +1,11 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf003_implicit_reopen_rework_active`
+Status: `rf003_corrected_review_pass_formal_verification_active`
 
 ## Current objective
 
-Correct RF-003 failed replacement-OPEN false-HEALTHY handling with a fresh bounded worker, then fresh
-RF-003 Slice and dependent integration review/verification/sign-off chains.
+Formally verify exact corrected RF-003 head `1e47953…`, then re-sign the Slice and revalidate
+the dependent integration chain.
 
 ## Authority
 
@@ -140,8 +140,7 @@ RF-003 Slice and dependent integration review/verification/sign-off chains.
 
 ## Exact next step
 
-Assign a fresh RF-003 worker limited to legacy gateway + its test; retain physical-loss
-evidence until replacement OPEN outcome, and clear only on authoritative success.
+Run fresh formal `DBG-VER-001-004-005` at exact `1e47953…`.
 
 ## Traceability state
 
@@ -198,8 +197,8 @@ evidence until replacement OPEN outcome, and clear only on authoritative success
 - Integration review `DBG-RVW-001-004-003`: PASS at `860a98a…`
 - Verification `DBG-VER-001-004-003`: PASS at `860a98a…`
 - Parent review attempts `DBG-RVW-002-001-002` / `DBG-RVW-003-001-002`: REWORK
-- Review `DBG-RVW-001-004-009`: REWORK at `f776b1a…`
-- Active gate: fresh RF-003 failed replacement-OPEN rework
+- Review `DBG-RVW-001-004-011`: PASS at `1e47953…`
+- Active gate: formal `DBG-VER-001-004-005`
 
 ## Agents and worktree
 
