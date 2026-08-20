@@ -1,10 +1,10 @@
 # DBG-SPR-001 Handoff
 
-Status: `parent_final_reviews_pass_formal_verification_active`
+Status: `rf002_parent_verified_rf003_reverification_active`
 
 ## Current objective
 
-Run fresh formal parent RF-002/RF-003 verifications against the complete signed chain.
+Run fresh formal RF-003 parent reverification, then Master parent sign-offs.
 
 ## Authority
 
@@ -139,7 +139,7 @@ Run fresh formal parent RF-002/RF-003 verifications against the complete signed 
 
 ## Exact next step
 
-Run `DBG-VER-002-001-001` and `DBG-VER-003-001-001`.
+Run `DBG-VER-003-001-002`.
 
 ## Traceability state
 
@@ -201,14 +201,15 @@ Run `DBG-VER-002-001-001` and `DBG-VER-003-001-001`.
 - Dependent integration review `DBG-RVW-001-004-010`: PASS at `1e47953…`
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
-- Parent final reviews: PASS
-- Active gate: formal parent verifications
+- Parent final reviews: PASS; RF-002 parent verification PASS
+- Active gate: fresh RF-003 parent reverification
 
 ## Agents and worktree
 
 The prior design/portable-contract chain is complete. Steering authorized the v1.1 refreeze,
 and its exact implementation passed fresh review. Foundation rework and fresh re-reviews are
-complete; the corrected complete signed chain is PASS. Fresh parent final reviews are active.
+complete; the corrected signed chain and parent reviews are PASS. RF-003 fresh parent
+verification is active.
 Controlled work is on
 `codex/dbg-rf-002-003`;
 the user's original dirty

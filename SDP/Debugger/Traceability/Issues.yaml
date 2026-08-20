@@ -19,7 +19,7 @@ issues:
     master_signoff: pass
   DBG-DA-001:
     issue: 38
-    status: debugger_v1_design_frozen_complete_signed_chain_parent_final_reviews_active
+    status: debugger_v1_design_frozen_RF002_verified_RF003_reverification_active
     decision_package_comment: 5346421143
     architecture_acceptance_comment: 5348190806
     steering_start_comment: 5345600066
@@ -162,15 +162,17 @@ issues:
     dependent_integration_verification: DBG-VER-001-004-006
     dependent_integration_verification_status: pass
     dependent_integration_signed_head: 1e479536ce5e746e1b06a53b1039b1af84adaed6
-    first_wave_current_gate: formal_parent_verifications_DBG-VER-002-001-001_and_DBG-VER-003-001-001
+    first_wave_current_gate: fresh_DBG-VER-003-001-002_then_parent_signoffs
     portable_contract_gate: complete_accepted_frozen
     rf002_parent_review_attempt_6: DBG-RVW-002-001-006
     rf002_parent_review_attempt_6_status: rework_trace_only
   DBG-RF-002:
     issue: 39
-    status: parent_final_review_pass_pending_verification
+    status: parent_verified_pass_pending_master_signoff
     final_review: DBG-RVW-002-001-007
     final_review_status: pass
+    final_verification: DBG-VER-002-001-001
+    final_verification_status: pass
     iteration: DBG-IT-001-004
     slice: DBG-SL-001-004-001
     shared_interface: dbg.controller-gateway/1.1
@@ -178,9 +180,12 @@ issues:
     steering_comment: 5356484309
   DBG-RF-003:
     issue: 40
-    status: parent_final_review_pass_pending_verification
+    status: parent_review_pass_reverification_active
     final_review: DBG-RVW-003-001-006
     final_review_status: pass
+    parent_verification_attempt_1: DBG-VER-003-001-001
+    parent_verification_attempt_1_status: fail_trace_only
+    final_verification: DBG-VER-003-001-002
     iteration: DBG-IT-001-004
     slice: DBG-SL-001-004-002
     shared_interface: dbg.controller-gateway/1.1

@@ -399,7 +399,7 @@ publication passed. Steering froze the HSX portable target contracts in #47 comm
 
 ## DBG-IT-001-004 — Controller/Gateway First Structural Wave
 
-Status: COMPLETE SIGNED FIRST-WAVE CHAIN / FINAL PARENT REVIEWS ACTIVE
+Status: RF-002 PARENT VERIFIED / RF-003 FRESH PARENT VERIFICATION ACTIVE
 
 ### Authority and scope
 

@@ -62,3 +62,5 @@ track IDs rather than silently renamed in historical documents.
 - `DBG-RVW-003-001-004` — RF-003 parent attempt, REWORK on mandatory-state trace
 - `DBG-RVW-003-001-005` — RF-003 parent attempt, REWORK on issue state
 - `DBG-RVW-003-001-006` / `DBG-VER-003-001-001` — RF-003 final parent review/verification
+- `DBG-VER-003-001-001` — RF-003 parent verification attempt, FAIL trace-only
+- `DBG-VER-003-001-002` — RF-003 fresh parent verification after current-state correction

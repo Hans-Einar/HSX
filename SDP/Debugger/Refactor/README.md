@@ -6,8 +6,8 @@ worker -> reviewer -> verification -> exact-head sign-off loop.
 | ID | Name | Status | Primary dependency |
 |---|---|---|---|
 | `DBG-RF-001` | DAP Protocol Baseline Stabilization | COMPLETE at `208063e` | DBG-GAP-001 |
-| `DBG-RF-002` | Debugger Controller, State Machine, Stop Epochs | COMPLETE SIGNED CHAIN — FINAL PARENT REVIEW | frozen DBG-D-001/D-003 + shared interface |
-| `DBG-RF-003` | Session/Transport/Event Health/Recovery | COMPLETE SIGNED CHAIN — FINAL PARENT REVIEW | frozen DBG-D-002 + shared interface |
+| `DBG-RF-002` | Debugger Controller, State Machine, Stop Epochs | PARENT REVIEW/VERIFICATION PASS — SIGN-OFF PENDING | frozen DBG-D-001/D-003 + shared interface |
+| `DBG-RF-003` | Session/Transport/Event Health/Recovery | PARENT REVIEW PASS — REVERIFICATION ACTIVE | frozen DBG-D-002 + shared interface |
 | `DBG-RF-004` | Symbol/Source/Address/Inspection Model | BLOCKED | DBG-DA-001 + HSX address contract |
 | `DBG-RF-005` | Breakpoint/Watch Ownership/Reconciliation | BLOCKED | DBG-RF-002 + DBG-RF-003 |
 | `DBG-RF-006` | Lifecycle and Execution/Stepping Semantics | BLOCKED | DBG-RF-002 + DBG-RF-003 + DBG-RF-004 |
