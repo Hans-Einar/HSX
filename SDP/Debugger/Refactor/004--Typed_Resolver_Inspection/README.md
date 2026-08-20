@@ -1,10 +1,10 @@
 # DBG-RF-004 — Typed Artifact, Source, Address, Stack, and Inspection
 
-- Status: **ACTIVE — REVIEWS 007/008 REWORK CORRECTED / REVIEW 009 PENDING**
+- Status: **ACTIVE — REVIEWS 007..009 REWORK CORRECTED / REVIEW 010 PENDING**
 - Steering authority: issue #38 comment `5362514094`
 - Dependency clarification: issue #42 comment `5362515750`
 - Sprint/iteration: `DBG-SPR-001` / `DBG-IT-001-005`
-- Slices: `DBG-SL-001-005-001..DBG-SL-001-005-006`
+- Slices: `DBG-SL-001-005-001..DBG-SL-001-005-007`
 - Requirements: `DBG-R-004`, `DBG-R-021..DBG-R-028`, `DBG-R-034..DBG-R-036`
 - Findings: `DBG-F-007`, `DBG-F-015`, `DBG-F-017`, `DBG-F-019`, `DBG-F-020`,
   inspection portion of `DBG-F-026`
@@ -12,8 +12,8 @@
   `DBG-D-004`, `DBG-D-009`
 - Portable inputs: `HSX-D-001..HSX-D-003`, especially `HSX-D-002`
 - Frozen interface: `dbg.resolver-inspection/1`
-- Interface reviews: `DBG-RVW-001-005-007` / `...008` REWORK; fresh
-  `DBG-RVW-001-005-009` pending
+- Interface reviews: `DBG-RVW-001-005-007..009` REWORK; fresh
+  `DBG-RVW-001-005-010` pending
 - Product base: `69a54aeb3394d3cd4792bce620748e15bab69f1f`
 
 ## Objective
@@ -50,17 +50,18 @@ into a resolver/inspection monolith.
 | Slice | Owned product/test files | Read-only dependencies |
 |---|---|---|
 | 001 legacy oracle | `python/tests/fixtures/rf004/`, `python/tests/test_hsx_debugger_rf004_legacy_oracles.py` | legacy SymbolIndex/SourceMap/stack behavior |
-| 002 identity/address | `identity.py`, `addresses.py`, `results.py`, `test_hsx_debugger_identity.py`, `test_hsx_debugger_addresses.py` | frozen HSX/Debugger contracts; existing `contracts.py` |
-| 003 artifact/index | `artifacts.py`, `legacy_symbols.py`, `test_hsx_debugger_artifacts.py` | signed Slices 001-002; legacy SymbolIndex read-only |
-| 004 source resolver | `sources.py`, `test_hsx_debugger_sources.py` | signed Slices 001-003; legacy SourceMap read-only |
-| 005 recipes/stack | `recipes.py`, `stack.py`, `test_hsx_debugger_recipes.py`, `test_hsx_debugger_stack.py` | signed Slices 001-004; snapshot test doubles only |
+| 002 identity/address | `identity.py`, `addresses.py`, `results.py`, `snapshot.py`, `metadata.py`, identity/address/metadata tests | frozen HSX/Debugger contracts; existing `contracts.py` |
+| 007 recipe foundation | `recipes.py`, `test_hsx_debugger_recipes.py` | signed Slices 001-002; artifact/stack read-only |
+| 003 artifact/index | `artifacts.py`, `legacy_symbols.py`, `test_hsx_debugger_artifacts.py` | signed Slices 001-002/007; legacy SymbolIndex read-only |
+| 004 source resolver | `sources.py`, `test_hsx_debugger_sources.py` | signed Slices 001-003/007; legacy SourceMap read-only |
+| 005 stack | `stack.py`, `test_hsx_debugger_stack.py` | signed Slices 001-004/007; recipes read-only |
 | 006 inspection | `handles.py`, `inspection.py`, `test_hsx_debugger_inspection.py` | signed Slices 001-005; existing epoch/controller contracts read-only |
 
-`python/hsx_debugger/__init__.py` may receive public exports only in the Slice that owns the
-exported implementation, with no import-time behavior. Shared product files from earlier
-Slices become read-only to later workers unless a recorded corrective Slice explicitly owns a
-change. The Master coordinates any cross-Slice correction and requires fresh review of all
-affected heads.
+`python/hsx_debugger/__init__.py` is the sole append-only shared exception: each Slice may add
+only exports for its own implementation and may not edit/remove/reorder prior exports or add
+import-time behavior. Every other product file from an earlier Slice becomes read-only to
+later workers unless a recorded corrective Slice explicitly owns a change. The Master
+coordinates any cross-Slice correction and requires fresh review of all affected heads.
 
 ## Preserved and intentionally changed legacy behavior
 
@@ -97,10 +98,11 @@ adapters but may not silently redirect current DAP/CLI product paths.
 
 1. Slice 001 freezes classified regression/golden evidence before legacy algorithms move.
 2. Slice 002 implements the public exact identity/address/result foundation.
-3. Slice 003 implements binding-verified immutable artifact/index behavior.
-4. Slice 004 implements exact case/content source resolution.
-5. Slice 005 implements bounded recipes, locations and stack reconstruction.
-6. Slice 006 integrates epoch handles and all inspection surfaces through an immutable
+3. Slice 007 implements the recipe DTO/validator/evaluator foundation.
+4. Slice 003 implements binding-verified immutable artifact/index behavior using Slice 007.
+5. Slice 004 implements exact case/content source resolution.
+6. Slice 005 implements snapshot-bound stack reconstruction using Slice 007.
+7. Slice 006 integrates epoch handles and all inspection surfaces through an immutable
    SnapshotReadPort fixture.
 
 Each Slice is sequential because the next consumes the prior signed public surface. Every
@@ -114,7 +116,7 @@ Slice or editing frozen contracts during implementation.
 
 ## Verification plan
 
-At minimum, evidence across the six Slices covers:
+At minimum, evidence across the seven Slices covers:
 
 - immutable type/equality validation and mismatch rejection across target/image/binding/epoch/
   snapshot refs;
@@ -131,8 +133,9 @@ At minimum, evidence across the six Slices covers:
 - existing RF-002/RF-003/controller/gateway regression suites remain green;
 - YAML/NDJSON/Markdown/diff validation and protected-path diff guards.
 
-Formal verification records are `DBG-VER-001-005-001..006`. Planned Slice reviews are
-`DBG-RVW-001-005-001..006`; interface reviews 007/008 are REWORK and fresh review 009 is pending.
+Formal verification records are `DBG-VER-001-005-001..007`. Planned Slice reviews are
+`DBG-RVW-001-005-001..006` plus `DBG-RVW-001-005-011` for Slice 007; interface reviews
+007..009 are REWORK and fresh review 010 is pending.
 Parent final review and
 verification are `DBG-RVW-004-001-001` and `DBG-VER-004-001-001`.
 
@@ -151,7 +154,7 @@ adapter and all intentional-change cases produce the frozen typed result.
 
 ## Parent completion signal
 
-RF-004 completes only when all six Slices are exact-head signed; the combined head passes
+RF-004 completes only when all seven Slices are exact-head signed; the combined head passes
 fresh independent parent review and formal verification; `dbg.resolver-inspection/1` coverage
 for address/source/stack/variables/snapshot expressions/memory/disassembly is durable; remaining degraded behavior
 is explicit; traceability and Handoff agree; and the full signed chain is published remotely.

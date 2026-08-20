@@ -172,7 +172,7 @@ issues:
     first_wave_current_gate: closed_steering_accepted
     next_authorized_refactor: DBG-RF-004
     rf004_iteration: DBG-IT-001-005
-    rf004_slices: DBG-SL-001-005-001..DBG-SL-001-005-006
+    rf004_slices: DBG-SL-001-005-001..DBG-SL-001-005-007
     rf004_interface: dbg.resolver-inspection/1
     rf004_interface_review: DBG-RVW-001-005-007
     rf004_interface_review_status: rework
@@ -181,6 +181,9 @@ issues:
     rf004_interface_rereview_status: rework
     rf004_interface_rereviewed_head: 8d6c0f571f46a10ce6db7331618ef7600d6a8203
     rf004_interface_review_attempt_3: DBG-RVW-001-005-009
+    rf004_interface_review_attempt_3_status: rework
+    rf004_interface_review_attempt_3_head: 07f7e16040bec1c225d263c682066f65b173e6aa
+    rf004_interface_review_attempt_4: DBG-RVW-001-005-010
     rf005_dependency_clarification_issue: 42
     rf005_dependency_clarification_comment: 5362515750
     portable_contract_gate: complete_accepted_frozen
@@ -218,7 +221,8 @@ issues:
     issue: 41
     status: active_candidate_refrozen_rereview_pending_product_not_started
     iteration: DBG-IT-001-005
-    slices: DBG-SL-001-005-001..DBG-SL-001-005-006
+    slices: DBG-SL-001-005-001..DBG-SL-001-005-007
+    execution_order: DBG-SL-001-005-001,DBG-SL-001-005-002,DBG-SL-001-005-007,DBG-SL-001-005-003,DBG-SL-001-005-004,DBG-SL-001-005-005,DBG-SL-001-005-006
     public_interface: dbg.resolver-inspection/1
     interface_review: DBG-RVW-001-005-007
     interface_review_status: rework
@@ -227,6 +231,9 @@ issues:
     interface_rereview_status: rework
     interface_rereviewed_head: 8d6c0f571f46a10ce6db7331618ef7600d6a8203
     interface_review_attempt_3: DBG-RVW-001-005-009
+    interface_review_attempt_3_status: rework
+    interface_review_attempt_3_head: 07f7e16040bec1c225d263c682066f65b173e6aa
+    interface_review_attempt_4: DBG-RVW-001-005-010
     steering_authority_comment: 5362514094
   DBG-RF-005:
     issue: 42

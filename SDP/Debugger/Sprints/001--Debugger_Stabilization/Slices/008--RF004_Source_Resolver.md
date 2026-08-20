@@ -3,7 +3,7 @@
 - Status: **FROZEN / PLANNED**
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
-- Depends on signed: `DBG-SL-001-005-001..003`
+- Depends on signed: `DBG-SL-001-005-001..003`, `DBG-SL-001-005-007`
 - Review: `DBG-RVW-001-005-004`
 - Verification: `DBG-VER-001-005-004`
 

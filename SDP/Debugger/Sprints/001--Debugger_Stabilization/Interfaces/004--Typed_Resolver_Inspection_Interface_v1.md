@@ -1,6 +1,6 @@
 # `dbg.resolver-inspection/1` — Typed Resolver and Inspection Interface
 
-- Status: **REFROZEN CANDIDATE — REVIEWS 007/008 REWORK / REVIEW 009 PENDING**
+- Status: **REFROZEN CANDIDATE — REVIEWS 007..009 REWORK / REVIEW 010 PENDING**
 - Iteration: `DBG-IT-001-005`
 - Parent Refactor: `DBG-RF-004`
 - Steering authority: issue #38 comment `5362514094`
@@ -9,10 +9,11 @@
 - Portable contracts: `HSX-D-001..HSX-D-003`, especially `HSX-D-002`
 - Review `DBG-RVW-001-005-007`: REWORK at `82154c614a31284723bf3e6a337c5bedfb8aba5d`
 - Review `DBG-RVW-001-005-008`: REWORK at `8d6c0f571f46a10ce6db7331618ef7600d6a8203`
-- Fresh independent re-review: `DBG-RVW-001-005-009`
+- Review `DBG-RVW-001-005-009`: REWORK at `07f7e16040bec1c225d263c682066f65b173e6aa`
+- Fresh independent re-review: `DBG-RVW-001-005-010`
 - Public interface ID: `dbg.resolver-inspection/1`
 
-This document freezes the public Python-domain interface to be implemented by the six bounded
+This document freezes the public Python-domain interface to be implemented by the seven bounded
 RF-004 Slices. It is frontend-neutral and side-by-side: it does not migrate DAP, CLI, VS Code,
 the Executive, VM, or AVR paths.
 
@@ -31,10 +32,12 @@ boundaries:
 | `identity.py` | Immutable target, image, artifact, bundle, binding, stop and snapshot references | Parsing, filesystem lookup, target reads, frontend IDs |
 | `addresses.py` | Address-space descriptors, typed addresses/ranges, checked arithmetic and formatting | Symbol lookup, masks hidden in adapters, memory reads |
 | `results.py` | Typed resolver/inspection statuses, diagnostics and immutable result envelopes | Service algorithms or policy fallbacks |
+| `snapshot.py` | SnapshotReadPort Protocol and exact context/result fencing helpers | Runtime adapter, live reads, transport/retry |
+| `metadata.py` | Pure source/function/symbol/type/scope/instruction/memory record DTOs | Parsing/indexes, recipe rows/evaluation, target reads |
 | `artifacts.py` | Verified bundle/component parsing and immutable debug indexes | Local source selection, live reads, stack walking, frontend mapping |
 | `legacy_symbols.py` | Explicit `hsx.python-debug-legacy/1` `.sym` adaptation behind classified evidence | Portable conformance claims, implicit masks/case/basename policy |
 | `sources.py` | Exact source identity and content-verified locator resolution | Symbol parsing, target state, UI navigation |
-| `recipes.py` | Bounded unwind/location recipe validation and evaluation | Stack traversal policy, raw live reads, implicit ABI guesses |
+| `recipes.py` | Unwind/Location row DTOs, bounded recipe validation and evaluation | Artifact component parsing/index, stack traversal policy, raw live reads, implicit ABI guesses |
 | `stack.py` | Snapshot-bound unwind/stack reconstruction and partial diagnostics | Artifact parsing, frontend frames, fixed R7 fallback |
 | `inspection.py` | Epoch-bound registers/scopes/variables/memory/disassembly composition | Run control, transport retry, artifact parsing, frontend/DAP policy |
 | `handles.py` | Domain handle allocation/validation for one StopEpoch | DAP integer allocation or lifetime ownership |
@@ -147,7 +150,7 @@ excluded from equality/digest scope.
 
 ```text
 ExecutiveInstanceRef { value: str }
-TargetRef { executive: ExecutiveInstanceRef, target_id: str,
+TargetRef { canonical_ref: str, executive: ExecutiveInstanceRef, target_id: str,
             target_generation: int >= 1, display_pid: int,
             pid_generation: int >= 1 }
 CanonicalUInt64 { value: int in 0..2^64-1 }
@@ -241,6 +244,14 @@ requires it to equal `bundle_digest`, then recomputes the exact binding payload 
 `accepted_image_debug_capability_profile`. Any mapping that changes a normative key, excludes
 a mandatory field or includes a local/provenance field is `CORRUPT` and produces no ref/binding.
 
+`TargetRef.canonical_ref` is the opaque canonical scalar reference supplied with the frozen
+HSX TargetRef; it is not derived from PID, target_id or display data. LoadedImageRef retains
+the complete TargetRef as its Python field, but `canonical_payload()` emits
+`executive_instance_ref.value` for `executive_instance_ref` and
+`target_ref.canonical_ref` for the scalar `target_ref` key exactly as canonical vector 4.
+Within one accepted identity registry, reuse of one canonical_ref with different TargetRef
+fields is `CORRUPT`; absence of canonical_ref prevents canonical LoadedImageRef construction.
+
 `StopEpochId` is one opaque non-empty exact string; it is never parsed for generation.
 `supported_read_sets` uses the frozen names `registers`, `memory`, `disassembly`, `stack`, and
 `resources`; a service requiring an absent set returns `UNAVAILABLE`.
@@ -286,7 +297,6 @@ Domain failures are returned, not hidden by `None`, first-candidate selection or
 - `STALE`
 - `UNSUPPORTED`
 - `CORRUPT`
-- `LIMIT_EXCEEDED`
 
 `ContextBindingStatus`:
 
@@ -379,6 +389,14 @@ SymbolRecord { symbol_id: str, name: str,
                type_id: str | None, declaration_order: int >= 0 }
 SourceLocation { source: SourceRef, line: int >= 1, column: int >= 1 | None,
                  discriminator: int | None }
+TypeMember { name: str, type_id: str, bit_offset: int >= 0, bit_size: int >= 1 }
+TypeRecord { type_id: str, name: str,
+             kind: INTEGER | FLOAT | POINTER | ARRAY | STRUCT | UNION | OPAQUE,
+             bit_size: int >= 1, byte_order: LITTLE | BIG,
+             members: tuple[TypeMember, ...] }
+LexicalScopeRecord { lexical_scope_id: str, function_id: str,
+                     parent_scope_id: str | None, pc_range: HsxAddressRange,
+                     declaration_order: int >= 0 }
 InstructionRecord { instruction_id: str, address: HsxAddress, byte_size: int >= 1,
                     encoded_word: int | None, function_id: str | None,
                     source: SourceLocation | None,
@@ -422,7 +440,7 @@ FramePage { total_frames: int >= 0, offset: int >= 0,
             frames: tuple[FrameRecord, ...] }
 ScopeRecord { context: InspectionContext, handle: DomainHandle,
               frame_handle: DomainHandle,
-              kind: REGISTERS | LOCALS | GLOBALS | WATCH,
+              kind: REGISTERS | LOCALS | GLOBALS,
               name: str, expensive: bool }
 ScopeSet { frame_handle: DomainHandle, scopes: tuple[ScopeRecord, ...] }
 ValuePiece { destination_bit_offset: int >= 0, bit_size: int >= 1,
@@ -433,6 +451,11 @@ EvaluatedValue { variable_id: str, name: str, declared_type_id: str | None,
                  bit_size: int >= 1 | None,
                  location_status: AVAILABLE | PARTIAL | OPTIMIZED_OUT | UNAVAILABLE,
                  pieces: tuple[ValuePiece, ...] }
+ExpressionValue { expression_kind: REGISTER | VARIABLE | SYMBOL | CONSTANT | MEMORY,
+                  source_id: str | None, display_value: str,
+                  raw_bytes: bytes | None, bit_size: int >= 1,
+                  status: AVAILABLE | PARTIAL | OPTIMIZED_OUT | UNAVAILABLE,
+                  pieces: tuple[ValuePiece, ...] }
 VariableRecord { context: InspectionContext, handle: DomainHandle,
                  scope_handle: DomainHandle, variable_id: str,
                  declaration_order: int >= 0, evaluated: EvaluatedValue,
@@ -454,7 +477,7 @@ DisassemblyBlock { start: HsxAddress, requested_count: int >= 1,
 `RegisterSelection` requires exactly one of `all_declared=true` with no IDs, or
 `all_declared=false` with unique explicit IDs. Explicit register results follow request order;
 all-declared results follow ArchitectureDescriptor `register_order`. Stack frames are ordered
-top-first by ascending frame_index; scopes are ordered REGISTERS, LOCALS, GLOBALS, WATCH;
+top-first by ascending frame_index; scopes are ordered REGISTERS, LOCALS, GLOBALS;
 variables are ordered by `(declaration_order, variable_id)`; disassembly is ordered by checked
 ascending code address. `PageRequest` slices the complete ordered collection as
 `[offset:min(offset+limit,total)]`; offset at/beyond total returns an empty tuple with the same
@@ -474,15 +497,19 @@ duplicate display names therefore remain distinct.
 `SnapshotExpression` is a closed typed union:
 
 ```text
-RegisterExpression { register_id }
-VariableExpression { variable_id, lexical_scope_id }
-SymbolExpression { symbol_id }
-ConstantExpression { unsigned_value, bit_width }
-MemoryExpression { address: HsxAddress, bit_width, byte_order }
+RegisterExpression { register_id: str }
+VariableExpression { variable_id: str, lexical_scope_id: str }
+SymbolExpression { symbol_id: str }
+ConstantExpression { unsigned_value: int >= 0, bit_width: int >= 1 }
+MemoryExpression { address: HsxAddress, bit_width: int >= 1,
+                   byte_order: LITTLE | BIG }
 ```
 
 There are no call, assignment, mutation, persistent-watch or raw-string variants. Frontend
 string parsing and presentation remain outside this interface.
+ExpressionValue.source_id is the register/variable/symbol ID for those variants and None for
+constant/memory. Only a VariableExpression backed by a PIECES LocationForm may be PARTIAL and
+carry ValuePieces; a missing register/symbol/scalar/memory value is UNAVAILABLE, never padded.
 
 Source locator schemas:
 
@@ -504,6 +531,10 @@ LegacyArtifactProvenance { profile: "hsx.python-debug-legacy/1",
                            sym_content_digest: ContentDigest,
                            hxe_crc32: int in 0..0xffffffff }
 LegacySourceSpelling { file: str, directory: str | None }
+LegacyFunctionRecord { function_id: str, name: str, linkage_name: str | None,
+                       range: HsxAddressRange,
+                       definition_spelling: LegacySourceSpelling | None,
+                       definition_line: int >= 1 | None }
 LegacyInstructionRecord { instruction_id: str, address: HsxAddress,
                           byte_size: int >= 1, function_id: str | None,
                           source_spelling: LegacySourceSpelling | None,
@@ -547,7 +578,15 @@ Public queries:
 
 ```text
 binding() -> ImageDebugBinding
+source_identities() -> tuple[SourceRef, ...]
 functions() -> tuple[FunctionRecord, ...]
+types() -> tuple[TypeRecord, ...]
+type_by_id(type_id: str) -> ResolutionResult[TypeRecord]
+lexical_scopes(function_id: str, frame_pc: HsxAddress)
+    -> tuple[LexicalScopeRecord, ...]
+variables_in_scope(lexical_scope_id: str, frame_pc: HsxAddress)
+    -> tuple[SymbolRecord, ...]
+global_variables() -> tuple[SymbolRecord, ...]
 symbols_named(name: str) -> ResolutionResult[SymbolRecord]
 instruction_at(address: HsxAddress) -> ResolutionResult[InstructionRecord]
 source_locations(source: SourceRef, line: int, column: int | None) -> ResolutionResult[InstructionRecord]
@@ -557,7 +596,7 @@ location_rows(variable_id: str, lexical_scope_id: str,
               frame_pc: HsxAddress) -> ResolutionResult[LocationRow]
 
 LegacyDebugArtifactIndex.provenance() -> LegacyArtifactProvenance
-LegacyDebugArtifactIndex.functions() -> tuple[FunctionRecord, ...]
+LegacyDebugArtifactIndex.functions() -> tuple[LegacyFunctionRecord, ...]
 LegacyDebugArtifactIndex.symbols_named(name: str) -> LegacyResolutionResult[SymbolRecord]
 LegacyDebugArtifactIndex.instruction_at(address: HsxAddress)
     -> LegacyResolutionResult[LegacyInstructionRecord]
@@ -572,8 +611,18 @@ Index ordering is observable and fixed: functions by `(space.value, range.start.
 function_id)`; symbol candidates by `(space.value, address.value, kind, symbol_id)`;
 instructions/source-location candidates by `(space.value, address.value, instruction_id)`;
 memory regions by `(space.value, range.start.value, region_id)`; unwind/location rows by
-`(space.value, pc_range.start.value, row_id)`. Exact duplicate records are rejected as corrupt;
+`(space.value, pc_range.start.value, row_id)`; SourceRefs by logical_id UTF-8; types by type_id;
+lexical scopes by `(declaration_order, lexical_scope_id)`; variables by
+`(declaration_order, symbol_id)`. Exact duplicate records are rejected as corrupt;
 distinct same-name/same-address records remain distinct candidates.
+
+Query cardinality is fixed: direct enumeration methods return their possibly-empty ordered
+tuple. `type_by_id`, `instruction_at`, `unwind_rows` and `location_rows` are RESOLVED only for
+exactly one value, UNAVAILABLE for zero and CORRUPT for duplicate/overlapping identity.
+`symbols_named` is UNAVAILABLE for zero, RESOLVED for one and AMBIGUOUS with every candidate
+for more than one. `source_locations` explicitly asks for the complete executable instruction
+set, so it is UNAVAILABLE for zero and RESOLVED with the ordered one-or-more set; it never
+chooses one address.
 
 Duplicate symbol names and multiple executable addresses remain candidate sets. Source records
 are keyed by exact `SourceRef`; no basename alias is part of the portable index. All code/data
@@ -586,7 +635,9 @@ and supplied HXE CRC evidence, convert every integer through an explicit descrip
 duplicate candidates and exact spelling, and return only the mandatory
 `hsx.python-debug-legacy/1`/LEGACY_UNVERIFIED provenance type. It may not claim
 `hsx.debug.image-bundle/1` conformance, produce SourceRef, or be passed where a
-DebugArtifactIndex/ImageDebugBinding is required.
+DebugArtifactIndex/ImageDebugBinding is required. Legacy functions/instructions use only
+LegacySourceSpelling records; portable FunctionRecord/SourceLocation/SourceRef types are never
+returned transitively by the legacy index.
 
 ## 6. Source resolver
 
@@ -679,7 +730,7 @@ RecipeEvaluationContext { context: InspectionContext, frame_index: int >= 0,
 RecipeBudget { opcodes_remaining: int >= 0, dereferences_remaining: int >= 0,
                bytes_remaining: int >= 0 }
 RecipeEvaluationResult { status: COMPLETE | UNAVAILABLE | UNSUPPORTED | CORRUPT |
-                                STALE | LIMIT_EXCEEDED,
+                                STALE,
                          context: InspectionContext, value: RecipeValue | None,
                          budget_after: RecipeBudget,
                          diagnostics: tuple[Diagnostic, ...] }
@@ -723,7 +774,9 @@ InspectionResult[tuple[UnwindFrame, ...]]` returns handle-free immutable frames 
 same context. Each frame has typed PC/SP/CFA/frame-base values,
 function/source metadata where resolved, resume PC distinct from checked call-site PC, and
 per-frame diagnostics. Terminal top level is explicit. Missing data returns partial/unavailable;
-unsupported, corrupt, stale and limit-exceeded remain distinct. The service never retries with
+unsupported, corrupt and stale remain distinct. Every bound exhaustion is status
+`UNSUPPORTED` with diagnostic code `limit_exceeded`, exactly as `HSX-D-002`; it is never a
+separate status or truncated result. The service never retries with
 a fixed R7 chain or invents a caller.
 
 `LocationEvaluator.evaluate(context: InspectionContext, frame: UnwindFrame,
@@ -745,7 +798,7 @@ scopes(context: InspectionContext, frame_handle: DomainHandle) -> InspectionResu
 variables(context: InspectionContext, scope_handle: DomainHandle,
           page: PageRequest) -> InspectionResult[VariablePage]
 evaluate_snapshot(context: InspectionContext, frame_handle: DomainHandle,
-                  expression: SnapshotExpression) -> InspectionResult[EvaluatedValue]
+                  expression: SnapshotExpression) -> InspectionResult[ExpressionValue]
 memory(context: InspectionContext, address: HsxAddress,
        byte_length: int) -> InspectionResult[MemoryBlock]
 disassemble(context: InspectionContext, address: HsxAddress,
@@ -770,6 +823,16 @@ is `UNKNOWN_HANDLE`; a known serial from an invalidated epoch is `STALE`.
 `SnapshotExpression` is a typed, side-effect-free AST over registers, selected-frame variables,
 symbols/constants and explicit typed memory dereference. String parsing and DAP Watch policy
 belong to later frontends; persistent live watches belong to RF-005 and are not created here.
+
+Scope composition is fixed, not frontend policy. `scopes()` returns REGISTERS when the snapshot
+declares register coverage, LOCALS when the frame resolves to exact function/PC lexical scopes,
+and GLOBALS when the index has globals; absent capabilities/data omit that scope and add an
+explicit diagnostic. There is no WATCH scope: each standard Watch/hover/evaluate request calls
+`evaluate_snapshot()` independently. `variables()` maps REGISTERS in descriptor order, LOCALS
+from `lexical_scopes()` plus `variables_in_scope()` for the selected frame PC, and GLOBALS from
+`global_variables()`. Local/global variables select exactly one applicable LocationRow and use
+LocationEvaluator; zero rows is unavailable and overlap is corrupt. No scope query invents a
+variable, reads the current top frame or creates a persistent live watch.
 
 Registers, stack, variables, snapshot expressions, memory and disassembly returned for one context must use one exact
 snapshot or immutable image bytes explicitly identified in the result. Cross-service tests
@@ -804,10 +867,15 @@ DAP/CLI consumers.
 |---|---|
 | `DBG-SL-001-005-001` | Classify and capture legacy symbol/source/stack evidence; no new service implementation |
 | `DBG-SL-001-005-002` | Implement identity/address/result/binding values and descriptor checks |
+| `DBG-SL-001-005-007` | Implement recipe DTO parsing/validation and bounded Recipe/Location evaluators |
 | `DBG-SL-001-005-003` | Implement verified artifact index and explicit legacy `.sym` adapter |
 | `DBG-SL-001-005-004` | Implement exact content-verified SourceResolver |
-| `DBG-SL-001-005-005` | Implement bounded recipes, locations and snapshot-bound stack service |
+| `DBG-SL-001-005-005` | Implement snapshot-bound StackService over the signed recipe foundation |
 | `DBG-SL-001-005-006` | Implement handles and integrated epoch-bound InspectionService |
+
+Execution order is `001 -> 002 -> 007 -> 003 -> 004 -> 005 -> 006`. Slice 007 was allocated
+after review 009 exposed the earlier sequencing contradiction; IDs are not recycled or
+renumbered. Artifact Slice 003 consumes the signed recipe DTO/validator and cannot begin first.
 
 Each Slice has a fresh worker, independent exact-head review, formal verification and Master
 sign-off. Later Slices consume earlier signed interfaces. No RF-005 product work starts from
@@ -816,7 +884,7 @@ and a later Steering authorization.
 
 ## 12. Interface completion signal
 
-`dbg.resolver-inspection/1` is accepted only when all six Slices and RF-004 parent review,
+`dbg.resolver-inspection/1` is accepted only when all seven Slices and RF-004 parent review,
 verification and exact-head Master sign-off pass on remote-resolvable history. The decision
 package must state exact interfaces, address/source/stack/variables/memory/disassembly
 coverage, legacy reuse/retirement, degraded behavior and every review/verification/sign-off

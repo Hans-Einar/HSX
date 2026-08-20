@@ -38,7 +38,7 @@ Read in this order:
    documents, and `DBG-ST-006`
 
 `DBG-ST-006` and `DBG-IT-001-004` are complete. Active work is `DBG-IT-001-005` /
-`DBG-RF-004` with frozen Slices `DBG-SL-001-005-001..006` and corrected public-interface
-candidate `dbg.resolver-inspection/1` awaiting `DBG-RVW-001-005-009`. Existing Executive behavior remains
+`DBG-RF-004` with frozen Slices `DBG-SL-001-005-001..007` and corrected public-interface
+candidate `dbg.resolver-inspection/1` awaiting `DBG-RVW-001-005-010`. Existing Executive behavior remains
 `hsx.python-debug-legacy/1`; RF-005..009, Executive/VM/AVR and frontend migration remain
 blocked.

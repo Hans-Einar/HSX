@@ -498,18 +498,19 @@ frontend mapping remain separate responsibilities.
 
 Interface review `DBG-RVW-001-005-007` returned REWORK at exact remote-published head
 `82154c614a31284723bf3e6a337c5bedfb8aba5d`. Master corrected only the candidate interface,
-Slice ownership and live traceability. Review 008 also returned REWORK; fresh
-`DBG-RVW-001-005-009` must PASS before product
+Slice ownership and live traceability. Reviews 008 and 009 also returned REWORK; fresh
+`DBG-RVW-001-005-010` must PASS before product
 dispatch. A finding requiring an accepted DBG/HSX design change returns to Steering.
 
 ### Frozen execution units
 
 1. `DBG-SL-001-005-001` — classified legacy oracle/golden evidence; tests/fixtures only.
 2. `DBG-SL-001-005-002` — immutable identities, binding, typed addresses and result algebra.
-3. `DBG-SL-001-005-003` — verified immutable artifact index and explicit legacy `.sym` adapter.
-4. `DBG-SL-001-005-004` — exact content-verified SourceResolver.
-5. `DBG-SL-001-005-005` — bounded recipe/location evaluator and snapshot-bound stack.
-6. `DBG-SL-001-005-006` — domain handles and integrated epoch-bound InspectionService.
+3. `DBG-SL-001-005-007` — recipe DTO/validator/evaluator foundation.
+4. `DBG-SL-001-005-003` — verified immutable artifact index and explicit legacy `.sym` adapter.
+5. `DBG-SL-001-005-004` — exact content-verified SourceResolver.
+6. `DBG-SL-001-005-005` — snapshot-bound StackService.
+7. `DBG-SL-001-005-006` — domain handles and integrated epoch-bound InspectionService.
 
 Slices are sequential because each later worker consumes prior signed interfaces. Each uses a
 fresh worker, fresh exact-head reviewer, formal `DBG-VER-001-005-00N` evidence and Master
@@ -529,10 +530,11 @@ exact-head sign-off before the next Slice starts.
 ### Traceability and dependency graph
 
 - Parent: `DBG-RF-004`; iteration `DBG-IT-001-005`; Slices
-  `DBG-SL-001-005-001..006`.
+  `DBG-SL-001-005-001..007`.
 - Requirements: `DBG-R-004`, `DBG-R-021..DBG-R-028`, `DBG-R-034..DBG-R-036`.
 - Design: `DBG-D-003`, `DBG-D-004`, `DBG-D-009`; portable `HSX-D-001..003`.
-- Reviews: `DBG-RVW-001-005-001..009`; verifications `DBG-VER-001-005-001..006`.
+- Slice reviews: `DBG-RVW-001-005-001..006` and `DBG-RVW-001-005-011`; interface
+  reviews: `DBG-RVW-001-005-007..010`; verifications `DBG-VER-001-005-001..007`.
 - Parent final: `DBG-RVW-004-001-001`, `DBG-VER-004-001-001`.
 - RF-005 explicitly depends on RF-004's accepted `dbg.resolver-inspection/1`; partial/frozen
   implementation does not satisfy the dependency and no RF-005 worker is authorized.
@@ -541,7 +543,7 @@ exact-head sign-off before the next Slice starts.
 
 Each Slice runs its frozen focused matrix, prior signed RF-004 tests and applicable
 RF-002/RF-003 regressions, plus YAML/NDJSON/diff/protected-path checks. Iteration 005 closes
-only after all six exact-head Slice sign-offs, fresh combined parent review/verification,
+only after all seven exact-head Slice sign-offs, fresh combined parent review/verification,
 parent Master sign-off, remote publication/fresh reconstruction and issue #38 decision
 package. The package must cover interfaces, address/source/stack/variables/memory/disassembly,
 legacy status, degraded behavior, exact heads and RF-005 recommendation. Master then stops for
@@ -580,3 +582,22 @@ froze recipe/op/rule/evaluator/budget and deterministic ordering/page rules, add
 records/handles/pieces, separated LegacyDebugArtifactIndex with mandatory
 LEGACY_UNVERIFIED provenance and no binding/SourceRef, and froze the StopEpoch matrix. No
 product file changed. Fresh exact-head review is `DBG-RVW-001-005-009`.
+
+### Interface review attempt 3
+
+Fresh read-only `DBG-RVW-001-005-009` reviewed exact remote head `07f7e1604…`. It confirmed
+the earlier handle/Relations/StopEpoch/variable-piece/legacy-type closures and all scope/
+trace validations, then returned REWORK:
+
+- High: composite TargetRef lacked exact scalar mapping for canonical LoadedImageRef;
+- High: recipe bound exhaustion used a forbidden separate LIMIT_EXCEEDED status;
+- High: artifact queries could not enumerate sources/types/scopes/variables, and generic
+  expressions incorrectly required variable identity;
+- High: artifact Slice 003 preceded the Slice 005-owned recipe validator it required;
+- Medium: legacy functions could transitively return portable SourceRef.
+
+Master added the exact opaque TargetRef canonical scalar/emission mapping, restored
+`unsupported(limit_exceeded)`, froze source/type/scope/variable queries and separate
+ExpressionValue plus scope composition, introduced early recipe foundation Slice 007 before
+artifact Slice 003, and added LegacyFunctionRecord. No product file changed. Fresh exact-head
+review is `DBG-RVW-001-005-010`.

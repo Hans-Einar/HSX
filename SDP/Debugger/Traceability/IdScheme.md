@@ -74,11 +74,14 @@ track IDs rather than silently renamed in historical documents.
 - `DBG-SL-001-005-004` — exact content-verified source resolver
 - `DBG-SL-001-005-005` — bounded recipes, locations and stack
 - `DBG-SL-001-005-006` — epoch-bound inspection integration
+- `DBG-SL-001-005-007` — early recipe schema/validator/evaluator foundation
 - `DBG-RVW-001-005-001..DBG-RVW-001-005-006` — exact-head Slice reviews
 - `DBG-RVW-001-005-007` — first `dbg.resolver-inspection/1` review, REWORK
 - `DBG-RVW-001-005-008` — corrected interface re-review, REWORK
-- `DBG-RVW-001-005-009` — fresh interface review attempt 3
-- `DBG-VER-001-005-001..DBG-VER-001-005-006` — formal Slice verifications
+- `DBG-RVW-001-005-009` — interface review attempt 3, REWORK
+- `DBG-RVW-001-005-010` — fresh interface review attempt 4
+- `DBG-RVW-001-005-011` — exact-head Slice review for `DBG-SL-001-005-007`
+- `DBG-VER-001-005-001..DBG-VER-001-005-007` — formal Slice verifications
 - `DBG-RVW-004-001-001` / `DBG-VER-004-001-001` — RF-004 parent review/verification
 
 Public interface string `dbg.resolver-inspection/1` is a versioned contract identifier rather

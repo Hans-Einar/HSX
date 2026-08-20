@@ -1,42 +1,37 @@
-# DBG-SL-001-005-005 — RF-004 Bounded Recipes, Locations, and Stack
+# DBG-SL-001-005-005 — RF-004 Snapshot-Bound Stack Service
 
 - Status: **FROZEN / PLANNED**
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
-- Depends on signed: `DBG-SL-001-005-001..004`
+- Depends on signed: `DBG-SL-001-005-001..004`, `DBG-SL-001-005-007`
 - Review: `DBG-RVW-001-005-005`
 - Verification: `DBG-VER-001-005-005`
 
 ## Goal and why now
 
-Implement the frozen bounded recipe/location evaluator and snapshot-bound stack service so
-callers and selected-frame variables are reconstructed without fixed ABI guesses or live reads.
+Implement the snapshot-bound StackService over the already signed recipe evaluator so callers
+are reconstructed without fixed ABI guesses or live reads.
 
 ## Owned files
 
-- `python/hsx_debugger/recipes.py`
 - `python/hsx_debugger/stack.py`
 - relevant additive exports in `python/hsx_debugger/__init__.py`
-- `python/tests/test_hsx_debugger_recipes.py`
 - `python/tests/test_hsx_debugger_stack.py`
 
-Earlier RF-004 modules, existing epoch/controller contracts, Executive and legacy stack code
-are read-only.
+Earlier RF-004 modules including `recipes.py`, existing epoch/controller contracts, Executive
+and legacy stack code are read-only.
 
 ## Required behavior
 
-- validate and execute only frozen `hsx.unwind-recipe/1` and
-  `hsx.location-recipe/1` opcodes, terminals and piece forms;
-- implement the exact frozen opcode/rule/location-piece/evaluation-context/budget/result DTOs
-  and RecipeEvaluator signature from `dbg.resolver-inspection/1`;
-- enforce exact opcode/stack/deref/byte/frame/total/location-piece/result-bit bounds;
+- consume the signed Slice 007 recipe DTO/validator/evaluator without editing it;
+- enforce exact frame/total request bounds through the signed evaluator budget/results;
 - use descriptor byte order, declared widths and checked typed-address operations only;
 - select non-overlapping half-open rows by exact image/ABI/function/scope/frame/PC;
 - reconstruct entry/push/body/pop/RET and terminal rows from immutable snapshot fixtures;
 - return handle-free `UnwindFrame` values; Slice 006 alone allocates/wraps domain handles;
 - return resume PC separately from checked call-site PC;
-- return partial/unavailable/unsupported/corrupt/stale/limit-exceeded distinctly;
-- evaluate selected non-top-frame variables from that frame/context;
+- return partial/unavailable/unsupported/corrupt/stale distinctly; every bound exhaustion is
+  `UNSUPPORTED` with diagnostic `limit_exceeded`;
 - never retry with a fixed R7 chain or invent/pad a caller/value.
 
 ## Invariants and non-goals
@@ -54,9 +49,7 @@ interface `dbg.resolver-inspection/1`.
 
 ## Verification and completion signal
 
-Test every opcode/terminal class, corrupt operands/rows, unsupported schema/opcode, every
-bound, endian/width/address failures, current ABI entry/body/epilogue rows, cycles/top-level,
-partial scalar vs structured piece-only results, stale context, selected non-top-frame locals
-and no fixed-R7 fallback. Run
-legacy stack diagnostics as an oracle. Close only after exact-head review, formal verification
-and Master sign-off.
+Test current ABI entry/body/epilogue rows, terminal top-level, cycles/non-progress, frame/total
+budgets, endian/width/address failures propagated from the signed evaluator, partial frame
+prefixes, stale context and no fixed-R7 fallback. Run legacy stack diagnostics as an oracle.
+Close only after exact-head review, formal verification and Master sign-off.

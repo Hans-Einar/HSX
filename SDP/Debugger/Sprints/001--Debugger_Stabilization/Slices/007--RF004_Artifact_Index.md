@@ -3,7 +3,7 @@
 - Status: **FROZEN / PLANNED**
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
-- Depends on signed: `DBG-SL-001-005-001..002`
+- Depends on signed: `DBG-SL-001-005-001..002`, `DBG-SL-001-005-007`
 - Review: `DBG-RVW-001-005-003`
 - Verification: `DBG-VER-001-005-003`
 
@@ -25,11 +25,13 @@ Legacy `python/hsx_dbg/symbols.py`, source mapping, runtime and frontend files a
 ## Required behavior
 
 - construct only from exact ImageDebugBinding and verified component/schema refs;
+- parse recipe-bearing rows only through Slice 007's signed pure DTO/validator surface;
 - reject artifact, bundle, binding, architecture, ABI, recipe or component mismatch without
   publishing an index;
 - preserve all duplicate symbol/name/line candidates and exact source identity/spelling;
 - expose typed functions, symbols, instructions, SourceRefs, memory regions, unwind rows and
-  location rows using typed addresses/ranges;
+  location rows using typed addresses/ranges, plus type records, lexical scopes and exact
+  scope/global variable enumeration;
 - reject malformed/overlapping/unsupported metadata with frozen result categories;
 - legacy adapter validates `.sym` v1 plus supplied HXE CRC evidence, uses explicit descriptor
   conversion, preserves candidates and returns only separate LegacyDebugArtifactIndex /

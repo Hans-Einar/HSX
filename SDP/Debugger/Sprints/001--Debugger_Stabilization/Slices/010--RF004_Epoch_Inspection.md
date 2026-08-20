@@ -3,7 +3,7 @@
 - Status: **FROZEN / PLANNED**
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
-- Depends on signed: `DBG-SL-001-005-001..005`
+- Depends on signed: `DBG-SL-001-005-001..005`, `DBG-SL-001-005-007`
 - Review: `DBG-RVW-001-005-006`
 - Verification: `DBG-VER-001-005-006`
 
@@ -42,6 +42,8 @@ gateway, Executive, DAP/CLI and VS Code modules are read-only.
 - unknown handle is explicit `UNKNOWN_HANDLE` and stale/different epoch is explicit `STALE`;
 - no fallback to current/top/first frame and no handle reuse across epochs;
 - variables use exact selected frame and location row; partial pieces stay partial;
+- scopes/variables follow the frozen register/local/global composition and artifact
+  source/type/lexical-scope/variable queries; Watch requests use separate ExpressionValue;
 - snapshot expressions are typed/side-effect-free, selected-frame-bound, and never create a
   persistent live watch or delegate a raw string to runtime;
 - memory/disassembly validate typed spaces/ranges/permissions and preserve unavailable bytes;

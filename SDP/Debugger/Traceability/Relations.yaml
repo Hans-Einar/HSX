@@ -168,6 +168,7 @@ relations:
     to:
       - DBG-SL-001-005-001
       - DBG-SL-001-005-002
+      - DBG-SL-001-005-007
       - DBG-SL-001-005-003
       - DBG-SL-001-005-004
       - DBG-SL-001-005-005
@@ -177,6 +178,7 @@ relations:
     to:
       - DBG-SL-001-005-001
       - DBG-SL-001-005-002
+      - DBG-SL-001-005-007
       - DBG-SL-001-005-003
       - DBG-SL-001-005-004
       - DBG-SL-001-005-005
@@ -234,10 +236,21 @@ relations:
     type: verified_by
     to: [DBG-VER-001-005-006]
     status: planned
+  - from: DBG-SL-001-005-007
+    type: reviewed_by
+    to: [DBG-RVW-001-005-011]
+    status: planned
+  - from: DBG-SL-001-005-007
+    type: verified_by
+    to: [DBG-VER-001-005-007]
+    status: planned
   - from: DBG-SL-001-005-001
     type: prerequisite_for
     to: [DBG-SL-001-005-002]
   - from: DBG-SL-001-005-002
+    type: prerequisite_for
+    to: [DBG-SL-001-005-007]
+  - from: DBG-SL-001-005-007
     type: prerequisite_for
     to: [DBG-SL-001-005-003]
   - from: DBG-SL-001-005-003
@@ -267,6 +280,13 @@ relations:
     type: reviewed_by
     to:
       - DBG-RVW-001-005-009
+    status: rework
+    reviewed_head: 07f7e16040bec1c225d263c682066f65b173e6aa
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/031--RF004_Interface_Review_Attempt3.md
+  - from: dbg.resolver-inspection/1
+    type: reviewed_by
+    to:
+      - DBG-RVW-001-005-010
     status: planned
   - from: DBG-RF-005
     type: depends_on_accepted_interface

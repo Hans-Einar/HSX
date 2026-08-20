@@ -18,9 +18,12 @@ typed HSX addresses.
 - `python/hsx_debugger/identity.py`
 - `python/hsx_debugger/addresses.py`
 - `python/hsx_debugger/results.py`
+- `python/hsx_debugger/snapshot.py`
+- `python/hsx_debugger/metadata.py`
 - relevant additive exports in `python/hsx_debugger/__init__.py`
 - `python/tests/test_hsx_debugger_identity.py`
 - `python/tests/test_hsx_debugger_addresses.py`
+- `python/tests/test_hsx_debugger_metadata.py`
 
 Existing `contracts.py`, controller/model/epochs/gateway/runtime files are read-only.
 
@@ -38,7 +41,11 @@ Existing `contracts.py`, controller/model/epochs/gateway/runtime files are read-
   permissions and explicit wrap policy;
 - checked arithmetic returns typed overflow/underflow/wrong-space/misalignment/range failures;
 - result envelopes enforce candidate/cardinality/status rules and retain structured diagnostics;
+- pure metadata DTOs freeze source/function/symbol/type/scope/instruction/memory records without
+  parsing/index policy; recipe row DTOs remain Slice 007-owned;
 - best-effort live evidence cannot be marked coherent or allocate stable epoch handles.
+- SnapshotReadPort is frozen as a Protocol with exact context/result fencing; no runtime/live
+  adapter is implemented in this Slice or RF-004.
 
 ## Invariants and non-goals
 
