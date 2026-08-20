@@ -144,7 +144,10 @@ issues:
     rf003_corrected_verification: DBG-VER-001-004-005
     rf003_corrected_verification_status: pass
     rf003_corrected_signed_head: 1e479536ce5e746e1b06a53b1039b1af84adaed6
-    portable_contract_current_gate: dependent_integration_rereview_DBG-RVW-001-004-010
+    dependent_integration_review: DBG-RVW-001-004-010
+    dependent_integration_review_status: pass
+    dependent_integration_reviewed_head: 1e479536ce5e746e1b06a53b1039b1af84adaed6
+    portable_contract_current_gate: formal_DBG-VER-001-004-006
   DBG-RF-002:
     issue: 39
     status: corrected_slice_product_pass_dependency_rework_active

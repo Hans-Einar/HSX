@@ -399,7 +399,7 @@ publication passed. Steering froze the HSX portable target contracts in #47 comm
 
 ## DBG-IT-001-004 — Controller/Gateway First Structural Wave
 
-Status: RF-003 IMPLICIT-REOPEN REWORK ACTIVE / DEPENDENT INTEGRATION RE-SIGN-OFF REQUIRED
+Status: DEPENDENT INTEGRATION REVIEW PASS / FORMAL VERIFICATION ACTIVE
 
 ### Authority and scope
 

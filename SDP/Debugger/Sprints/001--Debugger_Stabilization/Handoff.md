@@ -1,11 +1,11 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf003_corrected_signed_integration_revalidation_pending`
+Status: `dependent_integration_review_pass_formal_verification_active`
 
 ## Current objective
 
-Re-review and re-verify unchanged integration code against corrected signed RF-003 head
-`1e47953…`, then exact-head re-sign the dependency chain.
+Formally verify combined integration dependency head `1e47953…` under
+`DBG-VER-001-004-006`, then re-sign the integration dependency chain.
 
 ## Authority
 
@@ -140,7 +140,7 @@ Re-review and re-verify unchanged integration code against corrected signed RF-0
 
 ## Exact next step
 
-Run fresh `DBG-RVW-001-004-010` against current combined head; no product edit is planned.
+Run fresh formal `DBG-VER-001-004-006`; no product edit is planned.
 
 ## Traceability state
 
@@ -199,8 +199,8 @@ Run fresh `DBG-RVW-001-004-010` against current combined head; no product edit i
 - Parent review attempts `DBG-RVW-002-001-002` / `DBG-RVW-003-001-002`: REWORK
 - Review `DBG-RVW-001-004-011`: PASS at `1e47953…`
 - Verification `DBG-VER-001-004-005`: PASS at `1e47953…`
-- Corrected RF-003 sign-off: PASS at `1e47953…`
-- Active gate: dependent integration re-review `DBG-RVW-001-004-010`
+- Dependent integration review `DBG-RVW-001-004-010`: PASS at `1e47953…`
+- Active gate: formal `DBG-VER-001-004-006`
 
 ## Agents and worktree
 
