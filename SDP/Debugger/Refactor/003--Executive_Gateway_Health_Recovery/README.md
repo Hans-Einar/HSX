@@ -88,4 +88,4 @@ exact-head Slice re-sign-off are required; dependent integration must then be re
 The first correction at `f776b1a…` closed implicit non-OPEN reopen, but
 `DBG-RVW-001-004-009` found failed explicit replacement OPEN could still restore false prior
 health. Fail-closed correction at `1e47953…` passed fresh `DBG-RVW-001-004-011`; formal
-`DBG-VER-001-004-005`; exact-head re-sign-off remains.
+`DBG-VER-001-004-005` and exact-head v2 sign-off; dependent integration v2 also passes.

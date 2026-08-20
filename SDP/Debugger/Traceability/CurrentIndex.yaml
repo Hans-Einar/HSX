@@ -241,7 +241,9 @@ first_structural_wave:
       prior_parent_review_status: rework_gate_order_only
       parent_review_attempt_2: DBG-RVW-003-001-002
       parent_review_attempt_2_status: rework
-      final_review: DBG-RVW-003-001-003
+      parent_review_attempt_3: DBG-RVW-003-001-003
+      parent_review_attempt_3_status: rework_trace_only
+      final_review: DBG-RVW-003-001-004
       final_verification: DBG-VER-003-001-001
   slices:
     - id: DBG-SL-001-004-001
@@ -266,8 +268,8 @@ first_structural_wave:
       terminal_result_review: DBG-RVW-001-004-007
       terminal_result_review_status: rework
       terminal_result_reviewed_head: 1586bb84359aa7ed334dde70bdfd9baa128dd99d
-      next_review: DBG-RVW-001-004-008
-      next_verification: DBG-VER-001-004-004
+      completed_corrective_review: DBG-RVW-001-004-008
+      completed_corrective_verification: DBG-VER-001-004-004
       corrected_review_status: pass
       corrected_reviewed_head: a0640203a1a87c7acb080c75286ef09808e5195c
       corrected_review_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/013--RF002_Internal_Failure_Final_Review.md
@@ -278,7 +280,7 @@ first_structural_wave:
       corrected_signoff_record: SDP/Debugger/Verification/DBG-SL-001-004-001--Master_Signoff_v2.md
     - id: DBG-SL-001-004-002
       path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/003--Gateway_Foundation.md
-      status: rework_required_failed_replacement_open
+      status: corrected_complete_exact_head_signed
       implementation_base: 97d8c5b8d62d56dcfcab59c97c516d83f68c7075
       resume_base: 0cf52fcf69d11f254b957cfc52605a8be3114955
       review: DBG-RVW-001-004-002
@@ -296,11 +298,11 @@ first_structural_wave:
       parent_review_attempt_2: DBG-RVW-003-001-002
       parent_review_attempt_2_status: rework
       prior_corrective_review: DBG-RVW-001-004-009
-      next_verification: DBG-VER-001-004-005
+      completed_corrective_verification: DBG-VER-001-004-005
       implicit_reopen_review: DBG-RVW-001-004-009
       implicit_reopen_review_status: rework
       implicit_reopen_reviewed_head: f776b1a0ef847227ad94676a0328dc9c78eba507
-      next_review: DBG-RVW-001-004-011
+      completed_corrective_review: DBG-RVW-001-004-011
       corrected_review_status: pass
       corrected_reviewed_head: 1e479536ce5e746e1b06a53b1039b1af84adaed6
       corrected_review_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/018--RF003_Replacement_Open_Final_Review.md
@@ -335,7 +337,7 @@ first_structural_wave:
   runtime_profile: hsx.python-debug-legacy/1
   still_blocked: DBG-RF-004..DBG-RF-009
   partial_product_wip_stash: efc91f2640647402bc92c69bde1c57685cfaa1f1
-  current_gate: fresh_parent_final_reviews_DBG-RVW-002-001-004_and_DBG-RVW-003-001-003
+  current_gate: fresh_parent_final_reviews_DBG-RVW-002-001-004_and_DBG-RVW-003-001-004
 structural_gate:
   rule: Only Steering-authorized Refactors with frozen Slice/interface contracts may execute.
   authorized_refactors:

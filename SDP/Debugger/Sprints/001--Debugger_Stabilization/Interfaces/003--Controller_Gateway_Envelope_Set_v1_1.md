@@ -1,6 +1,6 @@
 # DBG-D-001 / DBG-D-002 — Frozen Controller/Gateway Envelope Set v1.1
 
-- Status: **REFROZEN / INTERFACE IMPLEMENTATION + INDEPENDENT REVIEW REQUIRED**
+- Status: **REFROZEN / IMPLEMENTED / INDEPENDENT REVIEW PASS**
 - Interface version: `dbg.controller-gateway/1.1`
 - Supersedes: `dbg.controller-gateway/1` for implementation
 - Steering authority: issue #38 comment `5357146230`
