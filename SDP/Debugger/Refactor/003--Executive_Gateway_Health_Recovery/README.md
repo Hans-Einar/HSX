@@ -1,6 +1,6 @@
 # DBG-RF-003 — Typed Executive Gateway, Health, and Recovery Foundation
 
-- Status: **CORRECTED REVIEW PASS — FORMAL VERIFICATION PENDING**
+- Status: **CORRECTED REVIEW + VERIFICATION PASS — RE-SIGN-OFF PENDING**
 - Steering authority: issue #38 comment `5356484309`
 - Iteration: `DBG-IT-001-004`
 - Owning Slice: `DBG-SL-001-004-002`
@@ -88,4 +88,4 @@ exact-head Slice re-sign-off are required; dependent integration must then be re
 The first correction at `f776b1a…` closed implicit non-OPEN reopen, but
 `DBG-RVW-001-004-009` found failed explicit replacement OPEN could still restore false prior
 health. Fail-closed correction at `1e47953…` passed fresh `DBG-RVW-001-004-011`; formal
-`DBG-VER-001-004-005` remains.
+`DBG-VER-001-004-005`; exact-head re-sign-off remains.

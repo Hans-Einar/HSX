@@ -1,11 +1,10 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf003_corrected_review_pass_formal_verification_active`
+Status: `rf003_corrected_verification_pass_resignoff_pending`
 
 ## Current objective
 
-Formally verify exact corrected RF-003 head `1e47953…`, then re-sign the Slice and revalidate
-the dependent integration chain.
+Exact-head re-sign corrected RF-003 head `1e47953…`, then revalidate dependent integration.
 
 ## Authority
 
@@ -140,7 +139,7 @@ the dependent integration chain.
 
 ## Exact next step
 
-Run fresh formal `DBG-VER-001-004-005` at exact `1e47953…`.
+Reconcile Master exact-head RF-003 Slice re-sign-off.
 
 ## Traceability state
 
@@ -198,7 +197,8 @@ Run fresh formal `DBG-VER-001-004-005` at exact `1e47953…`.
 - Verification `DBG-VER-001-004-003`: PASS at `860a98a…`
 - Parent review attempts `DBG-RVW-002-001-002` / `DBG-RVW-003-001-002`: REWORK
 - Review `DBG-RVW-001-004-011`: PASS at `1e47953…`
-- Active gate: formal `DBG-VER-001-004-005`
+- Verification `DBG-VER-001-004-005`: PASS at `1e47953…`
+- Active gate: Master RF-003 exact-head re-sign-off
 
 ## Agents and worktree
 
