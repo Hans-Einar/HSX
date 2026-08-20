@@ -162,7 +162,10 @@ issues:
     dependent_integration_verification: DBG-VER-001-004-006
     dependent_integration_verification_status: pass
     dependent_integration_signed_head: 1e479536ce5e746e1b06a53b1039b1af84adaed6
-    portable_contract_current_gate: fresh_parent_final_reviews_DBG-RVW-002-001-006_and_DBG-RVW-003-001-006
+    first_wave_current_gate: fresh_parent_final_reviews_DBG-RVW-002-001-007_and_DBG-RVW-003-001-006
+    portable_contract_gate: complete_accepted_frozen
+    rf002_parent_review_attempt_6: DBG-RVW-002-001-006
+    rf002_parent_review_attempt_6_status: rework_trace_only
   DBG-RF-002:
     issue: 39
     status: complete_signed_chain_parent_final_review_active
