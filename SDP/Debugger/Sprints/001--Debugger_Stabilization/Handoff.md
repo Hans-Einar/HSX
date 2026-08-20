@@ -9,6 +9,9 @@ stopped before staging/committing product code; partial owned-file work is prese
 recoverable stash `efc91f2640647402bc92c69bde1c57685cfaa1f1`. Integration and RF-004..009
 remain blocked.
 
+Steering question: issue #38 comment `5357088729`; recommended resolution is controller-owned
+preallocation in `dbg.controller-gateway/1.1`.
+
 ## Authority
 
 - issue #38 comment `5348190806` — accepted architecture direction and authorized `DBG-ST-006`
@@ -131,8 +134,9 @@ remain blocked.
 
 ## Exact next step
 
-Post the generation-handshake alternatives/recommendation to issue #38 and stop. On Steering
-authorization, re-freeze `dbg.controller-gateway/1.1` before restoring/reassigning any WIP.
+Wait for Steering on issue #38 comment `5357088729`. On authorization, re-freeze
+`dbg.controller-gateway/1.1` before restoring/reassigning any WIP. Until then, take no product
+action.
 
 ## Traceability state
 

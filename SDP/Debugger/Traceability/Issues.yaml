@@ -92,6 +92,7 @@ issues:
     first_wave_interface_blocker_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/002--Generation_Handshake_Refreeze_Proposal.md
     first_wave_recommended_interface: dbg.controller-gateway/1.1
     first_wave_wip_stash: efc91f2640647402bc92c69bde1c57685cfaa1f1
+    first_wave_interface_blocker_comment: 5357088729
     portable_contract_current_gate: steering_generation_handshake_refreeze_decision
   DBG-RF-002:
     issue: 39

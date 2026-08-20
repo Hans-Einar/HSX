@@ -211,6 +211,7 @@ first_structural_wave:
     read_only_consumer: DBG-SL-001-004-002
     blocker_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/002--Generation_Handshake_Refreeze_Proposal.md
     recommended_next_version: dbg.controller-gateway/1.1
+    steering_blocker_comment: 5357088729
   refactors:
     - id: DBG-RF-002
       path: SDP/Debugger/Refactor/002--Debugger_Controller_State_Epoch/README.md
