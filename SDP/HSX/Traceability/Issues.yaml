@@ -17,7 +17,10 @@ issues:
     contract_requirements: HSX-R-001..HSX-R-036
     contract_architecture: HSX-A-001..HSX-A-005
     contract_design: HSX-D-001..HSX-D-005
-    contract_status: proposed_pending_review
+    contract_status: rework_complete_pending_fresh_review
+    review_status: rework
+    reviewed_head: 5fff403f6668f794b760caf64ef34b4d1ecb4ae3
+    rereview: HSX-RVW-001-001-002
   HSX-ST-002:
     issue: 47
     status: complete_for_synthesis

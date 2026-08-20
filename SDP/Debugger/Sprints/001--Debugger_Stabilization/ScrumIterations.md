@@ -307,3 +307,17 @@ Master allocated and synthesized:
 
 All artifacts remain target/proposed. The active action is fresh independent exact-head
 review `HSX-RVW-001-001-001`; no design freeze or implementation authority exists.
+
+### Cross-track review attempt 1
+
+`HSX-RVW-001-001-001` reviewed exact proposal head
+`5fff403f6668f794b760caf64ef34b4d1ecb4ae3` and returned REWORK:
+
+- High: LoadedImageRef lost opaque target-bound load identity;
+- Medium: exact-step zero-retirement/precedence contradicted ST-004;
+- Medium: capability names/full-profile composition conflicted across A/D;
+- Medium: HSX/Debugger stage and Handoffs were stale.
+
+Master corrected all four documentation/contract findings. Fresh review is
+`HSX-RVW-001-001-002`. Every contract remains target/proposed and all implementation gates
+remain closed.

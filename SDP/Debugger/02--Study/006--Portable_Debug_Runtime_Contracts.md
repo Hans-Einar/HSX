@@ -1,6 +1,6 @@
 # DBG-ST-006 — Portable Debug Runtime Contract Study
 
-- Status: COMPLETE / PORTABLE CONTRACT PROPOSAL PENDING REVIEW
+- Status: REWORKED COMPLETE / PENDING FRESH CROSS-TRACK REVIEW
 - Owning track: Debugger
 - Required coordinator: HSX track through `HSX-ST-001`
 - Proposed by: `DBG-DA-001`
@@ -82,7 +82,7 @@ All remain target/proposed pending independent review and Steering acceptance.
 
 | DBG-ST-006 question | HSX Study | Proposed requirements | Architecture/design | Capability/fixture evidence |
 |---|---|---|---|---|
-| 1. Executive/stream/target/image identity | ST-002, ST-005 | R-001..R-005, R-011 | A-001; D-001/D-004 | restart, PID reuse, stream replacement, image digest/load generation |
+| 1. Executive/stream/target/image identity | ST-002, ST-005 | R-001..R-005, R-011 | A-001; D-001/D-004 | restart, PID reuse, stream replacement, opaque target-bound LoadedImageIds for identical artifacts, image digest/load generation |
 | 2. Address spaces/width/endian/alignment | ST-003 | R-012..R-015 | A-002; D-002 | multi-space/width/endian/alignment/overflow and image-bundle mismatch |
 | 3. Ordered run/stop/fault/terminal evidence | ST-004 | R-019..R-021 | A-003; D-003 | command receipt vs transition, causal precedence, terminal/fault ordering |
 | 4. Event cursor/gap/ACK/capabilities | ST-005 | R-028..R-033 | A-004; D-004 | filter-safe cursors, future ACK rejection, seq eviction/gaps/resume/health |

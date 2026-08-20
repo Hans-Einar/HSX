@@ -1,6 +1,6 @@
 # Portable Debug Runtime Contracts
 
-- Status: PROPOSED / PENDING INDEPENDENT REVIEW
+- Status: REWORKED PROPOSAL / PENDING FRESH INDEPENDENT REVIEW
 - Range: `HSX-D-001..HSX-D-005`
 - Architecture: `HSX-A-001..HSX-A-005`
 - Requirements: `HSX-R-001..HSX-R-036`
@@ -20,7 +20,8 @@ until Steering accepts them in #47/#38.
 | `EventStreamRef` | Executive instance + opaque stream ID + stream generation. |
 | `SessionRef` | Executive instance + session ID + session generation + negotiated profile. |
 | `TargetRef` | Executive instance + opaque target ID + target generation + display PID + PID generation. |
-| `ImageRef` | Content digest + image schema/profile + image/load generation + optional accepted artifact-bundle digest. |
+| `ArtifactRef` | Content digest + image schema/profile for immutable loadable bytes; identical bytes may share this value. |
+| `LoadedImageRef` | Executive instance + exact TargetRef + opaque never-reused LoadedImageId + ImageGeneration + ArtifactRef + accepted debug-bundle digest. |
 | `AttachmentLease` | Lease ID/revision, session/owner, TargetRef, exclusive/observer mode, expiry/grace and orphan policy. |
 | `LifecycleReceipt` | Operation ID, expected refs/revisions, accepted/rejected status and no implied target transition. |
 | `LifecycleCommit` | Operation ID, before/after refs, authoritative outcome/revisions and tombstone where terminal. |
@@ -31,11 +32,14 @@ until Steering accepts them in #47/#38.
   leases, targets and resources from the old instance.
 - Target creation allocates a never-reused `TargetId` and generation 1. PID reuse cannot reuse
   `TargetId`.
+- Every accepted load allocates a distinct opaque `LoadedImageId` scoped by ExecutiveInstance
+  and TargetRef. Equal ArtifactRefs and equal generation numbers on different targets cannot
+  alias because LoadedImageId and TargetRef remain distinct.
 - Reset/reinitialize that preserves deliberate logical target identity increments
   `TargetGeneration` and invalidates stop/snapshot/resource bindings.
 - Atomic `replace_image` may preserve `TargetId` only when explicitly supported; it increments
-  target and image generations and commits only after the new image is accepted. Ordinary kill
-  then load creates a new target.
+  target and image generations, allocates a new LoadedImageId, and commits only after the new
+  image is accepted. Ordinary kill then load creates a new target.
 - Termination retains a tombstone sufficient to reject stale operations; target IDs are never
   recycled.
 
@@ -75,7 +79,7 @@ legacy conversion evidence rather than the universal model.
 
 ### `ImageDebugBundle`
 
-The bundle binds exact `ImageRef`, HXE schema/content digest, `.sym` schema/content digest,
+The bundle binds exact `LoadedImageRef`, HXE schema/content digest, `.sym` schema/content digest,
 sources manifest digest, architecture/ABI descriptor IDs and toolchain/debug schema versions.
 Missing/mismatched content is explicit `unavailable`/`mismatch`; adjacent file paths or HXE CRC
 alone do not establish binding.
@@ -94,7 +98,7 @@ width/endian/type and report partial/stale rather than padding/truncating silent
 
 ### Capabilities
 
-`hsx.architecture-descriptor/1`, `hsx.debug-image-bundle/1`, and versioned ABI/unwind/location
+`hsx.architecture.descriptor/1`, `hsx.debug.image-bundle/1`, and versioned ABI/unwind/location
 recipe capabilities are negotiated per image. Legacy symbols use checked adapters and cannot
 claim portable unwind/location conformance.
 
@@ -108,7 +112,7 @@ claim portable unwind/location conformance.
 | `TransitionEvidence` | Target/image refs, monotonic transition revision, previous/new state, cause, operation correlation and structured details. |
 | `StableStopEvidence` | StopToken, transition revision, PC/address, cause, resource/step evidence and inspection stability. |
 | `InspectionSnapshotRef` | Target/image refs, transition + inspection revisions, snapshot token, supported read sets and stability grade. |
-| `StepOutcome` | Operation/origin stop, retired_count 0/1, final transition/stop evidence, bypass evidence and preemption/terminal result. |
+| `StepOutcome` | Operation/origin stop, retired_count 0/1, final transition/stop evidence, bypass evidence and precondition/preemption/terminal result. |
 
 ### Snapshot contract
 
@@ -123,24 +127,41 @@ stale. Late responses cannot populate another snapshot.
 
 ### Exact step and precedence
 
-Exact step retires zero or one guest instruction. Zero is valid only for preempting
-breakpoint/BRK/fault/terminal conditions before retirement. One-shot origin breakpoint bypass
+Exact step retires zero or one guest instruction. Zero is valid for rejected stale/authority/
+resource preconditions, a pre-dispatch pause, target loss, a non-bypassed origin breakpoint,
+or any other condition linearized before architectural commit. Whether a fault or BRK retires
+the attempted instruction is defined by the accepted ISA/fault profile and reported, never
+assumed from reason name. One-shot origin breakpoint bypass
 is fenced by TargetRef, origin StopToken, PC, operation ID and effective resource revision; it
 does not remove shared resources.
 
-Authoritative precedence is terminal/target-loss, fault, independent explicit pause,
-independent user/external breakpoint, runtime block, requested step completion, then ordinary
-running progress as applicable. Duplicate evidence uses identity/revision, not timing.
+Authoritative cause follows phase/linearization rather than one fixed reason order:
+
+1. reject stale identity/stop/authority/resource preconditions without execution;
+2. report target terminal/loss, pause/async break or non-bypassed origin breakpoint already
+   linearized before dispatch with `retired_count = 0`;
+3. after dispatch, the architectural instruction outcome controls fault/exception, BRK/trap,
+   return/termination, mailbox wait or sleep and reports its profile-defined retired count;
+4. after an otherwise normal commit, independently owned breakpoint/watchpoint or pause at
+   the new boundary precedes requested step completion;
+5. exact-step completion is primary only when no independent condition preempts.
+
+Target loss discovered only by reconciliation yields unavailable/unknown unless terminal
+evidence is independently proven. Duplicate evidence uses identity/revision, not timing.
 
 HSX exposes instruction retirement, transition/snapshot/unwind/resource primitives. Debugger
 owns source into/over/out plan algorithms and internal resource orchestration.
 
 ### Blocked-state matrix
 
-WAIT_MBX/SLEEPING are inspection-stable only under `hsx.blocked-snapshot/1`, which publishes a
+WAIT_MBX/SLEEPING are inspection-stable only under `hsx.blocked.snapshot/1`, which publishes a
 frozen SnapshotRef and invalidates it atomically before wake/timeout/deadline mutation. Without
 that capability, they are state events only and inspection is unavailable or best-effort
 degraded.
+
+The full execution/inspection contract requires `hsx.execution.evidence/1` and
+`hsx.inspection.snapshot/1`; `hsx.blocked.snapshot/1` is optional and governs only the named
+blocked states.
 
 ## HSX-D-004 — Event stream continuity, ACK, gaps, health, and profiles
 
@@ -186,7 +207,7 @@ Broad `events` is not a portable profile.
 
 ### Identity and ownership
 
-`ResourceRef` contains ExecutiveInstanceRef, TargetRef, ImageRef where relevant, kind, opaque
+`ResourceRef` contains ExecutiveInstanceRef, TargetRef, LoadedImageRef where relevant, kind, opaque
 resource ID and generation. `OwnerClaim` contains owner/session/lease/provenance, lifetime
 policy and owner revision. Executive-authored provenance distinguishes client-created,
 external, runtime/internal and legacy-unknown.
@@ -221,6 +242,9 @@ sample/transition revisions.
 resources are external, sharing/ownership cannot be proven, no unowned deletion/adoption is
 allowed, reconnect is conservative, and the profile has executable removal gates.
 
+The full resource capability is `hsx.debug-resource.revisions/1`; lifecycle events are
+negotiated separately as `hsx.debug-resource.events/1` and carried under HSX-D-004.
+
 ## Cross-contract transaction rules
 
 1. Every event/resource/snapshot/lifecycle operation is fenced by `HSX-D-001` identities.
@@ -234,7 +258,7 @@ allowed, reconnect is conservative, and the profile has executable removal gates
 
 | Contract | Minimum fixture families |
 |---|---|
-| D-001 | restart/session/stream/target/PID reuse; atomic launch; failed replace; exclusive/observer; stale generation; detach/disconnect/orphan; kill/tombstone; reconnect retained/lost |
+| D-001 | restart/session/stream/target/PID reuse; identical artifact loaded on two targets with distinct LoadedImageIds; atomic launch; failed replace; exclusive/observer; stale generation; detach/disconnect/orphan; kill/tombstone; reconnect retained/lost |
 | D-002 | multiple address widths/spaces; endian/alignment; checked overflow; image/debug mismatch; current R7 recipe and alternative/unavailable unwind; ranged/optimized locations |
 | D-003 | command receipt vs transition; pause/break/fault/terminal precedence; immutable/revision snapshots; stale reads; exact 0/1 step; fenced bypass; WAIT_MBX/SLEEPING capability |
 | D-004 | stream replacement; filter-safe cursors; atomic ordering; future ACK rejection; seq eviction; queue gap intervals; malformed/half-open health; contiguous resume/full reconcile |

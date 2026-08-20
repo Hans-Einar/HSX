@@ -1,6 +1,6 @@
 # Portable Debug Runtime Requirements
 
-- Status: PROPOSED / PENDING INDEPENDENT REVIEW
+- Status: REWORKED PROPOSAL / PENDING FRESH INDEPENDENT REVIEW
 - Range: `HSX-R-001..HSX-R-036`
 - Studies: `HSX-ST-001..HSX-ST-006`
 - Debugger dependency: `DBG-ST-006`
@@ -20,9 +20,11 @@ Steering accepts them in issues #47/#38. They authorize no product or AVR work.
 - **HSX-R-003 — Stable target identity.** Runtime targets SHALL expose an opaque `TargetId`
   plus `TargetGeneration`; PID remains display/scheduling data with an explicit
   `PidGeneration` and SHALL NOT prove continuity.
-- **HSX-R-004 — Loaded image identity.** A loaded image SHALL expose immutable content/schema
-  identity and `ImageGeneration`; integrity CRC, path, app name, and display PID are not
-  substitutes for identity.
+- **HSX-R-004 — Loaded image identity.** Every accepted load SHALL expose a target-bound
+  `LoadedImageRef` containing opaque never-reused `LoadedImageId`, exact `TargetRef`, artifact
+  content/schema identity and `ImageGeneration`. Two loads of identical bytes on different
+  targets or different load operations SHALL have distinct LoadedImageIds; CRC, path, app name,
+  digest alone and display PID are not substitutes for loaded-instance identity.
 - **HSX-R-005 — Session and attachment identity.** Sessions and target attachments SHALL have
   stable refs/generations, explicit exclusive/observer modes, owner identity, lease/revision,
   expiry and reconnect fencing.
@@ -56,7 +58,8 @@ Steering accepts them in issues #47/#38. They authorize no product or AVR work.
   checked conversions; implicit masking, wrap, truncation or cross-space comparison is
   forbidden outside a named degraded profile.
 - **HSX-R-015 — Image/debug bundle binding.** Debug metadata and sources SHALL be bound to an
-  exact `ImageRef` through schema/version and content digest evidence; mismatches fail closed.
+  exact `LoadedImageRef` through schema/version and content digest evidence; mismatches fail
+  closed.
 - **HSX-R-016 — ABI descriptor.** Each executable profile SHALL expose an `AbiDescriptor`
   covering argument/return registers, saved sets, SP/FP/LR roles, stack growth/alignment,
   frame/call/return layout and call-site PC interpretation.

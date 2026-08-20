@@ -1,6 +1,6 @@
 # Portable Debug Runtime Architecture
 
-- Status: PROPOSED / PENDING INDEPENDENT REVIEW
+- Status: REWORKED PROPOSAL / PENDING FRESH INDEPENDENT REVIEW
 - Range: `HSX-A-001..HSX-A-005`
 - Requirements: `HSX-R-001..HSX-R-036`
 - Studies: `HSX-ST-001..HSX-ST-006`
@@ -62,13 +62,18 @@ The target current profile is `hsx.portable-debug-runtime/1`, composed from capa
 
 - `hsx.runtime.identity-generations/1`
 - `hsx.lifecycle.authority-leases/1`
-- `hsx.architecture-descriptor/1`
-- `hsx.debug-image-bundle/1`
-- `hsx.execution-evidence/1`
-- `hsx.inspection-snapshot/1`
-- optional `hsx.blocked-snapshot/1`
-- `hsx.event-stream-resume/1`
-- `hsx.debug-resource-revisions/1`
+- `hsx.architecture.descriptor/1`
+- `hsx.debug.image-bundle/1`
+- `hsx.execution.evidence/1`
+- `hsx.inspection.snapshot/1`
+- optional `hsx.blocked.snapshot/1`
+- `hsx.event-stream.core/1`
+- `hsx.event-stream.resume/1`
+- `hsx.event-stream.health/1`
+- `hsx.runtime-state.events/1`
+- `hsx.debug-resource.events/1`
+- `hsx.reconcile-baseline/1`
+- `hsx.debug-resource.revisions/1`
 
 The Python legacy evidence is exposed only as named degraded profiles, including
 `hsx.python-debug-legacy/1`, `hsx.legacy-event-stream/1`, and

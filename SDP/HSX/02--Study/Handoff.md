@@ -1,6 +1,6 @@
 # HSX Portable Debug Contract Handoff
 
-- Status: CONTRACTS PROPOSED — INDEPENDENT REVIEW PENDING
+- Status: REVIEW REWORK COMPLETE — FRESH REVIEW PENDING
 - Coordinator: `HSX-ST-001`, issue #47
 - Debugger dependency: `DBG-ST-006`, issue #38
 - Iteration: `DBG-IT-001-003`
@@ -8,8 +8,8 @@
 
 ## Current objective
 
-Review the exact stable proposed contract package and `DBG-ST-006` mapping, then return to
-Steering before any Debugger design freeze or product work.
+Obtain fresh exact-head review of the corrected portable contract package and `DBG-ST-006`
+mapping, then return to Steering before any Debugger design freeze or product work.
 
 ## Authority
 
@@ -20,8 +20,16 @@ Steering before any Debugger design freeze or product work.
 
 ## Exact next step
 
-Commit the Requirements/Architecture/Design and `DBG-ST-006` mapping, then assign fresh
-`HSX-RVW-001-001-001` to the exact complete head.
+Commit the corrected Requirements/Architecture/Design and `DBG-ST-006` mapping, then assign
+fresh `HSX-RVW-001-001-002` to the exact complete head.
+
+## Review history
+
+- `HSX-RVW-001-001-001` reviewed `5fff403f6668f794b760caf64ef34b4d1ecb4ae3`
+  and returned one High plus three Medium findings.
+- Master restored opaque target-bound LoadedImageRef identity, phase-linearized exact-step
+  semantics, one canonical capability registry, and synchronized cross-track status/Handoff.
+- No contract acceptance or implementation authority resulted.
 
 ## Guards
 

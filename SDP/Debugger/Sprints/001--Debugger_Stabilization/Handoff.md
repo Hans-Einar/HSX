@@ -1,12 +1,11 @@
 # DBG-SPR-001 Handoff
 
-Status: `DBG-ST-006_HSX-ST-001_active`
+Status: `portable_contract_rework_complete_pending_fresh_review`
 
 ## Current objective
 
-Complete `DBG-ST-006` and coordinated `HSX-ST-001..HSX-ST-006`, obtain fresh independent
-review of the portable contract package, and return to issues #47/#38. No structural product
-or AVR work may be dispatched.
+Obtain fresh `HSX-RVW-001-001-002` review of the corrected portable contract package and
+return to issues #47/#38. No structural product or AVR work may be dispatched.
 
 ## Authority
 
@@ -90,17 +89,19 @@ or AVR work may be dispatched.
   complete provenance/technical evidence and no product/AVR/shared-traceability writes.
 - Master synthesized stable proposed `HSX-R-001..036`, `HSX-A-001..005`, and
   `HSX-D-001..005`, plus the complete `DBG-ST-006` mapping and fixture/profile plan.
+- `HSX-RVW-001-001-001` returned one High and three Medium findings; Master corrected
+  LoadedImageRef identity, exact-step phase semantics, capability naming/composition, and
+  stale cross-track status/Handoff.
 
 ## Not done
 
 - `DBG-D-001..DBG-D-010` remain proposed and have no implementation authority.
-- The portable contract package has not yet passed `HSX-RVW-001-001-001`.
-- Required stable HSX contract proposals and conformance fixtures do not yet exist.
+- The corrected portable contract package has not yet passed `HSX-RVW-001-001-002`.
 
 ## Exact next step
 
-Commit the stable portable HSX proposal/Debugger mapping, obtain exact-head independent
-review, post decision packages to #47 and #38, then
+Commit the corrected portable HSX proposal/Debugger mapping, obtain fresh exact-head review,
+post decision packages to #47 and #38, then
 stop before any design freeze or implementation authorization.
 
 ## Traceability state
@@ -112,9 +113,9 @@ stop before any design freeze or implementation authorization.
 - Verification PASS: `DBG-VER-001-001-001`, anchored to implementation head
   `208063e344b767f82790ce579eba6327e2cdd0ce` and repository head tested
   `fefd4b0c427dfa71d637e4f4cce9e4a345912591`.
-- CurrentIndex, Issues, sprint records, Relations, Ledger, and Handoff are current through the
-  issue #38 decision package.
-- Active DesignAnalysis: `DBG-DA-001`, `DBG-IT-001-002`
+- CurrentIndex, Issues, sprint records, Relations, Ledger, and Handoff are current through
+  portable-contract synthesis and review attempt 1.
+- Accepted architecture direction: `DBG-DA-001`, `DBG-A-001..DBG-A-008`
 - Completed Design Studies: `DBG-ST-002..DBG-ST-005`
 - Architecture review: `DBG-RVW-001-002-001` — REWORK at `f8b8097`
 - Architecture re-review: `DBG-RVW-001-002-002` — REWORK at `e1f72a5`
@@ -124,17 +125,18 @@ stop before any design freeze or implementation authorization.
 - Architecture-direction acceptance: issue #38 comment `5348190806`
 - Proposed architecture: `DBG-A-001..DBG-A-008`
 - Proposed detailed design: `DBG-D-001..DBG-D-010`
-- Active Debugger Study: `DBG-ST-006`
-- Active HSX coordinator: `HSX-ST-001`, issue #47
-- Active HSX Studies: `HSX-ST-002..HSX-ST-006`
+- Completed Debugger Study pending fresh review: `DBG-ST-006`
+- Completed HSX coordinator scope: `HSX-ST-001`, issue #47
+- Completed HSX Studies: `HSX-ST-002..HSX-ST-006`
 - Proposed contracts: `HSX-R-001..036`, `HSX-A-001..005`, `HSX-D-001..005`
 - Active iteration: `DBG-IT-001-003`
-- Planned cross-track review: `HSX-RVW-001-001-001`
+- Review `HSX-RVW-001-001-001`: REWORK at `5fff403`
+- Planned fresh review: `HSX-RVW-001-001-002`
 
 ## Agents and worktree
 
 The prior product/design chain and bounded HSX Study workers are complete. No reviewer is open
-yet; fresh `HSX-RVW-001-001-001` is the next role. The controlled branch is `codex/dbg-st-006`;
+yet; fresh `HSX-RVW-001-001-002` is the next role. The controlled branch is `codex/dbg-st-006`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.
 

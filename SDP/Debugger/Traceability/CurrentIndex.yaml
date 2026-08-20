@@ -51,7 +51,7 @@ active:
       status: complete_for_synthesis
     - id: DBG-ST-006
       path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
-      status: complete_pending_cross_track_review
+      status: rework_complete_pending_fresh_cross_track_review
 completed:
   refactor:
     id: DBG-RF-001
@@ -119,8 +119,11 @@ active_gate:
     hsx_coordinator: HSX-ST-001
     hsx_issue: 47
     hsx_studies: HSX-ST-002..HSX-ST-006
-    status: contracts_proposed_pending_review
+    status: contracts_rework_complete_pending_fresh_review
     review: HSX-RVW-001-001-001
+    review_status: rework
+    reviewed_head: 5fff403f6668f794b760caf64ef34b4d1ecb4ae3
+    rereview: HSX-RVW-001-001-002
     hsx_requirements: HSX-R-001..HSX-R-036
     hsx_architecture: HSX-A-001..HSX-A-005
     hsx_design: HSX-D-001..HSX-D-005
@@ -143,7 +146,7 @@ proposed:
   study:
     id: DBG-ST-006
     path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
-    status: active
+    status: rework_complete_pending_fresh_cross_track_review
 structural_gate:
   rule: No structural product-code refactor starts before DBG-DA-001 and relevant DBG-D contracts are accepted.
   blocked_refactors:

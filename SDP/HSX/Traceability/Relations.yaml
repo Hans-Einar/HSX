@@ -47,6 +47,7 @@ relations:
     type: reviewed_by
     to:
       - HSX-RVW-001-001-001
+      - HSX-RVW-001-001-002
   - from: HSX-ST-001
     type: provides_provenance_for
     to:
