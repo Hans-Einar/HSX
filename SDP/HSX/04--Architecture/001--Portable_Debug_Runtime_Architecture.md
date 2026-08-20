@@ -1,6 +1,6 @@
 # Portable Debug Runtime Architecture
 
-- Status: RESYNTHESIZED — PENDING INDEPENDENT REVIEW
+- Status: REVIEW 005 REWORK CORRECTED — PENDING FRESH REVIEW 006
 - Range: `HSX-A-001..HSX-A-005`
 - Requirements: `HSX-R-001..HSX-R-036`
 - Studies: `HSX-ST-001..HSX-ST-008`
@@ -14,7 +14,7 @@ portable HSX evidence and authority, not Debugger UI/controller policy or AVR re
 | ID | Boundary | Owns | Explicitly does not own |
 |---|---|---|---|
 | `HSX-A-001` | Runtime Identity and Lifecycle Authority | Executive/stream/session/target/PID/LoadedImage refs and generations; ArtifactRef; attachment leases; lifecycle commit/tombstone evidence | Debug-bundle identity/binding, Debugger disconnect defaults, UI naming, source-step algorithm, AVR storage/transport |
-| `HSX-A-002` | Architecture, ABI, and Debug Artifact Description | Typed address spaces; serialization/alignment; reusable ImageDebugBundleRef and target-specific ImageDebugBinding; source identity; ABI/unwind/location descriptors | Target lifecycle identity, local source locator/UI policy, implicit masks, one universal R7 recipe, target-specific AVR encoding choices outside profiles |
+| `HSX-A-002` | Architecture, ABI, and Debug Artifact Description | Typed address spaces; serialization/alignment; reusable ImageDebugBundleRef and target-specific ImageDebugBinding; canonical serializer/golden vectors; source identity; ABI/unwind/location descriptors | Target lifecycle identity, local source locator/UI policy, implicit masks, one universal R7 recipe, target-specific AVR encoding choices outside profiles |
 | `HSX-A-003` | Execution Evidence and Inspection Consistency | Ordered transitions, stable stops, inspection revisions/snapshots, exact step/bypass evidence, blocked-state capability | Debugger controller state machine, source into/over/out policy, fabricated timer completion |
 | `HSX-A-004` | Event Continuity and Capability Profiles | Stream identity, canonical order, cursor/selection, ACK/gaps/resume, checkpoints/health and current/degraded profiles | Client callback/threading policy, DAP events, version guessing, silent loss |
 | `HSX-A-005` | Remote Debug Resource Authority | Remote resource/owner/provenance identity, revisions/CAS, shared effective bindings, lifetime/tombstones/events and degraded limits | Debugger logical desired resources, snapshot Watch expressions, IDE presentation |

@@ -1,6 +1,6 @@
 # Portable Debug Runtime Contracts
 
-- Status: RESYNTHESIZED — PENDING INDEPENDENT REVIEW
+- Status: REVIEW 005 REWORK CORRECTED — PENDING FRESH REVIEW 006
 - Range: `HSX-D-001..HSX-D-005`
 - Architecture: `HSX-A-001..HSX-A-005`
 - Requirements: `HSX-R-001..HSX-R-036`
@@ -91,14 +91,14 @@ Construction is acyclic:
    input ref.
 
 Canonical structured digests are `SHA-256(UTF8(domain_tag) || 0x00 || canonical_json)`.
-Canonical JSON uses NFC strings/keys, exact case, object keys sorted by Unicode scalar,
-schema-defined array order, source records sorted by UTF-8 logical ID and sorted-set order for
-capability arrays. UInt64/digests use canonical decimal/lowercase-hex strings. Duplicate raw or
-NFC-normalized keys/IDs, floats, NaN/infinity, invalid Unicode, unknown mandatory fields and
-out-of-range values are rejected; absent optionals are omitted and no BOM/insignificant
-whitespace is emitted. A record's own digest, signatures, timestamps and local locator paths
-are excluded from its digest scope. Raw artifact/source/component byte digests cover exact
-bytes without newline, encoding, compression or host-path normalization.
+The [canonical digest appendix](002--Canonical_Digest_Golden_Vectors.md) is normative: it fixes
+literal domain-tag bytes, NFC/key/array ordering, minimal decimal-string encoding for every
+integer-valued identity field, lowercase Hex64 only for digests, control-character rejection,
+one quote/backslash escaping form, exact UTF-8 emission and golden source/component/bundle/
+binding bytes and hashes. JSON numeric tokens, alternate escapes and ambiguous hex/decimal
+integer choices are invalid. A record's own digest, signatures, timestamps and local locator
+paths are excluded from its digest scope. Raw artifact/source/component byte digests cover
+exact bytes without newline, encoding, compression or host-path normalization.
 
 `ImageDebugBundleRef` includes canonical symbol model, unwind/location recipes, source identity
 manifest and required capability/schema refs. Raw `.sym`/`sources.json` digests may remain
@@ -112,7 +112,8 @@ The bundle-internal `SourceIdentityRecord` contains an NFC artifact-relative log
 SHA-256 exact source bytes and byte length. An external `SourceRef` adds the exact
 `ImageDebugBundleRef`; this one-way construction avoids source/bundle recursion. `/` is the
 separator; case is preserved; absolute/drive/UNC/empty/dot/dot-dot/backslash/NUL IDs are
-invalid. Duplicate basenames and casefold collisions remain distinct or typed ambiguous.
+invalid, as are all U+0000..U+001F/U+007F controls. Duplicate basenames and casefold
+collisions remain distinct or typed ambiguous.
 Prefix maps, search roots, symlinks and local overrides are resolver-only, excluded from
 identity/digests, and candidate bytes must match SourceRef before use.
 
@@ -128,6 +129,12 @@ resume PC; after `PUSH R7; MOV R7,R15`, `[FP]=old R7`, `[FP+4]=resume PC`, physi
 The current compiled callee does not consume stack arguments; live-across-call saving beyond
 R7, aggregates, multiword values/returns, varargs, dynamic/tail/inline frames are unsupported,
 not implied by physical caller layout.
+
+Conforming one-word f16 values use the low 16 bits and zero upper 16 bits. Current Python
+`FADD`/`FSUB`/`FMUL`/`FDIV`/`I2F` preserve the destination's old upper half, and allocator
+reuse can expose it across a call/return. Those paths are explicit
+`hsx.python-debug-legacy/1` nonconformance and cannot advertise this ABI until the
+zero-extension removal fixture passes.
 
 | Value | Exact profile role |
 |---|---|
@@ -378,7 +385,7 @@ negotiated separately as `hsx.debug-resource.events/1` and carried under HSX-D-0
 | Contract | Minimum fixture families |
 |---|---|
 | D-001 | restart/session/stream/target/PID reuse; identical artifact loaded on two targets with distinct LoadedImageIds; atomic launch; failed replace; exclusive/observer; stale generation; detach/disconnect/orphan; kill/tombstone; reconnect retained/lost |
-| D-002 | multiple address widths/spaces; endian/alignment; checked overflow; canonical artifact/bundle/binding/source digests and recursion rejection; exact-case/basename/casefold/relocation/content outcomes; current ABI register/frame/call rows; unknown/limited/corrupt/stale unwind/location recipes; partial pieces; revision-fenced register mutation validation |
+| D-002 | multiple address widths/spaces; endian/alignment; checked overflow; cross-runtime golden canonical artifact/bundle/binding/source/component bytes and recursion rejection; exact-case/basename/casefold/relocation/content outcomes; current ABI register/frame/call rows; f16 allocator-reuse upper-zero expected-nonconformance/removal fixture; unknown/limited/corrupt/stale unwind/location recipes; partial pieces; revision-fenced register mutation validation |
 | D-003 | command receipt vs transition; pause/break/fault/terminal precedence; immutable/revision snapshots; stale reads; exact 0/1 step; fenced bypass; WAIT_MBX/SLEEPING capability |
 | D-004 | stream replacement; filter-safe cursors; atomic ordering; future ACK rejection; seq eviction; queue gap intervals; malformed/half-open health; contiguous resume/full reconcile |
 | D-005 | same-address multi-owner; owner release; external observation; CAS conflict; tombstones; reconnect/adoption; resource-event gap; live-watch sample revisions; legacy no-delete mode |

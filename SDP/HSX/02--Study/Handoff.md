@@ -1,16 +1,18 @@
 # HSX Portable Debug Contract Handoff
 
-- Status: CONTRACTS RESYNTHESIZED — FRESH REVIEW PENDING
+- Status: REVIEW 005 REWORK CORRECTED — CONTENT COMMIT/ANCHOR NEXT
 - Coordinator: `HSX-ST-001`, issue #47
 - Debugger dependency: `DBG-ST-006`, issue #38
 - Iteration: `DBG-IT-001-003`
-- Planned fresh review: `HSX-RVW-001-001-005`
+- Completed review: `HSX-RVW-001-001-005` — REWORK at
+  `84df21d763b73209efd0292990799f469283460a`
+- Planned fresh review: `HSX-RVW-001-001-006`
 
 ## Current objective
 
-Obtain fresh exact-head `HSX-RVW-001-001-005` of the complete portable contract package and
-`DBG-ST-006`, then return a reviewed decision package before any Debugger design freeze or
-product work.
+Commit the validated review-005 f16/canonical-digest/gate corrections, anchor the resulting
+proposal-content SHA in a trace-only assignment record, then obtain fresh
+`HSX-RVW-001-001-006` before any Debugger design freeze or product work.
 
 ## Authority
 
@@ -21,7 +23,8 @@ product work.
 
 ## Exact next step
 
-Commit the complete proposal head and assign `HSX-RVW-001-001-005` to that exact head.
+Validate and commit the documentation-only rework, then add a trace-only assignment record
+that anchors the proposal-content SHA for fresh `HSX-RVW-001-001-006`.
 
 ## Master verification
 
@@ -45,6 +48,10 @@ DBG mappings, Markdown fences and `git diff --check` passed. This is not indepen
 - `HSX-ST-007` froze the truthful current ABI profile, bounded unwind/location recipe schemas
   and revision-fenced register mutation proposal. `HSX-ST-008` froze the non-recursive
   artifact/load/bundle/binding and exact source-identity proposal. Master synthesized both.
+- `HSX-RVW-001-001-005` reviewed exact head `84df21d763b73209efd0292990799f469283460a`
+  and returned three Medium findings: undeclared current f16 upper-bit nonconformance,
+  non-unique canonical digest bytes, and stale exact-head/Handoff reconstruction. Findings are
+  durable in issue #47 comment `5354906185` and issue #38 comment `5354906338`.
 - No contract acceptance or implementation authority resulted.
 
 ## Guards

@@ -361,7 +361,8 @@ After all domain Studies completed, Master allocated stable proposed IDs:
 - `HSX-D-001..HSX-D-005`.
 
 The contract package and `DBG-ST-006` mapping are complete. Review attempts
-`HSX-RVW-001-001-001..004` required rework. Supplemental `HSX-ST-007` and `HSX-ST-008`
-are complete and resynthesized. The active gate is `HSX-RVW-001-001-005`, followed by
-decision packages in issues #47/#38. Broader HSX migration remains open exactly as routed
-above. No ID is accepted or implementation-authoritative merely because it is stable.
+`HSX-RVW-001-001-001..005` required rework. Supplemental `HSX-ST-007` and `HSX-ST-008`
+are complete and review-005 corrections are active. The next review is
+`HSX-RVW-001-001-006`, followed by decision packages in issues #47/#38. Broader HSX
+migration remains open exactly as routed above. No ID is accepted or
+implementation-authoritative merely because it is stable.

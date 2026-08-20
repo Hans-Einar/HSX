@@ -213,7 +213,7 @@ implementation remains blocked.
 
 ## DBG-IT-001-003 — Portable Debug Runtime Contracts
 
-Status: CONTRACTS RESYNTHESIZED — INDEPENDENT REVIEW 005 PENDING
+Status: REVIEW 005 REWORK CORRECTED — CONTENT COMMIT/REVIEW 006 ANCHOR NEXT
 
 ### Goal
 
@@ -250,8 +250,9 @@ portable runtime semantics required by `DBG-D-002..DBG-D-006`.
 - `SDP/HSX/02--Study/006--Resource_Provenance_Revisions.md`
 - `SDP/HSX/02--Study/007--ABI_Profile_Recipe_Schema.md`
 - `SDP/HSX/02--Study/008--Debug_Bundle_Source_Identity.md`
-- proposed HSX Requirements/Architecture/Design contract documents and both track traceability
-- independent review records `HSX-RVW-001-001-001..HSX-RVW-001-001-005`
+- proposed HSX Requirements/Architecture/Design contract documents, the `HSX-D-002` canonical
+  digest-vector appendix, and both track traceability
+- independent review records `HSX-RVW-001-001-001..HSX-RVW-001-001-006`
 
 No product/runtime/extension/test/package/AVR file may be modified.
 
@@ -269,7 +270,7 @@ No product/runtime/extension/test/package/AVR file may be modified.
 
 - Debugger: `DBG-ST-006`, `DBG-D-002..DBG-D-006`, `DBG-IT-001-003`
 - HSX: `HSX-ST-001..HSX-ST-008`, proposed stable `HSX-R-*`, `HSX-A-*`, `HSX-D-*`
-- Reviews: `HSX-RVW-001-001-001..004` REWORK; `...005` pending exact-head review
+- Reviews: `HSX-RVW-001-001-001..005` REWORK; `...006` planned after corrections
 - Issues: #47 coordination and #38 Steering gate
 
 ### Completion signal
@@ -362,5 +363,20 @@ changes. Master resynthesized their decisions into `HSX-R-004`, `R-006`, `R-015.
 `R-023`, `HSX-A-001/002`, `HSX-D-001..003`, `DBG-ST-006`, and proposed
 `DBG-D-002..DBG-D-006`. The package now defines exact ABI/frame rows, bounded recipe opcodes
 and limits, atomic register-write epoch replacement, canonical non-recursive bundle binding,
-and stable content-bound source identity. The only active gate is fresh exact-head
-`HSX-RVW-001-001-005`; no contract is accepted or implementation-authorized.
+and stable content-bound source identity. Review 005 completed REWORK; no contract is accepted
+or implementation-authorized.
+
+### Cross-track review attempt 5
+
+`HSX-RVW-001-001-005` reviewed exact head
+`84df21d763b73209efd0292990799f469283460a` and returned REWORK for three Medium findings:
+
+- the target f16 zero-upper-bit rule omitted current VM/compiler upper-half preservation as a
+  named nonconformance/removal fixture;
+- structured digest domain bytes, integer encodings and JSON escaping were not unique and
+  lacked golden vectors;
+- current Handoffs did not anchor the reviewed SHA or reflect the already-assigned review.
+
+All other technical, traceability, scope and evidence checks passed. Master completed and
+validated documentation-only corrections. The next actions are exact proposal-content
+anchoring and fresh `HSX-RVW-001-001-006`. Every design/RF/product/AVR gate remains closed.

@@ -1,12 +1,13 @@
 # Proposed Debugger Design Contracts
 
-- Status: PORTABLE DEPENDENCY REWORK PENDING REVIEW / NOT FROZEN / NO IMPLEMENTATION AUTHORITY
+- Status: PORTABLE DEPENDENCY REVIEW 005 CORRECTED / NOT FROZEN / NO IMPLEMENTATION AUTHORITY
 - DesignAnalysis: `DBG-DA-001`
 - Architecture: `DBG-A-001..DBG-A-008`
 - Architecture-direction review: `DBG-RVW-001-002-003` — PASS at
   `89d95de2d944179219a93895f1ab956f2786a232`
 - Portable dependency evidence: `DBG-ST-006`, `HSX-ST-001..HSX-ST-008`
-- Pending cross-track review: `HSX-RVW-001-001-005`
+- Review 005: REWORK at `84df21d763b73209efd0292990799f469283460a`
+- Planned fresh cross-track review: `HSX-RVW-001-001-006`
 - Target state: not implemented
 
 The contracts below are design proposals, not accepted implementation authority. A later

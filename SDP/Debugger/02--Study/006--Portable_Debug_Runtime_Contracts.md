@@ -1,6 +1,6 @@
 # DBG-ST-006 — Portable Debug Runtime Contract Study
 
-- Status: RESYNTHESIZED — PENDING FRESH INDEPENDENT REVIEW
+- Status: REVIEW 005 REWORK CORRECTED — PENDING FRESH REVIEW 006
 - Owning track: Debugger
 - Required coordinator: HSX track through `HSX-ST-001`
 - Proposed by: `DBG-DA-001`
@@ -87,7 +87,7 @@ All remain target/proposed pending independent review and Steering acceptance.
 | 3. Ordered run/stop/fault/terminal evidence | ST-004 | R-019..R-021 | A-003; D-003 | command receipt vs transition, causal precedence, terminal/fault ordering |
 | 4. Event cursor/gap/ACK/capabilities | ST-005 | R-028..R-033 | A-004; D-004 | filter-safe cursors, future ACK rejection, seq eviction/gaps/resume/health |
 | 5. Inspection snapshot consistency | ST-004, ST-003, ST-007 | R-022..R-023 | A-003/A-002; D-003/D-002 | immutable/revision snapshots, stale reads, debug-bundle/address fencing, register-write invalidation/replacement evidence |
-| 6. ABI/unwind/frame/location semantics | ST-003, ST-007, ST-008 | R-015..R-018 | A-002; D-002 | exact llc-r7-word32 profile, prologue/body/epilogue rows, bounded recipe schema/opcodes, partial/unsupported/corrupt/stale, source/bundle binding |
+| 6. ABI/unwind/frame/location semantics | ST-003, ST-007, ST-008 | R-015..R-018 | A-002; D-002 | exact llc-r7-word32 target profile with current f16 upper-bit nonconformance/removal fixture, prologue/body/epilogue rows, bounded recipe schema/opcodes, partial/unsupported/corrupt/stale, source/bundle binding and cross-runtime digest vectors |
 | 7. Exact step/bypass/precedence/source prerequisites | ST-004, ST-006 | R-025..R-027, R-035 | A-003/A-005; D-003/D-005 | retired_count 0/1, fenced bypass, shared breakpoint precedence |
 | 8. Lifecycle/observer/ownership authority | ST-002 | R-005..R-011 | A-001; D-001 | atomic launch, lease/observer enforcement, policy outcomes, tombstones |
 | 9. Resource identity/provenance/revisions | ST-006, ST-005 | R-034..R-036 | A-005/A-004; D-005/D-004 | multi-owner/CAS/tombstone/reconnect/event-gap/degraded no-delete fixtures |
@@ -107,6 +107,11 @@ Study to assume them:
 | raw register mutation | HSX-ST-007 | optional exclusive stopped/revision-fenced atomic write with replacement StopToken/SnapshotRef |
 | bundle digest construction | HSX-ST-008 | ArtifactRef → independent LoadedImageRef and reusable bundle → target-specific binding; no recursive field |
 | stable source identity/case/relocation | HSX-ST-008 | exact-case NFC logical ID plus exact content digest/length; locator policy remains Debugger-owned |
+
+Review 005 adds two explicit conformance closures without changing numeric IDs: current f16
+upper-half preservation is a named legacy nonconformance against the zero-extended target
+profile, and the `HSX-D-002` appendix fixes literal digest domains, field encodings, serializer
+bytes and cross-runtime golden vectors.
 
 These closures are synthesized into existing proposed IDs; no additional numeric R/A/D IDs
 were needed. They remain unaccepted until fresh review and Steering decision.
@@ -138,9 +143,9 @@ Until `DBG-ST-006` is complete and its required stable HSX contracts are accepte
 Documentation, test-oracle design, and interface comparison remain allowed within explicit
 Steering scope; this Study never grants product implementation authority by itself.
 
-The evidence and contract mapping are now complete, but the gate stays closed until the exact
-package passes fresh `HSX-RVW-001-001-005`, Steering accepts the HSX contracts, and a later
-decision freezes the affected `DBG-D-*` contracts.
+The evidence and contract mapping are now complete, but the gate stays closed until review-005
+rework is corrected, the exact package passes fresh `HSX-RVW-001-001-006`, Steering accepts
+the HSX contracts, and a later decision freezes the affected `DBG-D-*` contracts.
 
 ## Affected proposed contracts and requirements
 

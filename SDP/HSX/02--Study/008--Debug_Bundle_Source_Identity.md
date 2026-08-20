@@ -153,21 +153,30 @@ following deterministic JSON encoding before hashing:
    Unicode and values outside their declared type/range are rejected before canonicalization.
 2. Text is Unicode NFC. Object keys are NFC-normalized and sorted by Unicode scalar value.
    Two raw keys or logical IDs that normalize to the same NFC value are duplicates and fail.
-3. Strings preserve case. `/` is the only separator in logical IDs. Opaque IDs, UInt64
-   generations/revisions and other wire-sensitive integers use their already required
-   canonical lowercase-hex or unsigned-decimal **string** representation. Schema/version and
-   other bounded integers may use minimal base-10 JSON integers.
-4. No insignificant whitespace or BOM is emitted. Strings use JSON escaping only where
-   required; non-ASCII text is encoded as UTF-8, not host-locale bytes. Floating point,
-   `NaN`, infinities and implementation-specific numeric formatting are forbidden in an
-   identity payload. Optional absent values are omitted, not serialized as interchangeable
-   `null`/empty values.
+3. Strings preserve case. `/` is the only separator in logical IDs. Every integer-valued
+   identity field—including schema/container versions, widths, offsets, lengths, generations,
+   revisions and sequence values—is a JSON string using minimal base-10 form: unsigned is
+   `0` or `[1-9][0-9]*`; signed is `0`, positive unsigned form, or `-[1-9][0-9]*`. `+`, leading
+   zeroes and hexadecimal integer forms are forbidden. Digest values alone are exactly 64
+   lowercase hexadecimal characters. Opaque IDs are exact NFC schema-governed strings, never
+   parsed or reformatted as integers.
+4. Identity strings reject U+0000..U+001F and U+007F. The serializer emits `\"` for U+0022,
+   `\\` for U+005C, never escapes `/`, and emits every other Unicode scalar directly as
+   UTF-8; `\u` escapes are forbidden in canonical output. No insignificant whitespace or BOM
+   is emitted. Floating point, JSON number tokens, booleans/null outside schema-declared
+   fields, `NaN`, infinities and implementation-specific formatting are forbidden. Optional
+   absent values are omitted, not serialized as interchangeable `null`/empty values.
 5. Arrays preserve schema-defined order. Set-like arrays declare a canonical sort key; source
    records sort by UTF-8 bytes of `logical_id`. Producers may not silently de-duplicate
    records after hashing.
 6. A structured digest is
-   `SHA-256(UTF8(domain-tag) || 0x00 || canonical-json-bytes)`. Domain tags are type/schema
-   specific, so equal JSON from different domains cannot alias.
+   `SHA-256(UTF8(domain-tag) || 0x00 || canonical-json-bytes)`. The literal ASCII/UTF-8 domain
+   tags are: `hsx.source-identity-manifest/1`,
+   `hsx.debug-component.symbol-model/1`,
+   `hsx.debug-component.unwind-recipe/1`,
+   `hsx.debug-component.location-recipe/1`,
+   `hsx.image-debug-bundle/1`, and `hsx.image-debug-binding/1`. A future schema uses a new
+   literal tag; implementations do not derive, abbreviate or case-fold it.
 7. The field that carries a record's own digest, signatures over that digest, local locator
    hints and audit timestamps are excluded by the schema, never by ad-hoc implementation
    choice. A supplied digest is compared after recomputation; it is not replaced silently.
@@ -175,6 +184,10 @@ following deterministic JSON encoding before hashing:
 SHA-256 digests use exactly 64 lowercase hexadecimal characters on JSON/wire surfaces.
 Algorithm name, domain tag and schema version are part of the reference. Future algorithms or
 encodings require a negotiated schema/profile; clients must not guess.
+
+The normative serializer pseudocode and golden canonical-byte/SHA-256 vectors are in the
+`HSX-D-002` canonical-digest appendix. Implementations must reproduce all vectors before
+claiming `hsx.debug.image-bundle/1`; merely parsing equivalent JSON is insufficient.
 
 ### 5.2 Exact byte-content digests
 
@@ -373,7 +386,7 @@ the full `SourceRef` using the accepted bundle.
 
 - A logical ID is relative to one declared artifact source root. It is not a host path.
 - It uses `/`, contains no empty, `.` or `..` segments, drive letter, UNC prefix, URI scheme,
-  leading/trailing slash, NUL or backslash, and is Unicode NFC.
+  leading/trailing slash, backslash, U+0000..U+001F or U+007F, and is Unicode NFC.
 - Case is preserved and equality is exact code-point equality after NFC normalization.
   Locale-sensitive lowercase/case-fold operations are forbidden for identity.
 - Two exact/NFC-equal logical IDs in one manifest are invalid duplicates.
@@ -476,9 +489,11 @@ failure behavior end to end. No additional capability name is introduced by this
 1. Hash a fixed HXE byte vector and verify identical ArtifactRef results across at least
    Python and a language/runtime used by a debugger consumer; change one byte and require a
    different digest.
-2. Serialize structured payloads with permuted object-key order/whitespace and require one
-   canonical digest; reject duplicate keys, non-NFC duplicates, malformed UInt64/digest text,
-   floats and unknown mandatory fields.
+2. Reproduce every canonical-byte/digest golden vector in the `HSX-D-002` appendix from at
+   least Python and one Debugger-consumer runtime. Permuted key order/whitespace yields the
+   same bytes; non-control input `\u` escapes reserialize to direct UTF-8, while control-valued
+   strings, alternate integer forms, duplicate keys, non-NFC duplicates, malformed digest
+   text, floats and unknown mandatory fields are rejected.
 3. Change every identity field/component digest independently and require the relevant
    structured digest to change. Add/change excluded local path, timestamp and signature
    fields and require identity to remain unchanged.
@@ -509,7 +524,7 @@ failure behavior end to end. No additional capability name is introduced by this
 11. Manifest contains `a/main.c` and `b/main.c`; a basename-only query returns ambiguity and
     never line hits for both. Exact logical IDs resolve independently.
 12. Reject exact/NFC duplicate logical IDs and illegal absolute, drive, UNC, empty, `.`/`..`,
-    backslash and NUL path forms; allow identical content under two valid different IDs.
+    backslash and C0/DEL-control path forms; allow identical content under two valid different IDs.
 13. Resolve a relocated file and symlink only when exact bytes/length match. Changed line
     endings, encoding or content produce `source_content_mismatch`, not a successful path hit.
 14. Make a line/symbol record reference an absent logical ID and require component rejection;
@@ -530,7 +545,7 @@ existing proposed package.
 | `HSX-A-001` | Own ArtifactRef and lifecycle LoadedImageRef only; explicitly exclude bundle/source construction and local paths. Supply exact refs/generations to A-002. |
 | `HSX-A-002` | Own canonical debug components, reusable bundle/source identity and binding validation against A-001 refs/descriptors; explicitly exclude target lifecycle identity and Debugger local resolver policy. |
 | `HSX-D-001` | Remove “accepted debug-bundle digest” from LoadedImageRef. Add ArtifactRef exact-byte scope and the invariant that bundle acceptance cannot mutate a LoadedImageRef. |
-| `HSX-D-002` | Replace “bundle binds exact LoadedImageRef” with the four-layer model and canonical rules in sections 5–8. Add SourceIdentityManifest/SourceRef, target-specific immutable binding, and full/degraded outcomes. |
+| `HSX-D-002` | Replace “bundle binds exact LoadedImageRef” with the four-layer model and canonical rules in sections 5–8. Add SourceIdentityManifest/SourceRef, target-specific immutable binding, full/degraded outcomes, literal domain tags, exact integer/string serialization, and the normative golden-vector appendix. |
 | `DBG-D-003` | Every epoch/snapshot carries exact LoadedImageRef and accepted ImageDebugBinding where artifact interpretation is required; replacement invalidates them even for equal bytes. |
 | `DBG-D-004` | `DebugArtifactIndex` consumes only a verified binding/bundle. `SourceResolver` keys exact SourceRef/logical ID, validates content, separates locators and returns typed ambiguity/case/mismatch outcomes; no lowercase/basename identity. |
 | `DBG-D-006` | Source into/over/out require valid binding plus exact source mapping and required recipe components. Missing/mismatched sources are unavailable/error, never silently relabeled instruction stepping. |

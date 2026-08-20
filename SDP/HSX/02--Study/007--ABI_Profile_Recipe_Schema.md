@@ -215,6 +215,12 @@ unavailable. Conflicting legacy SVC prose is not incorporated into the ordinary 
 - The profile's conforming value classes are one word: `i32`, zero-extended compatible
   code/data pointers and `f16` bits in the low 16 bits with upper bits zero. Narrower language
   integers must be explicitly sign/zero extended to a word by the frontend before the call.
+- The zero-upper-bit f16 rule is the portable target, not current implementation evidence.
+  Review `HSX-RVW-001-001-005` confirmed that Python VM `FADD`/`FSUB`/`FMUL`/`FDIV`/`I2F`
+  preserve the destination register's previous upper 16 bits. Compiler register reuse can
+  therefore expose a non-zero upper half at calls/returns. Until producer/VM fixtures prove
+  zero-extension, affected current executions are `hsx.python-debug-legacy/1` nonconformance
+  and cannot advertise `hsx.abi.llc-r7-word32/1`.
 - Arguments one through three occupy `R1`, `R2`, `R3` left-to-right.
 - Overflow word arguments are pushed highest index first. At callee entry, return PC is
   `[SP+0]`, argument #4 is `[SP+4]`, #5 is `[SP+8]`. The caller removes overflow words.
@@ -449,7 +455,7 @@ the production Executive route.
 |---|---|
 | Descriptor selection | Exact architecture/ABI/schema refs accepted; wrong digest/version/architecture and inferred HXE/R7 profile rejected. |
 | Register preservation | Generated nested calls prove R7 preservation; deliberate clobbers prove R0..R6/R8..R14 caller-clobbered; live-across-call compiler case must spill or fail conformance. |
-| Arguments/return | 0–3 word arguments and R0 result end-to-end; f16/pointer word encoding; explicit extension fixtures; aggregate/multiword/varargs unsupported. |
+| Arguments/return | 0–3 word arguments and R0 result end-to-end; f16/pointer word encoding; allocator-reuse probe proving f16 upper bits zero after FADD/FSUB/FMUL/FDIV/I2F (current expected nonconformance/removal fixture); explicit extension fixtures; aggregate/multiword/varargs unsupported. |
 | Overflow layout | Caller pushes 4–6 arguments high-to-low; VM memory proves entry-SP and R7-relative layout; hand-written callee positive; compiled callee >=4 remains an explicit failing/removal fixture until implemented. |
 | Frame PC ranges | Stops at entry PUSH, MOV, stable body, each local-release POP, POP R7 and RET recover the same caller; nested/recursive/leaf/terminal cases. |
 | Return/call-site PC | Stored resume PC is call+4; call-site is checked -4; underflow, wrong opcode, alignment and image/range mismatch do not wrap. |
@@ -490,6 +496,11 @@ prove the proposed recipe or mutation capabilities; the fixture plan above is re
 Static evidence also found that the formal-callee `stack_args` list is constructed but never
 consumed, while the separate call-site `stack_args` variable emits only caller pushes. This
 is why overflow arguments are a declared compiler conformance gap rather than a claimed pass.
+
+Independent review `HSX-RVW-001-001-005` additionally inspected the current VM half-opcode
+assignments and ran a compiled allocator-reuse probe. A half-zero result returned
+`R0=0x12340000`, confirming that upper-half preservation is another explicit current
+nonconformance rather than evidence for the portable zero-extension rule.
 
 ## 10. Exact synthesis changes required
 

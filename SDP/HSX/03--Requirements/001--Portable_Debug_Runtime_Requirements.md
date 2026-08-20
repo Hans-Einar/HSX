@@ -1,6 +1,6 @@
 # Portable Debug Runtime Requirements
 
-- Status: RESYNTHESIZED — PENDING INDEPENDENT REVIEW
+- Status: REVIEW 005 REWORK CORRECTED — PENDING FRESH REVIEW 006
 - Range: `HSX-R-001..HSX-R-036`
 - Studies: `HSX-ST-001..HSX-ST-008`
 - Debugger dependency: `DBG-ST-006`
@@ -64,7 +64,9 @@ Steering accepts them in issues #47/#38. They authorize no product or AVR work.
 - **HSX-R-015 — Image/debug bundle and source binding.** Reusable artifact-bound
   `ImageDebugBundleRef` SHALL use domain-separated canonical digests independent of
   `LoadedImageRef`; an immutable `ImageDebugBinding` SHALL bind exact LoadedImageRef, bundle
-  and accepted descriptors without recursive digest fields. Source identity SHALL use
+  and accepted descriptors without recursive digest fields. Literal domain tags, every
+  integer/string encoding and canonical JSON byte SHALL be unique and cross-runtime golden
+  vectors SHALL pass. Source identity SHALL use
   exact-case NFC artifact-relative logical ID plus exact source-byte digest/length, separate
   from local paths/relocation. Mismatch, ambiguity, case collision and stale binding fail typed.
 - **HSX-R-016 — ABI descriptor.** Each executable profile SHALL expose
@@ -75,6 +77,9 @@ Steering accepts them in issues #47/#38. They authorize no product or AVR work.
   consumption and live-across-call preservation are not conformant. Aggregates, multiword
   returns, varargs, dynamic/tail/inline frames remain unsupported until separate profiles exist;
   SVC register signatures are separate exact descriptors rather than ordinary call-ABI claims.
+  Conforming f16 words have zero upper bits; current Python half arithmetic preserving prior
+  destination upper bits is an explicit nonconformance and SHALL remain degraded until its
+  failing/removal fixture passes.
 - **HSX-R-017 — Versioned unwind recipes.** Stack reconstruction SHALL consume
   `hsx.unwind-recipe/1` bounded typed declarative recipes, selected by exact image/ABI/PC range,
   with explicit prologue/body/epilogue rows, negotiated opcode/read/frame bounds and fail-closed

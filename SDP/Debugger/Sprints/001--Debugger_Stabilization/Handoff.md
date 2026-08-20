@@ -1,12 +1,12 @@
 # DBG-SPR-001 Handoff
 
-Status: `portable_contract_resynthesized_review_005_pending`
+Status: `portable_contract_review5_rework_corrected_content_anchor_next`
 
 ## Current objective
 
-Obtain fresh exact-head `HSX-RVW-001-001-005` for the complete resynthesized package, then
-return reviewed decision packages to issues #47/#38. No structural product or AVR work may be
-dispatched.
+Commit the validated review-005 f16/canonical-digest/gate corrections, anchor the resulting
+proposal-content SHA, then obtain fresh `HSX-RVW-001-001-006` and return reviewed decision
+packages to issues #47/#38. No structural product or AVR work may be dispatched.
 
 ## Authority
 
@@ -106,16 +106,21 @@ dispatched.
   environment skip; 99 plus 7 execution tests; 15 plus 7 supplemental ABI tests; 18
   bundle/source tests with one environment skip; YAML/NDJSON, 36/5/5 IDs, ten mappings,
   Markdown fences and diff-check all passed.
+- Fresh `HSX-RVW-001-001-005` reviewed exact proposal head
+  `84df21d763b73209efd0292990799f469283460a` and returned three Medium findings. Durable
+  coordination is in issue #47 comment `5354906185` and #38 comment `5354906338`; fresh
+  review after corrections is `HSX-RVW-001-001-006`.
 
 ## Not done
 
 - `DBG-D-001..DBG-D-010` remain proposed and have no implementation authority.
-- The final portable contract package has not passed `HSX-RVW-001-001-005`.
+- Review 005 is REWORK; the corrected package has not passed `HSX-RVW-001-001-006`.
 
 ## Exact next step
 
-Commit the resynthesized exact proposal head, obtain fresh exact-head review, post reviewed
-packages to #47 and #38, then stop before any design freeze or implementation authorization.
+Commit the documentation-only corrections, create a trace-only assignment anchor for the
+proposal-content SHA, obtain fresh review 006, post reviewed packages to #47 and #38, then
+stop before any design freeze or implementation authorization.
 
 ## Traceability state
 
@@ -127,7 +132,7 @@ packages to #47 and #38, then stop before any design freeze or implementation au
   `208063e344b767f82790ce579eba6327e2cdd0ce` and repository head tested
   `fefd4b0c427dfa71d637e4f4cce9e4a345912591`.
 - CurrentIndex, Issues, sprint records, Relations, Ledger, and Handoff are current through
-  review attempt 4, supplemental Study completion, and Master resynthesis.
+  review attempt 5 REWORK and the active Master-correction gate.
 - Accepted architecture direction: `DBG-DA-001`, `DBG-A-001..DBG-A-008`
 - Completed Design Studies: `DBG-ST-002..DBG-ST-005`
 - Architecture review: `DBG-RVW-001-002-001` — REWORK at `f8b8097`
@@ -147,13 +152,16 @@ packages to #47 and #38, then stop before any design freeze or implementation au
 - Review `HSX-RVW-001-001-002`: REWORK at `ffd0a42`
 - Review `HSX-RVW-001-001-003`: REWORK at `efd43d2`
 - Review `HSX-RVW-001-001-004`: REWORK at `cbddfa2`
+- Review `HSX-RVW-001-001-005`: REWORK at `84df21d`
 - Resynthesized supplemental Studies: `HSX-ST-007`, `HSX-ST-008`
-- Active gate: fresh exact-head `HSX-RVW-001-001-005`
+- Active gate: Master corrections, then fresh `HSX-RVW-001-001-006`
 
 ## Agents and worktree
 
-The prior product/design chain and all bounded HSX Study workers are complete. The next role is
-fresh independent reviewer `HSX-RVW-001-001-005`. The controlled branch is `codex/dbg-st-006`;
+The prior product/design chain and all bounded HSX Study workers are complete. Master has
+validated the review-005 documentation corrections; after the content/assignment commits the
+next agent role is fresh independent reviewer
+`HSX-RVW-001-001-006`. The controlled branch is `codex/dbg-st-006`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.
 

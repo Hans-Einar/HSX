@@ -51,7 +51,7 @@ active:
       status: complete_for_synthesis
     - id: DBG-ST-006
       path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
-      status: resynthesized_pending_fresh_cross_track_review
+      status: review5_rework_complete_pending_review6
 completed:
   refactor:
     id: DBG-RF-001
@@ -93,7 +93,7 @@ active_gate:
   iteration:
     id: DBG-IT-001-003
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/ScrumIterations.md
-    status: contract_resynthesis_complete_pending_fresh_review
+    status: contract_review5_rework_complete_pending_review6
   architecture_review:
     id: DBG-RVW-001-002-001
     status: rework
@@ -119,7 +119,7 @@ active_gate:
     hsx_coordinator: HSX-ST-001
     hsx_issue: 47
     hsx_studies: HSX-ST-002..HSX-ST-008
-    status: resynthesized_pending_fresh_cross_track_review
+    status: review5_rework_complete_pending_review6
     review: HSX-RVW-001-001-001
     review_status: rework
     reviewed_head: 5fff403f6668f794b760caf64ef34b4d1ecb4ae3
@@ -134,8 +134,12 @@ active_gate:
     review_attempt_4_head: cbddfa24d3cbb25bf7a17c63a0146ee8d0600883
     supplemental_studies: HSX-ST-007,HSX-ST-008
     review_attempt_5: HSX-RVW-001-001-005
-    review_attempt_5_status: pending_exact_head_review
-    current_gate: independent_review_HSX-RVW-001-001-005
+    review_attempt_5_status: rework
+    review_attempt_5_head: 84df21d763b73209efd0292990799f469283460a
+    review_attempt_5_record: SDP/HSX/Reviews/005--Portable_Debug_Contract_Review_Attempt5.md
+    review_attempt_6: HSX-RVW-001-001-006
+    review_attempt_6_status: planned_after_review5_rework
+    current_gate: commit_and_anchor_review6_candidate
     hsx_requirements: HSX-R-001..HSX-R-036
     hsx_architecture: HSX-A-001..HSX-A-005
     hsx_design: HSX-D-001..HSX-D-005
@@ -148,7 +152,7 @@ proposed:
   design:
     range: DBG-D-001..DBG-D-010
     path: SDP/Debugger/06--Design/001--Debugger_Design_Contracts.md
-    status: portable_dependency_rework_pending_review
+    status: portable_dependency_review5_rework_complete_pending_review6
     state: target
     gates:
       - range: DBG-D-002..DBG-D-006
@@ -158,7 +162,7 @@ proposed:
   study:
     id: DBG-ST-006
     path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
-    status: resynthesized_pending_fresh_cross_track_review
+    status: review5_rework_complete_pending_review6
 structural_gate:
   rule: No structural product-code refactor starts before DBG-DA-001 and relevant DBG-D contracts are accepted.
   blocked_refactors:

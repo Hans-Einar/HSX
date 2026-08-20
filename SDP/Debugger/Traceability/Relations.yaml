@@ -99,6 +99,7 @@ relations:
       - HSX-RVW-001-001-003
       - HSX-RVW-001-001-004
       - HSX-RVW-001-001-005
+      - HSX-RVW-001-001-006
   - from: DBG-ST-006
     type: satisfied_by_proposed_contracts
     to:

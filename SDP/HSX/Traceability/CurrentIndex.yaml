@@ -1,7 +1,7 @@
 schema_version: 1
 track: HSX
 namespace: HSX
-status: portable_contract_resynthesized_pending_independent_review
+status: portable_contract_review5_rework_complete_pending_content_anchor
 active:
   coordinating_study:
     id: HSX-ST-001
@@ -33,7 +33,7 @@ active:
   coordinated_debugger_study:
     id: DBG-ST-006
     issue: 38
-    status: resynthesized_pending_cross_track_review
+    status: review5_rework_complete_pending_review6
   review:
     id: HSX-RVW-001-001-001
     status: rework
@@ -56,28 +56,36 @@ active:
     path: SDP/HSX/Reviews/004--Portable_Debug_Contract_Review_Attempt4.md
   review_attempt_5:
     id: HSX-RVW-001-001-005
-    status: pending_exact_head_review
-  current_gate: independent_review_HSX-RVW-001-001-005
+    status: rework
+    reviewed_head: 84df21d763b73209efd0292990799f469283460a
+    path: SDP/HSX/Reviews/005--Portable_Debug_Contract_Review_Attempt5.md
+  review_attempt_6:
+    id: HSX-RVW-001-001-006
+    status: planned_after_review5_rework
+  current_gate: commit_and_anchor_review6_candidate
 proposed_contract_baseline:
   requirements:
     range: HSX-R-001..HSX-R-036
     path: SDP/HSX/03--Requirements/001--Portable_Debug_Runtime_Requirements.md
-    status: resynthesized_pending_review
+    status: review5_rework_complete_pending_review6
     state: target
   architecture:
     range: HSX-A-001..HSX-A-005
     path: SDP/HSX/04--Architecture/001--Portable_Debug_Runtime_Architecture.md
-    status: resynthesized_pending_review
+    status: review5_rework_complete_pending_review6
     state: target
   design:
     range: HSX-D-001..HSX-D-005
     path: SDP/HSX/06--Design/001--Portable_Debug_Runtime_Contracts.md
-    status: resynthesized_pending_review
+    status: review5_rework_complete_pending_review6
     state: target
+    appendix:
+      path: SDP/HSX/06--Design/002--Canonical_Digest_Golden_Vectors.md
+      status: review5_rework_complete_pending_review6
   debugger_mapping:
     id: DBG-ST-006
     path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
-    status: resynthesized_pending_review
+    status: review5_rework_complete_pending_review6
 legacy_sources:
   - main/02--Study
   - main/03--Architecture

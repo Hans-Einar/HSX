@@ -78,6 +78,7 @@ relations:
       - HSX-RVW-001-001-003
       - HSX-RVW-001-001-004
       - HSX-RVW-001-001-005
+      - HSX-RVW-001-001-006
   - from: HSX-ST-001
     type: provides_provenance_for
     to:
