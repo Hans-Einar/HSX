@@ -249,7 +249,9 @@ first_structural_wave:
       parent_review_attempt_3_status: rework_trace_only
       parent_review_attempt_4: DBG-RVW-003-001-004
       parent_review_attempt_4_status: rework_trace_only
-      final_review: DBG-RVW-003-001-005
+      parent_review_attempt_5: DBG-RVW-003-001-005
+      parent_review_attempt_5_status: rework_trace_only
+      final_review: DBG-RVW-003-001-006
       final_verification: DBG-VER-003-001-001
   slices:
     - id: DBG-SL-001-004-001
@@ -343,7 +345,7 @@ first_structural_wave:
   runtime_profile: hsx.python-debug-legacy/1
   still_blocked: DBG-RF-004..DBG-RF-009
   partial_product_wip_stash: efc91f2640647402bc92c69bde1c57685cfaa1f1
-  current_gate: fresh_parent_final_reviews_DBG-RVW-002-001-006_and_DBG-RVW-003-001-005
+  current_gate: fresh_parent_final_reviews_DBG-RVW-002-001-006_and_DBG-RVW-003-001-006
 structural_gate:
   rule: Only Steering-authorized Refactors with frozen Slice/interface contracts may execute.
   authorized_refactors:

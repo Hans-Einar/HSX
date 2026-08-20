@@ -34,11 +34,11 @@ issues:
     final_review_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/004--Architecture_Final_Review.md
     rereviewed_head: e1f72a59bed3455a06d4443750ebf2f8c068e409
     reviewed_head: f8b80977c5a78b81488ffc486a3604be863dfb26
-    proposed_architecture: DBG-A-001..DBG-A-008
-    proposed_design: DBG-D-001..DBG-D-010
-    proposed_followup_study: DBG-ST-006
-    blocked_design_pending_study: DBG-D-002..DBG-D-006
-    active_study: DBG-ST-006
+    accepted_architecture: DBG-A-001..DBG-A-008
+    frozen_design: DBG-D-001..DBG-D-010
+    completed_followup_study: DBG-ST-006
+    historical_pre_study_blocked_design: DBG-D-002..DBG-D-006
+    completed_study: DBG-ST-006
     hsx_coordinator_issue: 47
     hsx_studies: HSX-ST-001..HSX-ST-008
     cross_track_review: HSX-RVW-001-001-001
@@ -146,6 +146,8 @@ issues:
     rf003_parent_review_attempt_3_status: rework_trace_only
     rf003_parent_review_attempt_4: DBG-RVW-003-001-004
     rf003_parent_review_attempt_4_status: rework_trace_only
+    rf003_parent_review_attempt_5: DBG-RVW-003-001-005
+    rf003_parent_review_attempt_5_status: rework_trace_only
     rf003_implicit_reopen_review: DBG-RVW-001-004-009
     rf003_implicit_reopen_review_status: rework
     rf003_corrected_review: DBG-RVW-001-004-011
@@ -160,7 +162,7 @@ issues:
     dependent_integration_verification: DBG-VER-001-004-006
     dependent_integration_verification_status: pass
     dependent_integration_signed_head: 1e479536ce5e746e1b06a53b1039b1af84adaed6
-    portable_contract_current_gate: fresh_parent_final_reviews_DBG-RVW-002-001-006_and_DBG-RVW-003-001-005
+    portable_contract_current_gate: fresh_parent_final_reviews_DBG-RVW-002-001-006_and_DBG-RVW-003-001-006
   DBG-RF-002:
     issue: 39
     status: complete_signed_chain_parent_final_review_active
@@ -179,19 +181,19 @@ issues:
     steering_comment: 5356484309
   DBG-RF-004:
     issue: 41
-    status: blocked_by_DBG-DA-001_and_stop_epoch_contract
+    status: blocked_pending_later_steering_authorization_and_dependencies
   DBG-RF-005:
     issue: 42
-    status: blocked_by_DBG-RF-002_and_DBG-RF-003
+    status: blocked_pending_later_steering_authorization_and_dependencies
   DBG-RF-006:
     issue: 43
-    status: blocked_by_DBG-RF-002_DBG-RF-003_DBG-RF-004
+    status: blocked_pending_later_steering_authorization_and_dependencies
   DBG-RF-007:
     issue: 44
-    status: blocked_by_DBG-RF-002_through_DBG-RF-006
+    status: blocked_pending_later_steering_authorization_and_dependencies
   DBG-RF-008:
     issue: 45
-    status: blocked_by_DBG-RF-007
+    status: blocked_pending_later_steering_authorization_and_dependencies
   DBG-RF-009:
     issue: 46
-    status: blocked_by_DBG-RF-002_through_DBG-RF-008
+    status: blocked_pending_later_steering_authorization_and_dependencies
