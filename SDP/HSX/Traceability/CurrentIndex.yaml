@@ -1,7 +1,7 @@
 schema_version: 1
 track: HSX
 namespace: HSX
-status: supplemental_portable_contract_studies_active
+status: portable_contract_resynthesized_pending_independent_review
 active:
   coordinating_study:
     id: HSX-ST-001
@@ -33,7 +33,7 @@ active:
   coordinated_debugger_study:
     id: DBG-ST-006
     issue: 38
-    status: rework_pending_supplemental_studies
+    status: resynthesized_pending_cross_track_review
   review:
     id: HSX-RVW-001-001-001
     status: rework
@@ -56,28 +56,28 @@ active:
     path: SDP/HSX/Reviews/004--Portable_Debug_Contract_Review_Attempt4.md
   review_attempt_5:
     id: HSX-RVW-001-001-005
-    status: planned_after_supplemental_studies
-  current_gate: master_supplemental_synthesis
+    status: pending_exact_head_review
+  current_gate: independent_review_HSX-RVW-001-001-005
 proposed_contract_baseline:
   requirements:
     range: HSX-R-001..HSX-R-036
     path: SDP/HSX/03--Requirements/001--Portable_Debug_Runtime_Requirements.md
-    status: rework_pending_supplemental_studies
+    status: resynthesized_pending_review
     state: target
   architecture:
     range: HSX-A-001..HSX-A-005
     path: SDP/HSX/04--Architecture/001--Portable_Debug_Runtime_Architecture.md
-    status: rework_pending_supplemental_studies
+    status: resynthesized_pending_review
     state: target
   design:
     range: HSX-D-001..HSX-D-005
     path: SDP/HSX/06--Design/001--Portable_Debug_Runtime_Contracts.md
-    status: rework_pending_supplemental_studies
+    status: resynthesized_pending_review
     state: target
   debugger_mapping:
     id: DBG-ST-006
     path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
-    status: rework_pending_supplemental_studies
+    status: resynthesized_pending_review
 legacy_sources:
   - main/02--Study
   - main/03--Architecture

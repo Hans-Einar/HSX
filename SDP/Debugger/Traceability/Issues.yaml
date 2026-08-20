@@ -40,10 +40,10 @@ issues:
     blocked_design_pending_study: DBG-D-002..DBG-D-006
     active_study: DBG-ST-006
     hsx_coordinator_issue: 47
-    hsx_studies: HSX-ST-001..HSX-ST-006
+    hsx_studies: HSX-ST-001..HSX-ST-008
     cross_track_review: HSX-RVW-001-001-001
     portable_contracts: HSX-R-001..HSX-R-036,HSX-A-001..HSX-A-005,HSX-D-001..HSX-D-005
-    portable_contract_status: rework_complete_pending_fresh_review
+    portable_contract_status: resynthesized_pending_fresh_review
     portable_contract_review_status: rework
     portable_contract_rereview: HSX-RVW-001-001-002
     portable_contract_rereview_status: rework
@@ -52,8 +52,9 @@ issues:
     portable_contract_review_attempt_4: HSX-RVW-001-001-004
     portable_contract_review_attempt_4_status: rework
     portable_contract_review_attempt_5: HSX-RVW-001-001-005
+    portable_contract_review_attempt_5_status: pending_exact_head_review
     portable_contract_supplemental_studies: HSX-ST-007,HSX-ST-008
-    portable_contract_current_gate: HSX-ST-007,HSX-ST-008
+    portable_contract_current_gate: HSX-RVW-001-001-005
   DBG-RF-002:
     issue: 39
     status: blocked_by_DBG-DA-001

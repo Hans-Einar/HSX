@@ -60,7 +60,7 @@ separate gate and was not started in this iteration.
 
 ## DBG-IT-001-002 — Optimal Modular Debugger DesignAnalysis
 
-Status: AWAITING STEERING ACCEPTANCE
+Status: CLOSED — ARCHITECTURE DIRECTION ACCEPTED; DESIGN CONTRACTS UNFROZEN
 
 ### Goal
 
@@ -151,7 +151,8 @@ All four bounded Studies are complete for Master synthesis:
 Study-worker evidence included 51 and 118 targeted Python tests, balanced Mermaid/Markdown,
 complete `DBG-F-001..026` and `DBG-R-001..036` coverage in the reuse audit, and clean diffs.
 No Study granted implementation authority. Master synthesis and exact-head architecture review
-are complete; posting the reviewed Steering decision package is now the active action.
+are complete. The reviewed package was posted and Steering accepted the architecture direction
+in issue #38 comment `5348190806`; detailed design and implementation authority remain closed.
 
 ### Master synthesis result
 
@@ -212,7 +213,7 @@ implementation remains blocked.
 
 ## DBG-IT-001-003 — Portable Debug Runtime Contracts
 
-Status: SUPPLEMENTAL CONTRACT STUDIES ACTIVE
+Status: CONTRACTS RESYNTHESIZED — INDEPENDENT REVIEW 005 PENDING
 
 ### Goal
 
@@ -235,6 +236,8 @@ portable runtime semantics required by `DBG-D-002..DBG-D-006`.
 4. `HSX-ST-004` — run/stop evidence, snapshots, exact stepping and blocked-state inspection.
 5. `HSX-ST-005` — event-stream cursor, ACK, gaps, drops, resume and capability profiles.
 6. `HSX-ST-006` — breakpoint/watch identity, provenance, revisions and reconciliation evidence.
+7. `HSX-ST-007` — concrete ABI profile, bounded unwind/location schemas and register mutation.
+8. `HSX-ST-008` — non-recursive debug-bundle/source identity and canonicalization.
 
 ### Expected files
 
@@ -245,6 +248,8 @@ portable runtime semantics required by `DBG-D-002..DBG-D-006`.
 - `SDP/HSX/02--Study/004--Execution_Snapshot_Blocked_States.md`
 - `SDP/HSX/02--Study/005--Event_Stream_Continuity.md`
 - `SDP/HSX/02--Study/006--Resource_Provenance_Revisions.md`
+- `SDP/HSX/02--Study/007--ABI_Profile_Recipe_Schema.md`
+- `SDP/HSX/02--Study/008--Debug_Bundle_Source_Identity.md`
 - proposed HSX Requirements/Architecture/Design contract documents and both track traceability
 - independent review records `HSX-RVW-001-001-001..HSX-RVW-001-001-005`
 
@@ -263,8 +268,8 @@ No product/runtime/extension/test/package/AVR file may be modified.
 ### Traceability
 
 - Debugger: `DBG-ST-006`, `DBG-D-002..DBG-D-006`, `DBG-IT-001-003`
-- HSX: `HSX-ST-001..HSX-ST-006`, proposed stable `HSX-R-*`, `HSX-A-*`, `HSX-D-*`
-- Reviews: `HSX-RVW-001-001-001` REWORK, `...002` REWORK, `...003` REWORK, `...004` planned
+- HSX: `HSX-ST-001..HSX-ST-008`, proposed stable `HSX-R-*`, `HSX-A-*`, `HSX-D-*`
+- Reviews: `HSX-RVW-001-001-001..004` REWORK; `...005` pending exact-head review
 - Issues: #47 coordination and #38 Steering gate
 
 ### Completion signal
@@ -279,7 +284,7 @@ No product/runtime/extension/test/package/AVR file may be modified.
 
 ### Study work-package result
 
-`HSX-ST-001..HSX-ST-006` are complete for Master synthesis:
+`HSX-ST-001..HSX-ST-008` are complete and synthesized:
 
 - ST-001 classified the legacy DR/DG/DO catalogue and current Python oracle while routing
   broader HSX migration separately;
@@ -290,6 +295,10 @@ No product/runtime/extension/test/package/AVR file may be modified.
 - ST-005 defined stream-scoped cursors, ACK-after-apply, typed gaps/resume profiles and event
   health/reconciliation;
 - ST-006 defined owner/provenance/revision-aware remote resources and conservative legacy mode.
+- ST-007 defined `hsx.abi.llc-r7-word32/1`, bounded versioned unwind/location recipes and
+  exclusive revision-fenced register mutation.
+- ST-008 defined the acyclic ArtifactRef/LoadedImageRef/ImageDebugBundleRef/ImageDebugBinding
+  model and exact-case, content-bound source identity.
 
 Read-only evidence totals include 90, 40, 106, 77 and 114 passing targeted tests across the
 five technical Studies. All workers changed only their assigned Study. Study and contract
@@ -345,3 +354,13 @@ current-stage claims. Master corrected every current gate to point solely to
 unrouted address/ABI decisions and a recursive/underspecified debug-bundle identity. Master
 activated first-class `HSX-ST-007` and `HSX-ST-008`. Fresh review after synthesis is
 `HSX-RVW-001-001-005`.
+
+### Supplemental Study and resynthesis result
+
+Both supplemental Studies completed in bounded, disjoint Study files with no product or AVR
+changes. Master resynthesized their decisions into `HSX-R-004`, `R-006`, `R-015..R-018`,
+`R-023`, `HSX-A-001/002`, `HSX-D-001..003`, `DBG-ST-006`, and proposed
+`DBG-D-002..DBG-D-006`. The package now defines exact ABI/frame rows, bounded recipe opcodes
+and limits, atomic register-write epoch replacement, canonical non-recursive bundle binding,
+and stable content-bound source identity. The only active gate is fresh exact-head
+`HSX-RVW-001-001-005`; no contract is accepted or implementation-authorized.

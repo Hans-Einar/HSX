@@ -51,7 +51,7 @@ active:
       status: complete_for_synthesis
     - id: DBG-ST-006
       path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
-      status: rework_complete_pending_fresh_cross_track_review
+      status: resynthesized_pending_fresh_cross_track_review
 completed:
   refactor:
     id: DBG-RF-001
@@ -93,7 +93,7 @@ active_gate:
   iteration:
     id: DBG-IT-001-003
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/ScrumIterations.md
-    status: contract_rework_complete_pending_fresh_review
+    status: contract_resynthesis_complete_pending_fresh_review
   architecture_review:
     id: DBG-RVW-001-002-001
     status: rework
@@ -118,8 +118,8 @@ active_gate:
     debugger_study: DBG-ST-006
     hsx_coordinator: HSX-ST-001
     hsx_issue: 47
-    hsx_studies: HSX-ST-002..HSX-ST-006
-    status: supplemental_studies_complete_pending_master_resynthesis
+    hsx_studies: HSX-ST-002..HSX-ST-008
+    status: resynthesized_pending_fresh_cross_track_review
     review: HSX-RVW-001-001-001
     review_status: rework
     reviewed_head: 5fff403f6668f794b760caf64ef34b4d1ecb4ae3
@@ -134,7 +134,8 @@ active_gate:
     review_attempt_4_head: cbddfa24d3cbb25bf7a17c63a0146ee8d0600883
     supplemental_studies: HSX-ST-007,HSX-ST-008
     review_attempt_5: HSX-RVW-001-001-005
-    current_gate: master_supplemental_synthesis
+    review_attempt_5_status: pending_exact_head_review
+    current_gate: independent_review_HSX-RVW-001-001-005
     hsx_requirements: HSX-R-001..HSX-R-036
     hsx_architecture: HSX-A-001..HSX-A-005
     hsx_design: HSX-D-001..HSX-D-005
@@ -147,7 +148,7 @@ proposed:
   design:
     range: DBG-D-001..DBG-D-010
     path: SDP/Debugger/06--Design/001--Debugger_Design_Contracts.md
-    status: reviewed_awaiting_steering_acceptance
+    status: portable_dependency_rework_pending_review
     state: target
     gates:
       - range: DBG-D-002..DBG-D-006
@@ -157,7 +158,7 @@ proposed:
   study:
     id: DBG-ST-006
     path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
-    status: rework_complete_pending_fresh_cross_track_review
+    status: resynthesized_pending_fresh_cross_track_review
 structural_gate:
   rule: No structural product-code refactor starts before DBG-DA-001 and relevant DBG-D contracts are accepted.
   blocked_refactors:

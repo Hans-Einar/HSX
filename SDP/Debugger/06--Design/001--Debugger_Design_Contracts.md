@@ -1,11 +1,12 @@
 # Proposed Debugger Design Contracts
 
-- Status: REVIEWED PROPOSAL / NOT FROZEN / NO IMPLEMENTATION AUTHORITY
+- Status: PORTABLE DEPENDENCY REWORK PENDING REVIEW / NOT FROZEN / NO IMPLEMENTATION AUTHORITY
 - DesignAnalysis: `DBG-DA-001`
 - Architecture: `DBG-A-001..DBG-A-008`
-- Independent review: `DBG-RVW-001-002-003` — PASS at
+- Architecture-direction review: `DBG-RVW-001-002-003` — PASS at
   `89d95de2d944179219a93895f1ab956f2786a232`
-- Evidence: `DBG-ST-002..DBG-ST-005`
+- Portable dependency evidence: `DBG-ST-006`, `HSX-ST-001..HSX-ST-008`
+- Pending cross-track review: `HSX-RVW-001-001-005`
 - Target state: not implemented
 
 The contracts below are design proposals, not accepted implementation authority. A later
@@ -83,6 +84,8 @@ wire/session mechanics only.
 - duplicate/gap/drop/`seq_evicted` handling;
 - explicit EOF, malformed input, callback/parser/reducer/ACK/keepalive failures;
 - request retry only for declared idempotent operations;
+- typed descriptor, bundle/binding, snapshot, resource and optional register-mutation envelopes
+  are transported unchanged; successful legacy RPC calls never imply portable capability;
 - no hidden debugger-level reconnect or automatic claim of restored health.
 
 ### Reconciliation barrier
@@ -98,9 +101,10 @@ the full contract.
 
 ### Identity values
 
-`ExecutiveInstanceId`, `TargetId`, `PidGeneration`, `ImageId`, `ArchitectureDescriptor`,
-`SessionGeneration`, `TargetGeneration`, `StopToken`, and `StopEpochId` are distinct types.
-A PID or address integer alone is not identity.
+`ExecutiveInstanceRef`, `SessionRef`, `TargetRef`, `PidGeneration`, `ArtifactRef`, target-bound
+`LoadedImageRef`, accepted `ImageDebugBinding`, `ArchitectureDescriptorRef`, `StopToken`,
+`InspectionSnapshotRef`, and `StopEpochId` are distinct types. A PID, path, CRC, artifact digest
+or address integer alone is not target/load identity.
 
 ### Epoch rules
 
@@ -110,6 +114,8 @@ A PID or address integer alone is not identity.
   handles in the same epoch;
 - resume, termination, target/image generation change, or uncertain recovery invalidates the
   epoch before effects are issued;
+- accepted register mutation is a serialized stopped-to-stopped transition that invalidates
+  the origin epoch and installs only the returned replacement stop/snapshot evidence;
 - late reads cannot populate a newer epoch;
 - stale/unknown handles fail explicitly and never fall back to another object;
 - DAP integer IDs map to domain handles within one DAP session but do not own lifetime.
@@ -121,10 +127,12 @@ dependencies on `DBG-ST-006`/HSX contracts.
 
 ### Services
 
-- `DebugArtifactIndex` validates schema and `ImageId`, then exposes immutable functions,
-  symbols, instructions, source locations, type/location lists, and memory regions.
-- `SourceResolver` maps case-preserving artifact source identity through `sources.json`, prefix
-  maps, search roots, and explicit user overrides; ambiguous/missing results are typed.
+- `DebugArtifactIndex` consumes only a verified `ImageDebugBinding`/`ImageDebugBundleRef`, then
+  exposes immutable functions, symbols, instructions, source identities, type/location lists,
+  bounded unwind/location recipes, and memory regions for the exact LoadedImageRef.
+- `SourceResolver` keys exact case-preserving NFC `SourceRef`/logical ID, keeps local locators
+  separate, verifies candidate byte digest/length, and returns typed unavailable, ambiguous,
+  content-mismatch and case-collision outcomes.
 - `InspectionService` returns registers, stack, scopes, variables, memory, and disassembly for
   one epoch/snapshot with explicit partial/unavailable diagnostics.
 
@@ -138,7 +146,8 @@ fallback from an unknown frame to the current frame.
 
 Multiple address widths/spaces, case-colliding files, relocation/prefix/symlink mappings,
 duplicate symbols/basenames, image mismatch, malformed metadata, partial unwind, selected
-non-top-frame locals, epoch stability/staleness, and cross-service snapshot consistency.
+non-top-frame locals, unsupported recipe/schema/bounds, epoch stability/staleness, and
+cross-service snapshot consistency.
 
 ## DBG-D-005 — Resource ownership contract
 
@@ -198,6 +207,10 @@ an intermediate observed `Running` state.
   preempt a plan and retain their real reason;
 - missing source/unwind capability yields unavailable/incomplete, not a mislabeled instruction
   step;
+- source plans require a valid ImageDebugBinding, exact source-content mapping and applicable
+  bounded unwind/location rows; any missing/mismatch/unsupported input is typed unavailable;
+- register mutation cannot race an active plan; a successful write invalidates the plan origin
+  and any later plan starts from the replacement StopToken;
 - internal conditions are owner-scoped resources and never clear user/external breakpoints.
 
 ### State and reason

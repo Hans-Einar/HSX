@@ -18,6 +18,8 @@ relations:
       - HSX-ST-004
       - HSX-ST-005
       - HSX-ST-006
+      - HSX-ST-007
+      - HSX-ST-008
   - from: HSX-ST-002
     type: informs
     to:
@@ -38,7 +40,9 @@ relations:
     to:
       - HSX-ST-001
       - HSX-R-016..HSX-R-018
+      - HSX-A-002
       - HSX-D-002
+      - HSX-D-003
       - DBG-ST-006
   - from: HSX-ST-008
     type: informs
@@ -46,6 +50,8 @@ relations:
       - HSX-ST-001
       - HSX-R-004
       - HSX-R-015
+      - HSX-A-001
+      - HSX-A-002
       - HSX-D-001
       - HSX-D-002
       - DBG-ST-006
@@ -156,7 +162,7 @@ coordination:
       - 47
       - 38
 guards:
-  - subject: HSX-ST-001..HSX-ST-006
+  - subject: HSX-ST-001..HSX-ST-008
     product_code_authorized: false
     avr_work_authorized: false
   - subject: DBG-D-001..DBG-D-010

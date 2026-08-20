@@ -68,6 +68,8 @@ relations:
       - HSX-ST-004
       - HSX-ST-005
       - HSX-ST-006
+      - HSX-ST-007
+      - HSX-ST-008
   - from: DBG-SPR-001
     type: contains
     to:
@@ -87,6 +89,8 @@ relations:
       - HSX-ST-004
       - HSX-ST-005
       - HSX-ST-006
+      - HSX-ST-007
+      - HSX-ST-008
   - from: DBG-ST-006
     type: reviewed_by
     to:
@@ -95,11 +99,6 @@ relations:
       - HSX-RVW-001-001-003
       - HSX-RVW-001-001-004
       - HSX-RVW-001-001-005
-  - from: DBG-ST-006
-    type: requires_outputs_from
-    to:
-      - HSX-ST-007
-      - HSX-ST-008
   - from: DBG-ST-006
     type: satisfied_by_proposed_contracts
     to:
@@ -238,6 +237,8 @@ cross_track_dependencies:
       - HSX-ST-004
       - HSX-ST-005
       - HSX-ST-006
+      - HSX-ST-007
+      - HSX-ST-008
     required_contract: portable_debug_runtime_semantics
     blocks:
       - DBG-RF-003

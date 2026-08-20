@@ -1,6 +1,6 @@
 # HSX Portable Debug Contract Handoff
 
-- Status: SUPPLEMENTAL STUDIES COMPLETE — MASTER RESYNTHESIS ACTIVE
+- Status: CONTRACTS RESYNTHESIZED — FRESH REVIEW PENDING
 - Coordinator: `HSX-ST-001`, issue #47
 - Debugger dependency: `DBG-ST-006`, issue #38
 - Iteration: `DBG-IT-001-003`
@@ -8,8 +8,9 @@
 
 ## Current objective
 
-Synthesize completed `HSX-ST-007`/`HSX-ST-008` decisions into the portable contract package
-and `DBG-ST-006`, then obtain fresh review before any Debugger design freeze or product work.
+Obtain fresh exact-head `HSX-RVW-001-001-005` of the complete portable contract package and
+`DBG-ST-006`, then return a reviewed decision package before any Debugger design freeze or
+product work.
 
 ## Authority
 
@@ -20,7 +21,14 @@ and `DBG-ST-006`, then obtain fresh review before any Debugger design freeze or 
 
 ## Exact next step
 
-Master resynthesizes and assigns `HSX-RVW-001-001-005` to the exact complete head.
+Commit the complete proposal head and assign `HSX-RVW-001-001-005` to that exact head.
+
+## Master verification
+
+Read-only proposal verification passed: resource oracle 114; address/ABI 40 with one
+environment skip; execution 99 plus 7; supplemental ABI 15 plus 7; bundle/source 18 with one
+environment skip. Six traceability YAML files, both Ledgers, 36/5/5 stable IDs, ten
+DBG mappings, Markdown fences and `git diff --check` passed. This is not independent review.
 
 ## Review history
 
@@ -34,6 +42,9 @@ Master resynthesizes and assigns `HSX-RVW-001-001-005` to the exact complete hea
   current-gate statements. Master synchronized them and reserved review attempt 4.
 - `HSX-RVW-001-001-004` confirmed prior closure but required routing of unresolved ABI/recipe/
   register and bundle/source canonicalization questions. Master activated ST-007/ST-008.
+- `HSX-ST-007` froze the truthful current ABI profile, bounded unwind/location recipe schemas
+  and revision-fenced register mutation proposal. `HSX-ST-008` froze the non-recursive
+  artifact/load/bundle/binding and exact source-identity proposal. Master synthesized both.
 - No contract acceptance or implementation authority resulted.
 
 ## Guards

@@ -1,9 +1,9 @@
 # Portable Debug Runtime Architecture
 
-- Status: REWORK / SUPPLEMENTAL STUDIES ACTIVE
+- Status: RESYNTHESIZED — PENDING INDEPENDENT REVIEW
 - Range: `HSX-A-001..HSX-A-005`
 - Requirements: `HSX-R-001..HSX-R-036`
-- Studies: `HSX-ST-001..HSX-ST-006`
+- Studies: `HSX-ST-001..HSX-ST-008`
 - State: target; not implemented
 
 These stable architecture IDs remain proposed until Steering accepts them. They describe
@@ -13,8 +13,8 @@ portable HSX evidence and authority, not Debugger UI/controller policy or AVR re
 
 | ID | Boundary | Owns | Explicitly does not own |
 |---|---|---|---|
-| `HSX-A-001` | Runtime Identity and Lifecycle Authority | Executive/stream/session/target/PID/image refs and generations; attachment leases; lifecycle commit/tombstone evidence | Debugger disconnect defaults, UI naming, source-step algorithm, AVR storage/transport |
-| `HSX-A-002` | Architecture, ABI, and Debug Artifact Description | Typed address spaces; serialization/alignment; image/debug bundle; ABI/unwind/location descriptors | Frontend path mapping/UI, implicit masks, one universal R7 recipe, target-specific AVR encoding choices outside profiles |
+| `HSX-A-001` | Runtime Identity and Lifecycle Authority | Executive/stream/session/target/PID/LoadedImage refs and generations; ArtifactRef; attachment leases; lifecycle commit/tombstone evidence | Debug-bundle identity/binding, Debugger disconnect defaults, UI naming, source-step algorithm, AVR storage/transport |
+| `HSX-A-002` | Architecture, ABI, and Debug Artifact Description | Typed address spaces; serialization/alignment; reusable ImageDebugBundleRef and target-specific ImageDebugBinding; source identity; ABI/unwind/location descriptors | Target lifecycle identity, local source locator/UI policy, implicit masks, one universal R7 recipe, target-specific AVR encoding choices outside profiles |
 | `HSX-A-003` | Execution Evidence and Inspection Consistency | Ordered transitions, stable stops, inspection revisions/snapshots, exact step/bypass evidence, blocked-state capability | Debugger controller state machine, source into/over/out policy, fabricated timer completion |
 | `HSX-A-004` | Event Continuity and Capability Profiles | Stream identity, canonical order, cursor/selection, ACK/gaps/resume, checkpoints/health and current/degraded profiles | Client callback/threading policy, DAP events, version guessing, silent loss |
 | `HSX-A-005` | Remote Debug Resource Authority | Remote resource/owner/provenance identity, revisions/CAS, shared effective bindings, lifetime/tombstones/events and degraded limits | Debugger logical desired resources, snapshot Watch expressions, IDE presentation |
@@ -55,6 +55,10 @@ portable HSX evidence and authority, not Debugger UI/controller policy or AVR re
 8. Remote resource observation cannot transfer ownership.
 9. Legacy behavior is contained in named degraded profiles with tests and removal conditions.
 10. Portable contracts do not select Debugger UI policy or AVR implementation strategy.
+11. LoadedImageRef is target/load identity and never contains a bundle ref/digest; reusable
+    bundle identity and target-specific binding are separate acyclic records.
+12. Source logical identity preserves exact NFC case/content; local filesystem resolution is
+    locator policy, not HSX identity.
 
 ## Profile architecture
 
@@ -63,7 +67,11 @@ The target current profile is `hsx.portable-debug-runtime/1`, composed from capa
 - `hsx.runtime.identity-generations/1`
 - `hsx.lifecycle.authority-leases/1`
 - `hsx.architecture.descriptor/1`
+- `hsx.abi.descriptor/1`
 - `hsx.debug.image-bundle/1`
+- `hsx.debug.unwind-recipes/1`
+- `hsx.debug.location-recipes/1`
+- optional `hsx.debug.register-write/1`
 - `hsx.execution.evidence/1`
 - `hsx.inspection.snapshot/1`
 - optional `hsx.blocked.snapshot/1`

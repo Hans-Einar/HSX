@@ -321,8 +321,9 @@ The relevant goals are `DG-1.1..1.4`, `DG-2.1..2.3`, `DG-3.1`, `DG-3.3..3.5`,
   architecture/design/implementation evidence and the Python oracle.
 - `HSX-ST-001` **informs** `HSX-ST-002..HSX-ST-006`; those Studies own technical
   recommendations and uncertainty resolution.
-- `HSX-ST-002..HSX-ST-006` will inform the Master-synthesized portable HSX
-  Requirements/Architecture/Design proposal.
+- `HSX-ST-002..HSX-ST-006` informed the initial Master synthesis; review-routed
+  `HSX-ST-007..HSX-ST-008` closed the remaining ABI/recipe/register and bundle/source
+  subdomains for the resynthesized Requirements/Architecture/Design proposal.
 - The reviewed HSX proposal will **satisfy the dependency of** `DBG-ST-006` and map to
   proposed `DBG-D-002..DBG-D-006`; it does not freeze those Debugger designs.
 - `SDP/Debugger` owns controller/frontend/expression/presentation behavior; `SDP/HSX` owns
@@ -348,8 +349,8 @@ Completion does **not** mean:
 - any `DBG-D-*` is frozen;
 - any Debugger Refactor, product change, native implementation or AVR work is authorized.
 
-At Study completion, the next valid action was Master synthesis after
-`HSX-ST-002..HSX-ST-006`, followed by independent exact-head review and Steering packages.
+At Study completion, the next valid action was Master synthesis after the bounded domain
+Studies, followed by independent exact-head review and Steering packages.
 
 ## 15. Master synthesis allocation
 
@@ -361,5 +362,6 @@ After all domain Studies completed, Master allocated stable proposed IDs:
 
 The contract package and `DBG-ST-006` mapping are complete. Review attempts
 `HSX-RVW-001-001-001..004` required rework. Supplemental `HSX-ST-007` and `HSX-ST-008`
-are the active gate, followed by `HSX-RVW-001-001-005`. Broader HSX migration remains open exactly as routed
+are complete and resynthesized. The active gate is `HSX-RVW-001-001-005`, followed by
+decision packages in issues #47/#38. Broader HSX migration remains open exactly as routed
 above. No ID is accepted or implementation-authoritative merely because it is stable.

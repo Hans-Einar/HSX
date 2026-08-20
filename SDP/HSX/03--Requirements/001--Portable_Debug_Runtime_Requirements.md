@@ -1,8 +1,8 @@
 # Portable Debug Runtime Requirements
 
-- Status: REWORK / SUPPLEMENTAL STUDIES ACTIVE
+- Status: RESYNTHESIZED — PENDING INDEPENDENT REVIEW
 - Range: `HSX-R-001..HSX-R-036`
-- Studies: `HSX-ST-001..HSX-ST-006`
+- Studies: `HSX-ST-001..HSX-ST-008`
 - Debugger dependency: `DBG-ST-006`
 - State: target; not implemented
 
@@ -22,14 +22,18 @@ Steering accepts them in issues #47/#38. They authorize no product or AVR work.
   `PidGeneration` and SHALL NOT prove continuity.
 - **HSX-R-004 — Loaded image identity.** Every accepted load SHALL expose a target-bound
   `LoadedImageRef` containing opaque never-reused `LoadedImageId`, exact `TargetRef`, artifact
-  content/schema identity and `ImageGeneration`. Two loads of identical bytes on different
+  identity (`hsx.artifact-ref/1`: exact accepted HXE-byte SHA-256, media/container schema and
+  byte length) and `ImageGeneration`. Two loads of identical bytes on different
   targets or different load operations SHALL have distinct LoadedImageIds; CRC, path, app name,
   digest alone and display PID are not substitutes for loaded-instance identity.
+  `LoadedImageRef` SHALL NOT contain a debug-bundle reference or digest.
 - **HSX-R-005 — Session and attachment identity.** Sessions and target attachments SHALL have
   stable refs/generations, explicit exclusive/observer modes, owner identity, lease/revision,
   expiry and reconnect fencing.
 - **HSX-R-006 — Expected-generation mutation.** Target-mutating lifecycle requests SHALL carry
   expected identity/generation/revision preconditions and fail stale rather than rebind.
+  Raw register mutation, when supported, is an atomic stopped-state mutation under the same
+  authority/revision fencing.
 - **HSX-R-007 — Atomic create/load/start/claim.** A true launch capability SHALL atomically
   establish target/image identity, accepted image evidence, initial state and ownership; a
   non-atomic legacy load SHALL advertise a degraded profile.
@@ -57,18 +61,30 @@ Steering accepts them in issues #47/#38. They authorize no product or AVR work.
 - **HSX-R-014 — Checked typed addresses.** APIs SHALL use typed address/range values and
   checked conversions; implicit masking, wrap, truncation or cross-space comparison is
   forbidden outside a named degraded profile.
-- **HSX-R-015 — Image/debug bundle binding.** Debug metadata and sources SHALL be bound to an
-  exact `LoadedImageRef` through schema/version and content digest evidence; mismatches fail
-  closed.
-- **HSX-R-016 — ABI descriptor.** Each executable profile SHALL expose an `AbiDescriptor`
-  covering argument/return registers, saved sets, SP/FP/LR roles, stack growth/alignment,
-  frame/call/return layout and call-site PC interpretation.
-- **HSX-R-017 — Versioned unwind recipes.** Stack reconstruction SHALL consume versioned,
-  bounded unwind recipes and report complete, partial, unavailable, corrupt or stale results;
-  R7 or any fixed frame chain is profile evidence, not a universal debugger rule.
-- **HSX-R-018 — Variable-location recipes.** Debug locations SHALL be versioned, image-bound
-  and PC-ranged across register/stack/global/constant/optimized-out/unavailable forms with
-  explicit type/width/endian/address-space semantics.
+- **HSX-R-015 — Image/debug bundle and source binding.** Reusable artifact-bound
+  `ImageDebugBundleRef` SHALL use domain-separated canonical digests independent of
+  `LoadedImageRef`; an immutable `ImageDebugBinding` SHALL bind exact LoadedImageRef, bundle
+  and accepted descriptors without recursive digest fields. Source identity SHALL use
+  exact-case NFC artifact-relative logical ID plus exact source-byte digest/length, separate
+  from local paths/relocation. Mismatch, ambiguity, case collision and stale binding fail typed.
+- **HSX-R-016 — ABI descriptor.** Each executable profile SHALL expose
+  `hsx.abi-descriptor/1`. The current compiler/VM profile is explicitly
+  `hsx.abi.llc-r7-word32/1`: 32-bit slots/GPRs, args R1..R3, scalar return R0, only R7
+  callee-preserved, R15 derived SP mirror/reserved, descending 4-byte stack and the documented
+  R7 frame layout. The physical caller overflow layout is defined, but current compiled-callee
+  consumption and live-across-call preservation are not conformant. Aggregates, multiword
+  returns, varargs, dynamic/tail/inline frames remain unsupported until separate profiles exist;
+  SVC register signatures are separate exact descriptors rather than ordinary call-ABI claims.
+- **HSX-R-017 — Versioned unwind recipes.** Stack reconstruction SHALL consume
+  `hsx.unwind-recipe/1` bounded typed declarative recipes, selected by exact image/ABI/PC range,
+  with explicit prologue/body/epilogue rows, negotiated opcode/read/frame bounds and fail-closed
+  unknown schema/opcode. Results are complete, partial, unavailable, unsupported, corrupt or
+  stale; R7 is one profile recipe, not universal.
+- **HSX-R-018 — Variable-location recipes and register mutation.** Debug locations SHALL use
+  `hsx.location-recipe/1`, exact scope/frame/PC and typed register/stack/global/constant/
+  piece/optimized-out/unavailable values. Optional `hsx.debug.register-write/1` SHALL require
+  exclusive authority, exact Target/LoadedImage/Stop/Snapshot refs and revisions, reject direct
+  R15 writes, update SP+R15 coherently, validate PC/SP/R7/PSW, and replace stop/snapshot evidence.
 
 ## Run/stop evidence, snapshots, exact stepping, and blocked states
 
@@ -86,7 +102,8 @@ Steering accepts them in issues #47/#38. They authorize no product or AVR work.
   inspection revision.
 - **HSX-R-023 — Stale inspection rejection.** Resume, mutation, wake, target/image generation
   change or invalidated revision SHALL make affected reads/handles fail stale; data from
-  different revisions SHALL NOT be presented as one snapshot.
+  different revisions SHALL NOT be presented as one snapshot. Successful register mutation
+  increments transition/inspection revisions and publishes a replacement stop/snapshot token.
 - **HSX-R-024 — Blocked-state inspection capability.** WAIT_MBX, SLEEPING and other blocked
   states are inspection-stable only when a named capability supplies frozen snapshot/revision
   evidence; otherwise they are runtime-state notifications only.

@@ -1,6 +1,6 @@
 # Portable Debug Runtime Contracts
 
-- Status: REWORK / SUPPLEMENTAL STUDIES ACTIVE
+- Status: RESYNTHESIZED — PENDING INDEPENDENT REVIEW
 - Range: `HSX-D-001..HSX-D-005`
 - Architecture: `HSX-A-001..HSX-A-005`
 - Requirements: `HSX-R-001..HSX-R-036`
@@ -20,8 +20,8 @@ until Steering accepts them in #47/#38.
 | `EventStreamRef` | Executive instance + opaque stream ID + stream generation. |
 | `SessionRef` | Executive instance + session ID + session generation + negotiated profile. |
 | `TargetRef` | Executive instance + opaque target ID + target generation + display PID + PID generation. |
-| `ArtifactRef` | Content digest + image schema/profile for immutable loadable bytes; identical bytes may share this value. |
-| `LoadedImageRef` | Executive instance + exact TargetRef + opaque never-reused LoadedImageId + ImageGeneration + ArtifactRef + accepted debug-bundle digest. |
+| `ArtifactRef` | `hsx.artifact-ref/1` + HXE media/container version + canonical byte length + SHA-256 of exact accepted HXE bytes; identical accepted bytes may share this value. |
+| `LoadedImageRef` | Executive instance + exact TargetRef + opaque never-reused LoadedImageId + ImageGeneration + ArtifactRef. It contains no debug-bundle ref/digest. |
 | `AttachmentLease` | Lease ID/revision, session/owner, TargetRef, exclusive/observer mode, expiry/grace and orphan policy. |
 | `LifecycleReceipt` | Operation ID, expected refs/revisions, accepted/rejected status and no implied target transition. |
 | `LifecycleCommit` | Operation ID, before/after refs, authoritative outcome/revisions and tombstone where terminal. |
@@ -77,20 +77,111 @@ API silently masks or wraps; overflow/cross-space operations return typed failur
 Python profile may describe 16-bit byte-addressed code/data and 32-bit GPRs, but masks are
 legacy conversion evidence rather than the universal model.
 
-### `ImageDebugBundle`
+### Non-recursive artifact/bundle/binding model
 
-The bundle binds exact `LoadedImageRef`, HXE schema/content digest, `.sym` schema/content digest,
-sources manifest digest, architecture/ABI descriptor IDs and toolchain/debug schema versions.
-Missing/mismatched content is explicit `unavailable`/`mismatch`; adjacent file paths or HXE CRC
-alone do not establish binding.
+Construction is acyclic:
 
-### `AbiDescriptor` and recipes
+1. `ArtifactRef` is SHA-256 over exact accepted HXE bytes plus media/container schema/length.
+2. `LoadedImageRef` identifies one target-bound accepted load and contains ArtifactRef only.
+3. Reusable `ImageDebugBundleRef` is a domain-separated digest of canonical semantic debug
+   components, SourceIdentityManifest and architecture/ABI/recipe refs; it contains ArtifactRef
+   but no LoadedImageRef.
+4. Immutable `ImageDebugBinding` combines exact LoadedImageRef, ImageDebugBundleRef and accepted
+   descriptor refs. Its binding digest is over that binding payload and is not part of either
+   input ref.
 
-The ABI descriptor specifies argument/return registers, caller/callee saved sets, SP/FP/LR
-roles, stack growth/alignment, frame/call/return layout, overflow arguments and call-site PC
-adjustment. Unwind uses bounded versioned recipes with termination/cycle/range/read-failure
-rules and returns complete/partial/unavailable/corrupt/stale. The current R7 frame chain may be
-one profile recipe only.
+Canonical structured digests are `SHA-256(UTF8(domain_tag) || 0x00 || canonical_json)`.
+Canonical JSON uses NFC strings/keys, exact case, object keys sorted by Unicode scalar,
+schema-defined array order, source records sorted by UTF-8 logical ID and sorted-set order for
+capability arrays. UInt64/digests use canonical decimal/lowercase-hex strings. Duplicate raw or
+NFC-normalized keys/IDs, floats, NaN/infinity, invalid Unicode, unknown mandatory fields and
+out-of-range values are rejected; absent optionals are omitted and no BOM/insignificant
+whitespace is emitted. A record's own digest, signatures, timestamps and local locator paths
+are excluded from its digest scope. Raw artifact/source/component byte digests cover exact
+bytes without newline, encoding, compression or host-path normalization.
+
+`ImageDebugBundleRef` includes canonical symbol model, unwind/location recipes, source identity
+manifest and required capability/schema refs. Raw `.sym`/`sources.json` digests may remain
+provenance but cannot replace canonical component identity. `ImageDebugBinding` validation
+requires exact ArtifactRef and descriptor agreement; failures return typed artifact/bundle/
+component/schema/binding mismatch and publish no accepted binding.
+
+### Stable source identity
+
+The bundle-internal `SourceIdentityRecord` contains an NFC artifact-relative logical ID,
+SHA-256 exact source bytes and byte length. An external `SourceRef` adds the exact
+`ImageDebugBundleRef`; this one-way construction avoids source/bundle recursion. `/` is the
+separator; case is preserved; absolute/drive/UNC/empty/dot/dot-dot/backslash/NUL IDs are
+invalid. Duplicate basenames and casefold collisions remain distinct or typed ambiguous.
+Prefix maps, search roots, symlinks and local overrides are resolver-only, excluded from
+identity/digests, and candidate bytes must match SourceRef before use.
+
+### `AbiDescriptor` and current profile
+
+`hsx.abi-descriptor/1` supplies the envelope. The current narrow profile
+`hsx.abi.llc-r7-word32/1` specifies: 32-bit slots/GPRs; args R1..R3; scalar return R0; only R7
+callee-preserved; R0..R6/R8..R14 and flags caller-clobbered; PC/SP/PSW separate; R15 derived SP
+mirror/reserved; 4-byte descending stack; caller overflow high-to-low; CALL pushes little-endian
+resume PC; after `PUSH R7; MOV R7,R15`, `[FP]=old R7`, `[FP+4]=resume PC`, physical arg4 is
+`[FP+8]`, and call-site PC is checked `resume_pc-4`.
+
+The current compiled callee does not consume stack arguments; live-across-call saving beyond
+R7, aggregates, multiword values/returns, varargs, dynamic/tail/inline frames are unsupported,
+not implied by physical caller layout.
+
+| Value | Exact profile role |
+|---|---|
+| `R0` | one-word scalar result; caller-clobbered |
+| `R1..R3` | first three one-word arguments; caller-clobbered |
+| `R4..R6`, `R8..R14` | compiler/scratch values; caller-clobbered |
+| `R7` | only callee-preserved GPR and conventional emitted frame pointer |
+| `R15` | reserved derived mirror of authoritative SP; never independently writable |
+| `PC`, `SP`, `PSW` | separate descriptor-governed architectural values |
+
+The ABI slot and minimum stack/call alignment are 4 bytes. At callee entry, return PC is
+`[SP]` and physical overflow argument 4 begins at `[SP+4]`; after the emitted prologue,
+`[R7]` is caller R7, `[R7+4]` is resume PC and physical argument 4 is `[R7+8]`. Checked
+`resume_pc-4` yields call-site PC only when it is aligned, in the same image and names a CALL.
+SVC module/function register inputs, outputs and clobbers require separate exact signature
+descriptors and are never inferred from this call ABI.
+
+### Unwind/location recipe schemas
+
+`hsx.unwind-recipe/1` and `hsx.location-recipe/1` are bounded typed declarative recipe schemas,
+selected by exact ImageDebugBinding/ABI/scope/frame/PC ranges. Schema v1 uses canonical symbolic
+postfix opcodes: `reg_value`, `special_value`, `const_u`, `const_s`, `static_address`,
+`to_address`, `cfa`, `frame_base`, `add_sconst_checked`, `deref_u`, and `bit_slice`.
+Non-expression terminals are `same`, `undefined`, `unavailable(reason)` and
+`optimized_out(reason)`; piece composition is structural. Schema v1 has no loops, branches,
+recursive recipe calls, host-endian reads, implicit casts, masks or wrapping.
+
+| Negotiated bound for `hsx.abi.llc-r7-word32/1` | Limit |
+|---|---:|
+| opcodes / evaluator stack / dereferences per expression | 32 / 8 / 4 |
+| bytes per dereference | 16 |
+| unwind frames / total opcodes / total dereferenced bytes | 64 / 4096 / 1024 |
+| location pieces / declared result bits / location dereferenced bytes | 16 / 4096 / 512 |
+
+The selected compiler emits non-overlapping rows for entry before `PUSH R7`, after that push,
+stable body/local release, after `POP R7` at `RET`, and terminal top-level entry/return. These
+rows recover CFA, caller SP/PC/R7 from the exact snapshot and return resume PC separately from
+checked call-site PC. Location entries bind exact image, ABI, function/lexical scope, frame,
+declared type/bit size and half-open PC range, and use `address`, `value`, bounded `pieces`,
+`optimized_out` or `unavailable` forms.
+
+| Exact current-profile PC row | CFA and caller recovery |
+|---|---|
+| before entry `PUSH R7` | `CFA=SP+4`; caller PC=`[CFA-4]`; caller SP=CFA; caller R7=`same` |
+| after push, at `MOV R7,R15` | `CFA=SP+8`; caller PC=`[CFA-4]`; caller SP=CFA; caller R7=`[CFA-8]` |
+| stable body through pre-`POP R7` release | `CFA=R7+8`; caller PC=`[CFA-4]`; caller SP=CFA; caller R7=`[CFA-8]` |
+| after `POP R7`, at `RET` | `CFA=SP+4`; caller PC=`[CFA-4]`; caller SP=CFA; caller R7=`same` |
+| top-level entry/return | terminal; no fabricated caller |
+
+Unknown schema/opcode/mandatory field is `unsupported`; malformed operands, overlapping rows,
+bad types/ranges or cycles are `corrupt`; bound exhaustion is `unsupported(limit_exceeded)`;
+missing snapshot bytes/registers are `unavailable` or a structured piece-only `partial`;
+generation/revision mismatch is `stale`. Every result carries the exact terminating category
+and diagnostic row/op/frame context. The evaluator never retries with a fixed R7 chain.
 
 Variable locations are image/PC-ranged recipes for register, stack/frame offset, global typed
 address, constant, composite/piece, optimized-out or unavailable. Reads preserve declared
@@ -98,9 +189,18 @@ width/endian/type and report partial/stale rather than padding/truncating silent
 
 ### Capabilities
 
-`hsx.architecture.descriptor/1`, `hsx.debug.image-bundle/1`, and versioned ABI/unwind/location
-recipe capabilities are negotiated per image. Legacy symbols use checked adapters and cannot
-claim portable unwind/location conformance.
+Negotiated capability names are `hsx.architecture.descriptor/1`,
+`hsx.abi.descriptor/1`, `hsx.debug.image-bundle/1`,
+`hsx.debug.unwind-recipes/1`, and `hsx.debug.location-recipes/1`. Their accepted records use
+the schema/profile IDs `hsx.abi-descriptor/1`, `hsx.abi.llc-r7-word32/1`,
+`hsx.unwind-recipe/1`, and `hsx.location-recipe/1`. The image-bundle capability includes the
+source-identity manifest and target-specific binding; ST-008 introduces no extra capability
+name. Legacy symbols use checked adapters and cannot claim portable unwind/location/source
+conformance.
+
+`hsx.debug.register-write/1` is optional. D-002 owns descriptor/register validation; D-001
+owns attachment authority and D-003 owns stopped-state linearization, revision increments and
+replacement stop/snapshot evidence. Successful legacy RPC calls never imply this capability.
 
 ## HSX-D-003 — Execution evidence, snapshots, exact step, and blocked states
 
@@ -162,6 +262,25 @@ degraded.
 The full execution/inspection contract requires `hsx.execution.evidence/1` and
 `hsx.inspection.snapshot/1`; `hsx.blocked.snapshot/1` is optional and governs only the named
 blocked states.
+
+### Optional raw register mutation
+
+`hsx.debug.register-write/1` exposes one atomic `WriteRegisterSet` only for an exclusive
+mutator at an inspection-stable explicit debug stop. Requests carry operation ID, exact
+ExecutiveInstanceRef, SessionRef, AttachmentLease, TargetRef, LoadedImageRef, StopToken,
+InspectionSnapshotRef, expected transition/inspection/register-set revisions, exact
+architecture/ABI refs and typed register writes. A resume/step/lifecycle operation linearized
+first, an observer/running/blocked target, or any stale ref/revision rejects the whole write.
+
+R15 direct write is rejected; SP writes update authoritative SP and R15 mirror coherently;
+PC must be aligned/executable in the same load, SP/R7 must satisfy alignment/stack guards, PSW
+may change only declared writable bits, and duplicate/unknown/wrong-width entries fail
+atomically. Successful mutation keeps target stopped, increments transition/inspection/
+register revisions, publishes stopped→stopped `debug_register_write` TransitionEvidence and a
+replacement StableStopEvidence/StopToken/SnapshotRef, and invalidates every origin handle.
+The commit returns before/after revisions and new evidence; rejection changes no revision.
+Ambiguous/partial mutation cannot satisfy the capability. Legacy unfenced raw writes are
+unsupported at the portable boundary.
 
 ## HSX-D-004 — Event stream continuity, ACK, gaps, health, and profiles
 
@@ -259,7 +378,7 @@ negotiated separately as `hsx.debug-resource.events/1` and carried under HSX-D-0
 | Contract | Minimum fixture families |
 |---|---|
 | D-001 | restart/session/stream/target/PID reuse; identical artifact loaded on two targets with distinct LoadedImageIds; atomic launch; failed replace; exclusive/observer; stale generation; detach/disconnect/orphan; kill/tombstone; reconnect retained/lost |
-| D-002 | multiple address widths/spaces; endian/alignment; checked overflow; image/debug mismatch; current R7 recipe and alternative/unavailable unwind; ranged/optimized locations |
+| D-002 | multiple address widths/spaces; endian/alignment; checked overflow; canonical artifact/bundle/binding/source digests and recursion rejection; exact-case/basename/casefold/relocation/content outcomes; current ABI register/frame/call rows; unknown/limited/corrupt/stale unwind/location recipes; partial pieces; revision-fenced register mutation validation |
 | D-003 | command receipt vs transition; pause/break/fault/terminal precedence; immutable/revision snapshots; stale reads; exact 0/1 step; fenced bypass; WAIT_MBX/SLEEPING capability |
 | D-004 | stream replacement; filter-safe cursors; atomic ordering; future ACK rejection; seq eviction; queue gap intervals; malformed/half-open health; contiguous resume/full reconcile |
 | D-005 | same-address multi-owner; owner release; external observation; CAS conflict; tombstones; reconnect/adoption; resource-event gap; live-watch sample revisions; legacy no-delete mode |

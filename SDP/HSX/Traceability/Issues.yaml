@@ -17,7 +17,7 @@ issues:
     contract_requirements: HSX-R-001..HSX-R-036
     contract_architecture: HSX-A-001..HSX-A-005
     contract_design: HSX-D-001..HSX-D-005
-    contract_status: rework_complete_pending_fresh_review
+    contract_status: resynthesized_pending_fresh_review
     review_status: rework
     reviewed_head: 5fff403f6668f794b760caf64ef34b4d1ecb4ae3
     rereview: HSX-RVW-001-001-002
@@ -27,11 +27,11 @@ issues:
     review_attempt_3_status: rework
     review_attempt_3_head: efd43d2be9e4db1646419fe5036ec1f5b22c8deb
     review_attempt_4: HSX-RVW-001-001-004
-    current_review: HSX-RVW-001-001-004
-    review_attempt_4: HSX-RVW-001-001-004
+    current_review: HSX-RVW-001-001-005
     review_attempt_4_status: rework
     review_attempt_4_head: cbddfa24d3cbb25bf7a17c63a0146ee8d0600883
     review_attempt_5: HSX-RVW-001-001-005
+    review_attempt_5_status: pending_exact_head_review
     supplemental_studies:
       - HSX-ST-007
       - HSX-ST-008

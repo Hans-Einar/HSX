@@ -1,11 +1,11 @@
 # DBG-SPR-001 Handoff
 
-Status: `portable_contract_supplemental_studies_complete_resynthesis_active`
+Status: `portable_contract_resynthesized_review_005_pending`
 
 ## Current objective
 
-Resynthesize completed `HSX-ST-007`/`HSX-ST-008`, obtain fresh
-`HSX-RVW-001-001-005`, and return to issues #47/#38. No structural product or AVR work may be
+Obtain fresh exact-head `HSX-RVW-001-001-005` for the complete resynthesized package, then
+return reviewed decision packages to issues #47/#38. No structural product or AVR work may be
 dispatched.
 
 ## Authority
@@ -99,18 +99,23 @@ dispatched.
   gate statements; Master synchronized them.
 - `HSX-RVW-001-001-004` required supplemental first-class Studies for remaining ABI/recipe/
   register and bundle/source canonicalization decisions.
+- `HSX-ST-007` and `HSX-ST-008` completed in disjoint Study files. Master resynthesized their
+  ABI/recipe/register and non-recursive bundle/source decisions into the HSX package,
+  `DBG-ST-006`, and the still-proposed Debugger dependency contracts.
+- Master read-only verification passed: 114 resource tests; 40 address/ABI tests with one
+  environment skip; 99 plus 7 execution tests; 15 plus 7 supplemental ABI tests; 18
+  bundle/source tests with one environment skip; YAML/NDJSON, 36/5/5 IDs, ten mappings,
+  Markdown fences and diff-check all passed.
 
 ## Not done
 
 - `DBG-D-001..DBG-D-010` remain proposed and have no implementation authority.
-- `HSX-ST-007` and `HSX-ST-008` are complete but not yet synthesized.
 - The final portable contract package has not passed `HSX-RVW-001-001-005`.
 
 ## Exact next step
 
-Complete/synthesize supplemental Studies, obtain fresh exact-head review, post packages to
-#47 and #38, then
-stop before any design freeze or implementation authorization.
+Commit the resynthesized exact proposal head, obtain fresh exact-head review, post reviewed
+packages to #47 and #38, then stop before any design freeze or implementation authorization.
 
 ## Traceability state
 
@@ -122,7 +127,7 @@ stop before any design freeze or implementation authorization.
   `208063e344b767f82790ce579eba6327e2cdd0ce` and repository head tested
   `fefd4b0c427dfa71d637e4f4cce9e4a345912591`.
 - CurrentIndex, Issues, sprint records, Relations, Ledger, and Handoff are current through
-  portable-contract review attempt 3 rework and stage-coherence correction.
+  review attempt 4, supplemental Study completion, and Master resynthesis.
 - Accepted architecture direction: `DBG-DA-001`, `DBG-A-001..DBG-A-008`
 - Completed Design Studies: `DBG-ST-002..DBG-ST-005`
 - Architecture review: `DBG-RVW-001-002-001` — REWORK at `f8b8097`
@@ -135,20 +140,20 @@ stop before any design freeze or implementation authorization.
 - Proposed detailed design: `DBG-D-001..DBG-D-010`
 - Completed Debugger Study pending fresh review: `DBG-ST-006`
 - Completed HSX coordinator scope: `HSX-ST-001`, issue #47
-- Completed HSX Studies: `HSX-ST-002..HSX-ST-006`
+- Completed HSX Studies: `HSX-ST-002..HSX-ST-008`
 - Proposed contracts: `HSX-R-001..036`, `HSX-A-001..005`, `HSX-D-001..005`
 - Active iteration: `DBG-IT-001-003`
 - Review `HSX-RVW-001-001-001`: REWORK at `5fff403`
 - Review `HSX-RVW-001-001-002`: REWORK at `ffd0a42`
 - Review `HSX-RVW-001-001-003`: REWORK at `efd43d2`
 - Review `HSX-RVW-001-001-004`: REWORK at `cbddfa2`
-- Active supplemental Studies: `HSX-ST-007`, `HSX-ST-008`
-- Planned fresh review: `HSX-RVW-001-001-005`
+- Resynthesized supplemental Studies: `HSX-ST-007`, `HSX-ST-008`
+- Active gate: fresh exact-head `HSX-RVW-001-001-005`
 
 ## Agents and worktree
 
-The prior product/design chain and bounded HSX Study workers are complete. No reviewer is open
-yet; bounded ST-007/ST-008 workers are the next roles. The controlled branch is `codex/dbg-st-006`;
+The prior product/design chain and all bounded HSX Study workers are complete. The next role is
+fresh independent reviewer `HSX-RVW-001-001-005`. The controlled branch is `codex/dbg-st-006`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.
 
