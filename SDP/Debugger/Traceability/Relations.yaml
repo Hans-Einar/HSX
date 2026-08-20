@@ -228,6 +228,11 @@ relations:
     to:
       - DBG-RVW-001-004-003
     status: pass
+  - from: DBG-SL-001-004-003
+    type: verified_by
+    to:
+      - DBG-VER-001-004-003
+    status: pass
   - from: dbg.controller-gateway/1
     type: blocked_by
     to:
