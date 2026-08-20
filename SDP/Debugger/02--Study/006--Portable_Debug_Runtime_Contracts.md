@@ -123,7 +123,7 @@ Documentation, test-oracle design, and interface comparison remain allowed withi
 Steering scope; this Study never grants product implementation authority by itself.
 
 The evidence and contract mapping are now complete, but the gate stays closed until the exact
-package passes `HSX-RVW-001-001-001` and Steering accepts the HSX contracts and freezes the
+package passes fresh `HSX-RVW-001-001-003` and Steering accepts the HSX contracts and freezes the
 affected `DBG-D-*` contracts in a later decision.
 
 ## Affected proposed contracts and requirements

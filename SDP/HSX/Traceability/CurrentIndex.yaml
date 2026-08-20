@@ -35,6 +35,11 @@ active:
     path: SDP/HSX/Reviews/001--Portable_Debug_Contract_Review.md
   rereview:
     id: HSX-RVW-001-001-002
+    status: rework
+    reviewed_head: ffd0a4254751dea2692eb8e2f3d66cb6e68f7d5a
+    path: SDP/HSX/Reviews/002--Portable_Debug_Contract_Rereview.md
+  review_attempt_3:
+    id: HSX-RVW-001-001-003
     status: planned
 proposed_contract_baseline:
   requirements:

@@ -4,7 +4,7 @@ Status: `portable_contract_rework_complete_pending_fresh_review`
 
 ## Current objective
 
-Obtain fresh `HSX-RVW-001-001-002` review of the corrected portable contract package and
+Obtain fresh `HSX-RVW-001-001-003` review of the corrected portable contract package and
 return to issues #47/#38. No structural product or AVR work may be dispatched.
 
 ## Authority
@@ -92,11 +92,13 @@ return to issues #47/#38. No structural product or AVR work may be dispatched.
 - `HSX-RVW-001-001-001` returned one High and three Medium findings; Master corrected
   LoadedImageRef identity, exact-step phase semantics, capability naming/composition, and
   stale cross-track status/Handoff.
+- `HSX-RVW-001-001-002` confirmed technical closure and returned one Medium review-stage
+  finding; Master synchronized all current next-gate surfaces.
 
 ## Not done
 
 - `DBG-D-001..DBG-D-010` remain proposed and have no implementation authority.
-- The corrected portable contract package has not yet passed `HSX-RVW-001-001-002`.
+- The corrected portable contract package has not yet passed `HSX-RVW-001-001-003`.
 
 ## Exact next step
 
@@ -131,12 +133,13 @@ stop before any design freeze or implementation authorization.
 - Proposed contracts: `HSX-R-001..036`, `HSX-A-001..005`, `HSX-D-001..005`
 - Active iteration: `DBG-IT-001-003`
 - Review `HSX-RVW-001-001-001`: REWORK at `5fff403`
-- Planned fresh review: `HSX-RVW-001-001-002`
+- Review `HSX-RVW-001-001-002`: REWORK at `ffd0a42`
+- Planned fresh review: `HSX-RVW-001-001-003`
 
 ## Agents and worktree
 
 The prior product/design chain and bounded HSX Study workers are complete. No reviewer is open
-yet; fresh `HSX-RVW-001-001-002` is the next role. The controlled branch is `codex/dbg-st-006`;
+yet; fresh `HSX-RVW-001-001-003` is the next role. The controlled branch is `codex/dbg-st-006`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.
 

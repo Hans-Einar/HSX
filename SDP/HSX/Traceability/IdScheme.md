@@ -13,6 +13,7 @@ The existing DR, DG, and DO identifiers remain legacy provenance identifiers unt
 - `HSX-D-001..HSX-D-005` — proposed portable contract groups
 - `HSX-RVW-001-001-001` — independent cross-track contract review
 - `HSX-RVW-001-001-002` — fresh exact-head re-review after required corrections
+- `HSX-RVW-001-001-003` — fresh exact-head review after stage-coherence correction
 
 These IDs are stable but their artifacts remain target/proposed pending review and Steering
 acceptance. Stable numbering is not implementation authority.

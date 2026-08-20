@@ -46,6 +46,8 @@ issues:
     portable_contract_status: rework_complete_pending_fresh_review
     portable_contract_review_status: rework
     portable_contract_rereview: HSX-RVW-001-001-002
+    portable_contract_rereview_status: rework
+    portable_contract_review_attempt_3: HSX-RVW-001-001-003
   DBG-RF-002:
     issue: 39
     status: blocked_by_DBG-DA-001

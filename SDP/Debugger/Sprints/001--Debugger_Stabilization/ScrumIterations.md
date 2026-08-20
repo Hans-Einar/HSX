@@ -212,7 +212,7 @@ implementation remains blocked.
 
 ## DBG-IT-001-003 — Portable Debug Runtime Contracts
 
-Status: ACTIVE — CROSS-TRACK STUDIES
+Status: CONTRACT REWORK COMPLETE — PENDING `HSX-RVW-001-001-003`
 
 ### Goal
 
@@ -246,7 +246,7 @@ portable runtime semantics required by `DBG-D-002..DBG-D-006`.
 - `SDP/HSX/02--Study/005--Event_Stream_Continuity.md`
 - `SDP/HSX/02--Study/006--Resource_Provenance_Revisions.md`
 - proposed HSX Requirements/Architecture/Design contract documents and both track traceability
-- independent review record `HSX-RVW-001-001-001`
+- independent review records `HSX-RVW-001-001-001..HSX-RVW-001-001-003`
 
 No product/runtime/extension/test/package/AVR file may be modified.
 
@@ -264,7 +264,7 @@ No product/runtime/extension/test/package/AVR file may be modified.
 
 - Debugger: `DBG-ST-006`, `DBG-D-002..DBG-D-006`, `DBG-IT-001-003`
 - HSX: `HSX-ST-001..HSX-ST-006`, proposed stable `HSX-R-*`, `HSX-A-*`, `HSX-D-*`
-- Review: `HSX-RVW-001-001-001`
+- Reviews: `HSX-RVW-001-001-001` REWORK, `...002` REWORK, `...003` planned
 - Issues: #47 coordination and #38 Steering gate
 
 ### Completion signal
@@ -292,8 +292,8 @@ No product/runtime/extension/test/package/AVR file may be modified.
 - ST-006 defined owner/provenance/revision-aware remote resources and conservative legacy mode.
 
 Read-only evidence totals include 90, 40, 106, 77 and 114 passing targeted tests across the
-five technical Studies. All workers changed only their assigned Study. Master contract
-synthesis is now active.
+five technical Studies. All workers changed only their assigned Study. Study and contract
+synthesis are complete.
 
 ### Master contract synthesis result
 
@@ -306,7 +306,7 @@ Master allocated and synthesized:
 - named full/degraded capability profiles and reusable conformance fixtures.
 
 All artifacts remain target/proposed. The active action is fresh independent exact-head
-review `HSX-RVW-001-001-001`; no design freeze or implementation authority exists.
+review `HSX-RVW-001-001-003`; no design freeze or implementation authority exists.
 
 ### Cross-track review attempt 1
 
@@ -321,3 +321,11 @@ review `HSX-RVW-001-001-001`; no design freeze or implementation authority exist
 Master corrected all four documentation/contract findings. Fresh review is
 `HSX-RVW-001-001-002`. Every contract remains target/proposed and all implementation gates
 remain closed.
+
+### Cross-track review attempt 2
+
+`HSX-RVW-001-001-002` reviewed exact head
+`ffd0a4254751dea2692eb8e2f3d66cb6e68f7d5a`. It confirmed LoadedImageRef,
+phase-linearized exact-step and capability-registry closure, then returned REWORK for stale
+current review-stage references. Master synchronized every next-gate surface. Fresh review is
+`HSX-RVW-001-001-003`.

@@ -348,9 +348,8 @@ Completion does **not** mean:
 - any `DBG-D-*` is frozen;
 - any Debugger Refactor, product change, native implementation or AVR work is authorized.
 
-The next valid action is Master synthesis after `HSX-ST-002..HSX-ST-006` complete, followed by
-fresh independent exact-head review `HSX-RVW-001-001-001` and Steering decision packages in
-issues #47/#38.
+At Study completion, the next valid action was Master synthesis after
+`HSX-ST-002..HSX-ST-006`, followed by independent exact-head review and Steering packages.
 
 ## 15. Master synthesis allocation
 
@@ -360,6 +359,7 @@ After all domain Studies completed, Master allocated stable proposed IDs:
 - `HSX-A-001..HSX-A-005`;
 - `HSX-D-001..HSX-D-005`.
 
-The contract package and `DBG-ST-006` mapping are complete pending
-`HSX-RVW-001-001-001`. Broader HSX migration remains open exactly as routed above. No ID is
-accepted or implementation-authoritative merely because it is stable.
+The contract package and `DBG-ST-006` mapping are complete. Review attempts
+`HSX-RVW-001-001-001` and `...002` required rework; fresh
+`HSX-RVW-001-001-003` is the active gate. Broader HSX migration remains open exactly as routed
+above. No ID is accepted or implementation-authoritative merely because it is stable.

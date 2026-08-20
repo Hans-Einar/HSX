@@ -21,6 +21,9 @@ issues:
     review_status: rework
     reviewed_head: 5fff403f6668f794b760caf64ef34b4d1ecb4ae3
     rereview: HSX-RVW-001-001-002
+    rereview_status: rework
+    rereviewed_head: ffd0a4254751dea2692eb8e2f3d66cb6e68f7d5a
+    review_attempt_3: HSX-RVW-001-001-003
   HSX-ST-002:
     issue: 47
     status: complete_for_synthesis

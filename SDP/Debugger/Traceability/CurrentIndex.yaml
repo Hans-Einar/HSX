@@ -124,6 +124,9 @@ active_gate:
     review_status: rework
     reviewed_head: 5fff403f6668f794b760caf64ef34b4d1ecb4ae3
     rereview: HSX-RVW-001-001-002
+    rereview_status: rework
+    rereviewed_head: ffd0a4254751dea2692eb8e2f3d66cb6e68f7d5a
+    review_attempt_3: HSX-RVW-001-001-003
     hsx_requirements: HSX-R-001..HSX-R-036
     hsx_architecture: HSX-A-001..HSX-A-005
     hsx_design: HSX-D-001..HSX-D-005
