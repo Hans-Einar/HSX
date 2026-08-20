@@ -162,13 +162,15 @@ issues:
     dependent_integration_verification: DBG-VER-001-004-006
     dependent_integration_verification_status: pass
     dependent_integration_signed_head: 1e479536ce5e746e1b06a53b1039b1af84adaed6
-    first_wave_current_gate: fresh_parent_final_reviews_DBG-RVW-002-001-007_and_DBG-RVW-003-001-006
+    first_wave_current_gate: formal_parent_verifications_DBG-VER-002-001-001_and_DBG-VER-003-001-001
     portable_contract_gate: complete_accepted_frozen
     rf002_parent_review_attempt_6: DBG-RVW-002-001-006
     rf002_parent_review_attempt_6_status: rework_trace_only
   DBG-RF-002:
     issue: 39
-    status: complete_signed_chain_parent_final_review_active
+    status: parent_final_review_pass_pending_verification
+    final_review: DBG-RVW-002-001-007
+    final_review_status: pass
     iteration: DBG-IT-001-004
     slice: DBG-SL-001-004-001
     shared_interface: dbg.controller-gateway/1.1
@@ -176,7 +178,9 @@ issues:
     steering_comment: 5356484309
   DBG-RF-003:
     issue: 40
-    status: complete_signed_chain_parent_final_review_active
+    status: parent_final_review_pass_pending_verification
+    final_review: DBG-RVW-003-001-006
+    final_review_status: pass
     iteration: DBG-IT-001-004
     slice: DBG-SL-001-004-002
     shared_interface: dbg.controller-gateway/1.1

@@ -1,10 +1,10 @@
 # DBG-SPR-001 Handoff
 
-Status: `complete_chain_signed_parent_final_reviews_pending`
+Status: `parent_final_reviews_pass_formal_verification_active`
 
 ## Current objective
 
-Run fresh final parent RF-002/RF-003 reviews against the complete signed chain.
+Run fresh formal parent RF-002/RF-003 verifications against the complete signed chain.
 
 ## Authority
 
@@ -139,7 +139,7 @@ Run fresh final parent RF-002/RF-003 reviews against the complete signed chain.
 
 ## Exact next step
 
-Run `DBG-RVW-002-001-007` and `DBG-RVW-003-001-006`.
+Run `DBG-VER-002-001-001` and `DBG-VER-003-001-001`.
 
 ## Traceability state
 
@@ -201,7 +201,8 @@ Run `DBG-RVW-002-001-007` and `DBG-RVW-003-001-006`.
 - Dependent integration review `DBG-RVW-001-004-010`: PASS at `1e47953…`
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
-- Active gate: fresh parent final reviews
+- Parent final reviews: PASS
+- Active gate: formal parent verifications
 
 ## Agents and worktree
 
