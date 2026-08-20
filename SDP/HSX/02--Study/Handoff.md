@@ -1,20 +1,21 @@
 # HSX Portable Debug Contract Handoff
 
-- Status: REVIEW 006 PASS — PENDING MASTER VERIFICATION AND ISSUE DECISION PACKAGES
+- Status: VERIFICATION PASS — PENDING MASTER EXACT-CONTENT SIGN-OFF AND ISSUE PACKAGES
 - Coordinator: `HSX-ST-001`, issue #47
 - Debugger dependency: `DBG-ST-006`, issue #38
 - Iteration: `DBG-IT-001-003`
 - Completed review: `HSX-RVW-001-001-005` — REWORK at
   `84df21d763b73209efd0292990799f469283460a`
 - Final fresh review: `HSX-RVW-001-001-006` — PASS
-- Active gate: `reviewed_package_pending_master_verification_and_issue_decision_packages`
+- Verification: `HSX-VER-001-001-001` — PASS
+- Active gate: `master_exact_content_signoff_and_issue_decision_packages`
 
 ## Current objective
 
-Master verifies `HSX-RVW-001-001-006` against exact proposal-content head
-`b57e368f77bb533b09397d633fc92565655e1668` and trace assignment head
-`24beb825b40ccafb9391019f7bd7530e388cd675`, then prepares issue #47/#38 decision packages.
-No proposal-content change is permitted before that verification.
+Master signs exact proposal-content head `b57e368f77bb533b09397d633fc92565655e1668`
+after reconciling review `HSX-RVW-001-001-006`, verification `HSX-VER-001-001-001` and the
+trace-only review chain, then prepares issue #47/#38 decision packages. No proposal-content
+change is permitted.
 
 ## Authority
 
@@ -25,16 +26,17 @@ No proposal-content change is permitted before that verification.
 
 ## Exact next step
 
-Master verifies the review record and exact review-record commit, posts the reviewed decision
-packages to issues #47/#38, and stops before contract acceptance, design freeze, or
-implementation authorization unless Steering records a later decision.
+Master records exact-content sign-off, posts the reviewed/verified decision packages to issues
+#47/#38, and stops before contract acceptance, design freeze, or implementation authorization
+unless Steering records a later decision.
 
 ## Master verification
 
-Read-only proposal verification passed: resource oracle 114; address/ABI 40 with one
-environment skip; execution 99 plus 7; supplemental ABI 15 plus 7; bundle/source 18 with one
-environment skip. Six traceability YAML files, both Ledgers, 36/5/5 stable IDs, ten
-DBG mappings, Markdown fences and `git diff --check` passed. This is not independent review.
+`HSX-VER-001-001-001` passed against proposal content `b57e368…` and review-record head
+`ef1f8d8…`: resource oracle 114; address/ABI 40 with one environment skip; execution 99 plus
+7; supplemental ABI 15 plus 7; bundle/source 18 with one environment skip; Python+Node golden
+vectors 4/4; eight YAML, both Ledgers/57 records, 52 Markdown files, 36/5/5 stable IDs, ten DBG
+mappings and diff/scope guards passed.
 
 ## Review history
 

@@ -1,6 +1,6 @@
 # DBG-SPR-001 — Debugger Stabilization
 
-- Status: ITERATION 003 REVIEW 006 PASS — PENDING MASTER VERIFICATION AND ISSUE DECISION PACKAGES
+- Status: ITERATION 003 VERIFICATION PASS — MASTER SIGN-OFF / ISSUE PACKAGES PENDING
 - Owning track: Debugger
 - Owning GapAnalysis: `DBG-GAP-001`
 
@@ -44,8 +44,9 @@ Steering accepted `DBG-A-001..DBG-A-008` as target architecture direction in com
 - Review `HSX-RVW-001-001-005`: REWORK at `84df21d763b73209efd0292990799f469283460a`
 - Review `HSX-RVW-001-001-006`: PASS on exact proposal content `b57e368…` plus trace-only
   assignment head `24beb82…`
-- Stop gate: `reviewed_package_pending_master_verification_and_issue_decision_packages` for
-  issues #47/#38 before any `DBG-D-*` freeze
+- Verification `HSX-VER-001-001-001`: PASS
+- Stop gate: Master exact-content sign-off and reviewed/verified decision packages in issues
+  #47/#38 before any `DBG-D-*` freeze
 
 ## Non-goals for this iteration
 

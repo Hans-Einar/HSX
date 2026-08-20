@@ -18,9 +18,9 @@ runtime capability. Those capabilities are dependencies on the `SDP/HSX` track.
 The current product baseline originated on `Implementation/vscode`. `DBG-RF-001` completed
 the production-path protocol baseline. Steering accepted the reviewed `DBG-A-001..DBG-A-008`
 target direction. Coordinated `DBG-ST-006` / `HSX-ST-001..008` portable-runtime contract
-work is complete for review. `HSX-RVW-001-001-006` passed exact proposal content
-`b57e368…`; the active gate is
-`reviewed_package_pending_master_verification_and_issue_decision_packages`. Every `DBG-D-*`
+work is reviewed and verified. `HSX-RVW-001-001-006` and `HSX-VER-001-001-001` passed exact
+proposal content `b57e368…`; the active gate is Master exact-content sign-off and issue
+decision packages. Every `DBG-D-*`
 remains proposed and no structural product implementation is authorized.
 
 Read in this order:

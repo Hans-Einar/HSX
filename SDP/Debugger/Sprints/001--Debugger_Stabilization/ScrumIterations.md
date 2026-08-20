@@ -213,7 +213,7 @@ implementation remains blocked.
 
 ## DBG-IT-001-003 — Portable Debug Runtime Contracts
 
-Status: REVIEW 006 PASS — PENDING MASTER VERIFICATION AND ISSUE DECISION PACKAGES
+Status: VERIFICATION PASS — MASTER EXACT-CONTENT SIGN-OFF / ISSUE PACKAGES PENDING
 
 ### Goal
 
@@ -392,6 +392,6 @@ findings. It independently reproduced all four canonical hashes in Python and No
 the current f16 allocator-reuse nonconformance, re-ran the representative oracle suites, and
 validated YAML/NDJSON, Markdown, IDs/mappings, guards, SDP-only scope and diff cleanliness.
 
-The active gate is now `reviewed_package_pending_master_verification_and_issue_decision_packages`.
-All contracts remain target/proposed and every DBG-D/RF/product/AVR implementation gate stays
-closed.
+Verification `HSX-VER-001-001-001` passed. The active gate is now Master exact-content
+sign-off and reviewed/verified issue #47/#38 decision packages. All contracts remain
+target/proposed and every DBG-D/RF/product/AVR implementation gate stays closed.

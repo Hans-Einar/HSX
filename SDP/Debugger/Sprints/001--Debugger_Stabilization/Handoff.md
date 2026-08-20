@@ -1,13 +1,13 @@
 # DBG-SPR-001 Handoff
 
-Status: `reviewed_package_pending_master_verification_and_issue_decision_packages`
+Status: `verified_package_pending_master_exact_content_signoff_and_issue_decision_packages`
 
 ## Current objective
 
-Master verifies `HSX-RVW-001-001-006` against exact proposal-content head
-`b57e368f77bb533b09397d633fc92565655e1668` and trace assignment head
-`24beb825b40ccafb9391019f7bd7530e388cd675`, then returns reviewed decision packages to issues
-#47/#38. No structural product or AVR work may be dispatched.
+Master signs exact proposal-content head `b57e368f77bb533b09397d633fc92565655e1668`
+after reconciling `HSX-RVW-001-001-006` PASS and `HSX-VER-001-001-001` PASS, then returns
+reviewed/verified decision packages to issues #47/#38. No structural product or AVR work may
+be dispatched.
 
 ## Authority
 
@@ -114,18 +114,20 @@ Master verifies `HSX-RVW-001-001-006` against exact proposal-content head
 - Fresh `HSX-RVW-001-001-006` reviewed exact proposal content `b57e368f…` plus trace-only
   assignment head `24beb82…` and returned PASS with no Blocking/High/Medium findings. Python
   and Node reproduced all four canonical hashes; representative oracle and structural suites
-  passed. Master verification remains pending.
+  passed. The reviewer correctly made no Master-verification claim.
+- Formal `HSX-VER-001-001-001` repeated every representative oracle set, Python+Node golden
+  vectors, exact-content/scope, 8 YAML, 57 pre-verification Ledger records, 52 Markdown files,
+  36/5/5 IDs and ten mappings; PASS. Master exact-content sign-off remains pending.
 
 ## Not done
 
 - `DBG-D-001..DBG-D-010` remain proposed and have no implementation authority.
-- Master verification and durable issue #47/#38 decision packages are not complete.
+- Master exact-content sign-off and durable issue #47/#38 decision packages are not complete.
 
 ## Exact next step
 
-Master verifies the review record and exact review-record commit, posts packages to #47/#38,
-and stops before design freeze or implementation authorization unless Steering records a later
-decision.
+Master records exact-content sign-off, posts packages to #47/#38, and stops before design
+freeze or implementation authorization unless Steering records a later decision.
 
 ## Traceability state
 
@@ -137,7 +139,7 @@ decision.
   `208063e344b767f82790ce579eba6327e2cdd0ce` and repository head tested
   `fefd4b0c427dfa71d637e4f4cce9e4a345912591`.
 - CurrentIndex, Issues, sprint records, Relations, Ledger, and Handoff are current through
-  review attempt 6 PASS and the pending Master-verification/issue-package gate.
+  review attempt 6 PASS and `HSX-VER-001-001-001` PASS.
 - Accepted architecture direction: `DBG-DA-001`, `DBG-A-001..DBG-A-008`
 - Completed Design Studies: `DBG-ST-002..DBG-ST-005`
 - Architecture review: `DBG-RVW-001-002-001` — REWORK at `f8b8097`
@@ -160,14 +162,17 @@ decision.
 - Review `HSX-RVW-001-001-005`: REWORK at `84df21d`
 - Review `HSX-RVW-001-001-006`: PASS on proposal content `b57e368…` and trace assignment
   `24beb82…`
+- Verification `HSX-VER-001-001-001`: PASS on proposal content `b57e368…` and review-record
+  head `ef1f8d8…`
 - Resynthesized supplemental Studies: `HSX-ST-007`, `HSX-ST-008`
-- Active gate: `reviewed_package_pending_master_verification_and_issue_decision_packages`
+- Active gate: `master_exact_content_signoff_and_issue_decision_packages`
 
 ## Agents and worktree
 
-The prior product/design chain, all bounded HSX Study workers, and independent review
-`HSX-RVW-001-001-006` are complete. The next active role is Master verification and issue
-decision-package preparation. The controlled branch is `codex/dbg-st-006`;
+The prior product/design chain, all bounded HSX Study workers, independent review
+`HSX-RVW-001-001-006`, and verification `HSX-VER-001-001-001` are complete. The next active
+role is Master exact-content sign-off and issue decision-package preparation. The controlled
+branch is `codex/dbg-st-006`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.
 

@@ -80,6 +80,10 @@ relations:
       - HSX-RVW-001-001-005
       - HSX-RVW-001-001-006
   - from: HSX-ST-001
+    type: verified_by
+    to:
+      - HSX-VER-001-001-001
+  - from: HSX-ST-001
     type: provides_provenance_for
     to:
       - HSX-R-001..HSX-R-036

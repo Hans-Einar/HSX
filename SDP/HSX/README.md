@@ -32,8 +32,8 @@ no product or AVR work.
 synthesized stable proposed `HSX-R-001..036`, `HSX-A-001..005`, and `HSX-D-001..005`; the
 first five independent reviews required rework. Final fresh review
 `HSX-RVW-001-001-006` passed exact proposal content `b57e368…` with no
-Blocking/High/Medium findings. The active gate is now
-`reviewed_package_pending_master_verification_and_issue_decision_packages` for issues #47/#38.
+Blocking/High/Medium findings, and `HSX-VER-001-001-001` passed. The active gate is Master
+exact-content sign-off and reviewed/verified decision packages for issues #47/#38.
 
 Target-specific implementations such as AVR belong in `SDP/AVR` and reference HSX core
 requirements rather than duplicating them.

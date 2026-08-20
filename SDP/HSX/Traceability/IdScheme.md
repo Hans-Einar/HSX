@@ -19,6 +19,7 @@ The existing DR, DG, and DO identifiers remain legacy provenance identifiers unt
 - `HSX-ST-008` — debug bundle/source identity canonicalization follow-up
 - `HSX-RVW-001-001-005` — fresh exact-head review after supplemental Studies
 - `HSX-RVW-001-001-006` — final fresh exact-content review after review-005 corrections
+- `HSX-VER-001-001-001` — formal verification of exact portable-contract proposal content
 
 These IDs are stable but their artifacts remain target/proposed pending review and Steering
 acceptance. Stable numbering is not implementation authority.
