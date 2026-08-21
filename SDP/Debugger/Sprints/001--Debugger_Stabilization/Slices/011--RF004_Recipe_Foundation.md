@@ -37,6 +37,8 @@ inspection, legacy product/runtime and frontend files are read-only.
   any opcode/read;
 - validate nullable LocationRow function/scope exactly against LOCAL, GLOBAL or CONSTANT
   SymbolRecord kind invariants; no address sentinel is permitted;
+- preserve LocationRow.value_byte_order and exact ScalarBytes encoding for value/register/
+  constant forms; address forms preserve exact read bytes;
 - reject unknown mandatory schema/field/opcode as unsupported and malformed
   arity/type/width/stack/address/piece coverage as corrupt;
 - enforce exact profile limits; every exhaustion is `UNSUPPORTED` with diagnostic

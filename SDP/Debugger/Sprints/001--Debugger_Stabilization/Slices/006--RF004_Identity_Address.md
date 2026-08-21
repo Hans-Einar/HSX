@@ -70,7 +70,8 @@ interface `dbg.resolver-inspection/1`.
 
 Test exact mismatch matrices, immutability, digest/logical-ID validation, complete descriptor
 version/encoding/serialization/register/special fields, multiple widths and
-spaces, GPR+PC/SP/PSW ordering/widths, the frozen StopEpoch binding status/code matrix, every checked
+spaces, GPR+PC/SP/PSW ordering/widths/register byte order, canonical scalar byte encoding and
+padding, the frozen StopEpoch binding status/code matrix, every checked
 arithmetic/range/alignment/unit-conversion failure, explicit wrap selection, result
 cardinality and degraded coherence guards. Run earlier RF-002/RF-003 contract/epoch regressions.
 Close only after exact-head review, formal verification and Master sign-off.

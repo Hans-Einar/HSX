@@ -28,6 +28,8 @@ separate from the artifact index and any frontend navigation policy.
 - preserve original SourceRef identity through relocation and symlink resolution;
 - verify exact candidate byte length and SHA-256 before `RESOLVED`;
 - return missing, ambiguous, content-mismatch and case-collision outcomes with all candidates;
+- enforce exact override/no-fallthrough then case-collision/ambiguity/single-candidate content
+  precedence; one content match among multiple locators remains ambiguous;
 - adapt classified SourceMap prefix/relocation/symlink behavior without using its first-match
   fallback as target semantics;
 - never globally lowercase/casefold identity or perform basename guessing.

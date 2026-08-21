@@ -1,6 +1,6 @@
 # `dbg.resolver-inspection/1` — Typed Resolver and Inspection Interface
 
-- Status: **REFROZEN CANDIDATE — REVIEWS 007..010/012..017 REWORK / REVIEW 018 PENDING**
+- Status: **REFROZEN CANDIDATE — REVIEWS 007..010/012..018 REWORK / REVIEW 019 PENDING**
 - Iteration: `DBG-IT-001-005`
 - Parent Refactor: `DBG-RF-004`
 - Steering authority: issue #38 comment `5362514094`
@@ -17,7 +17,8 @@
 - Review `DBG-RVW-001-005-015`: REWORK at `18c0a26cad4c2d82e4a23ef0ec3e6409b022cb95`
 - Review `DBG-RVW-001-005-016`: REWORK at `e330a7b344715dfdbae0de46e44f4720b4387d4e`
 - Review `DBG-RVW-001-005-017`: REWORK at `cb88b62b7c45ea6ebfe31c40e522daa3adcf8896`
-- Fresh independent re-review: `DBG-RVW-001-005-018` (`...011` is reserved for Slice 007)
+- Review `DBG-RVW-001-005-018`: REWORK at `08719457a341b01ca8f64ea568e1ab04678dd10d`
+- Fresh independent re-review: `DBG-RVW-001-005-019` (`...011` is reserved for Slice 007)
 - Public interface ID: `dbg.resolver-inspection/1`
 
 This document freezes the public Python-domain interface to be implemented by the seven bounded
@@ -222,6 +223,7 @@ ArchitectureDescriptor { ref: ArchitectureDescriptorRef,
                          container_header_byte_order: LITTLE | BIG,
                          instruction_serialization_byte_order: LITTLE | BIG,
                          register_width_bits: int >= 1,
+                         register_byte_order: LITTLE | BIG,
                          register_count: int >= 1,
                          spaces: tuple[AddressSpaceDescriptor, ...],
                          register_order: tuple[str, ...],
@@ -507,6 +509,7 @@ LocationRow { row_id: str, binding: ImageDebugBinding, symbol_id: str,
               lexical_scope_id: str | None, function_id: str | None,
               pc_range: HsxAddressRange, declared_type_id: str | None,
               declared_bit_size: int >= 1, abi: AbiDescriptorRef,
+              value_byte_order: LITTLE | BIG,
               frame_binding: SELECTED_FRAME,
               schema: RecipeSchemaRef,
               location_form: LocationForm }
@@ -526,6 +529,9 @@ kinds use VariableExpression and LocationEvaluator.
 LocationRow is static metadata and `frame_binding=SELECTED_FRAME` is the only v1 value;
 LocationEvaluator binds it to the explicit UnwindFrame argument and requires matching context,
 function and frame PC. No current/top-frame lookup or runtime handle is stored in the artifact.
+When declared_type_id is present it must resolve to exactly one TypeRecord whose bit_size and
+byte_order equal the LocationRow fields; mismatch or missing type is CORRUPT. A null type ID
+still retains explicit declared_bit_size/value_byte_order.
 
 Pagination and inspection record schemas:
 
@@ -601,6 +607,17 @@ a PARTIAL result.
 MemorySegment.offset/requested_length and MemoryBlock.requested_length are bytes relative to
 the converted start address; address-space ranges remain unit-counted as defined above.
 
+```text
+ScalarBytes.encode(value: int, signed: bool, bit_width: int >= 1,
+                   byte_order: LITTLE | BIG) -> bytes
+```
+
+ScalarBytes produces exactly `ceil(bit_width/8)` bytes. The value must fit the declared
+unsigned or two's-complement signed range. Negative signed values are reduced modulo
+`2^bit_width`; unused high padding bits in the most-significant storage byte are sign bits for
+negative signed values and zero otherwise; fixed-length output is then emitted in byte_order.
+There is no host-endian conversion, truncation or minimal-length form.
+
 For an `AVAILABLE` scalar, `raw_bytes` contains the complete declared value and `pieces` is
 empty. `PARTIAL` is legal only for a structural pieces location: `raw_bytes` is None,
 ValuePieces have non-overlapping destination ranges within declared `bit_size`, every missing
@@ -613,13 +630,23 @@ source_id=register_id), no symbol/address, and its own VARIABLE handle. RF-004 r
 scope handle; compound layout remains available through TypeRecord.members without an invented
 handle traversal contract.
 
+Raw-byte source is exact: RegisterVariableRecord/RegisterExpression uses
+ArchitectureDescriptor.register_byte_order; VariableExpression uses LocationRow.value_byte_order
+and RecipeScalar.signed; SymbolExpression encodes the address unsigned using its
+AddressSpaceDescriptor.byte_order/width_bits; ConstantExpression uses its explicit byte_order
+and unsigned encoding; MemoryExpression returns the exact bytes read, with its byte_order used
+only to interpret display_value. Address/location memory forms preserve exact bytes read; value/
+register/constant forms use ScalarBytes. AVAILABLE never leaves raw_bytes unspecified.
+
 `SnapshotExpression` is a closed typed union:
 
 ```text
 RegisterExpression { register_id: str }
-VariableExpression { symbol_id: str, lexical_scope_id: str }
+VariableExpression { symbol_id: str, function_id: str | None,
+                     lexical_scope_id: str | None }
 SymbolExpression { symbol_id: str }
-ConstantExpression { unsigned_value: int >= 0, bit_width: int >= 1 }
+ConstantExpression { unsigned_value: int >= 0, bit_width: int >= 1,
+                     byte_order: LITTLE | BIG }
 MemoryExpression { address: HsxAddress, bit_width: int >= 1,
                    byte_order: LITTLE | BIG }
 ```
@@ -629,6 +656,10 @@ string parsing and presentation remain outside this interface.
 ExpressionValue.source_id is the register/variable/symbol ID for those variants and None for
 constant/memory. Only a VariableExpression backed by a PIECES LocationForm may be PARTIAL and
 carry ValuePieces; a missing register/symbol/scalar/memory value is UNAVAILABLE, never padded.
+VariableExpression function/scope IDs must exactly equal its GLOBAL/LOCAL/CONSTANT
+SymbolRecord: locals pass both non-null, globals pass None/None, and constants pass the pair
+their symbol declares. Evaluation uses the explicit selected frame PC and never invents a
+global-scope sentinel.
 
 Source locator schemas:
 
@@ -794,6 +825,16 @@ candidate in that tier is collected and content-checked before selection. Multip
 prefix rules with the same longest prefix remain candidates; declaration order is diagnostic,
 not a tie-breaker. Duplicate physical locators are deduplicated only by exact resolved locator
 string plus verified bytes, never by basename or casefold.
+
+Outcome precedence is first-match and frozen. A configured exact SourceRef override is the
+only candidate tier and never falls through: invalid locator is CORRUPT/source_locator_invalid,
+missing path is UNAVAILABLE, present mismatched bytes is CONTENT_MISMATCH, and one exact match
+is RESOLVED. Without override, no existing candidate is UNAVAILABLE. After exact physical
+deduplication, a host-filesystem case collision that cannot address each spelling separately is
+CASE_COLLISION. More than one remaining distinct existing locator is AMBIGUOUS regardless of
+how many candidates match content; all content-match flags remain diagnostic and no candidate
+is preferred. Exactly one remaining locator is RESOLVED only when digest+length match,
+otherwise CONTENT_MISMATCH. Thus a single matching path among several never silently wins.
 
 Before returning `RESOLVED`, the resolver reads the candidate bytes and verifies exact byte
 length and SHA-256 from `SourceRef`. It returns all exact candidates for ambiguity, reports
