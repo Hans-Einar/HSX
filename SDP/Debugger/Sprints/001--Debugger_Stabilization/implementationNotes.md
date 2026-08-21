@@ -52,5 +52,20 @@ started; structural product-code work remains blocked pending accepted design co
   stage in issue #38 comment `5362514094`.
 - The frozen `dbg.controller-gateway/1.1` interface remains authoritative.
 
-RF-004 activation/contracts are planning state and are not recorded here as verified product
-work. No RF-004 product Slice has started.
+RF-004 activation/contracts themselves are planning state; verified RF-004 execution begins
+with the Slice 001 record below.
+
+## DBG-SL-001-005-001 verified legacy oracle
+
+- exact signed head: `8e5669940dd5c23df532577c39dc10bd84692ad2`;
+- interface review `DBG-RVW-001-005-019`: PASS;
+- Slice review `DBG-RVW-001-005-020`: PASS;
+- formal verification `DBG-VER-001-005-009`: PASS after trace-only attempts 001/008;
+- 29 classified cases: 13 preserve, 8 intentional-change, 8 retire; all legacy outputs are
+  explicitly non-target-conformant;
+- oracle 16 passed/1 explicit WinError 1314 skip; symbols 2 passed; source map 4 passed/1 same
+  skip; focused 14 passed; hashseed 0/1 repeats PASS;
+- exact owned/protected scope, trace, hashes, ancestry, objects/connectivity and remote/clean
+  evidence: PASS.
+
+Windows symlink behavior remains degraded/unverified on this host; no symlink PASS is claimed.

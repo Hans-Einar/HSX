@@ -217,7 +217,15 @@ relations:
   - from: DBG-SL-001-005-001
     type: verified_by
     to: [DBG-VER-001-005-009]
-    status: planned
+    status: pass
+    implementation_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
+    coordination_head: 4e33f768ddfd8fcf2c0cb61a0c0b5ad2c6ab1f98
+    record: SDP/Debugger/Verification/DBG-VER-001-005-009.md
+  - from: DBG-SL-001-005-001
+    type: signed_at
+    to: [8e5669940dd5c23df532577c39dc10bd84692ad2]
+    status: pass
+    record: SDP/Debugger/Verification/DBG-SL-001-005-001--Master_Signoff.md
   - from: DBG-SL-001-005-002
     type: reviewed_by
     to: [DBG-RVW-001-005-002]

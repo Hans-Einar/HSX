@@ -94,7 +94,7 @@ track IDs rather than silently renamed in historical documents.
 - `DBG-VER-001-005-001..DBG-VER-001-005-007` — formal Slice verifications
 - `DBG-VER-001-005-001` — Slice 001 verification attempt, FAIL trace-only
 - `DBG-VER-001-005-008` — Slice 001 reverification attempt 2, FAIL trace-only
-- `DBG-VER-001-005-009` — Slice 001 fresh reverification after normalized Issues correction
+- `DBG-VER-001-005-009` — Slice 001 final reverification, PASS
 - `DBG-RVW-004-001-001` / `DBG-VER-004-001-001` — RF-004 parent review/verification
 
 Public interface string `dbg.resolver-inspection/1` is a versioned contract identifier rather

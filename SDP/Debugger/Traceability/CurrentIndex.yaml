@@ -1,7 +1,7 @@
 schema_version: 1
 track: Debugger
 namespace: DBG
-status: debugger_rf004_slice001_review_pass_reverification_009_pending
+status: debugger_rf004_slice001_complete_slice002_ready
 baseline:
   repository: Hans-Einar/HSX
   implementation_branch: Implementation/vscode
@@ -94,7 +94,7 @@ active_gate:
   iteration:
     id: DBG-IT-001-005
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/ScrumIterations.md
-    status: active_slice001_review_pass_reverification_009_pending
+    status: active_slice001_complete_slice002_ready
   architecture_review:
     id: DBG-RVW-001-002-001
     status: rework
@@ -124,7 +124,7 @@ active_gate:
     first_wave_status: complete_steering_accepted
     first_wave_acceptance_comment: 5362514094
     next_authorized_refactor: DBG-RF-004
-    next_wave_status: rf004_only_slice001_review_pass_reverification_009_pending
+    next_wave_status: rf004_only_slice001_complete_slice002_ready
     rf004_authorization_comment: 5362514094
     rf005_dependency_clarification_comment: 5362515750
   portable_contract_study:
@@ -373,12 +373,12 @@ active_rf004:
   refactor:
     id: DBG-RF-004
     path: SDP/Debugger/Refactor/004--Typed_Resolver_Inspection/README.md
-    status: active_slice001_review_pass_reverification_009_pending
+    status: active_slice001_complete_slice002_ready
     steering_authority_comment: 5362514094
   iteration:
     id: DBG-IT-001-005
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/ScrumIterations.md
-    status: active_slice001_review_pass_reverification_009_pending
+    status: active_slice001_complete_slice002_ready
   interface:
     id: dbg.resolver-inspection/1
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/004--Typed_Resolver_Inspection_Interface_v1.md
@@ -446,7 +446,7 @@ active_rf004:
   slices:
     - id: DBG-SL-001-005-001
       path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/005--RF004_Legacy_Oracle.md
-      status: review_pass_pending_reverification
+      status: complete_exact_head_signed
       implementation_head: a9a22fc4750f22d774eade43810a499dd1992859
       prior_review: DBG-RVW-001-005-001
       prior_review_status: rework
@@ -459,6 +459,10 @@ active_rf004:
       reverification: DBG-VER-001-005-008
       reverification_status: fail_trace_only
       reverification_2: DBG-VER-001-005-009
+      reverification_2_status: pass
+      signoff_status: pass
+      signed_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
+      signoff_record: SDP/Debugger/Verification/DBG-SL-001-005-001--Master_Signoff.md
       review: DBG-RVW-001-005-001
       verification: DBG-VER-001-005-001
     - id: DBG-SL-001-005-002
@@ -495,7 +499,7 @@ active_rf004:
   parent_verification: DBG-VER-004-001-001
   product_base: 69a54aeb3394d3cd4792bce620748e15bab69f1f
   runtime_profile: hsx.python-debug-legacy/1
-  current_gate: DBG-VER-001-005-009
+  current_gate: activate_DBG-SL-001-005-002
 structural_gate:
   rule: Only Steering-authorized Refactors with frozen Slice/interface contracts may execute.
   authorized_refactors:

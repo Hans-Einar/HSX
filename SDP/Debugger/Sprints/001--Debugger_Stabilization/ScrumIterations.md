@@ -799,3 +799,11 @@ returned FAIL trace-only because `Issues.yaml` RF-004 normalized status alone re
 pre-worker value. Master corrected that field, recorded attempts 001/008 as trace-only FAIL,
 and reserved fresh `DBG-VER-001-005-009`. Implementation remains `8e566994…`; no sign-off or
 later Slice start.
+
+### Slice 001 verification attempt 3 and sign-off
+
+Fresh `DBG-VER-001-005-009` passed against unchanged reviewed head `8e566994…` and remote
+coordination `4e33f76…`: six YAML, Debugger 148/HSX 24 Ledger rows, all contracted tests,
+manifest, scope, python hash, ancestry/objects/connectivity and clean remote state passed. The
+only residual is explicit WinError 1314 symlink-degraded evidence; no symlink PASS is claimed.
+Master exact-head sign-off passed. Slice 001 is complete; Slice 002 is next.
