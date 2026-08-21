@@ -271,7 +271,16 @@ relations:
   - from: DBG-SL-001-005-002
     type: reviewed_by
     to: [DBG-RVW-001-005-027]
-    status: conditional_on_private_correction
+    status: not_started_blocked
+  - from: DBG-SL-001-005-002
+    type: blocked_by
+    to: [DBG-BLK-001-005-001]
+    status: awaiting_steering_decision
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/005--RF004_Enum_Immutability_Steering_Blocker.md
+  - from: DBG-BLK-001-005-001
+    type: requires_steering_decision_on
+    to: [dbg.resolver-inspection/1]
+    status: open
   - from: DBG-SL-001-005-002
     type: verified_by
     to: [DBG-VER-001-005-002]

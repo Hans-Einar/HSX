@@ -1,6 +1,6 @@
 # DBG-RF-004 — Typed Artifact, Source, Address, Stack, and Inspection
 
-- Status: **ACTIVE — SLICE 001 SIGNED / SLICE 002 REWORK 6 FEASIBILITY GATE**
+- Status: **BLOCKED — AWAITING STEERING ON ENUM IMMUTABILITY**
 - Steering authority: issue #38 comment `5362514094`
 - Dependency clarification: issue #42 comment `5362515750`
 - Sprint/iteration: `DBG-SPR-001` / `DBG-IT-001-005`

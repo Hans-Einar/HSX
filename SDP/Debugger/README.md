@@ -40,6 +40,6 @@ Read in this order:
 `DBG-ST-006` and `DBG-IT-001-004` are complete. Active work is `DBG-IT-001-005` /
 `DBG-RF-004` with frozen Slices `DBG-SL-001-005-001..007`; public interface
 `dbg.resolver-inspection/1` passed `DBG-RVW-001-005-019` at `058c338…`. Slice 001 is signed;
-Slice 002 is at the review-026 feasibility gate; private closure or Steering stop only. Existing Executive behavior remains
+RF-004 is stopped at `DBG-BLK-001-005-001` awaiting Steering. Existing Executive behavior remains
 `hsx.python-debug-legacy/1`; RF-005..009, Executive/VM/AVR and frontend migration remain
 blocked.

@@ -1,6 +1,6 @@
 # DBG-SPR-001 — Debugger Stabilization
 
-- Status: ITERATION 005 ACTIVE — SLICE 001 SIGNED / SLICE 002 REWORK 6 FEASIBILITY GATE
+- Status: ITERATION 005 BLOCKED — AWAITING STEERING ON ENUM IMMUTABILITY
 - Owning track: Debugger
 - Owning GapAnalysis: `DBG-GAP-001`
 
@@ -75,8 +75,8 @@ Steering accepted `DBG-A-001..DBG-A-008` as target architecture direction in com
 - Interface reviews 007..010/012..018: REWORK; `DBG-RVW-001-005-019`: PASS at
   `058c3383593553aa1497d024d41285d44d9c67a8`
 - Exact product base: `69a54aeb3394d3cd4792bce620748e15bab69f1f`
-- Active product gate: Slice 002 review 026 REWORK; fresh feasibility worker must privately
-  close retained Enum snapshot immutability or stop for Steering
+- Active gate: `DBG-BLK-001-005-001`; review 026's retained Enum snapshot invariant cannot be
+  closed privately without changing a frozen mutation/representation premise
 - Authority: issue #38 comment `5362514094`
 - Dependency clarification: issue #42 comment `5362515750`
 - Still blocked: `DBG-RF-005..DBG-RF-009`

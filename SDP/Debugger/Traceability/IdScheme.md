@@ -99,6 +99,7 @@ track IDs rather than silently renamed in historical documents.
 - `DBG-RVW-001-005-025` — Slice 002 review attempt 6, REWORK
 - `DBG-RVW-001-005-026` — Slice 002 review attempt 7, REWORK
 - `DBG-RVW-001-005-027` — conditional Slice 002 review after private Enum snapshot correction
+- `DBG-BLK-001-005-001` — RF-004 frozen Enum immutability/interface Steering blocker
 - `DBG-VER-001-005-001..DBG-VER-001-005-007` — formal Slice verifications
 - `DBG-VER-001-005-001` — Slice 001 verification attempt, FAIL trace-only
 - `DBG-VER-001-005-008` — Slice 001 reverification attempt 2, FAIL trace-only

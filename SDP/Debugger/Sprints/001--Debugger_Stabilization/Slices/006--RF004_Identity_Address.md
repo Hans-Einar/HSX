@@ -1,6 +1,6 @@
 # DBG-SL-001-005-002 — RF-004 Typed Identity, Binding, Address, and Result Foundation
 
-- Status: **REWORK 6 / ENUM SNAPSHOT FEASIBILITY**
+- Status: **BLOCKED / AWAITING STEERING — `DBG-BLK-001-005-001`**
 - Implementation head: `4b5837644dc1196accfd8608bc3dbd20980476bb`
 - Corrected head: `4280bc6008385042bdff923bd8e5392a1c290fdc`
 - Corrected head 2: `6c933ea6b11e42d58da52faf0997f8c978dad54b`
@@ -124,6 +124,11 @@ Review 026: REWORK. Pre-construction Enum/storage findings are closed, but retai
 singleton does not snapshot post-construction member/property changes. Fresh corrective worker
 6 first performs a frozen-contract feasibility assessment; review 027 is conditional on a
 private type-preserving correction, otherwise work stops for Steering.
+
+Feasibility result: NEGATIVE with no edits. Exact Python Enum singleton identity and an
+independent post-construction immutable snapshot cannot both be preserved under the frozen
+schemas. See `Interfaces/005--RF004_Enum_Immutability_Steering_Blocker.md`. Review 027,
+verification and later Slices are not started.
 
 Second correction: exact atom types; directly declared frozen dataclasses only; all fields
 deep-traversed; undeclared dict/slot state rejected. Focused 43, debugger 180+1 skip, mandated

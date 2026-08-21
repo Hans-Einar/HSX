@@ -474,7 +474,7 @@ traceability and no product drift after the combined signed head. Steering accep
 
 ## DBG-IT-001-005 — Typed Resolver and Inspection
 
-Status: ACTIVE — INTERFACE PASS / SLICE 001 SIGNED / SLICE 002 REWORK 6 FEASIBILITY GATE
+Status: BLOCKED — AWAITING STEERING ON `DBG-BLK-001-005-001`
 
 ### Authority and goal
 
@@ -934,3 +934,13 @@ scope, API, YAML/Ledger and git gates passed; the sprint top status was the sole
 is corrected. A fresh feasibility worker must either implement a private type-preserving
 immutable snapshot or stop for Steering because scalar/proxy snapshotting changes the frozen
 generic typed envelope. Review 027 is conditional; no later Slice is active.
+
+### Slice 002 feasibility result / Steering stop
+
+Fresh feasibility worker returned NEGATIVE at clean remote-exact head `71b471a…` and made no
+edits. Exact Python Enum values are class-owned canonical singletons: copy/deepcopy retain the
+same member, while a detached object/proxy/scalar changes canonical identity or the frozen type.
+Global sealing is not a private portable guarantee, and revalidation cannot revoke a returned
+reference. This conflicts with Interface 004's simultaneous exact typed Enum-bearing schemas
+and absolute post-construction immutable result requirement. Master opened
+`DBG-BLK-001-005-001`, stopped review 027/verification/later Slices, and returns to Steering.
