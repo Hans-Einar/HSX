@@ -1,8 +1,9 @@
 # DBG-SL-001-005-002 — RF-004 Typed Identity, Binding, Address, and Result Foundation
 
-- Status: **REWORK 2 / FRESH CORRECTIVE WORKER PENDING**
+- Status: **CORRECTED 2 / FRESH RE-REVIEW 022 PENDING**
 - Implementation head: `4b5837644dc1196accfd8608bc3dbd20980476bb`
 - Corrected head: `4280bc6008385042bdff923bd8e5392a1c290fdc`
+- Corrected head 2: `6c933ea6b11e42d58da52faf0997f8c978dad54b`
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
 - Depends on signed: `DBG-SL-001-005-001`
@@ -91,6 +92,10 @@ Close only after exact-head review, formal verification and Master sign-off.
 
 Review `DBG-RVW-001-005-002`: REWORK. Next review after bounded correction:
 `DBG-RVW-001-005-021` — REWORK. Next fresh review after correction: `DBG-RVW-001-005-022`.
+
+Second correction: exact atom types; directly declared frozen dataclasses only; all fields
+deep-traversed; undeclared dict/slot state rejected. Focused 43, debugger 180+1 skip, mandated
+39+1, canonical 2, compile/import/export 129, diff/fsck/scope/clean PASS.
 
 Corrective result: `results.py` and owned metadata test only; focused 39 passed; all
 `test_hsx_debugger*.py` 176 passed/1 WinError 1314 skip; mandated 39 passed/1 same skip;

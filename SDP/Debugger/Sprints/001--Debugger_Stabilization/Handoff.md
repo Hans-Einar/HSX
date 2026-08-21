@@ -1,6 +1,6 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf004_slice001_signed_slice002_rereview_021_rework_corrective_worker_2_pending`
+Status: `rf004_slice001_signed_slice002_corrected_rereview_022_pending`
 
 ## Current objective
 
@@ -156,15 +156,15 @@ remain blocked.
   `DBG-RVW-001-005-002` returned REWORK; correction, fresh review, verification and sign-off
   remain open. Corrected head is `4280bc6008385042bdff923bd8e5392a1c290fdc`.
 - `DBG-RVW-001-005-021` returned REWORK for scalar/dataclass subclass deep-immutability plus
-  stale normalized summaries; fresh correction/review remain open.
+  stale normalized summaries. Correction 2 is `6c933ea6b11e42d58da52faf0997f8c978dad54b`;
+  fresh review remains open.
 - `DBG-RVW-001-005-019` passed exact contract head `058c338…` after the prior REWORK chain.
 - Six RF-004 Slice loops and the parent gate remain open.
 - RF-005..009 remain blocked; no Executive/VM/AVR or DAP/CLI/VS Code migration is authorized.
 
 ## Exact next step
 
-Fresh bounded corrective worker fixes exact atom/dataclass-subclass immutability in Slice 002;
-no later Slice may start.
+Fresh `DBG-RVW-001-005-022` reviews corrected Slice 002; no later Slice may start.
 
 ## Traceability state
 
@@ -243,7 +243,7 @@ no later Slice may start.
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: Slice 002 corrective worker 2, then `DBG-RVW-001-005-022`
+- Active gate: `DBG-RVW-001-005-022`
 
 ## Agents and worktree
 

@@ -850,3 +850,11 @@ through generic result freeze; Medium normalized CurrentIndex/Issues summaries s
 Slice-002-rework rather than corrected re-review. Exact DTO, piece, memory, tests, canonical,
 scope and trace mechanics otherwise passed. Fresh corrective worker fixes deep subtype rejection;
 next review is `DBG-RVW-001-005-022`.
+
+### Slice 002 corrective result 2
+
+Fresh worker committed `6c933ea6b11e42d58da52faf0997f8c978dad54b`, changing only
+`results.py` and the owned metadata test. Exact scalar atom types, directly declared frozen
+dataclasses, full field traversal and rejection of undeclared dict/slot state are enforced.
+Evidence: focused 43; debugger 180+1 skip; mandated 39+1; canonical 2; compile/import/export
+129; diff/fsck/scope/clean PASS. Fresh review is `DBG-RVW-001-005-022`.
