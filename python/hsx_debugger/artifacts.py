@@ -1734,6 +1734,17 @@ class DebugArtifactIndex:
             multiple_code="symbol_ambiguous",
         )
 
+    def symbol_by_id(self, symbol_id: str) -> ResolutionResult[SymbolRecord]:
+        if not isinstance(symbol_id, str) or not symbol_id:
+            raise ValueError("symbol_id must be a non-empty string")
+        values = tuple(record for record in self._symbols if record.symbol_id == symbol_id)
+        return _query_result(
+            self._binding,
+            values,
+            unavailable_code="symbol_id_unavailable",
+            multiple_code="duplicate_symbol_identity",
+        )
+
     def instruction_at(self, address: HsxAddress) -> ResolutionResult[InstructionRecord]:
         if not isinstance(address, HsxAddress):
             raise TypeError("address must be HsxAddress")
