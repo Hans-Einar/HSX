@@ -1158,3 +1158,10 @@ Fresh review004 returned 0 Blocking / 0 High / 1 Medium. On Windows, `os.path.jo
 an inner `C:` segment in valid logical ID `src/C:/unit.c` as host drive syntax and collapse the
 explicit-root/full-ID locator. Correct only literal joining and add the regression; review036
 then verification004 remain the next gates. Slice005 is stopped.
+
+### Slice004 bounded correction
+
+Fresh worker reproduced and closed only review004 M1 at `3d1f2e8a…`: validated logical-ID
+segments are joined as literal locator text and an inner Windows `C:` segment cannot reset the
+explicit root. Focused SourceResolver/SourceMap is 30 passed/3 classified skips; exact two-file
+scope and compile/Black/signature/Git pass. Fresh review036 is next.

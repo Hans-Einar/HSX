@@ -1,6 +1,6 @@
 # DBG-SL-001-005-004 — RF-004 Exact Source Resolver
 
-- Status: **REWORK / BOUNDED CORRECTIVE WORKER PENDING**
+- Status: **CORRECTED / INDEPENDENT REVIEW036 PENDING**
 - Product head: `c0f975c4a278cecd89e19d332ca5601b074a115e`
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
@@ -70,3 +70,11 @@ tests unchanged. Close only after exact-head review, formal verification and Mas
 Review004 returned one Medium finding: Windows host join semantics can collapse an inner
 drive-looking segment in a valid artifact-relative logical ID. Correct only the private literal
 join and add the regression. All other SourceResolver behavior passed. Review036 is reserved.
+
+## Corrective worker evidence
+
+- Corrected product head: `3d1f2e8a98308835162702c579dda1dc3ef40900`.
+- Exact scope: `sources.py` and owned source test.
+- Focused SourceResolver/SourceMap: `30 passed, 3` classified platform skips.
+- Compile/Black/import/signature/scope/diff/connectivity: PASS.
+- No frozen-contract or filesystem-semantic blocker.
