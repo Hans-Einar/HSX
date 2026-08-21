@@ -1,6 +1,6 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf004_interface_1_2_pass_slice007_corrected_review_033_pending`
+Status: `rf004_slice007_product_pass_trace_review_034_pending`
 
 Steering escalation: issue #38 comment `5369244294`.
 Steering frame-evidence refreeze: issue #38 comment `5370574104`.
@@ -20,7 +20,8 @@ The accepted first-wave gate is closed. Execute only `DBG-RF-004` through the se
 Historical versions `1`/`1.1` passed reviews019/030; Slices001–002 are signed. Steering accepted
 `DBG-BLK-001-005-002` and selected frame-carried recovered evidence in comment `5370574104`.
 Review031 returned REWORK trace-only; review032 passed exact head `f79eb629…`. Slice007 review011
-returned REWORK; corrected head `3228c9b2…` awaits fresh review033. RF-005..009 and
+returned REWORK; review033 passed product but returned REWORK trace-only. Fresh review034 is
+pending against unchanged head. RF-005..009 and
 Executive/VM/AVR/frontend migration remain blocked.
 
 ## Authority
@@ -195,7 +196,7 @@ Executive/VM/AVR/frontend migration remain blocked.
 
 ## Exact next step
 
-Dispatch fresh review033 against exact head `3228c9b23dcd8fa08a81499181e2ea9b55a0f5f0`.
+Dispatch fresh review034 against exact head `3228c9b23dcd8fa08a81499181e2ea9b55a0f5f0`.
 Do not start verification007 or Slice003 before PASS.
 
 ## Traceability state
@@ -209,7 +210,7 @@ Do not start verification007 or Slice003 before PASS.
   `fefd4b0c427dfa71d637e4f4cce9e4a345912591`.
 - CurrentIndex, Issues, sprint records, Relations, Ledger, and Handoff are current through
   interface review030 PASS, Slice002 sign-off, blocker002 accepted, review031 REWORK trace-only,
-  review032 PASS, Slice007 review011 REWORK, corrected head `3228c9b2…` and review033 pending.
+  review032 PASS, Slice007 review011 REWORK, review033 REWORK trace-only and review034 pending.
 - Accepted architecture direction: `DBG-DA-001`, `DBG-A-001..DBG-A-008`
 - Completed Design Studies: `DBG-ST-002..DBG-ST-005`
 - Architecture review: `DBG-RVW-001-002-001` — REWORK at `f8b8097`
@@ -280,7 +281,7 @@ Do not start verification007 or Slice003 before PASS.
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: `DBG-RVW-001-005-033` at `3228c9b2…`
+- Active gate: `DBG-RVW-001-005-034` at `3228c9b2…`
 - Blocker authority: issue #38 comment `5369244294`
 - Refreeze authority: issue #38 comment `5370574104`
 - Blocker authority: issue #38 comment `5365959417`
@@ -290,7 +291,7 @@ Do not start verification007 or Slice003 before PASS.
 
 The prior design/portable-contract chain and RF-002/RF-003/integration wave are complete,
 Steering-accepted and remotely reconstructable. RF-004 `1.2` passed review032; only Slice007
-review033 is open. Verification/later Slices remain stopped. Controlled work is on
+review034 is open. Verification/later Slices remain stopped. Controlled work is on
 `codex/dbg-rf-004` from exact base `69a54aeb3394d3cd4792bce620748e15bab69f1f`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.
