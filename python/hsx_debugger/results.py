@@ -7,8 +7,10 @@ exchange.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Hashable, Mapping
+from dataclasses import dataclass, fields, is_dataclass
 from enum import Enum
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Generic, TypeAlias, TypeVar
 
 if TYPE_CHECKING:
@@ -49,6 +51,98 @@ def _tuple(value: object, field_name: str) -> tuple:
     if isinstance(value, (str, bytes)) or not isinstance(value, (tuple, list)):
         raise TypeError(f"{field_name} must be a tuple or list")
     return tuple(value)
+
+
+_IMMUTABLE_PAYLOAD_ATOMS = (str, bytes, int, float, complex, bool, type(None), Enum)
+
+
+def _deep_freeze(value: object, field_name: str, active: set[int] | None = None) -> object:
+    """Copy supported generic payload containers into deeply immutable values.
+
+    Result envelopes are generic, so their constructors cannot validate one static DTO type.
+    They instead accept immutable scalar values, frozen dataclass DTOs, and the standard
+    container forms that can be copied to tuples, frozensets, and detached read-only mappings.
+    Mutable or structurally duck-typed objects outside those forms are rejected.
+    """
+
+    if isinstance(value, _IMMUTABLE_PAYLOAD_ATOMS):
+        return value
+
+    if active is None:
+        active = set()
+    identity = id(value)
+    if identity in active:
+        raise ValueError(f"{field_name} must not contain a reference cycle")
+
+    if isinstance(value, (tuple, list)):
+        active.add(identity)
+        try:
+            frozen_items = tuple(
+                _deep_freeze(item, f"{field_name}[{index}]", active)
+                for index, item in enumerate(value)
+            )
+        finally:
+            active.remove(identity)
+        if type(value) is tuple and all(
+            frozen is original for frozen, original in zip(frozen_items, value)
+        ):
+            return value
+        return frozen_items
+
+    if isinstance(value, (set, frozenset)):
+        active.add(identity)
+        try:
+            frozen_items = tuple(
+                _deep_freeze(item, f"{field_name} item", active) for item in value
+            )
+        finally:
+            active.remove(identity)
+        if type(value) is frozenset and all(
+            frozen is original for frozen, original in zip(frozen_items, value)
+        ):
+            return value
+        try:
+            return frozenset(frozen_items)
+        except TypeError as exc:
+            raise TypeError(f"{field_name} contains an unhashable frozen value") from exc
+
+    if isinstance(value, Mapping):
+        active.add(identity)
+        try:
+            frozen_mapping: dict[object, object] = {}
+            for key, item in value.items():
+                frozen_key = _deep_freeze(key, f"{field_name} key", active)
+                if not isinstance(frozen_key, Hashable):
+                    raise TypeError(f"{field_name} contains an unhashable frozen key")
+                frozen_mapping[frozen_key] = _deep_freeze(
+                    item, f"{field_name}[{key!r}]", active
+                )
+        finally:
+            active.remove(identity)
+        return MappingProxyType(frozen_mapping)
+
+    if is_dataclass(value) and not isinstance(value, type):
+        dataclass_parameters = getattr(type(value), "__dataclass_params__", None)
+        if dataclass_parameters is None or not dataclass_parameters.frozen:
+            raise TypeError(f"{field_name} dataclass payload must be frozen")
+        active.add(identity)
+        try:
+            for record_field in fields(value):
+                member = getattr(value, record_field.name)
+                frozen_member = _deep_freeze(
+                    member, f"{field_name}.{record_field.name}", active
+                )
+                if frozen_member is not member:
+                    raise TypeError(
+                        f"{field_name}.{record_field.name} must already be deeply immutable"
+                    )
+        finally:
+            active.remove(identity)
+        return value
+
+    raise TypeError(
+        f"{field_name} must contain immutable scalars, frozen DTOs, or supported containers"
+    )
 
 
 class ResolutionStatus(str, Enum):
@@ -178,6 +272,9 @@ class ResolutionResult(Generic[T]):
             if not isinstance(self.binding, ImageDebugBinding):
                 raise TypeError("binding must be ImageDebugBinding or None")
         values = _tuple(self.values, "values")
+        values = tuple(
+            _deep_freeze(value, f"values[{index}]") for index, value in enumerate(values)
+        )
         diagnostics = _diagnostics(self.diagnostics)
         object.__setattr__(self, "values", values)
         object.__setattr__(self, "diagnostics", diagnostics)
@@ -206,14 +303,28 @@ class InspectionResult(Generic[T]):
 
         if not isinstance(self.context, InspectionContext):
             raise TypeError("context must be InspectionContext")
+        value = None if self.value is None else _deep_freeze(self.value, "value")
+        object.__setattr__(self, "value", value)
         if self.status is InspectionStatus.COMPLETE:
-            if self.value is None:
+            if value is None:
                 raise ValueError("COMPLETE requires one value")
         elif self.status is InspectionStatus.PARTIAL:
-            if self.value is None or not diagnostics:
+            if value is None or not diagnostics:
                 raise ValueError("PARTIAL requires a value and a missing-piece diagnostic")
-        elif self.value is not None:
+        elif value is not None:
             raise ValueError("non-complete inspection statuses require no value")
+        if isinstance(value, MemoryBlock):
+            complete_segments = sum(
+                segment.status is MemorySegmentStatus.COMPLETE for segment in value.segments
+            )
+            if self.status is InspectionStatus.COMPLETE:
+                if complete_segments != len(value.segments):
+                    raise ValueError("COMPLETE MemoryBlock requires every segment complete")
+            elif self.status is InspectionStatus.PARTIAL:
+                if complete_segments == 0 or complete_segments == len(value.segments):
+                    raise ValueError(
+                        "PARTIAL MemoryBlock requires available and unavailable segments"
+                    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -426,12 +537,16 @@ def _validate_pieces(
         raise ValueError("pieces must be ordered by destination_bit_offset")
     previous_end = 0
     for item in items:
-        if item.destination_bit_offset < previous_end:
-            raise ValueError("piece destination ranges must not overlap")
+        if item.destination_bit_offset != previous_end:
+            if item.destination_bit_offset < previous_end:
+                raise ValueError("piece destination ranges must not overlap")
+            raise ValueError("piece destination ranges must explicitly cover every bit")
         end = item.destination_bit_offset + item.bit_size
         if end > bit_size:
             raise ValueError("piece destination range exceeds bit_size")
         previous_end = end
+    if previous_end != bit_size:
+        raise ValueError("piece destination ranges must explicitly cover every bit")
     if require_unavailable and all(
         item.status is ValuePieceStatus.AVAILABLE for item in items
     ):
@@ -598,9 +713,13 @@ class DisassembledInstruction:
         if self.text is not None and not isinstance(self.text, str):
             raise TypeError("text must be a string or None")
         if self.instruction is not None:
-            if getattr(self.instruction, "address", None) != self.address:
+            from .metadata import InstructionRecord
+
+            if type(self.instruction) is not InstructionRecord:
+                raise TypeError("instruction must be exactly metadata.InstructionRecord or None")
+            if self.instruction.address != self.address:
                 raise ValueError("instruction address must match address")
-            if getattr(self.instruction, "byte_size", None) != len(self.encoded):
+            if self.instruction.byte_size != len(self.encoded):
                 raise ValueError("instruction byte_size must match encoded length")
 
 

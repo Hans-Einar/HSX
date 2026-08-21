@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import FrozenInstanceError, replace
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -227,6 +228,33 @@ def test_result_envelopes_enforce_status_cardinality_and_structured_diagnostics(
         ContextBindingResult(ContextBindingStatus.STALE, context, (diagnostic,))
 
 
+def test_generic_result_payloads_are_deeply_frozen_after_construction() -> None:
+    _, context = refs()
+    source = {"outer": [{"numbers": [1, 2], "labels": {"a", "b"}}]}
+    inspection = InspectionResult(InspectionStatus.COMPLETE, context, source, ())
+    resolution = ResolutionResult(ResolutionStatus.RESOLVED, None, [source], ())
+
+    source["outer"][0]["numbers"].append(3)
+    source["outer"][0]["labels"].add("c")
+    source["new"] = []
+
+    for payload in (inspection.value, resolution.values[0]):
+        assert payload["outer"][0]["numbers"] == (1, 2)
+        assert payload["outer"][0]["labels"] == frozenset({"a", "b"})
+        assert "new" not in payload
+        with pytest.raises(TypeError):
+            payload["new"] = "mutation"  # type: ignore[index]
+
+
+def test_generic_result_payloads_reject_mutable_duck_objects() -> None:
+    _, context = refs()
+    duck = SimpleNamespace(value=1)
+    with pytest.raises(TypeError, match="immutable scalars"):
+        InspectionResult(InspectionStatus.COMPLETE, context, duck, ())
+    with pytest.raises(TypeError, match="immutable scalars"):
+        ResolutionResult(ResolutionStatus.RESOLVED, None, (duck,), ())
+
+
 def test_memory_and_value_records_preserve_missing_segments_and_partial_pieces() -> None:
     data = AddressSpaceId("data")
     complete = MemorySegment(0, 2, b"ab", MemorySegmentStatus.COMPLETE)
@@ -250,6 +278,83 @@ def test_memory_and_value_records_preserve_missing_segments_and_partial_pieces()
         replace(expression, expression_kind=ExpressionKind.REGISTER)
 
 
+def test_partial_pieces_require_ordered_exact_destination_bit_coverage() -> None:
+    available_low = ValuePiece(0, 4, 0, b"\x01", ValuePieceStatus.AVAILABLE)
+    unavailable_high = ValuePiece(8, 8, 0, None, ValuePieceStatus.UNAVAILABLE, "not captured")
+    with pytest.raises(ValueError, match="cover every bit"):
+        EvaluatedValue(
+            "x", "x", "u16", "<partial>", None, 16, ValueAvailability.PARTIAL,
+            (available_low, unavailable_high),
+        )
+
+    overlapping = ValuePiece(3, 5, 0, None, ValuePieceStatus.UNAVAILABLE, "not captured")
+    with pytest.raises(ValueError, match="overlap"):
+        EvaluatedValue(
+            "x", "x", "u8", "<partial>", None, 8, ValueAvailability.PARTIAL,
+            (available_low, overlapping),
+        )
+
+    out_of_range = ValuePiece(4, 5, 0, None, ValuePieceStatus.UNAVAILABLE, "not captured")
+    with pytest.raises(ValueError, match="exceeds"):
+        EvaluatedValue(
+            "x", "x", "u8", "<partial>", None, 8, ValueAvailability.PARTIAL,
+            (available_low, out_of_range),
+        )
+
+    trailing_gap = ValuePiece(4, 3, 0, None, ValuePieceStatus.UNAVAILABLE, "not captured")
+    with pytest.raises(ValueError, match="cover every bit"):
+        EvaluatedValue(
+            "x", "x", "u8", "<partial>", None, 8, ValueAvailability.PARTIAL,
+            (available_low, trailing_gap),
+        )
+
+    with pytest.raises(ValueError, match="ordered"):
+        EvaluatedValue(
+            "x", "x", "u8", "<partial>", None, 8, ValueAvailability.PARTIAL,
+            (
+                ValuePiece(4, 4, 0, None, ValuePieceStatus.UNAVAILABLE, "not captured"),
+                available_low,
+            ),
+        )
+
+
+def test_memory_inspection_status_matches_segment_evidence_bidirectionally() -> None:
+    _, context = refs()
+    data = AddressSpaceId("data")
+    diagnostic = Diagnostic("memory_unavailable", "some bytes were not captured")
+    unrelated = Diagnostic("note", "unrelated diagnostic")
+    complete = MemoryBlock(
+        HsxAddress(data, 0),
+        4,
+        (MemorySegment(0, 4, b"abcd", MemorySegmentStatus.COMPLETE),),
+    )
+    mixed = MemoryBlock(
+        HsxAddress(data, 0),
+        4,
+        (
+            MemorySegment(0, 2, b"ab", MemorySegmentStatus.COMPLETE),
+            MemorySegment(2, 2, b"", MemorySegmentStatus.UNAVAILABLE),
+        ),
+    )
+    unavailable = MemoryBlock(
+        HsxAddress(data, 0),
+        4,
+        (MemorySegment(0, 4, b"", MemorySegmentStatus.UNAVAILABLE),),
+    )
+
+    assert InspectionResult(InspectionStatus.COMPLETE, context, complete, ()).value is complete
+    assert InspectionResult(InspectionStatus.PARTIAL, context, mixed, (diagnostic,)).value is mixed
+    with pytest.raises(ValueError, match="every segment complete"):
+        InspectionResult(InspectionStatus.COMPLETE, context, mixed, ())
+    with pytest.raises(ValueError, match="available and unavailable"):
+        InspectionResult(InspectionStatus.PARTIAL, context, complete, (unrelated,))
+    with pytest.raises(ValueError, match="available and unavailable"):
+        InspectionResult(InspectionStatus.PARTIAL, context, unavailable, (diagnostic,))
+    with pytest.raises(ValueError, match="no value"):
+        InspectionResult(InspectionStatus.UNAVAILABLE, context, unavailable, (diagnostic,))
+    assert InspectionResult(InspectionStatus.UNAVAILABLE, context, None, (diagnostic,)).value is None
+
+
 def test_instruction_and_disassembly_records_enforce_order_and_exact_metadata_bytes() -> None:
     code = AddressSpaceId("code")
     insn = InstructionRecord(
@@ -263,6 +368,13 @@ def test_instruction_and_disassembly_records_enforce_order_and_exact_metadata_by
         DisassemblyBlock(HsxAddress(code, 0), 2, (second, first))
     with pytest.raises(ValueError, match="byte_size"):
         replace(first, encoded=b"\x12")
+    with pytest.raises(TypeError, match="InstructionRecord"):
+        DisassembledInstruction(
+            insn.address,
+            b"\x12\x34",
+            SimpleNamespace(address=insn.address, byte_size=2),
+            "nop",
+        )
 
 
 def test_snapshot_port_is_protocol_only_and_fences_mixed_or_unsupported_context() -> None:
