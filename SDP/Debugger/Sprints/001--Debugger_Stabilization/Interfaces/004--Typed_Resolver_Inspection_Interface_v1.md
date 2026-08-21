@@ -1,6 +1,6 @@
 # `dbg.resolver-inspection/1.2` — Typed Resolver and Inspection Interface
 
-- Status: **STEERING REFROZEN / REVIEW 031 REWORK TRACE-ONLY / REVIEW 032 PENDING**
+- Status: **FROZEN / INDEPENDENT REVIEW 032 PASS**
 - Iteration: `DBG-IT-001-005`
 - Parent Refactor: `DBG-RF-004`
 - Steering authority: issue #38 comment `5362514094`
@@ -29,6 +29,8 @@
 - Version `1.1` interface/review: `dbg.resolver-inspection/1.1` / `DBG-RVW-001-005-030` PASS
 - Public interface ID: `dbg.resolver-inspection/1.2`
 - Recovered-frame conformance: `DBG-CF-001-005-002`
+- Final frame-evidence review: `DBG-RVW-001-005-032` PASS at content head
+  `f79eb6298798250e7aca7e0266b1948af7903138`
 
 This document freezes the public Python-domain interface to be implemented by the seven bounded
 RF-004 Slices. It is frontend-neutral and side-by-side: it does not migrate DAP, CLI, VS Code,

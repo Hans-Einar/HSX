@@ -187,7 +187,7 @@ relations:
     type: produces_interface
     to:
       - dbg.resolver-inspection/1.2
-    status: refrozen_review031_rework_review032_pending_product_stopped
+    status: frozen_review032_pass_slice007_resumed
   - from: DBG-SL-001-005-001
     type: reviewed_by
     to: [DBG-RVW-001-005-001]
@@ -331,12 +331,12 @@ relations:
   - from: DBG-SL-001-005-007
     type: blocked_by
     to: [DBG-BLK-001-005-002]
-    status: superseded_by_refreeze_review_pending
+    status: resolved_refreeze_review032_pass
     record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/007--RF004_Location_Frame_Evidence_Steering_Blocker.md
   - from: DBG-BLK-001-005-002
     type: requires_steering_decision_on
     to: [dbg.resolver-inspection/1.2]
-    status: resolved_by_steering_refreeze_pending_interface_review
+    status: resolved_by_steering_refreeze_and_review032_pass
     issue: 38
     escalation_comment: 5369244294
     resolution_comment: 5370574104
@@ -354,12 +354,14 @@ relations:
   - from: dbg.resolver-inspection/1.2
     type: reviewed_by
     to: [DBG-RVW-001-005-032]
-    status: planned
+    status: pass
     candidate_head: f79eb6298798250e7aca7e0266b1948af7903138
+    coordination_head: 0ebd8ef8b4a3d70543e7ee8ac445b107d6589da9
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/055--RF004_Interface_1_2_Final_Review.md
   - from: DBG-SL-001-005-007
     type: resumes_after
     to: [DBG-RVW-001-005-032]
-    status: blocked_pending_review_pass
+    status: satisfied
     issue: 38
     comment: 5370574104
   - from: DBG-SL-001-005-003

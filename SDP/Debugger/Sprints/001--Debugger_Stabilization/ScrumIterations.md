@@ -474,7 +474,7 @@ traceability and no product drift after the combined signed head. Steering accep
 
 ## DBG-IT-001-005 — Typed Resolver and Inspection
 
-Status: ACTIVE — INTERFACE 1.2 REVIEW031 REWORK / REVIEW032 PENDING
+Status: ACTIVE — INTERFACE 1.2 PASS / SLICE 007 ACTIVE
 
 ### Authority and goal
 
@@ -1052,3 +1052,11 @@ Slice007 resume cited blocker escalation instead of refreeze authority, and Issu
 1.1 as the immediate prior interface. Master corrected only those current trace fields. Fresh
 interface review032 is the sole gate; Slice007 product remains untouched.
 The trace-corrected remote candidate is `f79eb6298798250e7aca7e0266b1948af7903138`.
+
+### Interface 1.2 review032 PASS / Slice007 restart
+
+Fresh `DBG-RVW-001-005-032` passed exact content head `f79eb629…` at coordination `0ebd8ef…`
+with zero findings. The two-field UnwindFrame delta, recovered GPR/PSW rules, HSX authority
+boundary, fixtures and review031 trace closures all passed. Master closes blocker002 and
+restarts only Slice007 with a fresh bounded worker. Review011 remains product-only;
+verification007/sign-off must pass before Slice003.

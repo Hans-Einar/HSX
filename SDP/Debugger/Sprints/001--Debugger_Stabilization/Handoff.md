@@ -1,6 +1,6 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf004_interface_1_2_review_031_rework_review_032_pending_product_stopped`
+Status: `rf004_interface_1_2_pass_slice007_worker_pending`
 
 Steering escalation: issue #38 comment `5369244294`.
 Steering frame-evidence refreeze: issue #38 comment `5370574104`.
@@ -19,8 +19,8 @@ The accepted first-wave gate is closed. Execute only `DBG-RF-004` through the se
 `DBG-SL-001-005-001..007` contracts and refrozen `dbg.resolver-inspection/1.2` interface.
 Historical versions `1`/`1.1` passed reviews019/030; Slices001–002 are signed. Steering accepted
 `DBG-BLK-001-005-002` and selected frame-carried recovered evidence in comment `5370574104`.
-Review031 returned REWORK trace-only; Slice007 product remains stopped pending fresh exact-head
-interface review032. RF-005..009 and
+Review031 returned REWORK trace-only; review032 passed exact head `f79eb629…`. Only fresh
+Slice007 product work may start. RF-005..009 and
 Executive/VM/AVR/frontend migration remain blocked.
 
 ## Authority
@@ -195,9 +195,8 @@ Executive/VM/AVR/frontend migration remain blocked.
 
 ## Exact next step
 
-Dispatch fresh independent interface review032 against exact candidate
-`f79eb6298798250e7aca7e0266b1948af7903138`. Do
-not restart Slice007 or use product review011 before PASS.
+Dispatch a fresh bounded Slice007 worker under existing `recipes.py`/test ownership. Then run
+product review011, verification007 and Master sign-off before Slice003.
 
 ## Traceability state
 
@@ -209,9 +208,8 @@ not restart Slice007 or use product review011 before PASS.
   `208063e344b767f82790ce579eba6327e2cdd0ce` and repository head tested
   `fefd4b0c427dfa71d637e4f4cce9e4a345912591`.
 - CurrentIndex, Issues, sprint records, Relations, Ledger, and Handoff are current through
-  Steering refreeze comment `5368017338`, candidate `1.1`/`DBG-CF-001-005-001`, and planned
   interface review030 PASS, Slice002 sign-off, blocker002 accepted, review031 REWORK trace-only,
-  and review032 pending.
+  review032 PASS and Slice007 activation.
 - Accepted architecture direction: `DBG-DA-001`, `DBG-A-001..DBG-A-008`
 - Completed Design Studies: `DBG-ST-002..DBG-ST-005`
 - Architecture review: `DBG-RVW-001-002-001` — REWORK at `f8b8097`
@@ -232,7 +230,7 @@ not restart Slice007 or use product review011 before PASS.
 - Frozen Slices: `DBG-SL-001-005-001..007`
 - Historical interface: `dbg.resolver-inspection/1`, review 019 PASS at `058c338…`
 - Prior interface: `dbg.resolver-inspection/1.1`, review030 PASS at `ae49435…`
-- Refrozen interface candidate: `dbg.resolver-inspection/1.2`, review031 REWORK / review032 pending
+- Refrozen interface: `dbg.resolver-inspection/1.2`, review032 PASS at `f79eb629…`
 - Recovered-frame conformance: `DBG-CF-001-005-002`
 - Refrozen conformance: `DBG-CF-001-005-001`
 - Interface review `DBG-RVW-001-005-007`: REWORK at `82154c614…`
@@ -282,7 +280,7 @@ not restart Slice007 or use product review011 before PASS.
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: `DBG-RVW-001-005-032`
+- Active gate: fresh Slice007 worker
 - Blocker authority: issue #38 comment `5369244294`
 - Refreeze authority: issue #38 comment `5370574104`
 - Blocker authority: issue #38 comment `5365959417`
@@ -291,9 +289,8 @@ not restart Slice007 or use product review011 before PASS.
 ## Agents and worktree
 
 The prior design/portable-contract chain and RF-002/RF-003/integration wave are complete,
-Steering-accepted and remotely reconstructable. RF-004 `1.2` is the refrozen interface candidate;
-version `1.1` passed review030. Product workers/reviewers/verifiers are stopped pending interface
-review032. Controlled work is on
+Steering-accepted and remotely reconstructable. RF-004 `1.2` passed review032; only the bounded
+Slice007 worker is open. Later product/review/verification remains stopped. Controlled work is on
 `codex/dbg-rf-004` from exact base `69a54aeb3394d3cd4792bce620748e15bab69f1f`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.

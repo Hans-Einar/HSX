@@ -1,6 +1,6 @@
 # DBG-CF-001-005-002 — `dbg.resolver-inspection/1.2` Recovered-Frame Conformance
 
-- Status: **CONTRACT PASS / TRACE-CORRECTED CANDIDATE / REVIEW 032 PENDING**
+- Status: **FROZEN / REVIEW 032 PASS**
 - Authority: issue #38 comment `5370574104`
 - Interface: `dbg.resolver-inspection/1.2`
 - Scope: UnwindFrame recovered GPR/PSW evidence and explicit LocationEvaluator consumption
@@ -55,3 +55,5 @@ Review `DBG-RVW-001-005-031` passed contract content but returned REWORK trace-o
 `DBG-RVW-001-005-032` reviews the unchanged `1.2` semantics plus corrected current trace. Product review
 identity `DBG-RVW-001-005-011` remains reserved for a later post-refreeze Slice-007 product
 head. No Slice-007 worker restarts before interface-review PASS.
+
+`DBG-RVW-001-005-032` passed exact content head `f79eb629…`; the Slice007 worker gate is open.

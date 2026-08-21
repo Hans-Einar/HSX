@@ -1,6 +1,6 @@
 # DBG-SL-001-005-007 — RF-004 Recipe Schema and Evaluator Foundation
 
-- Status: **BLOCKED PENDING INTERFACE REVIEW 032**
+- Status: **ACTIVE / FRESH WORKER PENDING**
 
 - Discovery head: `269d0bb962f85241633e1af8489b459357f2ff77`
 - Product changes: none
@@ -94,5 +94,5 @@ edits; review011/verification007 did not start.
 
 Steering comment `5370574104` accepts blocker002 and refreezes frame-carried recovered evidence
 in Interface1.2. Review031 returned REWORK trace-only; product remains stopped until fresh
-interface review032 PASS; product review
+interface review032 PASS at `f79eb629…`; a fresh worker may restart. Product review
 identity 011 remains reserved.
