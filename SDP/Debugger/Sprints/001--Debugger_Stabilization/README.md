@@ -1,6 +1,6 @@
 # DBG-SPR-001 — Debugger Stabilization
 
-- Status: ITERATION 005 ACTIVE — SLICE 007 PRODUCT PASS / REVIEW 034 PENDING
+- Status: ITERATION 005 ACTIVE — SLICE 007 VERIFICATION PENDING
 - Owning track: Debugger
 - Owning GapAnalysis: `DBG-GAP-001`
 
@@ -77,7 +77,7 @@ Steering accepted `DBG-A-001..DBG-A-008` as target architecture direction in com
 - Interface reviews 007..010/012..018: REWORK; `DBG-RVW-001-005-019`: PASS at
   `058c3383593553aa1497d024d41285d44d9c67a8`
 - Exact product base: `69a54aeb3394d3cd4792bce620748e15bab69f1f`
-- Active gate: fresh `DBG-RVW-001-005-034` at unchanged head `3228c9b2…`
+- Active gate: formal `DBG-VER-001-005-007` at reviewed head `3228c9b2…`
 - Authority: issue #38 comment `5362514094`
 - Refreeze authority: issue #38 comment `5368017338`
 - Frame-evidence refreeze authority: issue #38 comment `5370574104`

@@ -42,7 +42,7 @@ Read in this order:
 `dbg.resolver-inspection/1.1` passed review030 at `ae49435…`; Slices 001–002 are signed.
 Steering accepted blocker002 and refroze
 `dbg.resolver-inspection/1.2` passed review032 at `f79eb629…`; Slice007 review011 returned
-REWORK; review033 passed product but returned REWORK trace-only. Fresh review034 is pending.
+REWORK; final review034 passed and formal verification007 is pending.
 Existing Executive behavior remains
 `hsx.python-debug-legacy/1`; RF-005..009, Executive/VM/AVR and frontend migration remain
 blocked.

@@ -273,7 +273,7 @@ issues:
     steering_completion_comment: 5362514094
   DBG-RF-004:
     issue: 41
-    status: interface_1_2_pass_slice007_corrected_review_033_pending
+    status: slice007_review_pass_verification_007_pending
     iteration: DBG-IT-001-005
     slices: DBG-SL-001-005-001..DBG-SL-001-005-007
     execution_order: DBG-SL-001-005-001,DBG-SL-001-005-002,DBG-SL-001-005-007,DBG-SL-001-005-003,DBG-SL-001-005-004,DBG-SL-001-005-005,DBG-SL-001-005-006
@@ -294,9 +294,10 @@ issues:
     slice001_signoff_status: pass
     slice001_signed_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
     active_slice: DBG-SL-001-005-007
-    active_slice_status: product_correct_trace_review_034_pending
+    active_slice_status: review_pass_verification_007_pending
     active_slice_review: DBG-RVW-001-005-034
-    active_slice_review_status: planned
+    active_slice_review_status: pass
+    active_slice_review_coordination_head: d045fb29dd7c94535d99134779cef07943b5196f
     active_slice_verification: DBG-VER-001-005-007
     active_slice_implementation_head: ec75c4eb22333368cbe4847920dc4420fe8231cf
     active_slice_initial_review: DBG-RVW-001-005-011
