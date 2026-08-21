@@ -1,6 +1,6 @@
 # DBG-SL-001-005-004 — RF-004 Exact Source Resolver
 
-- Status: **CORRECTED / INDEPENDENT REVIEW036 PENDING**
+- Status: **REVIEW036 PASS / FORMAL VERIFICATION004 PENDING**
 - Product head: `c0f975c4a278cecd89e19d332ca5601b074a115e`
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
@@ -78,3 +78,9 @@ join and add the regression. All other SourceResolver behavior passed. Review036
 - Focused SourceResolver/SourceMap: `30 passed, 3` classified platform skips.
 - Compile/Black/import/signature/scope/diff/connectivity: PASS.
 - No frozen-contract or filesystem-semantic blocker.
+
+## Review036 decision
+
+Fresh review036 passed exact corrected head `3d1f2e8a…` with zero findings. Focused30/3,
+oracle16/1, broad280/3, compile/exports/signatures, strict trace, exact scope and Git integrity
+pass. Skips remain classified Windows host/symlink degradation.

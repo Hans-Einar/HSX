@@ -1,6 +1,6 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf004_slices001_002_003_007_signed_slice004_rereview_pending`
+Status: `rf004_slices001_002_003_007_signed_slice004_verification_pending`
 
 Steering escalation: issue #38 comment `5369244294`.
 Steering frame-evidence refreeze: issue #38 comment `5370574104`.
@@ -30,7 +30,7 @@ trace-only; verification010 passed and Master signed the exact product head. Fro
 SourceResolver Slice004 is implemented at `c0f975c4a278cecd89e19d332ca5601b074a115e`;
 review004 returned one bounded Windows join REWORK finding. Fresh corrective worker and
 corrected head `3d1f2e8a98308835162702c579dda1dc3ef40900`; fresh review036 is next.
-RF-005..009 and
+Review036 passed; formal verification004 is next. RF-005..009 and
 Executive/VM/AVR/frontend migration remain blocked.
 
 ## Authority
@@ -205,9 +205,9 @@ Executive/VM/AVR/frontend migration remain blocked.
 
 ## Exact next step
 
-Dispatch fresh independent review036 against exact corrected SourceResolver head
-`3d1f2e8a98308835162702c579dda1dc3ef40900`. Only review PASS may open verification004; no
-Slice005 work begins before Slice004 exact-head sign-off.
+Run formal verification004 against exact corrected SourceResolver head
+`3d1f2e8a98308835162702c579dda1dc3ef40900` and review036 PASS. No Slice005 work begins before
+Slice004 exact-head sign-off.
 
 ## Traceability state
 
@@ -290,7 +290,7 @@ Slice005 work begins before Slice004 exact-head sign-off.
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: fresh independent SourceResolver review036
+- Active gate: formal SourceResolver verification004
 - Blocker authority: issue #38 comment `5369244294`
 - Refreeze authority: issue #38 comment `5370574104`
 - Blocker authority: issue #38 comment `5365959417`

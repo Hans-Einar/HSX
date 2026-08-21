@@ -1165,3 +1165,9 @@ Fresh worker reproduced and closed only review004 M1 at `3d1f2e8a…`: validated
 segments are joined as literal locator text and an inner Windows `C:` segment cannot reset the
 explicit root. Focused SourceResolver/SourceMap is 30 passed/3 classified skips; exact two-file
 scope and compile/Black/signature/Git pass. Fresh review036 is next.
+
+### Slice004 review036 PASS
+
+Fresh review036 passed corrected product `3d1f2e8a…` with zero findings. M1 and all frozen
+SourceResolver tiers/content/case/symlink boundaries pass with focused30/3, oracle16/1,
+broad280/3 and exact trace/scope/Git evidence. Formal verification004 is next; Slice005 stops.
