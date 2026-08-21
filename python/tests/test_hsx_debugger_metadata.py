@@ -529,6 +529,89 @@ def test_generic_results_inspect_raw_enum_value_behind_custom_access() -> None:
         ResolutionResult(ResolutionStatus.RESOLVED, None, (ConcealingEnum.ITEM,), ())
 
 
+@pytest.mark.parametrize(
+    ("field_name", "replacement", "message"),
+    [
+        ("_name_", [], "enum name"),
+        ("_sort_order_", [], "enum sort order"),
+        ("__objclass__", [], "enum object class"),
+        ("_name_", "RENAMED", "metadata is inconsistent"),
+        ("_sort_order_", 99, "metadata is inconsistent"),
+        ("__objclass__", Enum, "enum object class"),
+    ],
+)
+def test_generic_results_reject_mutable_or_inconsistent_enum_metadata(
+    field_name: str, replacement: object, message: str
+) -> None:
+    _, context = refs()
+
+    class MetadataEnum(Enum):
+        ITEM = 1
+
+    object.__setattr__(MetadataEnum.ITEM, field_name, replacement)
+    for factory in (
+        lambda: InspectionResult(
+            InspectionStatus.COMPLETE, context, MetadataEnum.ITEM, ()
+        ),
+        lambda: ResolutionResult(
+            ResolutionStatus.RESOLVED, None, (MetadataEnum.ITEM,), ()
+        ),
+    ):
+        with pytest.raises(TypeError, match=message):
+            factory()
+
+
+def test_generic_results_reject_extra_enum_dict_and_slot_storage() -> None:
+    _, context = refs()
+
+    class DictStateEnum(Enum):
+        ITEM = 1
+
+    class SlotStateEnum(Enum):
+        __slots__ = ("extra_state",)
+
+        ITEM = 1
+
+    object.__setattr__(DictStateEnum.ITEM, "extra_state", [])
+    object.__setattr__(SlotStateEnum.ITEM, "extra_state", [])
+
+    with pytest.raises(TypeError, match="undeclared instance state"):
+        InspectionResult(InspectionStatus.COMPLETE, context, DictStateEnum.ITEM, ())
+    with pytest.raises(TypeError, match="undeclared member storage"):
+        ResolutionResult(
+            ResolutionStatus.RESOLVED, None, (SlotStateEnum.ITEM,), ()
+        )
+
+
+def test_generic_results_recheck_enum_storage_after_member_construction() -> None:
+    _, context = refs()
+
+    class ConstructedEnum(Enum):
+        ITEM = 1
+
+    accepted = ResolutionResult(
+        ResolutionStatus.RESOLVED, None, (ConstructedEnum.ITEM,), ()
+    )
+    assert accepted.values == (ConstructedEnum.ITEM,)
+
+    object.__setattr__(ConstructedEnum.ITEM, "_sort_order_", [])
+    with pytest.raises(TypeError, match="enum sort order"):
+        InspectionResult(InspectionStatus.COMPLETE, context, ConstructedEnum.ITEM, ())
+
+
+def test_result_status_fields_enforce_enum_storage_invariant() -> None:
+    status = ResolutionStatus.RESOLVED
+    original_sort_order = object.__getattribute__(status, "_sort_order_")
+    try:
+        object.__setattr__(status, "_sort_order_", [])
+        with pytest.raises(TypeError, match="enum sort order"):
+            ResolutionResult(status, None, (1,), ())
+    finally:
+        object.__setattr__(status, "_sort_order_", original_sort_order)
+
+    assert ResolutionResult(status, None, (1,), ()).status is status
+
+
 def test_generic_results_accept_direct_deeply_frozen_dataclasses() -> None:
     _, context = refs()
 
@@ -557,18 +640,49 @@ def test_generic_results_accept_direct_deeply_frozen_dataclasses() -> None:
     class StringEnum(str, Enum):
         ITEM = "item"
 
+    class AliasedEnum(Enum):
+        PRIMARY = 1
+        ALIAS = 1
+
     payload = FrozenPayload("valid", FrozenChild(1), (2, 3), frozenset({"a", "b"}))
     derived = FrozenDerived(4, "derived")
+    diagnostic = Diagnostic("valid", "valid public DTO")
+    segment = MemorySegment(0, 1, b"x", MemorySegmentStatus.COMPLETE)
+    legitimate_enums = (
+        ScalarEnum.ITEM,
+        StringEnum.ITEM,
+        AliasedEnum.ALIAS,
+        EvidenceGrade.PORTABLE,
+        ByteOrder.LITTLE,
+        SymbolKind.GLOBAL,
+        ResolutionStatus.RESOLVED,
+        InspectionStatus.COMPLETE,
+    )
     inspection = InspectionResult(InspectionStatus.COMPLETE, context, payload, ())
     resolution = ResolutionResult(
         ResolutionStatus.RESOLVED,
         None,
-        (payload, derived, ScalarEnum.ITEM, StringEnum.ITEM),
+        (payload, derived, diagnostic, segment, *legitimate_enums),
         (),
     )
 
     assert inspection.value is payload
-    assert resolution.values == (payload, derived, ScalarEnum.ITEM, StringEnum.ITEM)
+    assert resolution.values == (
+        payload,
+        derived,
+        diagnostic,
+        segment,
+        *legitimate_enums,
+    )
+    for member in legitimate_enums:
+        raw_state = object.__getattribute__(member, "__dict__")
+        member_type = type(member)
+        member_names = type.__getattribute__(member_type, "__dict__")["_member_names_"]
+        member_map = type.__getattribute__(member_type, "__dict__")["_member_map_"]
+        assert set(raw_state) == {"_value_", "_name_", "__objclass__", "_sort_order_"}
+        assert raw_state["__objclass__"] is member_type
+        assert member_names[raw_state["_sort_order_"]] == raw_state["_name_"]
+        assert member_map[raw_state["_name_"]] is member
 
 
 def test_memory_and_value_records_preserve_missing_segments_and_partial_pieces() -> None:

@@ -46,6 +46,7 @@ def _require_bool(value: bool, field_name: str) -> None:
 def _require_enum(value: object, enum_type: type[Enum], field_name: str) -> None:
     if not isinstance(value, enum_type):
         raise TypeError(f"{field_name} must be {enum_type.__name__}")
+    _require_immutable_enum(value, field_name)
 
 
 def _tuple(value: object, field_name: str) -> tuple:
@@ -247,12 +248,43 @@ def _require_immutable_enum(value: Enum, field_name: str) -> None:
     """Accept conventional scalar enum members without accepting scalar subclasses generally."""
 
     storage = _require_declared_instance_state(value, field_name, _ENUM_MEMBER_STATE)
-    stored_values = storage.get("_value_", ())
-    if len(stored_values) != 1:
-        raise TypeError(f"{field_name} enum value must have exact raw storage")
-    stored_value = stored_values[0]
+    for name in _ENUM_MEMBER_STATE:
+        if len(storage.get(name, ())) != 1:
+            raise TypeError(
+                f"{field_name} enum metadata {name} must have exact raw storage"
+            )
+
+    stored_value = storage["_value_"][0]
     if type(stored_value) not in _IMMUTABLE_PAYLOAD_ATOM_TYPES:
         raise TypeError(f"{field_name} enum value must be an exact immutable scalar")
+
+    stored_name = storage["_name_"][0]
+    if type(stored_name) is not str or not stored_name:
+        raise TypeError(f"{field_name} enum name must be an exact non-empty string")
+
+    enum_type = type(value)
+    if storage["__objclass__"][0] is not enum_type:
+        raise TypeError(f"{field_name} enum object class must match its exact type")
+
+    stored_sort_order = storage["_sort_order_"][0]
+    if (
+        type(stored_sort_order) is not int
+        or stored_sort_order < 0
+    ):
+        raise TypeError(f"{field_name} enum sort order must be an exact non-negative integer")
+
+    enum_namespace = _raw_type_namespace(enum_type)
+    member_names = enum_namespace.get("_member_names_")
+    member_map = enum_namespace.get("_member_map_")
+    if (
+        type(member_names) is not list
+        or type(member_map) is not dict
+        or stored_sort_order >= len(member_names)
+        or member_names[stored_sort_order] != stored_name
+        or member_map.get(stored_name) is not value
+        or enum_namespace.get(stored_name) is not value
+    ):
+        raise TypeError(f"{field_name} enum name/type/order metadata is inconsistent")
 
 
 def _deep_freeze(value: object, field_name: str, active: set[int] | None = None) -> object:
