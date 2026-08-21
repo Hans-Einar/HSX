@@ -216,7 +216,7 @@ issues:
     rf004_refreeze_candidate_head: 94a59f3738fadc0b6230fc3dc69cf36ca8b9202e
     rf004_refreeze_review: DBG-RVW-001-005-028
     rf004_refreeze_review_status: rework
-    rf004_corrected_refreeze_candidate_head: pending_publication
+    rf004_corrected_refreeze_candidate_head: 4c581a740ee95c3362aa77de85630ba001013e1c
     rf004_refreeze_rereview: DBG-RVW-001-005-029
     rf004_refreeze_rereview_status: planned
     rf004_refreeze_conformance: DBG-CF-001-005-001
@@ -312,7 +312,7 @@ issues:
     refreeze_interface_review_status: rework
     refreeze_reviewed_content_head: 94a59f3738fadc0b6230fc3dc69cf36ca8b9202e
     refreeze_reviewed_coordination_head: 7998e0a55c2a1bd648e43ca667a9678dc8af0642
-    corrected_refreeze_candidate_head: pending_publication
+    corrected_refreeze_candidate_head: 4c581a740ee95c3362aa77de85630ba001013e1c
     refreeze_interface_rereview: DBG-RVW-001-005-029
     refreeze_interface_rereview_status: planned
     refreeze_conformance: DBG-CF-001-005-001

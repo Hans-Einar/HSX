@@ -972,3 +972,4 @@ domain, and IdScheme still described review 027 using the rejected private-snaps
 Master corrected dict normalization to an insertion-ordered tuple of recursively frozen pairs,
 removed mapping output, and reserved review 027 solely for a new post-refreeze product head.
 Fresh exact-head interface review 029 is the only active gate; product remains stopped.
+The corrected remote-published content head is `4c581a740ee95c3362aa77de85630ba001013e1c`.
