@@ -273,7 +273,7 @@ issues:
     steering_completion_comment: 5362514094
   DBG-RF-004:
     issue: 41
-    status: slices001_002_003_007_signed_slice004_final_reverification_pending
+    status: slices001_002_003_004_007_signed_slice005_worker_pending
     draft_pull_request: 50
     draft_pull_request_url: https://github.com/Hans-Einar/HSX/pull/50
     draft_pull_request_base: codex/dbg-rf-002-003
@@ -299,8 +299,8 @@ issues:
     slice001_final_verification_status: pass
     slice001_signoff_status: pass
     slice001_signed_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
-    active_slice: DBG-SL-001-005-004
-    active_slice_status: review036_pass_verifications004_011_fail_trace_corrected_verification012_pending
+    active_slice: DBG-SL-001-005-005
+    active_slice_status: active_fresh_worker_pending
     slice004_implementation_head: c0f975c4a278cecd89e19d332ca5601b074a115e
     slice004_implementation_parent: d575299e81b1d1d29f75c9f0a5d2d43005fa8d11
     slice004_focused_evidence: 29_passed_3_classified_skips
@@ -323,9 +323,9 @@ issues:
     slice003_final_verification_coordination_head: fffe766b8d4257bef4375973e16ff01364befca5
     slice003_signoff_status: pass
     slice003_signed_head: a335789759a68dfd8bef01dbdf59591b096307d3
-    active_slice_review: DBG-RVW-001-005-004
-    active_slice_review_status: rework
-    active_slice_review_coordination_head: 54196e271dbc83b99bbf9f02286f45e8491a1fb5
+    slice004_initial_review: DBG-RVW-001-005-004
+    slice004_initial_review_status: rework
+    slice004_initial_review_coordination_head: 54196e271dbc83b99bbf9f02286f45e8491a1fb5
     slice004_corrected_head: 3d1f2e8a98308835162702c579dda1dc3ef40900
     slice004_corrective_focused_evidence: 30_passed_3_classified_skips
     slice004_corrective_review: DBG-RVW-001-005-036
@@ -337,7 +337,14 @@ issues:
     slice004_verification_attempt_2: DBG-VER-001-005-011
     slice004_verification_attempt_2_status: fail_trace_only
     slice004_verification_attempt_2_coordination_head: c0a024b598a3f9b7b3f355b2e4c1dea919c27d98
-    active_slice_verification: DBG-VER-001-005-012
+    slice004_final_verification: DBG-VER-001-005-012
+    slice004_final_verification_status: pass
+    slice004_final_verification_coordination_head: 346a5612bf9e0ceb2743a2590d8a72e546bb5a4f
+    slice004_signoff_status: pass
+    slice004_signed_head: 3d1f2e8a98308835162702c579dda1dc3ef40900
+    active_slice_review: DBG-RVW-001-005-005
+    active_slice_review_status: planned
+    active_slice_verification: DBG-VER-001-005-005
     slice007_verification_status: pass
     slice007_verification_coordination_head: 86f43d8241f8ff504c7fd25afceed43d2f9c0b77
     slice007_signoff_status: pass

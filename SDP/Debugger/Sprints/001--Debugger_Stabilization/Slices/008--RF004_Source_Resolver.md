@@ -1,6 +1,6 @@
 # DBG-SL-001-005-004 — RF-004 Exact Source Resolver
 
-- Status: **REVIEW036 PASS / VERIFICATIONS004_011 TRACE-FAIL CORRECTED / VERIFICATION012 PENDING**
+- Status: **COMPLETE / EXACT-HEAD SIGNED**
 - Product head: `c0f975c4a278cecd89e19d332ca5601b074a115e`
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
@@ -93,3 +93,9 @@ head remains unchanged.
 
 Verification011 passed the requested correction and full product matrix but found one later
 stale Handoff summary. Master corrected only that sentence. Fresh verification012 is required.
+
+## Final verification and sign-off
+
+Verification012 passed unchanged product `3d1f2e8a…`, full current Handoff, focused30/3,
+oracle16/1, broad280/3, M1 tiers7, compile/exports/signatures, exact scope and remote integrity.
+Master signed the exact product head and authorized only Slice005.
