@@ -247,6 +247,12 @@ relations:
   - from: DBG-SL-001-005-002
     type: reviewed_by
     to: [DBG-RVW-001-005-023]
+    status: rework
+    reviewed_head: 6c933ea6b11e42d58da52faf0997f8c978dad54b
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/046--RF004_Identity_Address_Review_Attempt4.md
+  - from: DBG-SL-001-005-002
+    type: reviewed_by
+    to: [DBG-RVW-001-005-024]
     status: planned
   - from: DBG-SL-001-005-002
     type: verified_by
