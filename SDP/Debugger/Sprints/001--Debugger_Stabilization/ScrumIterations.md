@@ -1042,3 +1042,4 @@ explicit, top evidence comes only from the exact snapshot, and caller evidence o
 accepted EXPRESSION/SAME rules. Missing/clobbered/unsupported state never falls back. Master
 published `DBG-CF-001-005-002`; interface review031 is the sole gate. Product review011 remains
 reserved and Slice007 has no product changes.
+The exact remote-published refreeze content head is `cb575ac0920bec8cc7ddd5565df9544b746f069b`.

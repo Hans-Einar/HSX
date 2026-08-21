@@ -9,6 +9,7 @@
 - Product changes during discovery: none
 - Steering escalation: issue #38 comment `5369244294`
 - Steering refreeze: issue #38 comment `5370574104`
+- Published refreeze content head: `cb575ac0920bec8cc7ddd5565df9544b746f069b`
 
 ## Frozen contradiction
 

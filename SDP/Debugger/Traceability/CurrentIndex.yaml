@@ -462,7 +462,7 @@ active_rf004:
     conformance_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/006--Typed_Resolver_Inspection_Immutability_Conformance_v1_1.md
     prior_master_refreeze_status_1_1: pass_slice002_resume_authorized
     prior_frozen_contract_head_1_1: ae49435ebb24198ad1fb2017e5998bbad305792f
-    frame_refreeze_candidate_head: pending_publication
+    frame_refreeze_candidate_head: cb575ac0920bec8cc7ddd5565df9544b746f069b
     frame_refreeze_review: DBG-RVW-001-005-031
     frame_refreeze_review_status: planned
     recovered_frame_conformance_id: DBG-CF-001-005-002

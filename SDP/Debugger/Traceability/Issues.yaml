@@ -227,7 +227,7 @@ issues:
     rf004_refreeze_review_3_coordination_head: 39f6a2efca83a584b554ecd818c9d31319304143
     rf004_interface_frozen_head_1_1: ae49435ebb24198ad1fb2017e5998bbad305792f
     rf004_refreeze_conformance: DBG-CF-001-005-001
-    rf004_frame_refreeze_candidate_head: pending_publication
+    rf004_frame_refreeze_candidate_head: cb575ac0920bec8cc7ddd5565df9544b746f069b
     rf004_frame_refreeze_review: DBG-RVW-001-005-031
     rf004_frame_refreeze_review_status: planned
     rf004_frame_refreeze_conformance: DBG-CF-001-005-002
@@ -297,7 +297,7 @@ issues:
     active_slice_blocker_comment: 5369244294
     active_slice_refreeze_comment: 5370574104
     active_slice_blocker_status: superseded_by_refreeze_review_pending
-    frame_refreeze_candidate_head: pending_publication
+    frame_refreeze_candidate_head: cb575ac0920bec8cc7ddd5565df9544b746f069b
     frame_refreeze_interface_review: DBG-RVW-001-005-031
     frame_refreeze_interface_review_status: planned
     frame_refreeze_conformance: DBG-CF-001-005-002
