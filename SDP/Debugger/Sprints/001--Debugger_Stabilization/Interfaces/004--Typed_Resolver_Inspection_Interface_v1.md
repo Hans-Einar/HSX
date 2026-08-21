@@ -1,6 +1,6 @@
 # `dbg.resolver-inspection/1` — Typed Resolver and Inspection Interface
 
-- Status: **REFROZEN CANDIDATE — REVIEWS 007..010/012..013 REWORK / REVIEW 014 PENDING**
+- Status: **REFROZEN CANDIDATE — REVIEWS 007..010/012..014 REWORK / REVIEW 015 PENDING**
 - Iteration: `DBG-IT-001-005`
 - Parent Refactor: `DBG-RF-004`
 - Steering authority: issue #38 comment `5362514094`
@@ -13,7 +13,8 @@
 - Review `DBG-RVW-001-005-010`: REWORK at `72b06ad0bae53b70bc3d64edad91591998d2408d`
 - Review `DBG-RVW-001-005-012`: REWORK at `573f396e29de728f69abb0961e9b79a2fdb3c29d`
 - Review `DBG-RVW-001-005-013`: REWORK at `1e8fb7e74c92a69711bd48809696552cf2f982db`
-- Fresh independent re-review: `DBG-RVW-001-005-014` (`...011` is reserved for Slice 007)
+- Review `DBG-RVW-001-005-014`: REWORK at `96daa3a5dffa6b80b2b5687b9cd0429ffaa402c8`
+- Fresh independent re-review: `DBG-RVW-001-005-015` (`...011` is reserved for Slice 007)
 - Public interface ID: `dbg.resolver-inspection/1`
 
 This document freezes the public Python-domain interface to be implemented by the seven bounded
@@ -205,8 +206,9 @@ SourceRef { image_debug_bundle_ref: ImageDebugBundleRef, logical_id: str,
             content_digest: ContentDigest, byte_length: CanonicalUInt64 }
 AddressSpaceId { value: str }
 HsxAddress { space: AddressSpaceId, unsigned_value: int >= 0 }
-HsxAddressRange { start: HsxAddress, byte_length: int >= 0 }
-AddressSpaceDescriptor { space: AddressSpaceId, unit: str, width_bits: int >= 1,
+HsxAddressRange { start: HsxAddress, length_units: int >= 0 }
+AddressSpaceDescriptor { space: AddressSpaceId, unit: str,
+                         bits_per_unit: int >= 1, width_bits: int >= 1,
                          legal_ranges: tuple[HsxAddressRange, ...],
                          byte_order: LITTLE | BIG, alignment: int >= 1,
                          wrap_policy: FORBIDDEN | EXPLICIT,
@@ -285,9 +287,11 @@ byte order, alignment, permissions and wrap policy. Public operations are checke
 
 ```text
 validate(address) -> AddressResult
-add(address, unsigned_delta, mode: CHECKED | WRAP) -> AddressResult
-subtract(address, unsigned_delta, mode: CHECKED | WRAP) -> AddressResult
-range(start, byte_length) -> AddressRangeResult
+add(address, delta_units: int >= 0, mode: CHECKED | WRAP) -> AddressResult
+subtract(address, delta_units: int >= 0, mode: CHECKED | WRAP) -> AddressResult
+range(start, length_units: int >= 0) -> AddressRangeResult
+units_for_bytes(space: AddressSpaceId, byte_length: int >= 0) -> UnitCountResult
+bytes_for_units(space: AddressSpaceId, length_units: int >= 0) -> ByteLengthResult
 format(address) -> str
 ```
 
@@ -296,6 +300,17 @@ wrap unless an explicit descriptor space declares wrap and the caller passes `WR
 `CHECKED` never wraps and neither operation has an implicit/default mode.
 Overflow, underflow, wrong space, misalignment, range crossing and permission failure are typed
 failures. Addresses in different spaces never compare as interchangeable.
+
+HsxAddress.unsigned_value and every range/arithmetic delta are measured in the named space's
+declared address units; a half-open range ends at `start.unsigned_value + length_units`.
+AddressSpaceDescriptor.alignment and legal-range endpoints use those same units, while
+width_bits constrains unsigned_value itself. `format` uses width_bits and never bits_per_unit.
+`unit="byte"` requires bits_per_unit=8. Other exact unit names are allowed, but byte conversion
+is supported only when bits_per_unit is divisible by 8: bytes_per_unit=bits_per_unit/8,
+byte_length must be an exact multiple for units_for_bytes, and multiplication/division is
+checked. Non-byte-aligned units return UNIT_CONVERSION_UNSUPPORTED; a non-multiple byte request
+returns MISALIGNED. Snapshot memory reads take byte_length and must perform this conversion
+before range validation; no delta is silently interpreted as bytes.
 
 ## 4. Typed outcome algebra
 
@@ -345,6 +360,7 @@ Domain failures are returned, not hidden by `None`, first-candidate selection or
 - `OUT_OF_RANGE`
 - `PERMISSION_DENIED`
 - `WRAP_FORBIDDEN`
+- `UNIT_CONVERSION_UNSUPPORTED`
 
 Every result is immutable and contains status, exact input/evidence identity, zero or more
 typed values/candidates, and ordered structured diagnostics. `RESOLVED`/`COMPLETE` requires
@@ -404,6 +420,10 @@ AddressResult { status: AddressStatus, value: HsxAddress | None,
                 diagnostics: tuple[Diagnostic, ...] }
 AddressRangeResult { status: AddressStatus, value: HsxAddressRange | None,
                      diagnostics: tuple[Diagnostic, ...] }
+UnitCountResult { status: AddressStatus, value: int | None,
+                  diagnostics: tuple[Diagnostic, ...] }
+ByteLengthResult { status: AddressStatus, value: int | None,
+                   diagnostics: tuple[Diagnostic, ...] }
 ```
 
 `RESOLVED` has one or more values (duplicate candidates are allowed only when the query itself
@@ -533,6 +553,8 @@ total, and every non-empty page contains exactly that slice. Pagination returns 
 and order for one immutable context. Memory segments are ordered, non-overlapping and exactly
 cover the requested range when status is COMPLETE; gaps are explicit UNAVAILABLE segments in
 a PARTIAL result.
+MemorySegment.offset/requested_length and MemoryBlock.requested_length are bytes relative to
+the converted start address; address-space ranges remain unit-counted as defined above.
 
 For an `AVAILABLE` scalar, `raw_bytes` contains the complete declared value and `pieces` is
 empty. `PARTIAL` is legal only for a structural pieces location: `raw_bytes` is None,
@@ -612,6 +634,7 @@ Construction entrypoints are exact:
 DebugArtifactIndex.build(binding: ImageDebugBinding,
                          bundle_identity: ImageDebugBundleIdentityPayload,
                          source_manifest: SourceIdentityManifest,
+                         architecture: ArchitectureDescriptor,
                          components: tuple[DebugComponentInput, ...])
     -> ResolutionResult[DebugArtifactIndex]
 LegacySymbolAdapter.build(sym_bytes: bytes,
@@ -620,7 +643,10 @@ LegacySymbolAdapter.build(sym_bytes: bytes,
     -> LegacyResolutionResult[LegacyDebugArtifactIndex]
 ```
 
-Portable build rechecks each input byte digest/schema against the bundle before parsing.
+Portable build first requires binding/bundle accepted architecture ref+digest to equal
+ArchitectureDescriptor.ref, then rechecks each input byte digest/schema against the bundle
+before parsing and validates every typed address/range/row through that descriptor. Ref or
+digest mismatch is ARTIFACT_MISMATCH/`architecture_mismatch` and publishes no index.
 Legacy build requires `.sym` version 1 and exact `hxe_crc == expected_hxe_crc32`; it returns a
 different `LegacyDebugArtifactIndex` type with mandatory LegacyArtifactProvenance. That type
 has no ImageDebugBinding accessor, no SourceRef, no portable unwind/location rows and no
@@ -771,7 +797,9 @@ DerefUOp { opcode: "deref_u", byte_length: 1 | 2 | 4 | 8 | 16,
 BitSliceOp { opcode: "bit_slice", source_bit_offset: int >= 0,
              bit_size: int >= 1 }
 RecipeOpcode = the closed union above
-RecipeExpression { opcodes: tuple[RecipeOpcode, ...],
+RecipeExpression { role: CFA | CALLER_PC | CALLER_SP | CALLER_FRAME_BASE |
+                         REGISTER | LOCATION,
+                   opcodes: tuple[RecipeOpcode, ...],
                    required_result: ADDRESS | UNSIGNED_SCALAR | SIGNED_SCALAR | REGISTER,
                    required_bit_width: int >= 1 | None }
 RecipeRule { kind: EXPRESSION | SAME | UNDEFINED | UNAVAILABLE | OPTIMIZED_OUT,
@@ -786,6 +814,7 @@ RecipeAddress { address: HsxAddress }
 RecipeRegister { register_id: str, bit_width: int >= 1, unsigned_value: int }
 RecipeValue = RecipeScalar | RecipeAddress | RecipeRegister
 RecipeEvaluationContext { context: InspectionContext, frame_index: int >= 0,
+                          architecture: ArchitectureDescriptor,
                           pc: HsxAddress, sp: HsxAddress,
                           psw: RecipeScalar | None,
                           recovered_registers: RegisterSet,
@@ -816,9 +845,10 @@ Postfix stack transitions and value propagation are normative:
 | `const_s` | none | Push signed RecipeScalar; value must fit the two's-complement range for bit_width. |
 | `static_address` | none | Validate the supplied address against its exact descriptor space/range/alignment and push RecipeAddress. |
 | `to_address` | one RecipeScalar | Scalar must be non-negative; validate in the named space and push RecipeAddress. RecipeRegister is not implicitly cast. |
-| `cfa` / `frame_base` | none | Push the applicable RecipeEvaluationContext address; absent context value is UNAVAILABLE. |
+| `cfa` | none | Forbidden in role=CFA as recursive/cyclic CORRUPT; in other roles push already-computed context CFA, and absent CFA is CORRUPT/`cfa_not_computed`. |
+| `frame_base` | none | Push context frame_base; absent frame base is UNAVAILABLE. |
 | `add_sconst_checked` | one RecipeAddress or RecipeScalar | Checked add preserves address space or scalar signedness/bit_width; under/overflow, range hole or wrong type is CORRUPT. |
-| `deref_u` | one RecipeAddress | SnapshotReadPort reads exactly byte_length with declared byte_order; push unsigned RecipeScalar of `byte_length*8`; missing bytes are UNAVAILABLE. |
+| `deref_u` | one RecipeAddress | Checked unit/byte conversion and SnapshotReadPort read exactly byte_length with declared byte_order; push unsigned RecipeScalar of `byte_length*8`; missing bytes are UNAVAILABLE, unsupported unit conversion is UNSUPPORTED, and misalignment is CORRUPT. |
 | `bit_slice` | one RecipeScalar or RecipeRegister | Require `source_bit_offset+bit_size <= input width`; push unsigned RecipeScalar of bit_size. |
 
 Each opcode pops exactly the listed inputs and pushes exactly one output. Stack underflow,
@@ -829,6 +859,13 @@ exactly one value matching required_result: RecipeAddress with required_bit_widt
 signed/unsigned RecipeScalar with exact required_bit_width and signedness; or RecipeRegister
 with exact required_bit_width. Zero/multiple final values or any other result kind is CORRUPT.
 No implicit extension, truncation, sign change, host endian or address/register cast occurs.
+
+UnwindRow.cfa_expression must have role=CFA; caller_pc/sp/frame-base expression rules use their
+matching roles; caller-register rules use REGISTER; every LocationForm expression/piece uses
+LOCATION. Row/component validation rejects a role mismatch as CORRUPT. CFA is evaluated first;
+snapshot/register/memory absence while computing it returns UNAVAILABLE and prevents dependent
+rule evaluation. A `cfa` opcode inside CFA, repeated/non-progressing CFA or a CFA address cycle
+is CORRUPT with the exact offending row/op/frame diagnostic, never UNAVAILABLE or fallback.
 
 ```text
 RecipeLimits {
@@ -856,7 +893,8 @@ RecipeEvaluator.evaluate(evaluation: RecipeEvaluationContext,
 must advertise a different degraded profile and cannot claim this one. A caller may lower only
 the request's frame/piece maxima through `RecipeRequestLimits`; attempts to exceed the profile
 are `UNSUPPORTED`. `StackService.unwind(context: InspectionContext,
-index: DebugArtifactIndex, read_port: SnapshotReadPort, profile_limits: RecipeLimits,
+index: DebugArtifactIndex, read_port: SnapshotReadPort,
+architecture: ArchitectureDescriptor, profile_limits: RecipeLimits,
 request_limits: RecipeRequestLimits) ->
 InspectionResult[tuple[UnwindFrame, ...]]` returns handle-free immutable frames bound to the
 same context. Each frame has typed PC/SP/CFA/frame-base values,
@@ -869,6 +907,7 @@ a fixed R7 chain or invents a caller.
 
 `LocationEvaluator.evaluate(context: InspectionContext, frame: UnwindFrame,
 variable: SymbolRecord, row: LocationRow, read_port: SnapshotReadPort,
+architecture: ArchitectureDescriptor,
 profile_limits: RecipeLimits, request_limits: RecipeRequestLimits) ->
 InspectionResult[EvaluatedValue]` selects the exact
 half-open PC row for the selected frame and returns register, address, value, bounded pieces,
@@ -959,8 +998,10 @@ Slice 006 converts handle-free `UnwindFrame`s from StackService into `FrameRecor
 only allocator of DomainHandle values. All returned frames, scopes and variables retain the
 complete evidence tuple. `EpochHandleStore` allocates opaque domain handles monotonically
 within one StopEpoch. Repeated/paged requests may
-allocate more handles without invalidating earlier handles in the same epoch. Unknown handles
-return `UNKNOWN_HANDLE`; invalidated or different-epoch handles return `STALE`; neither falls back
+allocate more handles without invalidating earlier handles in the same epoch. For the exact
+active context, an unknown serial or wrong kind returns `UNKNOWN_HANDLE`; an invalidated
+session or a handle whose epoch ID is recorded in this service's stale history returns `STALE`;
+a foreign context/epoch absent from that history returns `UNKNOWN_HANDLE`. No outcome falls back
 to a current/top/first frame. DAP integer IDs are outside this interface and later map to domain
 handles without owning their lifetime.
 
@@ -992,8 +1033,8 @@ Scope composition is fixed, not frontend policy. `scopes()` returns REGISTERS wh
 declares register coverage, LOCALS when the frame resolves to exact function/PC lexical scopes,
 and GLOBALS when the index has globals; absent capabilities/data omit that scope and add an
 explicit diagnostic. There is no WATCH scope: each standard Watch/hover/evaluate request calls
-`evaluate_snapshot()` independently. `variables()` maps REGISTERS in descriptor order, LOCALS
-to RegisterVariableRecord without synthesizing SymbolRecord/address, LOCALS from
+`evaluate_snapshot()` independently. `variables()` maps the REGISTERS scope in descriptor order
+to RegisterVariableRecord without synthesizing SymbolRecord/address; LOCALS come from
 `lexical_scopes()` plus `variables_in_scope()` for the selected frame PC, and GLOBALS from
 `global_variables()`. Local/global variables select exactly one applicable LocationRow and use
 LocationEvaluator; zero rows is unavailable and overlap is corrupt. No scope query invents a

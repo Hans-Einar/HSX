@@ -25,6 +25,8 @@ Legacy `python/hsx_dbg/symbols.py`, source mapping, runtime and frontend files a
 ## Required behavior
 
 - construct only from exact ImageDebugBinding and verified component/schema refs;
+- require the exact ArchitectureDescriptor and validate its ref+digest plus every typed
+  address/range before publishing an index;
 - parse recipe-bearing rows only through Slice 007's signed pure DTO/validator surface;
 - reject artifact, bundle, binding, architecture, ABI, recipe or component mismatch without
   publishing an index;

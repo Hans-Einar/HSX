@@ -29,6 +29,8 @@ inspection, legacy product/runtime and frontend files are read-only.
   and RecipeEvaluator/LocationEvaluator signatures from `dbg.resolver-inspection/1`;
 - implement every frozen postfix pop/push, signedness/width propagation, final-stack/result
   rule and exact corrupt/unavailable/unsupported classification;
+- enforce expression roles: CFA forbids recursive `cfa`; dependent roles require computed CFA;
+  row/form role mismatch and cyclic/non-progressing CFA are corrupt;
 - own UnwindRow/LocationRow DTOs and consume Slice 002 metadata SymbolRecord read-only, so no
   future artifact-module import cycle exists;
 - reject unknown mandatory schema/field/opcode as unsupported and malformed
@@ -38,6 +40,8 @@ inspection, legacy product/runtime and frontend files are read-only.
 - keep scalar absence unavailable and allow partial only for structural pieces with exact
   available/missing ranges;
 - use SnapshotReadPort only through exact InspectionContext and checked typed addresses;
+- carry exact ArchitectureDescriptor in RecipeEvaluationContext for all register/special/
+  address/alignment/serialization behavior;
 - expose a pure row/component validator consumed read-only by the artifact Slice.
 
 ## Invariants and non-goals

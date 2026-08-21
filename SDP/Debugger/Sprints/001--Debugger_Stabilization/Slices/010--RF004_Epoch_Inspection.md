@@ -44,7 +44,8 @@ gateway, Executive, DAP/CLI and VS Code modules are read-only.
   structural available/missing pieces; duplicate names remain distinct;
 - all collections follow the frozen order/page-slice rules and exact object keys intern the
   same handle on repeated queries;
-- unknown handle is explicit `UNKNOWN_HANDLE` and stale/different epoch is explicit `STALE`;
+- exact-context unknown/wrong-kind and foreign-context handles are `UNKNOWN_HANDLE`; service-
+  history invalidated handles/sessions are `STALE`;
 - no fallback to current/top/first frame and no handle reuse across epochs;
 - variables use exact selected frame and location row; partial pieces stay partial;
 - scopes/variables follow the frozen register/local/global composition and artifact
@@ -54,6 +55,7 @@ gateway, Executive, DAP/CLI and VS Code modules are read-only.
 - snapshot expressions are typed/side-effect-free, selected-frame-bound, and never create a
   persistent live watch or delegate a raw string to runtime;
 - memory/disassembly validate typed spaces/ranges/permissions and preserve unavailable bytes;
+- memory byte_length converts through the exact address-space unit contract before reads;
 - best-effort live evidence cannot create coherent results or stable handles;
 - bounded concurrent fixture calls are deterministic and immutable.
 - same-context open is idempotent, different valid epoch invalidates old before publish, same

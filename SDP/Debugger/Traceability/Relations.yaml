@@ -308,6 +308,13 @@ relations:
     type: reviewed_by
     to:
       - DBG-RVW-001-005-014
+    status: rework
+    reviewed_head: 96daa3a5dffa6b80b2b5687b9cd0429ffaa402c8
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/035--RF004_Interface_Review_Attempt7.md
+  - from: dbg.resolver-inspection/1
+    type: reviewed_by
+    to:
+      - DBG-RVW-001-005-015
     status: planned
   - from: DBG-RF-005
     type: depends_on_accepted_interface
