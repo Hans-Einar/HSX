@@ -446,12 +446,14 @@ active_rf004:
   slices:
     - id: DBG-SL-001-005-001
       path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/005--RF004_Legacy_Oracle.md
-      status: corrected_pending_rereview
+      status: review_pass_pending_verification
       implementation_head: a9a22fc4750f22d774eade43810a499dd1992859
       prior_review: DBG-RVW-001-005-001
       prior_review_status: rework
       corrective_review: DBG-RVW-001-005-020
       corrected_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
+      corrective_review_status: pass
+      corrective_reviewed_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
       review: DBG-RVW-001-005-001
       verification: DBG-VER-001-005-001
     - id: DBG-SL-001-005-002
@@ -488,7 +490,7 @@ active_rf004:
   parent_verification: DBG-VER-004-001-001
   product_base: 69a54aeb3394d3cd4792bce620748e15bab69f1f
   runtime_profile: hsx.python-debug-legacy/1
-  current_gate: DBG-RVW-001-005-020
+  current_gate: DBG-VER-001-005-001
 structural_gate:
   rule: Only Steering-authorized Refactors with frozen Slice/interface contracts may execute.
   authorized_refactors:

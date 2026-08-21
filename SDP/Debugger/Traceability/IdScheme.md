@@ -90,7 +90,7 @@ track IDs rather than silently renamed in historical documents.
 - `DBG-RVW-001-005-017` — interface review attempt 10, REWORK
 - `DBG-RVW-001-005-018` — interface review attempt 11, REWORK
 - `DBG-RVW-001-005-019` — final interface review, PASS
-- `DBG-RVW-001-005-020` — Slice 001 fresh corrective re-review
+- `DBG-RVW-001-005-020` — Slice 001 fresh corrective re-review, PASS
 - `DBG-VER-001-005-001..DBG-VER-001-005-007` — formal Slice verifications
 - `DBG-RVW-004-001-001` / `DBG-VER-004-001-001` — RF-004 parent review/verification
 

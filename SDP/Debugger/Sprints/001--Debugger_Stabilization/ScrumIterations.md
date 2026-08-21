@@ -771,3 +771,13 @@ other-OSError handling and exact local/global assertions are covered. The manife
 conformant. Evidence: new oracle 16 passed/1 skip; SymbolIndex 2 passed; SourceMap 4 passed/
 1 same skip; focused 14 passed; hashseed 0/1 repeat; scope/diff/clean PASS. Fresh re-review is
 `DBG-RVW-001-005-020`.
+
+### Slice 001 review attempt 2
+
+Fresh independent `DBG-RVW-001-005-020` reviewed corrected head
+`8e5669940dd5c23df532577c39dc10bd84692ad2` and returned PASS with no
+Blocking/High/Medium findings. All five prior findings are closed. Independent evidence:
+oracle 16 passed/1 WinError 1314 skip; SymbolIndex 2 passed; SourceMap 4 passed/1 same skip;
+focused 14 passed; hashseed 0/1 repeats; 29 unique classified/provenanced/non-target-
+conformant legacy outputs; exact correction/combined scope and trace PASS. No symlink PASS is
+claimed. Formal next gate is `DBG-VER-001-005-001`.

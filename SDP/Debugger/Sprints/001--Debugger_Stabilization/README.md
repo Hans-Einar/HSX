@@ -1,6 +1,6 @@
 # DBG-SPR-001 — Debugger Stabilization
 
-- Status: ITERATION 005 ACTIVE — RF-004 INTERFACE PASS / SLICE 001 RE-REVIEW
+- Status: ITERATION 005 ACTIVE — RF-004 INTERFACE PASS / SLICE 001 VERIFYING
 - Owning track: Debugger
 - Owning GapAnalysis: `DBG-GAP-001`
 
