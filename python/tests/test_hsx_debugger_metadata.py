@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import FrozenInstanceError, replace
+from dataclasses import FrozenInstanceError, dataclass, replace
 from pathlib import Path
 import sys
 from types import SimpleNamespace
@@ -253,6 +253,127 @@ def test_generic_result_payloads_reject_mutable_duck_objects() -> None:
         InspectionResult(InspectionStatus.COMPLETE, context, duck, ())
     with pytest.raises(TypeError, match="immutable scalars"):
         ResolutionResult(ResolutionStatus.RESOLVED, None, (duck,), ())
+
+
+def test_generic_results_reject_mutable_scalar_subclasses() -> None:
+    _, context = refs()
+
+    class MutableInt(int):
+        pass
+
+    class MutableStr(str):
+        pass
+
+    class MutableBytes(bytes):
+        pass
+
+    values = (MutableInt(1), MutableStr("text"), MutableBytes(b"bytes"))
+    for value in values:
+        value.mutable_state = []
+        with pytest.raises(TypeError, match="immutable scalars"):
+            InspectionResult(InspectionStatus.COMPLETE, context, value, ())
+        with pytest.raises(TypeError, match="immutable scalars"):
+            ResolutionResult(ResolutionStatus.RESOLVED, None, (value,), ())
+
+
+def test_generic_results_reject_inherited_frozen_dataclasses_with_extra_state() -> None:
+    _, context = refs()
+
+    @dataclass(frozen=True)
+    class FrozenDictBase:
+        value: int
+
+    class MutableDictChild(FrozenDictBase):
+        def __init__(self, value: int) -> None:
+            super().__init__(value)
+            self.mutable_state = []
+
+    @dataclass(frozen=True, slots=True)
+    class FrozenSlotsBase:
+        value: int
+
+    class MutableSlotsChild(FrozenSlotsBase):
+        __slots__ = ("mutable_state",)
+
+        def __init__(self, value: int) -> None:
+            super().__init__(value)
+            object.__setattr__(self, "mutable_state", [])
+
+    for value in (MutableDictChild(1), MutableSlotsChild(2)):
+        with pytest.raises(TypeError, match="directly declared as a dataclass"):
+            InspectionResult(InspectionStatus.COMPLETE, context, value, ())
+        value.mutable_state.append("visible mutation")
+        with pytest.raises(TypeError, match="directly declared as a dataclass"):
+            ResolutionResult(ResolutionStatus.RESOLVED, None, (value,), ())
+
+
+def test_generic_results_reject_undeclared_state_on_direct_frozen_dataclasses() -> None:
+    _, context = refs()
+
+    @dataclass(frozen=True)
+    class DictPayload:
+        value: int
+
+    @dataclass(frozen=True)
+    class SlotPayload:
+        __slots__ = ("value", "mutable_state")
+
+        value: int
+
+    @dataclass(frozen=True)
+    class MutableFieldPayload:
+        values: list[int]
+
+    dict_payload = DictPayload(1)
+    object.__setattr__(dict_payload, "mutable_state", [])
+    slot_payload = SlotPayload(2)
+    object.__setattr__(slot_payload, "mutable_state", [])
+    mutable_values = [3]
+
+    with pytest.raises(TypeError, match="undeclared instance state"):
+        InspectionResult(InspectionStatus.COMPLETE, context, dict_payload, ())
+    with pytest.raises(TypeError, match="undeclared slots"):
+        ResolutionResult(ResolutionStatus.RESOLVED, None, (slot_payload,), ())
+    with pytest.raises(TypeError, match="deeply immutable"):
+        InspectionResult(
+            InspectionStatus.COMPLETE,
+            context,
+            MutableFieldPayload(mutable_values),
+            (),
+        )
+    mutable_values.append(4)
+    assert mutable_values == [3, 4]
+
+
+def test_generic_results_accept_direct_deeply_frozen_dataclasses() -> None:
+    _, context = refs()
+
+    @dataclass(frozen=True, slots=True)
+    class FrozenChild:
+        value: int
+
+    @dataclass(frozen=True)
+    class FrozenPayload:
+        name: str
+        child: FrozenChild
+        values: tuple[int, ...]
+        tags: frozenset[str]
+
+    @dataclass(frozen=True, slots=True)
+    class FrozenBase:
+        value: int
+
+    @dataclass(frozen=True, slots=True)
+    class FrozenDerived(FrozenBase):
+        label: str
+
+    payload = FrozenPayload("valid", FrozenChild(1), (2, 3), frozenset({"a", "b"}))
+    derived = FrozenDerived(4, "derived")
+    inspection = InspectionResult(InspectionStatus.COMPLETE, context, payload, ())
+    resolution = ResolutionResult(ResolutionStatus.RESOLVED, None, (payload, derived), ())
+
+    assert inspection.value is payload
+    assert resolution.values == (payload, derived)
 
 
 def test_memory_and_value_records_preserve_missing_segments_and_partial_pieces() -> None:

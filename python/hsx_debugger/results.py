@@ -53,7 +53,51 @@ def _tuple(value: object, field_name: str) -> tuple:
     return tuple(value)
 
 
-_IMMUTABLE_PAYLOAD_ATOMS = (str, bytes, int, float, complex, bool, type(None), Enum)
+_IMMUTABLE_PAYLOAD_ATOM_TYPES = frozenset(
+    {str, bytes, int, float, complex, bool, type(None)}
+)
+_ENUM_MEMBER_STATE = frozenset({"_value_", "_name_", "__objclass__", "_sort_order_"})
+
+
+def _slot_storage_names(record_type: type[object]) -> tuple[str, ...]:
+    names: list[str] = []
+    for owner in record_type.__mro__:
+        declared = owner.__dict__.get("__slots__", ())
+        if isinstance(declared, str):
+            declared = (declared,)
+        for name in declared:
+            if name in {"__dict__", "__weakref__"}:
+                continue
+            if name.startswith("__") and not name.endswith("__"):
+                name = f"_{owner.__name__.lstrip('_')}{name}"
+            names.append(name)
+    return tuple(names)
+
+
+def _require_declared_instance_state(
+    value: object,
+    field_name: str,
+    declared_names: frozenset[str],
+) -> None:
+    state = getattr(value, "__dict__", None)
+    if state is not None:
+        undeclared = set(state).difference(declared_names)
+        if undeclared:
+            names = ", ".join(sorted(undeclared))
+            raise TypeError(f"{field_name} has undeclared instance state: {names}")
+
+    undeclared_slots = set(_slot_storage_names(type(value))).difference(declared_names)
+    if undeclared_slots:
+        names = ", ".join(sorted(undeclared_slots))
+        raise TypeError(f"{field_name} has undeclared slots: {names}")
+
+
+def _require_immutable_enum(value: Enum, field_name: str) -> None:
+    """Accept conventional scalar enum members without accepting scalar subclasses generally."""
+
+    _require_declared_instance_state(value, field_name, _ENUM_MEMBER_STATE)
+    if type(value.value) not in _IMMUTABLE_PAYLOAD_ATOM_TYPES:
+        raise TypeError(f"{field_name} enum value must be an exact immutable scalar")
 
 
 def _deep_freeze(value: object, field_name: str, active: set[int] | None = None) -> object:
@@ -65,7 +109,11 @@ def _deep_freeze(value: object, field_name: str, active: set[int] | None = None)
     Mutable or structurally duck-typed objects outside those forms are rejected.
     """
 
-    if isinstance(value, _IMMUTABLE_PAYLOAD_ATOMS):
+    if type(value) in _IMMUTABLE_PAYLOAD_ATOM_TYPES:
+        return value
+
+    if isinstance(value, Enum):
+        _require_immutable_enum(value, field_name)
         return value
 
     if active is None:
@@ -122,12 +170,21 @@ def _deep_freeze(value: object, field_name: str, active: set[int] | None = None)
         return MappingProxyType(frozen_mapping)
 
     if is_dataclass(value) and not isinstance(value, type):
-        dataclass_parameters = getattr(type(value), "__dataclass_params__", None)
-        if dataclass_parameters is None or not dataclass_parameters.frozen:
+        concrete_type = type(value)
+        dataclass_parameters = concrete_type.__dict__.get("__dataclass_params__")
+        declared_fields = concrete_type.__dict__.get("__dataclass_fields__")
+        if dataclass_parameters is None or declared_fields is None:
+            raise TypeError(
+                f"{field_name} concrete type must be directly declared as a dataclass"
+            )
+        if not dataclass_parameters.frozen:
             raise TypeError(f"{field_name} dataclass payload must be frozen")
+        record_fields = fields(value)
+        record_field_names = frozenset(record_field.name for record_field in record_fields)
+        _require_declared_instance_state(value, field_name, record_field_names)
         active.add(identity)
         try:
-            for record_field in fields(value):
+            for record_field in record_fields:
                 member = getattr(value, record_field.name)
                 frozen_member = _deep_freeze(
                     member, f"{field_name}.{record_field.name}", active
