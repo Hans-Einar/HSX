@@ -19,6 +19,8 @@ from .artifacts import *
 from .artifacts import __all__ as _artifacts_all
 from .legacy_symbols import *
 from .legacy_symbols import __all__ as _legacy_symbols_all
+from .sources import *
+from .sources import __all__ as _sources_all
 
 __all__ = [
     *__all__,
@@ -30,4 +32,5 @@ __all__ = [
     *_snapshot_all,
     *_artifacts_all,
     *_legacy_symbols_all,
+    *_sources_all,
 ]
