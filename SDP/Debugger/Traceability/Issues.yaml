@@ -289,6 +289,7 @@ issues:
     active_slice_implementation_head: pending
     active_slice_blocker: DBG-BLK-001-005-002
     active_slice_blocker_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/007--RF004_Location_Frame_Evidence_Steering_Blocker.md
+    active_slice_blocker_comment: 5369244294
     slice002_initial_implementation_head: 4b5837644dc1196accfd8608bc3dbd20980476bb
     slice002_initial_review: DBG-RVW-001-005-002
     slice002_initial_review_status: rework

@@ -6,6 +6,7 @@
 - Last signed dependency: Slice 002 at `c7bc39057469f1aa62a78f409753ec0213631214`
 - Discovery/coordination head: `269d0bb962f85241633e1af8489b459357f2ff77`
 - Product changes during discovery: none
+- Steering escalation: issue #38 comment `5369244294`
 
 ## Frozen contradiction
 

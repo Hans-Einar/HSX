@@ -2,6 +2,8 @@
 
 Status: `rf004_blocked_awaiting_steering_location_frame_evidence`
 
+Steering escalation: issue #38 comment `5369244294`.
+
 Steering escalation: issue #38 comment `5365959417`.
 Steering refreeze: issue #38 comment `5368017338`.
 Published refreeze content head: `94a59f3738fadc0b6230fc3dc69cf36ca8b9202e`.
@@ -274,6 +276,7 @@ or any later Slice until an exact public frame-evidence seam is refrozen and rev
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
 - Active gate: Steering decision on `DBG-BLK-001-005-002`
+- Blocker authority: issue #38 comment `5369244294`
 - Blocker authority: issue #38 comment `5365959417`
 - Refreeze authority: issue #38 comment `5368017338`
 
