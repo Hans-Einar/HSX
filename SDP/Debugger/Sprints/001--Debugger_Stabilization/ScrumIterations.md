@@ -982,3 +982,4 @@ review028 technical closures, but returned REWORK trace-only because two Relatio
 still named review028 as the current gate. Master corrected the RF-004 interface production
 status and product-review-027 restart dependency to fresh review030. Contract semantics and
 product files are unchanged; review030 is the only active gate.
+The trace-corrected remote candidate is `ae49435ebb24198ad1fb2017e5998bbad305792f`.

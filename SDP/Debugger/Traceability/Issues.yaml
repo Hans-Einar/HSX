@@ -220,7 +220,7 @@ issues:
     rf004_refreeze_rereview: DBG-RVW-001-005-029
     rf004_refreeze_rereview_status: rework_trace_only
     rf004_refreeze_rereviewed_coordination_head: ed23423814d58fe3c03b252084d43d2464a46118
-    rf004_trace_corrected_refreeze_candidate_head: pending_publication
+    rf004_trace_corrected_refreeze_candidate_head: ae49435ebb24198ad1fb2017e5998bbad305792f
     rf004_refreeze_review_3: DBG-RVW-001-005-030
     rf004_refreeze_review_3_status: planned
     rf004_refreeze_conformance: DBG-CF-001-005-001
@@ -320,7 +320,7 @@ issues:
     refreeze_interface_rereview: DBG-RVW-001-005-029
     refreeze_interface_rereview_status: rework_trace_only
     refreeze_rereviewed_coordination_head: ed23423814d58fe3c03b252084d43d2464a46118
-    trace_corrected_refreeze_candidate_head: pending_publication
+    trace_corrected_refreeze_candidate_head: ae49435ebb24198ad1fb2017e5998bbad305792f
     refreeze_interface_review_3: DBG-RVW-001-005-030
     refreeze_interface_review_3_status: planned
     refreeze_conformance: DBG-CF-001-005-001

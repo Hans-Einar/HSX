@@ -6,6 +6,7 @@ Steering escalation: issue #38 comment `5365959417`.
 Steering refreeze: issue #38 comment `5368017338`.
 Published refreeze content head: `94a59f3738fadc0b6230fc3dc69cf36ca8b9202e`.
 Corrected refreeze content head: `4c581a740ee95c3362aa77de85630ba001013e1c`.
+Trace-corrected refreeze head: `ae49435ebb24198ad1fb2017e5998bbad305792f`.
 
 ## Current objective
 
@@ -186,7 +187,8 @@ interface review 030. RF-005..009 and Executive/VM/AVR/frontend migration remain
 
 ## Exact next step
 
-Publish the trace-corrected candidate and dispatch fresh independent `DBG-RVW-001-005-030`.
+Dispatch fresh independent `DBG-RVW-001-005-030` against exact candidate
+`ae49435ebb24198ad1fb2017e5998bbad305792f`.
 Do not start a Slice 002 worker unless that
 interface review passes.
 

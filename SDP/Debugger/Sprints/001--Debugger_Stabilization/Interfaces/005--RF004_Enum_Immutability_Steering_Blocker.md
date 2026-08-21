@@ -12,6 +12,7 @@
 - Steering refreeze: issue #38 comment `5368017338`
 - Published refreeze content head: `94a59f3738fadc0b6230fc3dc69cf36ca8b9202e`
 - Corrected refreeze content head: `4c581a740ee95c3362aa77de85630ba001013e1c`
+- Trace-corrected refreeze head: `ae49435ebb24198ad1fb2017e5998bbad305792f`
 
 ## Frozen contradiction
 

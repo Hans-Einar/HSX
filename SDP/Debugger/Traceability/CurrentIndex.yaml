@@ -448,7 +448,7 @@ active_rf004:
     refreeze_rereview_status: rework_trace_only
     refreeze_rereviewed_content_head: 4c581a740ee95c3362aa77de85630ba001013e1c
     refreeze_rereviewed_coordination_head: ed23423814d58fe3c03b252084d43d2464a46118
-    trace_corrected_refreeze_candidate_head: pending_publication
+    trace_corrected_refreeze_candidate_head: ae49435ebb24198ad1fb2017e5998bbad305792f
     refreeze_review_3: DBG-RVW-001-005-030
     refreeze_review_3_status: planned
     conformance_id: DBG-CF-001-005-001
