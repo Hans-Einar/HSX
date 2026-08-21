@@ -620,6 +620,20 @@ def test_unknown_recipe_schema_and_opcode_are_unsupported() -> None:
     assert result.diagnostics[0].code == "unsupported_opcode"
 
 
+def test_recipe_validator_bound_exhaustion_is_unsupported_but_malformed_is_corrupt() -> None:
+    locations = _location_rows()
+    locations[0] = {**locations[0], "declared_bit_size": "4097"}
+    result = build(portable_fixture(location_rows=locations))
+    assert result.status is ResolutionStatus.SCHEMA_UNSUPPORTED
+    assert result.diagnostics[0].code == "limit_exceeded"
+
+    locations = _location_rows()
+    locations[0] = {**locations[0], "pc_range": _range("data", 0x100, 4)}
+    result = build(portable_fixture(location_rows=locations))
+    assert result.status is ResolutionStatus.CORRUPT
+    assert result.diagnostics[0].code == "row_pc_space_mismatch"
+
+
 def test_variable_rows_are_mandatory_and_address_bearing_symbols_cannot_own_them() -> None:
     result = build(portable_fixture(location_rows=_location_rows()[:-1]))
     assert result.status is ResolutionStatus.CORRUPT
@@ -754,6 +768,34 @@ def test_legacy_public_inputs_are_strict() -> None:
         LegacyDebugArtifactIndex()
     with pytest.raises(FrozenInstanceError):
         legacy_build().values[0]._functions = ()
+
+
+def test_legacy_result_recursively_freezes_generic_values_and_rejects_mutable_objects() -> None:
+    provenance = legacy_build().provenance
+    payload = {"ordered": [1, {"flags": {"A", "B"}}]}
+    caller_values = [payload]
+    result = LegacyResolutionResult(
+        ResolutionStatus.RESOLVED,
+        provenance,
+        caller_values,
+    )
+
+    published = result.values[0]
+    assert published[0][0] == "ordered"
+    assert published[0][1][0] == 1
+    assert published[0][1][1][0] == ("flags", frozenset({"A", "B"}))
+
+    caller_values.clear()
+    payload["ordered"].append(2)
+    payload["ordered"][1]["flags"].add("C")
+    assert published[0][1] == (1, (("flags", frozenset({"A", "B"})),))
+
+    with pytest.raises(TypeError):
+        LegacyResolutionResult(
+            ResolutionStatus.RESOLVED,
+            provenance,
+            (SimpleNamespace(value=1),),
+        )
 
 
 def test_public_artifact_exports_are_unique_and_append_only_visible() -> None:

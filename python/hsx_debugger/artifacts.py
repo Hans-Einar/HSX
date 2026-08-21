@@ -1236,7 +1236,19 @@ def _validate_portable_records(
             )
         diagnostics = RecipeComponentValidator.validate_unwind_row(row, architecture, abi)
         if diagnostics:
-            raise _ArtifactError(ResolutionStatus.CORRUPT, diagnostics[0].code, diagnostics[0].message, component="unwind_recipe", row_id=row.row_id)
+            diagnostic = diagnostics[0]
+            status = (
+                ResolutionStatus.SCHEMA_UNSUPPORTED
+                if diagnostic.code == "limit_exceeded"
+                else ResolutionStatus.CORRUPT
+            )
+            raise _ArtifactError(
+                status,
+                diagnostic.code,
+                diagnostic.message,
+                component="unwind_recipe",
+                row_id=row.row_id,
+            )
     for prior, current in zip(ordered_unwind, ordered_unwind[1:]):
         if _range_overlaps(prior.pc_range, current.pc_range):
             raise _fail(
@@ -1269,7 +1281,19 @@ def _validate_portable_records(
             row, variable, architecture, abi
         )
         if diagnostics:
-            raise _ArtifactError(ResolutionStatus.CORRUPT, diagnostics[0].code, diagnostics[0].message, component="location_recipe", row_id=row.row_id)
+            diagnostic = diagnostics[0]
+            status = (
+                ResolutionStatus.SCHEMA_UNSUPPORTED
+                if diagnostic.code == "limit_exceeded"
+                else ResolutionStatus.CORRUPT
+            )
+            raise _ArtifactError(
+                status,
+                diagnostic.code,
+                diagnostic.message,
+                component="location_recipe",
+                row_id=row.row_id,
+            )
         if row.declared_type_id is not None:
             declared_type = type_by_id.get(row.declared_type_id)
             if (

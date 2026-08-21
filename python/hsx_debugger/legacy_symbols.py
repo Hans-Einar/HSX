@@ -22,7 +22,13 @@ from .addresses import (
 )
 from .identity import ContentDigest
 from .metadata import MemoryRegion, SymbolKind, SymbolRecord
-from .results import AddressStatus, Diagnostic, ResolutionStatus
+from .results import (
+    AddressStatus,
+    Diagnostic,
+    ResolutionStatus,
+    _deep_freeze,
+    _register_contract_enums,
+)
 
 
 T = TypeVar("T")
@@ -30,6 +36,9 @@ T = TypeVar("T")
 
 class LegacyIdentityStatus(str, Enum):
     LEGACY_UNVERIFIED = "legacy_unverified"
+
+
+_register_contract_enums(LegacyIdentityStatus)
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,7 +168,10 @@ class LegacyResolutionResult(Generic[T]):
             self.diagnostics, (tuple, list)
         ):
             raise TypeError("diagnostics must be a tuple or list")
-        values = tuple(self.values)
+        values = tuple(
+            _deep_freeze(value, f"values[{index}]")
+            for index, value in enumerate(self.values)
+        )
         diagnostics = tuple(self.diagnostics)
         if not all(isinstance(item, Diagnostic) for item in diagnostics):
             raise TypeError("diagnostics must contain Diagnostic values")
