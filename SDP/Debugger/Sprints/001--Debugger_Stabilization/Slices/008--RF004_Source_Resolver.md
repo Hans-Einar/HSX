@@ -1,6 +1,6 @@
 # DBG-SL-001-005-004 — RF-004 Exact Source Resolver
 
-- Status: **IMPLEMENTED / INDEPENDENT REVIEW004 PENDING**
+- Status: **REWORK / BOUNDED CORRECTIVE WORKER PENDING**
 - Product head: `c0f975c4a278cecd89e19d332ca5601b074a115e`
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
@@ -64,3 +64,9 @@ tests unchanged. Close only after exact-head review, formal verification and Mas
 - Compile/import/exports/exact resolve signature/Black: PASS.
 - Exact three-file scope, diff check and clean Git state: PASS.
 - Broad regression intentionally deferred to review/verification.
+
+## Review004 decision
+
+Review004 returned one Medium finding: Windows host join semantics can collapse an inner
+drive-looking segment in a valid artifact-relative logical ID. Correct only the private literal
+join and add the regression. All other SourceResolver behavior passed. Review036 is reserved.

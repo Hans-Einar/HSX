@@ -1151,3 +1151,10 @@ Fresh bounded SourceResolver worker completed exact product head `c0f975c4…` o
 coordination base `d575299e…`. Scope is only `sources.py`, additive exports and owned source
 tests. Focused SourceResolver/legacy SourceMap evidence is 29 passed/3 classified platform
 skips; compile/import/signature/Black/scope/Git pass. Fresh review004 is the only next gate.
+
+### Slice004 review004 REWORK
+
+Fresh review004 returned 0 Blocking / 0 High / 1 Medium. On Windows, `os.path.join` can treat
+an inner `C:` segment in valid logical ID `src/C:/unit.c` as host drive syntax and collapse the
+explicit-root/full-ID locator. Correct only literal joining and add the regression; review036
+then verification004 remain the next gates. Slice005 is stopped.
