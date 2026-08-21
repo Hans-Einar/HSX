@@ -9,10 +9,12 @@ conformance tests.
 from __future__ import annotations
 
 import ast
+import errno
 import json
 import logging
 import re
 import sys
+from collections import Counter
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -86,6 +88,29 @@ def _all_strings(value: Any):
             yield from _all_strings(child)
 
 
+def _symlink_skip_category(
+    exc: BaseException,
+    *,
+    platform: str = sys.platform,
+) -> str | None:
+    if isinstance(exc, NotImplementedError):
+        return "SKIP_SYMLINK_UNSUPPORTED"
+    if not isinstance(exc, OSError):
+        return None
+    if platform == "win32" and getattr(exc, "winerror", None) == 1314:
+        return "SKIP_SYMLINK_PRIVILEGE"
+    unsupported_errnos = {
+        value
+        for name in ("ENOSYS", "ENOTSUP", "EOPNOTSUPP")
+        if (value := getattr(errno, name, None)) is not None
+    }
+    if exc.errno in unsupported_errnos or (
+        platform == "win32" and getattr(exc, "winerror", None) == 50
+    ):
+        return "SKIP_SYMLINK_UNSUPPORTED"
+    return None
+
+
 def test_oracle_manifest_is_complete_classified_and_nonconformant() -> None:
     manifest = _manifest()
     assert manifest["schema"] == "hsx.debug.rf004-legacy-oracle/1"
@@ -96,6 +121,8 @@ def test_oracle_manifest_is_complete_classified_and_nonconformant() -> None:
 
     required_ids = {
         "address_hidden_16bit_mask",
+        "address_narrow_descriptor_overflow",
+        "address_wide_descriptor_resolved_unmasked",
         "artifact_hxe_crc_mismatch",
         "artifact_malformed_json",
         "artifact_schema_version",
@@ -103,7 +130,9 @@ def test_oracle_manifest_is_complete_classified_and_nonconformant() -> None:
         "location_register_evidence",
         "location_stack_evidence",
         "source_case_colliding_logical_paths",
+        "source_host_locator_case_collision",
         "source_duplicate_basename_alias",
+        "source_basename_without_locator",
         "source_exact_requested_path",
         "source_first_candidate",
         "source_multiple_line_candidates",
@@ -144,6 +173,7 @@ def test_oracle_manifest_is_complete_classified_and_nonconformant() -> None:
         "ResolutionStatus.RESOLVED",
         "ResolutionStatus.SCHEMA_UNSUPPORTED",
         "ResolutionStatus.UNAVAILABLE",
+        "SourceRef",
     }
     for case in cases:
         assert case["classification"] in allowed
@@ -157,9 +187,96 @@ def test_oracle_manifest_is_complete_classified_and_nonconformant() -> None:
         assert isinstance(case["known_bad_legacy_output"], bool)
         if case["classification"] == "retire":
             assert case["known_bad_legacy_output"] is True
-    assert _case("address_hidden_16bit_mask")["frozen_target"]["address_category"] == (
-        "AddressStatus.OVERFLOW"
+    assert Counter(case["classification"] for case in cases) == {
+        "preserve": 13,
+        "change_intentionally": 8,
+        "retire": 8,
+    }
+
+
+def test_frozen_address_and_source_boundaries_are_explicit() -> None:
+    raw = _load_json(SYMBOL_V1_PATH)
+    fixture_wide_address = next(
+        item["address"]
+        for item in raw["symbols"]["functions"]
+        if item["name"] == "wide_address"
     )
+
+    hidden_mask = _case("address_hidden_16bit_mask")
+    narrow = _case("address_narrow_descriptor_overflow")
+    wide = _case("address_wide_descriptor_resolved_unmasked")
+    assert "address_category" not in hidden_mask["frozen_target"]
+    assert narrow["inputs"]["address"] == fixture_wide_address == 0x10020
+    assert narrow["inputs"]["descriptor"] == {
+        "space": "code",
+        "width_bits": 16,
+        "legal_range_start": 0,
+        "legal_range_length_units": 0x10000,
+        "wrap_policy": "FORBIDDEN",
+    }
+    assert narrow["frozen_target"]["category"] == "ResolutionStatus.CORRUPT"
+    assert narrow["frozen_target"]["address_category"] == "AddressStatus.OVERFLOW"
+    assert wide["inputs"]["address"] == fixture_wide_address
+    assert wide["inputs"]["descriptor"] == {
+        "space": "code",
+        "width_bits": 24,
+        "legal_range_start": 0,
+        "legal_range_length_units": 0x20000,
+        "wrap_policy": "FORBIDDEN",
+    }
+    assert wide["frozen_target"]["category"] == "ResolutionStatus.RESOLVED"
+    assert wide["frozen_target"]["address_category"] == "AddressStatus.VALID"
+    assert wide["frozen_target"]["value"] == {
+        "space": "code",
+        "unsigned_value": 0x10020,
+    }
+
+    case_identity = _case("source_case_colliding_logical_paths")["frozen_target"]
+    case_collision = _case("source_host_locator_case_collision")
+    assert case_identity["category"] == "SourceRef"
+    assert case_identity["logical_ids"] == ["src/Case.c", "src/case.c"]
+    assert len(set(case_identity["logical_ids"])) == 2
+    assert case_collision["inputs"] == {
+        "source_logical_ids": case_identity["logical_ids"],
+        "host_locator_capability": "cannot_address_both_exact_spellings",
+    }
+    assert case_collision["frozen_target"]["category"] == "ResolutionStatus.CASE_COLLISION"
+    assert case_collision["frozen_target"]["resolved_locator"] is None
+
+    basename_identity = _case("source_duplicate_basename_alias")["frozen_target"]
+    no_locator = _case("source_basename_without_locator")
+    ambiguity = _case("source_first_candidate")["frozen_target"]
+    assert basename_identity["category"] == "SourceRef"
+    assert basename_identity["logical_ids"] == [
+        "src/alpha/unit.c",
+        "lib/beta/unit.c",
+    ]
+    assert len(set(basename_identity["logical_ids"])) == 2
+    assert no_locator["inputs"] == {
+        "source_logical_id": "unit.c",
+        "existing_winning_tier_locators": [],
+    }
+    assert no_locator["frozen_target"]["category"] == "ResolutionStatus.UNAVAILABLE"
+    assert no_locator["frozen_target"]["resolved_locator"] is None
+    assert ambiguity["source_logical_id"] == "src/ambiguous.c"
+    assert ambiguity["winning_tier"] == "PREFIX"
+    assert ambiguity["candidate_locators"] == [
+        "candidate_a/src/ambiguous.c",
+        "candidate_b/src/ambiguous.c",
+    ]
+    assert ambiguity["category"] == "ResolutionStatus.AMBIGUOUS"
+    assert ambiguity["resolved_locator"] is None
+
+    source_resolver_cases = [
+        case
+        for case in _manifest()["cases"]
+        if case["frozen_target"]["interface"] == "SourceResolver.resolve"
+    ]
+    assert {
+        case["id"]
+        for case in source_resolver_cases
+        if case["frozen_target"]["category"] == "ResolutionStatus.CASE_COLLISION"
+    } == {"source_host_locator_case_collision"}
 
 
 def test_oracle_fixtures_are_deterministic_and_have_no_host_locator_identity() -> None:
@@ -201,8 +318,9 @@ def test_preserve_sym_v1_functions_labels_locals_globals_and_memory_regions() ->
 
     assert symbol_index.lookup_symbol("main") == expected["function_main"]
     assert symbol_index.lookup_symbol("loop") == expected["label_loop"]
-    assert symbol_index.locals_for_function("main")[0]["name"] == "counter"
-    assert symbol_index.globals_list()[0]["name"] == expected["global"]
+    for function_name, function_locals in expected["locals_for_function"].items():
+        assert symbol_index.locals_for_function(function_name) == function_locals
+    assert symbol_index.globals_list() == expected["globals_list"]
     assert raw["memory_regions"] == _current_value("sym_v1_memory_regions")
 
 
@@ -276,6 +394,7 @@ def test_preserve_source_map_symlink_with_explicit_supported_or_skip_evidence(
     assert case["platform_evidence"]["allowed_outcomes"] == [
         "SUPPORTED",
         "SKIP_SYMLINK_PRIVILEGE",
+        "SKIP_SYMLINK_UNSUPPORTED",
     ]
     source = next(item for item in template["sources"] if item["case_id"] == "source_symlink")
     target = tmp_path / "shared" / "symlink.c"
@@ -285,12 +404,32 @@ def test_preserve_source_map_symlink_with_explicit_supported_or_skip_evidence(
     locator.parent.mkdir(parents=True, exist_ok=True)
     try:
         locator.symlink_to(target)
-    except (OSError, NotImplementedError) as exc:
-        pytest.skip(f"SKIP_SYMLINK_PRIVILEGE: {exc}")
+    except NotImplementedError as exc:
+        category = _symlink_skip_category(exc)
+        assert category == "SKIP_SYMLINK_UNSUPPORTED"
+        pytest.skip(f"{category}: {exc}")
+    except OSError as exc:
+        category = _symlink_skip_category(exc)
+        if category is not None:
+            pytest.skip(f"{category}: {exc}")
+        raise
 
     resolved = source_map.resolve("./src/symlink.c", search_roots=[Path("new_root")])
     assert resolved == locator
     assert resolved.read_bytes() == target.read_bytes()
+
+
+def test_symlink_skip_classification_is_narrow_and_portable() -> None:
+    privilege = OSError(errno.EACCES, "symlink privilege unavailable")
+    privilege.winerror = 1314
+    unsupported = OSError(errno.ENOSYS, "symlink unsupported")
+    unrelated = OSError(errno.EIO, "unrelated filesystem failure")
+
+    assert _symlink_skip_category(privilege, platform="win32") == "SKIP_SYMLINK_PRIVILEGE"
+    assert _symlink_skip_category(privilege, platform="linux") is None
+    assert _symlink_skip_category(NotImplementedError()) == "SKIP_SYMLINK_UNSUPPORTED"
+    assert _symlink_skip_category(unsupported) == "SKIP_SYMLINK_UNSUPPORTED"
+    assert _symlink_skip_category(unrelated) is None
 
 
 def test_legacy_oracle_known_bad_source_map_selects_first_existing_candidate(
@@ -406,4 +545,8 @@ def test_legacy_oracle_known_bad_stack_merges_mixed_live_read_revisions() -> Non
     assert "snapshot" not in result
     target = _case("stack_mixed_live_read_coherence")["frozen_target"]
     assert target["category"] == "ContextBindingStatus.UNAVAILABLE"
-    assert target["diagnostic"] == "coherent_snapshot_unavailable"
+    assert target["diagnostic"] == "portable_snapshot_evidence_unavailable"
+    assert target["coherent_snapshot_unavailable_reserved_for"] == [
+        "stop_token_absent_or_untyped",
+        "snapshot_absent_or_untyped",
+    ]

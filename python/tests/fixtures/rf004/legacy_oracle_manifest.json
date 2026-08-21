@@ -35,8 +35,88 @@
       "frozen_target": {
         "interface": "HsxAddress and LegacySymbolAdapter",
         "category": "ResolutionStatus.CORRUPT",
+        "expectation": "Retire the hidden mask itself: never publish a masked alias, and let the explicit descriptor determine whether the original address overflows or resolves."
+      },
+      "known_bad_legacy_output": true,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "address_narrow_descriptor_overflow",
+      "classification": "change_intentionally",
+      "legacy_surface": "SymbolIndex",
+      "provenance": {
+        "kind": "legacy_fixture_and_product",
+        "path": "python/tests/fixtures/rf004/legacy_symbols_v1.sym",
+        "product_path": "python/hsx_dbg/symbols.py",
+        "symbols": [
+          "SymbolIndex._load_functions"
+        ]
+      },
+      "inputs": {
+        "address": 65568,
+        "descriptor": {
+          "space": "code",
+          "width_bits": 16,
+          "legal_range_start": 0,
+          "legal_range_length_units": 65536,
+          "wrap_policy": "FORBIDDEN"
+        }
+      },
+      "current_behavior": {
+        "observation": "The legacy index has no descriptor input and masks the fixture address 0x10020 to 0x0020.",
+        "value": [
+          32
+        ]
+      },
+      "frozen_target": {
+        "interface": "HsxAddress and LegacySymbolAdapter",
+        "category": "ResolutionStatus.CORRUPT",
         "address_category": "AddressStatus.OVERFLOW",
-        "expectation": "Validate through the explicit descriptor and publish no masked address or accepted index."
+        "expectation": "Under this explicit 16-bit non-wrapping descriptor, reject 0x10020 as OVERFLOW and publish no accepted legacy index."
+      },
+      "known_bad_legacy_output": true,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "address_wide_descriptor_resolved_unmasked",
+      "classification": "change_intentionally",
+      "legacy_surface": ".sym v1 fixture and SymbolIndex",
+      "provenance": {
+        "kind": "legacy_fixture_and_product",
+        "path": "python/tests/fixtures/rf004/legacy_symbols_v1.sym",
+        "product_path": "python/hsx_dbg/symbols.py",
+        "symbols": [
+          "SymbolIndex._load_functions"
+        ]
+      },
+      "inputs": {
+        "address": 65568,
+        "descriptor": {
+          "space": "code",
+          "width_bits": 24,
+          "legal_range_start": 0,
+          "legal_range_length_units": 131072,
+          "wrap_policy": "FORBIDDEN"
+        }
+      },
+      "current_behavior": {
+        "observation": "The fixture retains 0x10020, but the descriptor-free legacy index exposes only the masked value 0x0020.",
+        "value": {
+          "fixture_address": 65568,
+          "legacy_lookup": [
+            32
+          ]
+        }
+      },
+      "frozen_target": {
+        "interface": "HsxAddress and LegacySymbolAdapter",
+        "category": "ResolutionStatus.RESOLVED",
+        "address_category": "AddressStatus.VALID",
+        "value": {
+          "space": "code",
+          "unsigned_value": 65568
+        },
+        "expectation": "Under this explicit sufficiently wide legal descriptor, resolve the original address as unmasked code:0x10020."
       },
       "known_bad_legacy_output": true,
       "legacy_output_is_target_conformance": false
@@ -221,9 +301,55 @@
         }
       },
       "frozen_target": {
-        "interface": "SourceRef and SourceResolver.resolve",
+        "interface": "SourceRef",
+        "category": "SourceRef",
+        "logical_ids": [
+          "src/Case.c",
+          "src/case.c"
+        ],
+        "expectation": "Keep the two logical IDs exact, case-sensitive, and distinct independently of host locator behavior."
+      },
+      "known_bad_legacy_output": true,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "source_host_locator_case_collision",
+      "classification": "change_intentionally",
+      "legacy_surface": "SymbolIndex source spelling lookup",
+      "provenance": {
+        "kind": "legacy_fixture_and_product",
+        "path": "python/tests/fixtures/rf004/legacy_symbols_v1.sym",
+        "product_path": "python/hsx_dbg/symbols.py",
+        "symbols": [
+          "_canonical_path",
+          "SymbolIndex.lookup_line"
+        ]
+      },
+      "inputs": {
+        "source_logical_ids": [
+          "src/Case.c",
+          "src/case.c"
+        ],
+        "host_locator_capability": "cannot_address_both_exact_spellings"
+      },
+      "current_behavior": {
+        "observation": "The legacy lookup case-folds before any host-locator capability can be classified.",
+        "value": {
+          "src/Case.c": [
+            272,
+            276
+          ],
+          "src/case.c": [
+            272,
+            276
+          ]
+        }
+      },
+      "frozen_target": {
+        "interface": "SourceResolver.resolve",
         "category": "ResolutionStatus.CASE_COLLISION",
-        "expectation": "Keep logical IDs exact and case-sensitive; report CASE_COLLISION only when the host filesystem cannot address both spellings separately."
+        "resolved_locator": null,
+        "expectation": "Return CASE_COLLISION only for this explicit host-locator condition, after retaining the two SourceRefs as distinct identities, and select no locator."
       },
       "known_bad_legacy_output": true,
       "legacy_output_is_target_conformance": false
@@ -254,9 +380,45 @@
         }
       },
       "frozen_target": {
-        "interface": "DebugArtifactIndex and SourceResolver.resolve",
+        "interface": "SourceRef and DebugArtifactIndex",
+        "category": "SourceRef",
+        "logical_ids": [
+          "src/alpha/unit.c",
+          "lib/beta/unit.c"
+        ],
+        "expectation": "Keep the two exact full logical IDs as distinct SourceRefs; neither acquires a basename alias."
+      },
+      "known_bad_legacy_output": true,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "source_basename_without_locator",
+      "classification": "retire",
+      "legacy_surface": "SymbolIndex",
+      "provenance": {
+        "kind": "legacy_fixture_and_product",
+        "path": "python/tests/fixtures/rf004/legacy_symbols_v1.sym",
+        "product_path": "python/hsx_dbg/symbols.py",
+        "symbols": [
+          "SymbolIndex.lookup_line"
+        ]
+      },
+      "inputs": {
+        "source_logical_id": "unit.c",
+        "existing_winning_tier_locators": []
+      },
+      "current_behavior": {
+        "observation": "The legacy basename query guesses both unrelated full-path records even though no locator exists for the exact logical ID unit.c.",
+        "value": [
+          280,
+          284
+        ]
+      },
+      "frozen_target": {
+        "interface": "SourceResolver.resolve",
         "category": "ResolutionStatus.UNAVAILABLE",
-        "expectation": "There is no basename alias; exact SourceRef queries remain exact and multiple locator candidates are AMBIGUOUS without a preferred result."
+        "resolved_locator": null,
+        "expectation": "With no existing locator for this exact SourceRef, return UNAVAILABLE; never substitute basename matches."
       },
       "known_bad_legacy_output": true,
       "legacy_output_is_target_conformance": false
@@ -304,7 +466,14 @@
       "frozen_target": {
         "interface": "SourceResolver.resolve",
         "category": "ResolutionStatus.AMBIGUOUS",
-        "expectation": "Return every distinct winning-tier candidate, no resolved_locator, and no preferred candidate."
+        "source_logical_id": "src/ambiguous.c",
+        "winning_tier": "PREFIX",
+        "candidate_locators": [
+          "candidate_a/src/ambiguous.c",
+          "candidate_b/src/ambiguous.c"
+        ],
+        "resolved_locator": null,
+        "expectation": "For one exact SourceRef with multiple distinct existing winning-tier locators, return every candidate, no resolved_locator, and no preferred candidate."
       },
       "known_bad_legacy_output": true,
       "legacy_output_is_target_conformance": false
@@ -399,7 +568,8 @@
       "platform_evidence": {
         "allowed_outcomes": [
           "SUPPORTED",
-          "SKIP_SYMLINK_PRIVILEGE"
+          "SKIP_SYMLINK_PRIVILEGE",
+          "SKIP_SYMLINK_UNSUPPORTED"
         ]
       },
       "current_behavior": {
@@ -467,7 +637,11 @@
       "frozen_target": {
         "interface": "ControllerEpochAdapter and SnapshotReadPort",
         "category": "ContextBindingStatus.UNAVAILABLE",
-        "diagnostic": "coherent_snapshot_unavailable",
+        "diagnostic": "portable_snapshot_evidence_unavailable",
+        "coherent_snapshot_unavailable_reserved_for": [
+          "stop_token_absent_or_untyped",
+          "snapshot_absent_or_untyped"
+        ],
         "expectation": "BEST_EFFORT_LIVE or mixed-read evidence is never coherent and cannot allocate epoch handles."
       },
       "known_bad_legacy_output": true,
@@ -604,8 +778,54 @@
           "label_loop": [
             292
           ],
-          "local": "main::counter",
-          "global": "global_counter"
+          "locals_for_function": {
+            "main": [
+              {
+                "name": "counter",
+                "function": "main",
+                "file": "src/main.c",
+                "directory": "build/project",
+                "line": 11,
+                "scope": "main:block0",
+                "locations": [
+                  {
+                    "start": 256,
+                    "end": 272,
+                    "location": {
+                      "kind": "stack",
+                      "offset": -4,
+                      "size": 4
+                    }
+                  },
+                  {
+                    "start": 272,
+                    "end": 288,
+                    "location": {
+                      "kind": "register",
+                      "name": "R5",
+                      "index": 5,
+                      "size": 4
+                    }
+                  }
+                ]
+              }
+            ],
+            "shared": []
+          },
+          "globals_list": [
+            {
+              "name": "global_counter",
+              "address": 8192,
+              "size": 4,
+              "type": "i32"
+            },
+            {
+              "name": "shared",
+              "address": 296,
+              "size": 4,
+              "type": "i32"
+            }
+          ]
         }
       },
       "frozen_target": {
