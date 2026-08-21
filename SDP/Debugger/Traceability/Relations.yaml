@@ -399,8 +399,14 @@ relations:
   - from: DBG-SL-001-005-007
     type: reviewed_by
     to: [DBG-RVW-001-005-011]
-    status: planned
+    status: rework
     candidate_head: ec75c4eb22333368cbe4847920dc4420fe8231cf
+    coordination_head: 76d44110156b68e63fac448e38847e6cce28a716
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/056--RF004_Recipe_Foundation_Review.md
+  - from: DBG-SL-001-005-007
+    type: reviewed_by
+    to: [DBG-RVW-001-005-033]
+    status: planned
   - from: DBG-SL-001-005-007
     type: verified_by
     to: [DBG-VER-001-005-007]

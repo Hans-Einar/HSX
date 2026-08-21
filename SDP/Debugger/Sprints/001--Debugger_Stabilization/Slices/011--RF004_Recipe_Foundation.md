@@ -1,6 +1,6 @@
 # DBG-SL-001-005-007 — RF-004 Recipe Schema and Evaluator Foundation
 
-- Status: **IMPLEMENTED / REVIEW 011 PENDING**
+- Status: **REWORK / FRESH CORRECTIVE WORKER PENDING**
 
 - Implementation head: `ec75c4eb22333368cbe4847920dc4420fe8231cf`
 
@@ -107,3 +107,10 @@ parser/validator/evaluator surface, all opcodes/failure classes, selected-frame 
 and current-profile recovered GPR rules with non-top PSW unavailable. Evidence: owned 34 passed;
 signed Slice002 47; broad debugger 218+1 classified WinError1314 skip; compile/import/export
 170 package/41 recipe exports; exact scope/diff/fsck/clean PASS. Fresh review011 is next.
+
+## Review011 result
+
+`DBG-RVW-001-005-011` returned REWORK: High incomplete pure postfix/limit validation; Medium
+unavailable register terminals rejected, exact bool/float/schema parsing gaps, and widened
+LocationEvaluator index annotation. Fresh corrective worker owns the same three files; next
+review is `DBG-RVW-001-005-033`.

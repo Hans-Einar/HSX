@@ -474,7 +474,7 @@ traceability and no product drift after the combined signed head. Steering accep
 
 ## DBG-IT-001-005 — Typed Resolver and Inspection
 
-Status: ACTIVE — INTERFACE 1.2 PASS / SLICE 007 REVIEW 011 PENDING
+Status: ACTIVE — INTERFACE 1.2 PASS / SLICE 007 REWORK
 
 ### Authority and goal
 
@@ -1069,3 +1069,11 @@ opcode and failure category, selected-frame LocationEvaluator and current-profil
 are implemented; current HSX has no PSW caller-rule seam, so non-top PSW is unavailable.
 Owned 34, signed Slice002 47 and broad debugger 218+1 pass; compile/import/export/scope/git pass.
 Fresh product review011 is the sole gate.
+
+### Slice007 review011 REWORK
+
+Fresh `DBG-RVW-001-005-011` returned REWORK at `ec75c4eb…`: the pure artifact-facing validator
+omitted normative postfix/finality/limit checks; valid unavailable GPR terminals rejected;
+bool/float and unknown-schema parsing were misclassified; and LocationEvaluator exposed
+`index: object`. Binding/no-fallback/ownership and all existing suites otherwise passed. Fresh
+corrective worker is bounded to the same three files; review033 is next.
