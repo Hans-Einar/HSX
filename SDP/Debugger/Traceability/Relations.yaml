@@ -187,7 +187,7 @@ relations:
     type: produces_interface
     to:
       - dbg.resolver-inspection/1
-    status: refrozen_candidate_pending_rereview_and_implementation
+    status: frozen_review_pass_implementation_pending
   - from: DBG-SL-001-005-001
     type: reviewed_by
     to: [DBG-RVW-001-005-001]
@@ -343,7 +343,14 @@ relations:
     type: reviewed_by
     to:
       - DBG-RVW-001-005-019
-    status: planned
+    status: pass
+    reviewed_head: 058c3383593553aa1497d024d41285d44d9c67a8
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/040--RF004_Interface_Final_Review.md
+  - from: dbg.resolver-inspection/1
+    type: frozen_at
+    to:
+      - 058c3383593553aa1497d024d41285d44d9c67a8
+    status: pass
   - from: DBG-RF-005
     type: depends_on_accepted_interface
     to:

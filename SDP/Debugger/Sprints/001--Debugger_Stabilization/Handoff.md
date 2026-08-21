@@ -1,13 +1,14 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf004_interface_reviews_007_010_012_018_rework_corrected_review_019_pending`
+Status: `rf004_interface_review_019_pass_slice001_worker_active`
 
 ## Current objective
 
 The accepted first-wave gate is closed. Execute only `DBG-RF-004` through the seven frozen
 `DBG-SL-001-005-001..007` contracts and public `dbg.resolver-inspection/1` interface. Reviews
-007 through 010 and 012..018 returned REWORK; the corrected candidate must pass fresh review 019 before product
-dispatch. RF-005..009 and Executive/VM/AVR/frontend migration remain blocked.
+007 through 010 and 012..018 returned REWORK; review 019 passed exact contract head
+`058c338…`. Dispatch only Slice 001. RF-005..009 and Executive/VM/AVR/frontend migration
+remain blocked.
 
 ## Authority
 
@@ -144,17 +145,15 @@ dispatch. RF-005..009 and Executive/VM/AVR/frontend migration remain blocked.
 
 ## Not done
 
-- No RF-004 product Slice has started.
-- `DBG-RVW-001-005-007..010` and `...012..018` returned REWORK; Master completed
-  documentation-only corrections and review 019 is pending.
+- Slice 001 worker is active; no implementation result/review/verification/sign-off exists yet.
+- `DBG-RVW-001-005-019` passed exact contract head `058c338…` after the prior REWORK chain.
 - All seven RF-004 worker/review/verification/sign-off loops and the parent gate remain open.
 - RF-005..009 remain blocked; no Executive/VM/AVR or DAP/CLI/VS Code migration is authorized.
 
 ## Exact next step
 
-Commit and publish the corrected Master-only interface candidate, dispatch fresh independent
-`DBG-RVW-001-005-019` against that exact head, and only after PASS start
-`DBG-SL-001-005-001` with a fresh bounded worker.
+Fresh bounded worker executes only `DBG-SL-001-005-001`; next gate is independent exact-head
+`DBG-RVW-001-005-001`. No later Slice may start first.
 
 ## Traceability state
 
@@ -197,7 +196,7 @@ Commit and publish the corrected Master-only interface candidate, dispatch fresh
 - Interface review `DBG-RVW-001-005-016`: REWORK at `e330a7b34…`
 - Interface review `DBG-RVW-001-005-017`: REWORK at `cb88b62b7…`
 - Interface review `DBG-RVW-001-005-018`: REWORK at `08719457a…`
-- Planned fresh interface review: `DBG-RVW-001-005-019`
+- Interface review `DBG-RVW-001-005-019`: PASS at `058c3383593553aa1497d024d41285d44d9c67a8`
 - Frozen Slices: `DBG-SL-001-004-001..003`
 - Refrozen shared interface: `dbg.controller-gateway/1.1`
 - Review `HSX-RVW-001-001-001`: REWORK at `5fff403`
@@ -233,8 +232,7 @@ Commit and publish the corrected Master-only interface candidate, dispatch fresh
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: publish and pass `DBG-RVW-001-005-019` on the corrected RF-004 interface
-  candidate before the first product worker
+- Active gate: Slice 001 worker result, then `DBG-RVW-001-005-001`
 
 ## Agents and worktree
 

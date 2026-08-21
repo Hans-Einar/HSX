@@ -208,6 +208,9 @@ issues:
     rf004_interface_review_attempt_11_status: rework
     rf004_interface_review_attempt_11_head: 08719457a341b01ca8f64ea568e1ab04678dd10d
     rf004_interface_review_attempt_12: DBG-RVW-001-005-019
+    rf004_interface_review_attempt_12_status: pass
+    rf004_interface_review_attempt_12_head: 058c3383593553aa1497d024d41285d44d9c67a8
+    rf004_interface_frozen_head: 058c3383593553aa1497d024d41285d44d9c67a8
     rf005_dependency_clarification_issue: 42
     rf005_dependency_clarification_comment: 5362515750
     portable_contract_gate: complete_accepted_frozen
@@ -243,11 +246,12 @@ issues:
     steering_completion_comment: 5362514094
   DBG-RF-004:
     issue: 41
-    status: active_candidate_refrozen_rereview_pending_product_not_started
+    status: active_interface_frozen_review_pass_slice001_ready
     iteration: DBG-IT-001-005
     slices: DBG-SL-001-005-001..DBG-SL-001-005-007
     execution_order: DBG-SL-001-005-001,DBG-SL-001-005-002,DBG-SL-001-005-007,DBG-SL-001-005-003,DBG-SL-001-005-004,DBG-SL-001-005-005,DBG-SL-001-005-006
     public_interface: dbg.resolver-inspection/1
+    active_slice: DBG-SL-001-005-001
     interface_review: DBG-RVW-001-005-007
     interface_review_status: rework
     interface_reviewed_head: 82154c614a31284723bf3e6a337c5bedfb8aba5d
@@ -282,6 +286,9 @@ issues:
     interface_review_attempt_11_status: rework
     interface_review_attempt_11_head: 08719457a341b01ca8f64ea568e1ab04678dd10d
     interface_review_attempt_12: DBG-RVW-001-005-019
+    interface_review_attempt_12_status: pass
+    interface_review_attempt_12_head: 058c3383593553aa1497d024d41285d44d9c67a8
+    interface_frozen_head: 058c3383593553aa1497d024d41285d44d9c67a8
     steering_authority_comment: 5362514094
   DBG-RF-005:
     issue: 42

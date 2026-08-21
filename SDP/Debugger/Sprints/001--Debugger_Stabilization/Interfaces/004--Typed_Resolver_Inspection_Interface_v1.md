@@ -1,6 +1,6 @@
 # `dbg.resolver-inspection/1` — Typed Resolver and Inspection Interface
 
-- Status: **REFROZEN CANDIDATE — REVIEWS 007..010/012..018 REWORK / REVIEW 019 PENDING**
+- Status: **FROZEN / INDEPENDENT REVIEW 019 PASS**
 - Iteration: `DBG-IT-001-005`
 - Parent Refactor: `DBG-RF-004`
 - Steering authority: issue #38 comment `5362514094`
@@ -18,7 +18,7 @@
 - Review `DBG-RVW-001-005-016`: REWORK at `e330a7b344715dfdbae0de46e44f4720b4387d4e`
 - Review `DBG-RVW-001-005-017`: REWORK at `cb88b62b7c45ea6ebfe31c40e522daa3adcf8896`
 - Review `DBG-RVW-001-005-018`: REWORK at `08719457a341b01ca8f64ea568e1ab04678dd10d`
-- Fresh independent re-review: `DBG-RVW-001-005-019` (`...011` is reserved for Slice 007)
+- Review `DBG-RVW-001-005-019`: PASS at `058c3383593553aa1497d024d41285d44d9c67a8`
 - Public interface ID: `dbg.resolver-inspection/1`
 
 This document freezes the public Python-domain interface to be implemented by the seven bounded

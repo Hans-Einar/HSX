@@ -1,6 +1,6 @@
 # DBG-SL-001-005-001 — RF-004 Legacy Oracle Classification
 
-- Status: **FROZEN / PLANNED**
+- Status: **ACTIVE / FRESH WORKER DISPATCH**
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
 - Review: `DBG-RVW-001-005-001`
