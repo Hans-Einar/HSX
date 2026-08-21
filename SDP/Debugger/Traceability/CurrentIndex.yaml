@@ -623,6 +623,8 @@ active_rf004:
       discovery_head: 943b8d4d111304638989e429863bece8323b4b08
       blocker: DBG-BLK-001-005-003
       blocker_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/009--RF004_Stack_Register_Result_Steering_Blocker.md
+      blocker_published_head: 43c9cfaa8bd75a3bd098c3be5df8647612b3f51a
+      steering_blocker_comment: 5373731599
       product_changes: none
       review: DBG-RVW-001-005-005
       verification: DBG-VER-001-005-005

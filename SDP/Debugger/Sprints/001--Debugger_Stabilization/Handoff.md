@@ -4,6 +4,7 @@ Status: `rf004_slice005_blocked_awaiting_steering_recipe_result_decision`
 
 Steering escalation: issue #38 comment `5369244294`.
 Steering frame-evidence refreeze: issue #38 comment `5370574104`.
+Steering stack-recipe blocker: issue #38 comment `5373731599`.
 RF-004 stacked draft review: PR #50 (`codex/dbg-rf-004` -> `codex/dbg-rf-002-003`).
 Steering progress summary: issue #38 comment `5372569290` at published head `31322e3…`.
 
@@ -33,6 +34,7 @@ verification011 passed that correction but found one later stale summary; it is 
 verification012 passed; Master signed exact SourceResolver head. Frozen StackService Slice005
 proved frozen conflict `DBG-BLK-001-005-003`: required caller R7 memory recovery produces a
 RecipeScalar while Interface1.2 requires RecipeRegister. All product drafts were removed.
+The blocker and A/B/C options are published in issue #38 comment `5373731599`.
 RF-005..009 and
 Executive/VM/AVR/frontend migration remain blocked.
 

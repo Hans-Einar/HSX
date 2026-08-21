@@ -1,10 +1,12 @@
 # DBG-BLK-001-005-003 — Stack Caller-Register Recipe Result Conflict
 
-- Status: **OPEN / AWAITING STEERING**
+- Status: **PUBLISHED / AWAITING STEERING**
 - Refactor: `DBG-RF-004`
 - Slice: `DBG-SL-001-005-005`
 - Discovery head: `943b8d4d111304638989e429863bece8323b4b08`
 - Product changes: **none**
+- Published blocker head: `43c9cfaa8bd75a3bd098c3be5df8647612b3f51a`
+- Steering issue: #38 comment `5373731599`
 
 ## Minimal conflict
 

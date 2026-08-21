@@ -304,7 +304,9 @@ issues:
     active_slice_discovery_head: 943b8d4d111304638989e429863bece8323b4b08
     active_slice_blocker: DBG-BLK-001-005-003
     active_slice_blocker_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/009--RF004_Stack_Register_Result_Steering_Blocker.md
-    active_slice_blocker_status: awaiting_steering
+    active_slice_blocker_published_head: 43c9cfaa8bd75a3bd098c3be5df8647612b3f51a
+    active_slice_blocker_comment: 5373731599
+    active_slice_blocker_status: published_awaiting_steering
     active_slice_product_changes: none
     slice004_implementation_head: c0f975c4a278cecd89e19d332ca5601b074a115e
     slice004_implementation_parent: d575299e81b1d1d29f75c9f0a5d2d43005fa8d11

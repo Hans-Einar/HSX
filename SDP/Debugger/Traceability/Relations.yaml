@@ -437,8 +437,10 @@ relations:
   - from: DBG-SL-001-005-005
     type: requires_steering_decision_on
     to: [DBG-BLK-001-005-003]
-    status: open_awaiting_steering
+    status: published_awaiting_steering
     issue: 38
+    comment: 5373731599
+    published_head: 43c9cfaa8bd75a3bd098c3be5df8647612b3f51a
   - from: DBG-BLK-001-005-003
     type: conflicts_between
     to:
