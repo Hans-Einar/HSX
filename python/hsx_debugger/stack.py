@@ -1,8 +1,8 @@
 """Snapshot-bound, frontend-neutral stack reconstruction for RF-004.
 
-This module consumes the frozen artifact/recipe/snapshot contracts.  It owns only stack
-reconstruction: no frontend handles, caches, runtime adapters, retry policy, or fixed-layout
-fallbacks live here.
+The module owns stack reconstruction and its dedicated trustworthy-prefix result only.
+Frontend handles, runtime adapters, transport retries, run control, and fixed-layout fallbacks
+remain outside this boundary.
 """
 
 from __future__ import annotations
@@ -50,6 +50,17 @@ from .snapshot import SnapshotReadPort, fence_snapshot_result, require_snapshot_
 
 
 _CURRENT_ABI = "hsx.abi.llc-r7-word32/1"
+STACK_RESULT_STATUSES = frozenset(
+    {
+        InspectionStatus.COMPLETE,
+        InspectionStatus.PARTIAL,
+        InspectionStatus.UNAVAILABLE,
+        InspectionStatus.STALE,
+        InspectionStatus.ARTIFACT_MISMATCH,
+        InspectionStatus.UNSUPPORTED,
+        InspectionStatus.CORRUPT,
+    }
+)
 
 
 def _diag(
@@ -68,27 +79,91 @@ def _diag(
     )
 
 
-def _inspection_failure(
+@dataclass(frozen=True, slots=True)
+class StackWalkResult:
+    """Exact stack termination plus every frame proven before that termination."""
+
+    status: InspectionStatus
+    context: InspectionContext
+    frames: tuple[UnwindFrame, ...]
+    diagnostics: tuple[Diagnostic, ...] = ()
+
+    def __post_init__(self) -> None:
+        if type(self.status) is not InspectionStatus or self.status not in STACK_RESULT_STATUSES:
+            raise ValueError("status must be one frozen stack-result InspectionStatus")
+        if not isinstance(self.context, InspectionContext):
+            raise TypeError("context must be InspectionContext")
+        frames = tuple(self.frames)
+        diagnostics = tuple(self.diagnostics)
+        if not all(isinstance(frame, UnwindFrame) for frame in frames):
+            raise TypeError("frames must contain UnwindFrame values")
+        if not all(isinstance(item, Diagnostic) for item in diagnostics):
+            raise TypeError("diagnostics must contain Diagnostic values")
+        if any(frame.context != self.context for frame in frames):
+            raise ValueError("every proven frame must retain the exact result context")
+        if tuple(frame.frame_index for frame in frames) != tuple(range(len(frames))):
+            raise ValueError("proven frame indices must be contiguous from zero")
+
+        if self.status is InspectionStatus.COMPLETE:
+            if not frames or diagnostics:
+                raise ValueError("COMPLETE requires a non-empty prefix and no terminating diagnostic")
+        elif self.status is InspectionStatus.PARTIAL:
+            if not frames or not diagnostics:
+                raise ValueError("PARTIAL requires a non-empty prefix and terminating diagnostic")
+        elif self.status is InspectionStatus.UNAVAILABLE:
+            if frames or not diagnostics:
+                raise ValueError("UNAVAILABLE requires no proven frame and a diagnostic")
+        elif not diagnostics:
+            raise ValueError("terminating stack failures require diagnostics")
+
+        object.__setattr__(self, "frames", frames)
+        object.__setattr__(self, "diagnostics", diagnostics)
+
+
+def _result(
+    context: InspectionContext,
+    status: InspectionStatus,
+    frames: tuple[UnwindFrame, ...] | list[UnwindFrame] = (),
+    diagnostics: tuple[Diagnostic, ...] = (),
+) -> StackWalkResult:
+    return StackWalkResult(status, context, tuple(frames), tuple(diagnostics))
+
+
+def _failure(
     context: InspectionContext,
     status: InspectionStatus,
     diagnostic: Diagnostic,
-) -> InspectionResult[tuple[UnwindFrame, ...]]:
-    return InspectionResult(status, context, None, (diagnostic,))
+    frames: tuple[UnwindFrame, ...] | list[UnwindFrame] = (),
+) -> StackWalkResult:
+    return _result(context, status, frames, (diagnostic,))
 
 
 def _partial_prefix(
     context: InspectionContext,
     frames: list[UnwindFrame],
     diagnostics: tuple[Diagnostic, ...],
-) -> InspectionResult[tuple[UnwindFrame, ...]]:
+) -> StackWalkResult:
     if not frames:
         diagnostic = diagnostics[0] if diagnostics else _diag(
             "unwind_unavailable", "no trustworthy frame could be reconstructed"
         )
-        return _inspection_failure(context, InspectionStatus.UNAVAILABLE, diagnostic)
+        return _failure(context, InspectionStatus.UNAVAILABLE, diagnostic)
     if not diagnostics:
         diagnostics = (_diag("unwind_partial", "unwind stopped after a trustworthy prefix"),)
-    return InspectionResult(InspectionStatus.PARTIAL, context, tuple(frames), diagnostics)
+    return _result(context, InspectionStatus.PARTIAL, frames, diagnostics)
+
+
+def _terminated(
+    context: InspectionContext,
+    status: InspectionStatus,
+    frames: list[UnwindFrame],
+    diagnostics: tuple[Diagnostic, ...],
+) -> StackWalkResult:
+    if status is InspectionStatus.UNAVAILABLE:
+        return _partial_prefix(context, frames, diagnostics)
+    if not diagnostics:
+        diagnostics = (_diag("unwind_terminated", f"unwind terminated as {status.value}"),)
+    return _result(context, status, frames, diagnostics)
 
 
 def _recipe_status(status: RecipeEvaluationStatus) -> InspectionStatus:
@@ -131,11 +206,7 @@ class _AggregateBudget:
             self.bytes_remaining,
         )
         result = RecipeEvaluator.evaluate(
-            evaluation,
-            expression,
-            read_port,
-            limits,
-            budget,
+            evaluation, expression, read_port, limits, budget
         )
         consumed_opcodes = budget.opcodes_remaining - result.budget_after.opcodes_remaining
         consumed_bytes = budget.bytes_remaining - result.budget_after.bytes_remaining
@@ -160,7 +231,7 @@ def _validate_profile_request(
     context: InspectionContext,
     profile_limits: RecipeLimits,
     request_limits: RecipeRequestLimits,
-) -> InspectionResult[tuple[UnwindFrame, ...]] | None:
+) -> StackWalkResult | None:
     if not isinstance(profile_limits, RecipeLimits):
         raise TypeError("profile_limits must be RecipeLimits")
     if not isinstance(request_limits, RecipeRequestLimits):
@@ -169,7 +240,7 @@ def _validate_profile_request(
         request_limits.max_frames > profile_limits.unwind_frames
         or request_limits.max_pieces > profile_limits.location_pieces
     ):
-        return _inspection_failure(
+        return _failure(
             context,
             InspectionStatus.UNSUPPORTED,
             _diag("limit_exceeded", "request limits exceed the accepted recipe profile"),
@@ -182,12 +253,12 @@ def _validate_binding(
     index: DebugArtifactIndex,
     architecture: ArchitectureDescriptor,
     abi: AbiDescriptorRef,
-) -> tuple[object | None, object | None, InspectionResult[tuple[UnwindFrame, ...]] | None]:
+) -> tuple[object | None, object | None, StackWalkResult | None]:
     try:
         binding = index.binding()
         bundle_identity = index.bundle_identity()
     except Exception as exc:
-        return None, None, _inspection_failure(
+        return None, None, _failure(
             context,
             InspectionStatus.ARTIFACT_MISMATCH,
             _diag(
@@ -198,7 +269,7 @@ def _validate_binding(
     try:
         validation = DebugBindingValidator.validate(binding, bundle_identity, architecture, abi)
     except (TypeError, ValueError) as exc:
-        return None, None, _inspection_failure(
+        return None, None, _failure(
             context,
             InspectionStatus.ARTIFACT_MISMATCH,
             _diag("debug_binding_contract", str(exc)),
@@ -207,11 +278,11 @@ def _validate_binding(
         diagnostic = validation.diagnostics[0] if validation.diagnostics else _diag(
             "debug_binding_mismatch", "debug binding validation failed"
         )
-        return None, None, InspectionResult(
-            _resolution_status(validation.status), context, None, (diagnostic,)
+        return None, None, _failure(
+            context, _resolution_status(validation.status), diagnostic
         )
     if binding.payload.loaded_image_ref != context.image:
-        return None, None, _inspection_failure(
+        return None, None, _failure(
             context,
             InspectionStatus.ARTIFACT_MISMATCH,
             _diag(
@@ -233,9 +304,9 @@ def _validated_address(
     if not register.available:
         return None, _diag(code, f"{register.register_id} is unavailable in the snapshot")
     address = HsxAddress(space, register.unsigned_value)
-    result = architecture.validate(address, permission)
-    if result.status is not AddressStatus.VALID:
-        message = result.diagnostics[0].message if result.diagnostics else "invalid address evidence"
+    checked = architecture.validate(address, permission)
+    if checked.status is not AddressStatus.VALID:
+        message = checked.diagnostics[0].message if checked.diagnostics else "invalid address evidence"
         return None, _diag(code, message)
     return address, None
 
@@ -245,26 +316,25 @@ def _read_top_seed(
     read_port: SnapshotReadPort,
     architecture: ArchitectureDescriptor,
     abi: AbiDescriptorRef,
-) -> tuple[_FrameSeed | None, InspectionResult[tuple[UnwindFrame, ...]] | None]:
+) -> tuple[_FrameSeed | None, StackWalkResult | None]:
     coverage = require_snapshot_read_set(context, "registers")
     if coverage.status is not InspectionStatus.COMPLETE:
-        return None, InspectionResult(
-            coverage.status,
-            context,
-            None,
-            coverage.diagnostics,
+        diagnostic = coverage.diagnostics[0] if coverage.diagnostics else _diag(
+            "snapshot_registers_unavailable", "snapshot does not provide register evidence"
         )
+        return None, _failure(context, InspectionStatus.UNAVAILABLE, diagnostic)
+
     selection = RegisterSelection(True, ())
     try:
         result = read_port.read_registers(context, selection)
     except Exception as exc:
-        return None, _inspection_failure(
+        return None, _failure(
             context,
             InspectionStatus.CORRUPT,
             _diag("snapshot_read_contract", f"snapshot register port raised {type(exc).__name__}"),
         )
     if not isinstance(result, InspectionResult):
-        return None, _inspection_failure(
+        return None, _failure(
             context,
             InspectionStatus.CORRUPT,
             _diag("snapshot_read_contract", "snapshot register port returned a non-InspectionResult"),
@@ -274,18 +344,22 @@ def _read_top_seed(
         diagnostic = result.diagnostics[0] if result.diagnostics else _diag(
             "snapshot_registers_unavailable", "snapshot registers are unavailable"
         )
-        return None, InspectionResult(result.status, context, None, (diagnostic,))
-    registers = result.value
-    if not isinstance(registers, RegisterSet):
-        return None, _inspection_failure(
+        status = result.status if result.status in STACK_RESULT_STATUSES else InspectionStatus.CORRUPT
+        if status is InspectionStatus.PARTIAL:
+            status = InspectionStatus.UNAVAILABLE
+        return None, _failure(context, status, diagnostic)
+    if not isinstance(result.value, RegisterSet):
+        return None, _failure(
             context,
             InspectionStatus.CORRUPT,
             _diag("snapshot_read_contract", "snapshot register result is not RegisterSet"),
         )
+
+    registers = result.value
     expected = architecture.declared_register_order
     actual = tuple(item.register_id for item in registers.registers)
     if actual != expected:
-        return None, _inspection_failure(
+        return None, _failure(
             context,
             InspectionStatus.CORRUPT,
             _diag(
@@ -296,7 +370,7 @@ def _read_top_seed(
     by_id = {item.register_id: item for item in registers.registers}
     for register_id in expected:
         if by_id[register_id].bit_width != architecture.register_bit_width(register_id):
-            return None, _inspection_failure(
+            return None, _failure(
                 context,
                 InspectionStatus.CORRUPT,
                 _diag(
@@ -320,8 +394,11 @@ def _read_top_seed(
         code="top_sp_unavailable",
     )
     if pc is None or sp is None:
-        diagnostic = pc_error if pc is None else sp_error
-        return None, _inspection_failure(context, InspectionStatus.UNAVAILABLE, diagnostic)
+        return None, _failure(
+            context,
+            InspectionStatus.UNAVAILABLE,
+            pc_error if pc is None else sp_error,
+        )
 
     gprs = RegisterSet(tuple(by_id[item] for item in architecture.register_order))
     psw = by_id["PSW"]
@@ -356,9 +433,9 @@ def _read_top_seed(
     )
 
 
-def _annotations(index: DebugArtifactIndex, pc: HsxAddress) -> tuple[
-    FunctionRecord | None, SourceLocation | None, tuple[Diagnostic, ...]
-]:
+def _annotations(
+    index: DebugArtifactIndex, pc: HsxAddress
+) -> tuple[FunctionRecord | None, SourceLocation | None, tuple[Diagnostic, ...]]:
     diagnostics: list[Diagnostic] = []
     try:
         functions = tuple(item for item in index.functions() if item.range.contains(pc))
@@ -369,9 +446,7 @@ def _annotations(index: DebugArtifactIndex, pc: HsxAddress) -> tuple[
         )
     function = functions[0] if len(functions) == 1 else None
     if len(functions) > 1:
-        diagnostics.append(
-            _diag("function_ambiguous", "more than one function contains the frame PC")
-        )
+        diagnostics.append(_diag("function_ambiguous", "more than one function contains the frame PC"))
 
     source = None
     try:
@@ -383,7 +458,7 @@ def _annotations(index: DebugArtifactIndex, pc: HsxAddress) -> tuple[
     else:
         if instruction.status is ResolutionStatus.RESOLVED and len(instruction.values) == 1:
             source = instruction.values[0].source
-        elif instruction.status not in {ResolutionStatus.UNAVAILABLE}:
+        elif instruction.status is not ResolutionStatus.UNAVAILABLE:
             diagnostics.extend(instruction.diagnostics)
     return function, source, tuple(diagnostics)
 
@@ -536,10 +611,7 @@ def _recover_gprs(
 
         value = result.value
         if isinstance(value, RecipeRegister):
-            if (
-                value.register_id != register_id
-                or value.bit_width != architecture.register_width_bits
-            ):
+            if value.register_id != register_id or value.bit_width != architecture.register_width_bits:
                 return None, RecipeEvaluationStatus.CORRUPT, (
                     _diag(
                         "invalid_register_rule_result",
@@ -569,9 +641,7 @@ def _recover_gprs(
                     frame_index=frame_index,
                 ),
             )
-        recovered.append(
-            RegisterValue(register_id, architecture.register_width_bits, bits, True)
-        )
+        recovered.append(RegisterValue(register_id, architecture.register_width_bits, bits, True))
 
     return RegisterSet(tuple(recovered)), None, tuple(diagnostics)
 
@@ -589,9 +659,7 @@ def _checked_call_site(
     if adjustment == 0:
         candidate = resume_pc
     elif adjustment < 0:
-        checked = architecture.subtract(
-            resume_pc, -adjustment, AddressArithmeticMode.CHECKED
-        )
+        checked = architecture.subtract(resume_pc, -adjustment, AddressArithmeticMode.CHECKED)
         if checked.status is not AddressStatus.VALID:
             return None, (
                 _diag(
@@ -603,9 +671,7 @@ def _checked_call_site(
             )
         candidate = checked.value
     else:
-        checked = architecture.add(
-            resume_pc, adjustment, AddressArithmeticMode.CHECKED
-        )
+        checked = architecture.add(resume_pc, adjustment, AddressArithmeticMode.CHECKED)
         if checked.status is not AddressStatus.VALID:
             return None, (
                 _diag(
@@ -649,10 +715,8 @@ def _checked_call_site(
         )
         return None, tuple(diagnostics)
 
-    # HSX-D-002 additionally requires proof that the exact instruction *is a CALL*.
-    # The frozen RF-004 InstructionRecord has no portable semantic discriminator, so mere
-    # existence/encoded bytes cannot be promoted to CALL evidence by importing legacy opcode
-    # tables or hard-coding the current Python encoding here.
+    # D-002 additionally requires proof that this exact instruction is a CALL. RF-004's
+    # frozen InstructionRecord currently exposes no portable semantic discriminator.
     return None, (
         _diag(
             "call_site_semantics_unavailable",
@@ -675,7 +739,7 @@ class StackService:
         abi: AbiDescriptorRef,
         profile_limits: RecipeLimits,
         request_limits: RecipeRequestLimits,
-    ) -> InspectionResult[tuple[UnwindFrame, ...]]:
+    ) -> StackWalkResult:
         if not isinstance(context, InspectionContext):
             raise TypeError("context must be InspectionContext")
         if not isinstance(architecture, ArchitectureDescriptor):
@@ -710,7 +774,7 @@ class StackService:
                 current.sp.unsigned_value,
             )
             if key in seen_frame_keys:
-                return _inspection_failure(
+                return _failure(
                     context,
                     InspectionStatus.CORRUPT,
                     _diag(
@@ -718,6 +782,7 @@ class StackService:
                         "frame PC/SP pair repeated during unwind",
                         frame_index=frame_index,
                     ),
+                    frames,
                 )
             seen_frame_keys.add(key)
 
@@ -726,7 +791,7 @@ class StackService:
             try:
                 row_result = index.unwind_rows(current.pc, function_id)
             except Exception as exc:
-                return _inspection_failure(
+                return _failure(
                     context,
                     InspectionStatus.CORRUPT,
                     _diag(
@@ -734,6 +799,7 @@ class StackService:
                         f"unwind row lookup failed with {type(exc).__name__}",
                         frame_index=frame_index,
                     ),
+                    frames,
                 )
             if row_result.status is not ResolutionStatus.RESOLVED or len(row_result.values) != 1:
                 diagnostics = row_result.diagnostics or (
@@ -743,13 +809,13 @@ class StackService:
                         frame_index=frame_index,
                     ),
                 )
-                status = _resolution_status(row_result.status)
-                if status is InspectionStatus.UNAVAILABLE and frames:
-                    return _partial_prefix(context, frames, tuple(diagnostics))
-                return InspectionResult(status, context, None, tuple(diagnostics))
+                return _terminated(
+                    context, _resolution_status(row_result.status), frames, tuple(diagnostics)
+                )
+
             row = row_result.values[0]
             if not isinstance(row, UnwindRow) or row.abi != abi or row.binding != binding:
-                return _inspection_failure(
+                return _failure(
                     context,
                     InspectionStatus.ARTIFACT_MISMATCH,
                     _diag(
@@ -757,9 +823,10 @@ class StackService:
                         "selected unwind row differs from the validated binding/ABI",
                         frame_index=frame_index,
                     ),
+                    frames,
                 )
             if row.boundary is UnwindBoundary.UNSUPPORTED:
-                return _inspection_failure(
+                return _failure(
                     context,
                     InspectionStatus.UNSUPPORTED,
                     _diag(
@@ -768,6 +835,7 @@ class StackService:
                         row_id=row.row_id,
                         frame_index=frame_index,
                     ),
+                    frames,
                 )
 
             base_evaluation = _evaluation_context(
@@ -781,15 +849,9 @@ class StackService:
                 None,
             )
             cfa_result = aggregate.evaluate(
-                base_evaluation,
-                row.cfa_expression,
-                read_port,
-                profile_limits,
+                base_evaluation, row.cfa_expression, read_port, profile_limits
             )
             if cfa_result.status is not RecipeEvaluationStatus.COMPLETE:
-                status = _recipe_status(cfa_result.status)
-                if status is InspectionStatus.UNAVAILABLE and frames:
-                    return _partial_prefix(context, frames, cfa_result.diagnostics)
                 diagnostics = cfa_result.diagnostics or (
                     _diag(
                         "cfa_unavailable",
@@ -798,9 +860,11 @@ class StackService:
                         frame_index=frame_index,
                     ),
                 )
-                return InspectionResult(status, context, None, diagnostics)
+                return _terminated(
+                    context, _recipe_status(cfa_result.status), frames, diagnostics
+                )
             if not isinstance(cfa_result.value, RecipeAddress):
-                return _inspection_failure(
+                return _failure(
                     context,
                     InspectionStatus.CORRUPT,
                     _diag(
@@ -809,11 +873,13 @@ class StackService:
                         row_id=row.row_id,
                         frame_index=frame_index,
                     ),
+                    frames,
                 )
+
             cfa = cfa_result.value.address
             cfa_key = (cfa.space, cfa.unsigned_value)
             if cfa_key in seen_cfas:
-                return _inspection_failure(
+                return _failure(
                     context,
                     InspectionStatus.CORRUPT,
                     _diag(
@@ -822,12 +888,10 @@ class StackService:
                         row_id=row.row_id,
                         frame_index=frame_index,
                     ),
+                    frames,
                 )
             seen_cfas.add(cfa_key)
 
-            frame_diagnostics = tuple(
-                current.diagnostics + annotation_diagnostics + cfa_result.diagnostics
-            )
             frame = UnwindFrame(
                 context=context,
                 frame_index=frame_index,
@@ -842,14 +906,16 @@ class StackService:
                 function=function,
                 source=source,
                 terminal=row.boundary is UnwindBoundary.TERMINAL,
-                diagnostics=frame_diagnostics,
+                diagnostics=tuple(
+                    current.diagnostics + annotation_diagnostics + cfa_result.diagnostics
+                ),
             )
             frames.append(frame)
 
             if row.boundary is UnwindBoundary.TERMINAL:
-                return InspectionResult(InspectionStatus.COMPLETE, context, tuple(frames), ())
+                return _result(context, InspectionStatus.COMPLETE, frames, ())
             if frame_index + 1 >= request_limits.max_frames:
-                return InspectionResult(InspectionStatus.COMPLETE, context, tuple(frames), ())
+                return _result(context, InspectionStatus.COMPLETE, frames, ())
 
             evaluation = _evaluation_context(
                 context,
@@ -873,10 +939,9 @@ class StackService:
                 frame_index=frame_index,
             )
             if pc_status is not None:
-                status = _recipe_status(pc_status)
-                if status is InspectionStatus.UNAVAILABLE:
-                    return _partial_prefix(context, frames, pc_diagnostics)
-                return InspectionResult(status, context, None, pc_diagnostics)
+                return _terminated(
+                    context, _recipe_status(pc_status), frames, pc_diagnostics
+                )
 
             caller_sp, sp_status, sp_diagnostics = _required_address_rule(
                 row.caller_sp_rule,
@@ -890,10 +955,9 @@ class StackService:
                 frame_index=frame_index,
             )
             if sp_status is not None:
-                status = _recipe_status(sp_status)
-                if status is InspectionStatus.UNAVAILABLE:
-                    return _partial_prefix(context, frames, sp_diagnostics)
-                return InspectionResult(status, context, None, sp_diagnostics)
+                return _terminated(
+                    context, _recipe_status(sp_status), frames, sp_diagnostics
+                )
 
             caller_frame_base, base_status, base_diagnostics = _optional_frame_base_rule(
                 row.caller_frame_base_rule,
@@ -906,8 +970,8 @@ class StackService:
                 frame_index=frame_index,
             )
             if base_status is not None:
-                return InspectionResult(
-                    _recipe_status(base_status), context, None, base_diagnostics
+                return _terminated(
+                    context, _recipe_status(base_status), frames, base_diagnostics
                 )
 
             caller_gprs, gpr_status, gpr_diagnostics = _recover_gprs(
@@ -921,24 +985,21 @@ class StackService:
                 frame_index=frame_index,
             )
             if gpr_status is not None:
-                return InspectionResult(
-                    _recipe_status(gpr_status), context, None, gpr_diagnostics
+                return _terminated(
+                    context, _recipe_status(gpr_status), frames, gpr_diagnostics
                 )
 
             call_site_pc, call_site_diagnostics = _checked_call_site(
-                caller_pc,
-                row,
-                index,
-                architecture,
-                frame_index,
+                caller_pc, row, index, architecture, frame_index
             )
             next_pc = call_site_pc if call_site_pc is not None else caller_pc
-            next_psw = RegisterValue("PSW", architecture.psw_width_bits, None, False)
             current = _FrameSeed(
                 pc=next_pc,
                 sp=caller_sp,
                 recovered_registers=caller_gprs,
-                recovered_psw=next_psw,
+                recovered_psw=RegisterValue(
+                    "PSW", architecture.psw_width_bits, None, False
+                ),
                 frame_base=caller_frame_base,
                 resume_pc=caller_pc,
                 call_site_pc=call_site_pc,
@@ -951,7 +1012,14 @@ class StackService:
                 ),
             )
 
-        return InspectionResult(InspectionStatus.COMPLETE, context, tuple(frames), ())
+        # RecipeRequestLimits requires at least one frame and the loop always returns on its
+        # final permitted frame. This is a defensive contract guard only.
+        return _failure(
+            context,
+            InspectionStatus.CORRUPT,
+            _diag("stack_internal_contract", "stack loop exited without a classified result"),
+            frames,
+        )
 
 
-__all__ = ["StackService"]
+__all__ = ["STACK_RESULT_STATUSES", "StackService", "StackWalkResult"]
