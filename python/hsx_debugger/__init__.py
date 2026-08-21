@@ -11,6 +11,8 @@ from .metadata import *
 from .metadata import __all__ as _metadata_all
 from .results import *
 from .results import __all__ as _results_all
+from .recipes import *
+from .recipes import __all__ as _recipes_all
 from .snapshot import *
 from .snapshot import __all__ as _snapshot_all
 
@@ -20,5 +22,6 @@ __all__ = [
     *_addresses_all,
     *_results_all,
     *_metadata_all,
+    *_recipes_all,
     *_snapshot_all,
 ]
