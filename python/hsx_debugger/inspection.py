@@ -508,6 +508,10 @@ class EpochInspectionSession:
         revision = self._begin()
         if revision is None:
             return self._stale()
+        try:
+            expected = self._service._architecture.selected_register_order(selection)
+        except (TypeError, ValueError, KeyError) as exc:
+            return _failure(self._context, InspectionStatus.CORRUPT, "register_selection_invalid", str(exc))
         coverage = require_snapshot_read_set(self._context, "registers")
         if coverage.status is not InspectionStatus.COMPLETE:
             return InspectionResult(coverage.status, self._context, None, coverage.diagnostics)
@@ -524,10 +528,6 @@ class EpochInspectionSession:
             return result
         if not isinstance(result.value, RegisterSet):
             return _failure(self._context, InspectionStatus.CORRUPT, "snapshot_read_contract", "register result is not RegisterSet")
-        try:
-            expected = self._service._architecture.selected_register_order(selection)
-        except (TypeError, ValueError, KeyError) as exc:
-            return _failure(self._context, InspectionStatus.CORRUPT, "register_selection_invalid", str(exc))
         if tuple(item.register_id for item in result.value.registers) != expected:
             return _failure(self._context, InspectionStatus.CORRUPT, "snapshot_register_shape_mismatch", "register result identity/order differs")
         for item in result.value.registers:
