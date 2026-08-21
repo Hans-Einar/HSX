@@ -1177,3 +1177,9 @@ broad280/3 and exact trace/scope/Git evidence. Formal verification004 is next; S
 Verification004 passed all SourceResolver product evidence but failed three stale Handoff
 sentences describing Slice002/six loops/review036 as open. Master normalized only those
 sentences. Fresh verification011 is required; product is unchanged and Slice005 remains stopped.
+
+### Slice004 verification011 FAIL trace-only
+
+Verification011 passed the complete unchanged product matrix and verification004 corrections,
+but one later Handoff summary still stopped at Slice003 verification003. Master corrected only
+that sentence. Fresh verification012 is required; Slice005 remains stopped.

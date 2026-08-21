@@ -1,6 +1,6 @@
 # DBG-SL-001-005-004 — RF-004 Exact Source Resolver
 
-- Status: **REVIEW036 PASS / VERIFICATION004 TRACE-FAIL CORRECTED / VERIFICATION011 PENDING**
+- Status: **REVIEW036 PASS / VERIFICATIONS004_011 TRACE-FAIL CORRECTED / VERIFICATION012 PENDING**
 - Product head: `c0f975c4a278cecd89e19d332ca5601b074a115e`
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
@@ -90,3 +90,6 @@ pass. Skips remain classified Windows host/symlink degradation.
 Product evidence passed; verification004 failed stale Handoff prose only. Master normalized
 the exact Slice002/open-loop/review036 sentences. Fresh verification011 is required; product
 head remains unchanged.
+
+Verification011 passed the requested correction and full product matrix but found one later
+stale Handoff summary. Master corrected only that sentence. Fresh verification012 is required.
