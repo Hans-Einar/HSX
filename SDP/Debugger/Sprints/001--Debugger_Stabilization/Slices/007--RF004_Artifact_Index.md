@@ -28,6 +28,7 @@ Legacy `python/hsx_dbg/symbols.py`, source mapping, runtime and frontend files a
 - require exact ArchitectureDescriptor/AbiDescriptorRef and pass shared DebugBindingValidator
   before validating typed address/range/recipe rows or publishing an index;
 - parse recipe-bearing rows only through Slice 007's signed pure DTO/validator surface;
+- require every UnwindRow/LocationRow ABI to equal the validated accepted ABI;
 - reject artifact, bundle, binding, architecture, ABI, recipe or component mismatch without
   publishing an index;
 - preserve all duplicate symbol/name/line candidates and exact source identity/spelling;

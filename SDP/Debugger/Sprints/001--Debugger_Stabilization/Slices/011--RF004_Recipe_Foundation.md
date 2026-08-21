@@ -33,6 +33,8 @@ inspection, legacy product/runtime and frontend files are read-only.
   row/form role mismatch and cyclic/non-progressing CFA are corrupt;
 - own UnwindRow/LocationRow DTOs and consume Slice 002 metadata SymbolRecord read-only, so no
   future artifact-module import cycle exists;
+- require exact AbiDescriptorRef on both row types and reject evaluator row/ABI mismatch before
+  any opcode/read;
 - reject unknown mandatory schema/field/opcode as unsupported and malformed
   arity/type/width/stack/address/piece coverage as corrupt;
 - enforce exact profile limits; every exhaustion is `UNSUPPORTED` with diagnostic

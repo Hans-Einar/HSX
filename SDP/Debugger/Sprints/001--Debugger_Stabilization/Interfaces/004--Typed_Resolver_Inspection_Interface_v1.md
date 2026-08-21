@@ -1,6 +1,6 @@
 # `dbg.resolver-inspection/1` — Typed Resolver and Inspection Interface
 
-- Status: **REFROZEN CANDIDATE — REVIEWS 007..010/012..015 REWORK / REVIEW 016 PENDING**
+- Status: **REFROZEN CANDIDATE — REVIEWS 007..010/012..016 REWORK / REVIEW 017 PENDING**
 - Iteration: `DBG-IT-001-005`
 - Parent Refactor: `DBG-RF-004`
 - Steering authority: issue #38 comment `5362514094`
@@ -15,7 +15,8 @@
 - Review `DBG-RVW-001-005-013`: REWORK at `1e8fb7e74c92a69711bd48809696552cf2f982db`
 - Review `DBG-RVW-001-005-014`: REWORK at `96daa3a5dffa6b80b2b5687b9cd0429ffaa402c8`
 - Review `DBG-RVW-001-005-015`: REWORK at `18c0a26cad4c2d82e4a23ef0ec3e6409b022cb95`
-- Fresh independent re-review: `DBG-RVW-001-005-016` (`...011` is reserved for Slice 007)
+- Review `DBG-RVW-001-005-016`: REWORK at `e330a7b344715dfdbae0de46e44f4720b4387d4e`
+- Fresh independent re-review: `DBG-RVW-001-005-017` (`...011` is reserved for Slice 007)
 - Public interface ID: `dbg.resolver-inspection/1`
 
 This document freezes the public Python-domain interface to be implemented by the seven bounded
@@ -501,7 +502,8 @@ UnwindRow { row_id: str, binding: ImageDebugBinding, pc_range: HsxAddressRange,
 LocationRow { row_id: str, binding: ImageDebugBinding, symbol_id: str,
               lexical_scope_id: str, function_id: str,
               pc_range: HsxAddressRange, declared_type_id: str | None,
-              declared_bit_size: int >= 1, schema: RecipeSchemaRef,
+              declared_bit_size: int >= 1, abi: AbiDescriptorRef,
+              schema: RecipeSchemaRef,
               location_form: LocationForm }
 ```
 
