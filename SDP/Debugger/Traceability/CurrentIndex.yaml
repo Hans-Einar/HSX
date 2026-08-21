@@ -467,7 +467,7 @@ active_rf004:
     frame_refreeze_review_status: rework_trace_only
     frame_refreeze_reviewed_content_head: cb575ac0920bec8cc7ddd5565df9544b746f069b
     frame_refreeze_reviewed_coordination_head: b4f95e4f3b4094f3bdfbc912207772f85c6c9a92
-    frame_trace_corrected_candidate_head: pending_publication
+    frame_trace_corrected_candidate_head: f79eb6298798250e7aca7e0266b1948af7903138
     frame_refreeze_rereview: DBG-RVW-001-005-032
     frame_refreeze_rereview_status: planned
     recovered_frame_conformance_id: DBG-CF-001-005-002

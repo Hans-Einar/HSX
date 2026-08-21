@@ -10,6 +10,7 @@
 - Steering escalation: issue #38 comment `5369244294`
 - Steering refreeze: issue #38 comment `5370574104`
 - Published refreeze content head: `cb575ac0920bec8cc7ddd5565df9544b746f069b`
+- Trace-corrected candidate head: `f79eb6298798250e7aca7e0266b1948af7903138`
 
 ## Frozen contradiction
 

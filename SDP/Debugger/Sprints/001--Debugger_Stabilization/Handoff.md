@@ -11,6 +11,7 @@ Published refreeze content head: `94a59f3738fadc0b6230fc3dc69cf36ca8b9202e`.
 Corrected refreeze content head: `4c581a740ee95c3362aa77de85630ba001013e1c`.
 Trace-corrected refreeze head: `ae49435ebb24198ad1fb2017e5998bbad305792f`.
 Frame-evidence refreeze content head: `cb575ac0920bec8cc7ddd5565df9544b746f069b`.
+Frame-evidence trace-corrected head: `f79eb6298798250e7aca7e0266b1948af7903138`.
 
 ## Current objective
 
@@ -194,7 +195,8 @@ Executive/VM/AVR/frontend migration remain blocked.
 
 ## Exact next step
 
-Publish the trace-corrected candidate and dispatch fresh independent interface review032. Do
+Dispatch fresh independent interface review032 against exact candidate
+`f79eb6298798250e7aca7e0266b1948af7903138`. Do
 not restart Slice007 or use product review011 before PASS.
 
 ## Traceability state
