@@ -191,6 +191,12 @@ relations:
   - from: DBG-SL-001-005-001
     type: reviewed_by
     to: [DBG-RVW-001-005-001]
+    status: rework
+    reviewed_head: a9a22fc4750f22d774eade43810a499dd1992859
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/041--RF004_Legacy_Oracle_Review.md
+  - from: DBG-SL-001-005-001
+    type: reviewed_by
+    to: [DBG-RVW-001-005-020]
     status: planned
   - from: DBG-SL-001-005-001
     type: verified_by

@@ -254,6 +254,8 @@ issues:
     active_slice: DBG-SL-001-005-001
     active_slice_implementation_head: a9a22fc4750f22d774eade43810a499dd1992859
     active_slice_review: DBG-RVW-001-005-001
+    active_slice_review_status: rework
+    active_slice_corrective_review: DBG-RVW-001-005-020
     interface_review: DBG-RVW-001-005-007
     interface_review_status: rework
     interface_reviewed_head: 82154c614a31284723bf3e6a337c5bedfb8aba5d

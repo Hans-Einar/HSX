@@ -752,3 +752,11 @@ target conformance. Worker evidence: new oracle 14 passed/1 WinError 1314 symlin
 SymbolIndex 2 passed; SourceMap 4 passed/1 same skip; focused stack/backend/location 11 passed;
 hash-seed 0/1 repeats each 14 passed/1 skip; diff/scope/clean PASS. Fresh exact-head review is
 `DBG-RVW-001-005-001`; no later Slice is active.
+
+### Slice 001 review attempt 1
+
+Fresh independent `DBG-RVW-001-005-001` reviewed `a9a22fc4750f22d774eade43810a499dd1992859`
+and returned REWORK: one High descriptor-independent wide-address target, plus Medium source
+identity/locator conflation, wrong BEST_EFFORT diagnostic, overly broad symlink skip and an
+unasserted function-qualified local golden. Product/scope/mechanical tests passed. Fresh
+corrective worker owns the same seven files; next review is `DBG-RVW-001-005-020`.

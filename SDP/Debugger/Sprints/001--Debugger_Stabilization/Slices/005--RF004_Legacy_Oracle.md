@@ -1,6 +1,6 @@
 # DBG-SL-001-005-001 — RF-004 Legacy Oracle Classification
 
-- Status: **IMPLEMENTED / INDEPENDENT REVIEW PENDING**
+- Status: **REWORK / FRESH CORRECTIVE WORKER PENDING**
 - Implementation head: `a9a22fc4750f22d774eade43810a499dd1992859`
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
@@ -66,4 +66,5 @@ exact-head review, formal verification and Master sign-off.
 - PYTHONHASHSEED 0/1: each 14 passed, 1 same skip;
 - diff-check/scope/clean status: PASS.
 
-Next gate: fresh exact-head `DBG-RVW-001-005-001`.
+Review `DBG-RVW-001-005-001`: REWORK. Next gate after bounded correction:
+`DBG-RVW-001-005-020`.
