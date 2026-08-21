@@ -96,6 +96,12 @@ Review `DBG-RVW-001-005-002`: REWORK. Next review after bounded correction:
 `DBG-RVW-001-005-022`: REWORK trace-only; all code findings PASS. Fresh review:
 `DBG-RVW-001-005-023` — REWORK. Next review after correction: `DBG-RVW-001-005-024`.
 
+Third correction at `373d786a983252d5b1735b599596293557adba5a`: raw, non-overridable
+dataclass/enum state inspection; custom attribute access rejected across relevant MRO; hidden
+extra/mutable state, direct frozen inheritance, enum concealment and legitimate DTO regressions.
+Focused 45, debugger 182+1 classified skip, mandated 39+1 same skip, canonical 2, compile/import/
+export 129, diff/fsck/exact scope/clean PASS. Review 024 is pending.
+
 Second correction: exact atom types; directly declared frozen dataclasses only; all fields
 deep-traversed; undeclared dict/slot state rejected. Focused 43, debugger 180+1 skip, mandated
 39+1, canonical 2, compile/import/export 129, diff/fsck/scope/clean PASS.

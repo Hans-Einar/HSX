@@ -254,6 +254,7 @@ relations:
     type: reviewed_by
     to: [DBG-RVW-001-005-024]
     status: planned
+    candidate_head: 373d786a983252d5b1735b599596293557adba5a
   - from: DBG-SL-001-005-002
     type: verified_by
     to: [DBG-VER-001-005-002]

@@ -873,3 +873,14 @@ Fresh `DBG-RVW-001-005-023` found one High remaining bypass: a directly frozen d
 override `__getattribute__` to hide extra/mutable raw state from validation. Normalized trace
 and every other code/test/scope gate passed. Fresh corrective worker must use non-overridable
 raw-state inspection/reject custom attribute access; next review is `DBG-RVW-001-005-024`.
+
+### Slice 002 corrective result 3
+
+Fresh worker committed `373d786a983252d5b1735b599596293557adba5a`, changing only
+`results.py` and the owned metadata test. Validation now reads raw dataclass/enum state through
+non-overridable access and rejects custom `__getattribute__`/`__getattr__` across the relevant
+MRO. Regressions cover hidden extra state, hidden mutable fields, direct frozen inheritance,
+enum concealment and legitimate frozen DTOs. Evidence: focused 45 passed; debugger 182 passed/
+1 classified WinError 1314 skip; mandated 39 passed/1 same skip; canonical 2 passed; compile/
+import/export 129 unique PASS; diff/fsck/exact scope/clean PASS. Fresh review is
+`DBG-RVW-001-005-024`; no later Slice is active.
