@@ -274,6 +274,12 @@ issues:
   DBG-RF-004:
     issue: 41
     status: slices001_002_007_signed_slice003_worker_pending
+    draft_pull_request: 50
+    draft_pull_request_url: https://github.com/Hans-Einar/HSX/pull/50
+    draft_pull_request_base: codex/dbg-rf-002-003
+    draft_pull_request_head: 31322e3a722fd575a02be2a65419f2e20882172a
+    steering_progress_issue: 38
+    steering_progress_summary_comment: 5372569290
     iteration: DBG-IT-001-005
     slices: DBG-SL-001-005-001..DBG-SL-001-005-007
     execution_order: DBG-SL-001-005-001,DBG-SL-001-005-002,DBG-SL-001-005-007,DBG-SL-001-005-003,DBG-SL-001-005-004,DBG-SL-001-005-005,DBG-SL-001-005-006

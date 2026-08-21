@@ -4,6 +4,8 @@ Status: `rf004_slices001_002_007_signed_slice003_worker_pending`
 
 Steering escalation: issue #38 comment `5369244294`.
 Steering frame-evidence refreeze: issue #38 comment `5370574104`.
+RF-004 stacked draft review: PR #50 (`codex/dbg-rf-004` -> `codex/dbg-rf-002-003`).
+Steering progress summary: issue #38 comment `5372569290` at published head `31322e3…`.
 
 Steering escalation: issue #38 comment `5365959417`.
 Steering refreeze: issue #38 comment `5368017338`.
@@ -21,7 +23,8 @@ Historical versions `1`/`1.1` passed reviews019/030; Slices001–002 are signed.
 `DBG-BLK-001-005-002` and selected frame-carried recovered evidence in comment `5370574104`.
 Review031 returned REWORK trace-only; review032 passed exact head `f79eb629…`. Slice007 review011
 returned REWORK; review033 returned REWORK trace-only; review034/verification007/sign-off passed.
-Artifact Slice003 is next. RF-005..009 and
+Draft PR #50 and Steering progress comment `5372569290` expose the exact signed heads and next
+gate. Artifact Slice003 is next. RF-005..009 and
 Executive/VM/AVR/frontend migration remain blocked.
 
 ## Authority
