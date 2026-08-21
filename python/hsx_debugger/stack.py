@@ -29,7 +29,6 @@ from .recipes import (
     RecipeLimits,
     RecipeRegister,
     RecipeRequestLimits,
-    RecipeResultKind,
     RecipeRole,
     RecipeRule,
     RecipeRuleKind,
@@ -649,7 +648,19 @@ def _checked_call_site(
             ),
         )
         return None, tuple(diagnostics)
-    return candidate, ()
+
+    # HSX-D-002 additionally requires proof that the exact instruction *is a CALL*.
+    # The frozen RF-004 InstructionRecord has no portable semantic discriminator, so mere
+    # existence/encoded bytes cannot be promoted to CALL evidence by importing legacy opcode
+    # tables or hard-coding the current Python encoding here.
+    return None, (
+        _diag(
+            "call_site_semantics_unavailable",
+            "exact instruction metadata does not provide frozen portable CALL semantic evidence",
+            row_id=row.row_id,
+            frame_index=frame_index,
+        ),
+    )
 
 
 class StackService:
