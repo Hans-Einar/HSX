@@ -370,14 +370,26 @@ class InspectionService:
             raise TypeError("context must be InspectionContext")
         if not isinstance(request_limits, RecipeRequestLimits):
             raise TypeError("request_limits must be RecipeRequestLimits")
-        if request_limits.max_frames > self._profile_limits.unwind_frames or request_limits.max_pieces > self._profile_limits.location_pieces:
-            return InspectionOpenResult(InspectionOpenStatus.UNAVAILABLE, None, (_diag("limit_exceeded", "epoch request limits exceed profile"),))
-        invalid = self._validate_open_context(context)
-        if invalid is not None:
-            return invalid
+
+        # Close is terminal. Check once before pure validation and again at the linearization
+        # point so a concurrent close cannot be hidden by a later limit/binding classification.
         with self._lock:
             if self._closed:
                 return InspectionOpenResult(InspectionOpenStatus.UNAVAILABLE, None, (_diag("inspection_service_closed", "inspection service is closed"),))
+
+        limit_invalid = (
+            request_limits.max_frames > self._profile_limits.unwind_frames
+            or request_limits.max_pieces > self._profile_limits.location_pieces
+        )
+        invalid = self._validate_open_context(context)
+
+        with self._lock:
+            if self._closed:
+                return InspectionOpenResult(InspectionOpenStatus.UNAVAILABLE, None, (_diag("inspection_service_closed", "inspection service is closed"),))
+            if limit_invalid:
+                return InspectionOpenResult(InspectionOpenStatus.UNAVAILABLE, None, (_diag("limit_exceeded", "epoch request limits exceed profile"),))
+            if invalid is not None:
+                return invalid
             epoch_id = context.epoch.stop_epoch_id.value
             if epoch_id in self._stale_history:
                 return InspectionOpenResult(InspectionOpenStatus.STALE, None, (_diag("epoch_id_previously_invalidated", "StopEpochId is retained as stale"),))
