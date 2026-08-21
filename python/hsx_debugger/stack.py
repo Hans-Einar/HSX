@@ -47,7 +47,7 @@ from .results import (
     RegisterValue,
     ResolutionStatus,
 )
-from .snapshot import SnapshotReadPort, fence_snapshot_result
+from .snapshot import SnapshotReadPort, fence_snapshot_result, require_snapshot_read_set
 
 
 _CURRENT_ABI = "hsx.abi.llc-r7-word32/1"
@@ -247,6 +247,14 @@ def _read_top_seed(
     architecture: ArchitectureDescriptor,
     abi: AbiDescriptorRef,
 ) -> tuple[_FrameSeed | None, InspectionResult[tuple[UnwindFrame, ...]] | None]:
+    coverage = require_snapshot_read_set(context, "registers")
+    if coverage.status is not InspectionStatus.COMPLETE:
+        return None, InspectionResult(
+            coverage.status,
+            context,
+            None,
+            coverage.diagnostics,
+        )
     selection = RegisterSelection(True, ())
     try:
         result = read_port.read_registers(context, selection)
