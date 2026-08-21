@@ -104,6 +104,12 @@ export 129, diff/fsck/exact scope/clean PASS. Review 024: REWORK because `__dict
 and mutated `__slots__` metadata can still hide live storage. Next review after bounded storage-
 descriptor correction: `DBG-RVW-001-005-025`.
 
+Fourth correction at `bbc5c8ba3be960bcb7d522edbf3d5ae12dbe8c2a`: raw class mapping,
+exact built-in storage descriptors, direct storage reads and layout cross-checks reject filtered
+dict descriptors plus slot metadata/descriptor concealment for dataclass and Enum. Focused 51,
+debugger 188+1 classified skip, mandated 39+1 same skip, canonical 2, adversarial 7, exports 129,
+diff/fsck/exact scope/clean PASS. Review 025 is pending.
+
 Second correction: exact atom types; directly declared frozen dataclasses only; all fields
 deep-traversed; undeclared dict/slot state rejected. Focused 43, debugger 180+1 skip, mandated
 39+1, canonical 2, compile/import/export 129, diff/fsck/scope/clean PASS.

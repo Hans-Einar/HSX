@@ -474,7 +474,7 @@ traceability and no product drift after the combined signed head. Steering accep
 
 ## DBG-IT-001-005 — Typed Resolver and Inspection
 
-Status: ACTIVE — INTERFACE PASS / SLICE 001 SIGNED / SLICE 002 REWORK 4
+Status: ACTIVE — INTERFACE PASS / SLICE 001 SIGNED / SLICE 002 CORRECTED 4 / REVIEW 025 PENDING
 
 ### Authority and goal
 
@@ -894,3 +894,14 @@ matrix found these three unexpected acceptances while every prior code closure a
 scope/trace/git gate passed. Master also corrected two stale narratives in this Iteration header
 and the Debugger README. Fresh corrective worker 4 must inspect actual raw storage descriptors;
 next review is `DBG-RVW-001-005-025`.
+
+### Slice 002 corrective result 4
+
+Fresh worker committed `bbc5c8ba3be960bcb7d522edbf3d5ae12dbe8c2a`, changing only
+`results.py` and the owned metadata test. Raw class mappings and exact built-in getset/member
+descriptors now drive dict/slot inventory and direct storage reads; layout cross-checks reject
+descriptor deletion/replacement and mutable metadata concealment. The six pre-fix bypass
+regressions now pass while legitimate frozen DTO/Enum cases remain accepted. Evidence: focused
+51 passed; debugger 188 passed/1 classified WinError 1314 skip; mandated 39 passed/1 same skip;
+canonical 2; targeted adversarial 7; compile/import/export 129 unique; exact scope/diff/fsck/
+ancestry/clean PASS. Fresh review is `DBG-RVW-001-005-025`; no later Slice is active.
