@@ -1,6 +1,6 @@
 # DBG-SL-001-005-002 — RF-004 Typed Identity, Binding, Address, and Result Foundation
 
-- Status: **IMPLEMENTED / INDEPENDENT REVIEW PENDING**
+- Status: **REWORK / FRESH CORRECTIVE WORKER PENDING**
 - Implementation head: `4b5837644dc1196accfd8608bc3dbd20980476bb`
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
@@ -88,4 +88,5 @@ Close only after exact-head review, formal verification and Master sign-off.
   metadata 86.5%, aggregate 84.2%;
 - diff-check, exact scope and clean status: PASS.
 
-Next gate: `DBG-RVW-001-005-002`.
+Review `DBG-RVW-001-005-002`: REWORK. Next review after bounded correction:
+`DBG-RVW-001-005-021`.

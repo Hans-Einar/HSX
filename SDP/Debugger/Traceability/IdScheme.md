@@ -77,6 +77,7 @@ track IDs rather than silently renamed in historical documents.
 - `DBG-SL-001-005-007` — early recipe schema/validator/evaluator foundation
 - `DBG-RVW-001-005-001..DBG-RVW-001-005-006` — exact-head Slice reviews
 - `DBG-RVW-001-005-001` — Slice 001 initial review, REWORK
+- `DBG-RVW-001-005-002` — Slice 002 initial review, REWORK
 - `DBG-RVW-001-005-007` — first `dbg.resolver-inspection/1` review, REWORK
 - `DBG-RVW-001-005-008` — corrected interface re-review, REWORK
 - `DBG-RVW-001-005-009` — interface review attempt 3, REWORK
@@ -91,6 +92,7 @@ track IDs rather than silently renamed in historical documents.
 - `DBG-RVW-001-005-018` — interface review attempt 11, REWORK
 - `DBG-RVW-001-005-019` — final interface review, PASS
 - `DBG-RVW-001-005-020` — Slice 001 fresh corrective re-review, PASS
+- `DBG-RVW-001-005-021` — Slice 002 fresh corrective re-review
 - `DBG-VER-001-005-001..DBG-VER-001-005-007` — formal Slice verifications
 - `DBG-VER-001-005-001` — Slice 001 verification attempt, FAIL trace-only
 - `DBG-VER-001-005-008` — Slice 001 reverification attempt 2, FAIL trace-only

@@ -824,3 +824,11 @@ owned files only and append-only prior exports. Evidence: focused 35 passed; all
 Slice001 39 passed/1 same skip; import/export 129 unique PASS; stdlib trace aggregate 84.2%;
 diff/scope/clean PASS. `pytest-cov` was unavailable, so coverage used stdlib trace. Fresh
 exact-head review is `DBG-RVW-001-005-002`; no later Slice is active.
+
+### Slice 002 review attempt 1
+
+Fresh independent `DBG-RVW-001-005-002` reviewed `4b5837644dc1196accfd8608bc3dbd20980476bb`
+and returned REWORK: High nested-result mutability/duck typing, High incomplete ValuePiece bit
+coverage, High MemoryBlock/result status contradiction, plus Medium normalized trace summaries
+still worker-active. All existing tests/canonical/scope/import evidence passed. Fresh corrective
+worker owns Slice 002 files only; next review is `DBG-RVW-001-005-021`.
