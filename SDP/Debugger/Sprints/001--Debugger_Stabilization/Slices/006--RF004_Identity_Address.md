@@ -1,6 +1,6 @@
 # DBG-SL-001-005-002 — RF-004 Typed Identity, Binding, Address, and Result Foundation
 
-- Status: **REWORK 3 / CUSTOM ATTRIBUTE CONCEALMENT**
+- Status: **REWORK 6 / ENUM SNAPSHOT FEASIBILITY**
 - Implementation head: `4b5837644dc1196accfd8608bc3dbd20980476bb`
 - Corrected head: `4280bc6008385042bdff923bd8e5392a1c290fdc`
 - Corrected head 2: `6c933ea6b11e42d58da52faf0997f8c978dad54b`
@@ -119,6 +119,11 @@ Enum/status storage validation, mutable/inconsistent metadata and extra-state re
 standard HSX/status Enum and public DTO acceptance. Focused 60, debugger 197+1 classified skip,
 mandated 39+1 same skip, oracle 16+1, canonical 2, exports 129, exact scope/git PASS. Review 026
 is pending.
+
+Review 026: REWORK. Pre-construction Enum/storage findings are closed, but retaining the Enum
+singleton does not snapshot post-construction member/property changes. Fresh corrective worker
+6 first performs a frozen-contract feasibility assessment; review 027 is conditional on a
+private type-preserving correction, otherwise work stops for Steering.
 
 Second correction: exact atom types; directly declared frozen dataclasses only; all fields
 deep-traversed; undeclared dict/slot state rejected. Focused 43, debugger 180+1 skip, mandated

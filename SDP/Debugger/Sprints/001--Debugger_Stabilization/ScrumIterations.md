@@ -474,7 +474,7 @@ traceability and no product drift after the combined signed head. Steering accep
 
 ## DBG-IT-001-005 — Typed Resolver and Inspection
 
-Status: ACTIVE — INTERFACE PASS / SLICE 001 SIGNED / SLICE 002 CORRECTED 5 / REVIEW 026 PENDING
+Status: ACTIVE — INTERFACE PASS / SLICE 001 SIGNED / SLICE 002 REWORK 6 FEASIBILITY GATE
 
 ### Authority and goal
 
@@ -924,3 +924,13 @@ metadata and extra dict/slot state are rejected while standard HSX/status Enums 
 remain accepted. Evidence: focused 60; debugger 197+1 classified WinError 1314 skip; mandated
 39+1 same skip; oracle 16+1; canonical 2; compile/import/export 129; exact scope/diff/fsck/
 ancestry/clean PASS. Fresh review is `DBG-RVW-001-005-026`; no later Slice is active.
+
+### Slice 002 review attempt 7
+
+Fresh `DBG-RVW-001-005-026` confirmed all pre-construction Enum and prior result findings
+closed at `0bedb2d1…`, but returned REWORK because `results.py` retains the original Enum
+singleton and an already accepted result can observe later member/property changes. All tests,
+scope, API, YAML/Ledger and git gates passed; the sprint top status was the sole trace defect and
+is corrected. A fresh feasibility worker must either implement a private type-preserving
+immutable snapshot or stop for Steering because scalar/proxy snapshotting changes the frozen
+generic typed envelope. Review 027 is conditional; no later Slice is active.
