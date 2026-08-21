@@ -295,6 +295,7 @@ issues:
     active_slice_corrective_review_7_status: not_started_blocked
     steering_blocker: DBG-BLK-001-005-001
     steering_blocker_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/005--RF004_Enum_Immutability_Steering_Blocker.md
+    steering_blocker_comment: 5365959417
     interface_review: DBG-RVW-001-005-007
     interface_review_status: rework
     interface_reviewed_head: 82154c614a31284723bf3e6a337c5bedfb8aba5d

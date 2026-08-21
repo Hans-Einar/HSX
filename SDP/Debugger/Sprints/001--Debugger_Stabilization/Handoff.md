@@ -2,6 +2,8 @@
 
 Status: `rf004_blocked_awaiting_steering_enum_immutability`
 
+Steering escalation: issue #38 comment `5365959417`.
+
 ## Current objective
 
 The accepted first-wave gate is closed. Execute only `DBG-RF-004` through the seven frozen
@@ -255,6 +257,7 @@ formal verification and every later Slice remain unstarted.
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
 - Active gate: Steering decision on `DBG-BLK-001-005-001`
+- Blocker authority: issue #38 comment `5365959417`
 
 ## Agents and worktree
 

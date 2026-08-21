@@ -496,6 +496,7 @@ active_rf004:
       corrective_review_7_status: not_started_blocked
       blocker: DBG-BLK-001-005-001
       blocker_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/005--RF004_Enum_Immutability_Steering_Blocker.md
+      steering_blocker_comment: 5365959417
       review: DBG-RVW-001-005-002
       verification: DBG-VER-001-005-002
     - id: DBG-SL-001-005-003

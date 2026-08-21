@@ -281,6 +281,8 @@ relations:
     type: requires_steering_decision_on
     to: [dbg.resolver-inspection/1]
     status: open
+    issue: 38
+    comment: 5365959417
   - from: DBG-SL-001-005-002
     type: verified_by
     to: [DBG-VER-001-005-002]

@@ -7,6 +7,7 @@
 - Last product head: `0bedb2d110147f3f34c5846d14ee9b9581926f2d`
 - Feasibility head: `71b471abc8544fa40b138a12e746b11b94e34e8c`
 - Product changes during feasibility: none
+- Steering escalation: issue #38 comment `5365959417`
 
 ## Frozen contradiction
 
