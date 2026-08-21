@@ -474,7 +474,7 @@ traceability and no product drift after the combined signed head. Steering accep
 
 ## DBG-IT-001-005 — Typed Resolver and Inspection
 
-Status: ACTIVE — INTERFACE PASS / SLICE 001 REVIEW PASS / REVERIFICATION PENDING
+Status: ACTIVE — INTERFACE PASS / SLICE 001 REVIEW PASS / REVERIFICATION 009 PENDING
 
 ### Authority and goal
 
@@ -790,3 +790,12 @@ WinError 1314 symlink skip and no symlink PASS. CurrentIndex active iteration/ne
 this iteration header still said product-not-started despite interface/review/verification
 state. Master corrected only current-state trace and reserved fresh
 `DBG-VER-001-005-008`; implementation head `8e566994…` remains unchanged.
+
+### Slice 001 verification attempt 2
+
+Fresh `DBG-VER-001-005-008` again passed every implementation, manifest, scope, head,
+connectivity and trace parse check, with only the explicit WinError 1314 symlink skip. It
+returned FAIL trace-only because `Issues.yaml` RF-004 normalized status alone retained the
+pre-worker value. Master corrected that field, recorded attempts 001/008 as trace-only FAIL,
+and reserved fresh `DBG-VER-001-005-009`. Implementation remains `8e566994…`; no sign-off or
+later Slice start.

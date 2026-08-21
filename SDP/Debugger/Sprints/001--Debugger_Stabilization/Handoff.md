@@ -1,6 +1,6 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf004_slice001_verification_001_trace_fail_reverification_008_pending`
+Status: `rf004_slice001_verifications_001_008_trace_fail_reverification_009_pending`
 
 ## Current objective
 
@@ -149,14 +149,15 @@ remain blocked.
   `DBG-RVW-001-005-001` returned REWORK. Correction is at `8e5669940dd5c23df532577c39dc10bd84692ad2`
   and review 020 passed; verification/sign-off remain open.
 - `DBG-VER-001-005-001` passed all implementation evidence but failed stale current-state
-  trace; trace is corrected and fresh `DBG-VER-001-005-008` is pending.
+  trace. `DBG-VER-001-005-008` repeated all evidence and failed only the remaining normalized
+  Issues status; it is corrected and fresh `DBG-VER-001-005-009` is pending.
 - `DBG-RVW-001-005-019` passed exact contract head `058c338…` after the prior REWORK chain.
 - All seven RF-004 worker/review/verification/sign-off loops and the parent gate remain open.
 - RF-005..009 remain blocked; no Executive/VM/AVR or DAP/CLI/VS Code migration is authorized.
 
 ## Exact next step
 
-Fresh verifier runs `DBG-VER-001-005-008` against unchanged corrected/reviewed exact head `8e566994…`.
+Fresh verifier runs `DBG-VER-001-005-009` against unchanged corrected/reviewed exact head `8e566994…`.
 No later Slice may start first.
 
 ## Traceability state
@@ -236,7 +237,7 @@ No later Slice may start first.
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: `DBG-VER-001-005-008`
+- Active gate: `DBG-VER-001-005-009`
 
 ## Agents and worktree
 

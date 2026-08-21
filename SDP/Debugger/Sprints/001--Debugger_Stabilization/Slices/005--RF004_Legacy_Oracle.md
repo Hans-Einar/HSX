@@ -1,6 +1,6 @@
 # DBG-SL-001-005-001 — RF-004 Legacy Oracle Classification
 
-- Status: **REVIEW PASS / VERIFICATION 001 TRACE-FAIL / REVERIFICATION 008 PENDING**
+- Status: **REVIEW PASS / VERIFICATIONS 001/008 TRACE-FAIL / REVERIFICATION 009 PENDING**
 - Implementation head: `a9a22fc4750f22d774eade43810a499dd1992859`
 - Corrected head: `8e5669940dd5c23df532577c39dc10bd84692ad2`
 - Parent: `DBG-RF-004`
@@ -70,7 +70,9 @@ exact-head review, formal verification and Master sign-off.
 Review `DBG-RVW-001-005-001`: REWORK; corrected `DBG-RVW-001-005-020`: PASS.
 
 `DBG-VER-001-005-001` passed implementation evidence but failed stale current-state trace;
-fresh formal gate is `DBG-VER-001-005-008` with no implementation change.
+`DBG-VER-001-005-008` again passed implementation evidence but found one stale normalized
+Issues status. That field is corrected; fresh formal gate is `DBG-VER-001-005-009` with no
+implementation change.
 
 Corrective result: two owned files changed; 29 cases (13 preserve, 8 intentional-change,
 8 retire); new oracle 16 passed/1 WinError 1314 skip; SymbolIndex 2 passed; SourceMap 4 passed/
