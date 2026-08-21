@@ -1,6 +1,6 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf004_slice001_signed_slice002_corrected_3_review_024_pending`
+Status: `rf004_slice001_signed_slice002_review_024_rework_corrective_worker_4_pending`
 
 ## Current objective
 
@@ -160,15 +160,16 @@ remain blocked.
   review 022 confirmed code PASS and returned only normalized trace REWORK; trace is corrected.
 - `DBG-RVW-001-005-023` found a High custom `__getattribute__` concealment bypass. Fresh
   correction 3 is `373d786a983252d5b1735b599596293557adba5a`, limited to `results.py`
-  and the owned metadata test; fresh review remains open.
+  and the owned metadata test. `DBG-RVW-001-005-024` returned REWORK because a `__dict__`
+  descriptor and mutated `__slots__` metadata still hide live raw storage; correction 4 is open.
 - `DBG-RVW-001-005-019` passed exact contract head `058c338…` after the prior REWORK chain.
 - Six RF-004 Slice loops and the parent gate remain open.
 - RF-005..009 remain blocked; no Executive/VM/AVR or DAP/CLI/VS Code migration is authorized.
 
 ## Exact next step
 
-Fresh `DBG-RVW-001-005-024` reviews exact corrected head `373d786a983252d5b1735b599596293557adba5a`;
-no later Slice starts before review, verification and Master sign-off.
+Fresh corrective worker 4 fixes only actual storage-descriptor discovery/inspection, then fresh
+`DBG-RVW-001-005-025`; no later Slice starts before review, verification and Master sign-off.
 
 ## Traceability state
 
@@ -247,7 +248,7 @@ no later Slice starts before review, verification and Master sign-off.
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: `DBG-RVW-001-005-024` at Slice 002 corrected head `373d786a…`
+- Active gate: Slice 002 corrective worker 4, then `DBG-RVW-001-005-025`
 
 ## Agents and worktree
 

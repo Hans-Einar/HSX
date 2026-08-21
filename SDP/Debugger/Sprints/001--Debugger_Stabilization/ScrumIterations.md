@@ -474,7 +474,7 @@ traceability and no product drift after the combined signed head. Steering accep
 
 ## DBG-IT-001-005 — Typed Resolver and Inspection
 
-Status: ACTIVE — INTERFACE PASS / SLICE 001 REVIEW PASS / REVERIFICATION 009 PENDING
+Status: ACTIVE — INTERFACE PASS / SLICE 001 SIGNED / SLICE 002 REWORK 4
 
 ### Authority and goal
 
@@ -884,3 +884,13 @@ enum concealment and legitimate frozen DTOs. Evidence: focused 45 passed; debugg
 1 classified WinError 1314 skip; mandated 39 passed/1 same skip; canonical 2 passed; compile/
 import/export 129 unique PASS; diff/fsck/exact scope/clean PASS. Fresh review is
 `DBG-RVW-001-005-024`; no later Slice is active.
+
+### Slice 002 review attempt 5
+
+Fresh `DBG-RVW-001-005-024` returned REWORK at exact code head `373d786a…`. A directly frozen
+dataclass can shadow `__dict__` with a filtering descriptor, and mutable `__slots__` metadata
+can hide live member descriptors for frozen dataclass and Enum instances. A 42-case independent
+matrix found these three unexpected acceptances while every prior code closure and full test/
+scope/trace/git gate passed. Master also corrected two stale narratives in this Iteration header
+and the Debugger README. Fresh corrective worker 4 must inspect actual raw storage descriptors;
+next review is `DBG-RVW-001-005-025`.
