@@ -239,6 +239,26 @@ def test_missing_prefix_candidates_fall_through_to_full_logical_id_search_root(
     assert result.candidates[0].discovery is SourceDiscovery.SEARCH_ROOT
 
 
+def test_windows_inner_drive_segment_cannot_reset_full_logical_id_join(
+    tmp_path: Path,
+) -> None:
+    if os.name != "nt":
+        pytest.skip("Windows drive-segment host semantics are inapplicable")
+    content = b"must not substitute the collapsed path"
+    source = source_ref("src/C:/unit.c", content)
+    collapsed = write(tmp_path / "root", "src/unit.c", content)
+
+    result = SourceResolver().resolve(
+        source,
+        policy(roots=(str(tmp_path / "root"),)),
+    )
+
+    assert collapsed.is_file()
+    assert result.status is ResolutionStatus.UNAVAILABLE
+    assert result.resolved_locator is None
+    assert result.candidates == ()
+
+
 def test_all_search_roots_are_one_ordered_winning_tier_without_first_choice(
     tmp_path: Path,
 ) -> None:

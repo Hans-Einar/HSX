@@ -187,7 +187,9 @@ def _validate_locator(locator: str) -> str | None:
 def _join_locator(root: str, suffix: str) -> str:
     if not suffix:
         return root
-    return os.path.join(root, *suffix.split("/"))
+    host_separators = (os.sep,) if os.altsep is None else (os.sep, os.altsep)
+    separator = "" if root.endswith(host_separators) else os.sep
+    return root + separator + os.sep.join(suffix.split("/"))
 
 
 def _prefix_suffix(logical_id: str, logical_prefix: str) -> str | None:
