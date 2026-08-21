@@ -17,6 +17,7 @@ from .identity import (
     canonical_structured_digest,
     validate_source_logical_id,
 )
+from .results import _register_contract_enums
 
 
 def _require_nonempty(value: str, field_name: str) -> None:
@@ -62,6 +63,9 @@ class InstructionClassification(str, Enum):
     USER = "user"
     COMPILER_GENERATED = "compiler_generated"
     UNMAPPED = "unmapped"
+
+
+_register_contract_enums(SymbolKind, TypeKind, InstructionClassification)
 
 
 @dataclass(frozen=True, slots=True)

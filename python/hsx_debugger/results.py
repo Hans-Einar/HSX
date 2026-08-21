@@ -7,11 +7,8 @@ exchange.
 
 from __future__ import annotations
 
-from collections.abc import Hashable, Mapping
 from dataclasses import dataclass, fields, is_dataclass
-from enum import Enum
-import struct
-from types import GetSetDescriptorType, MappingProxyType, MemberDescriptorType
+from enum import Enum, EnumMeta
 from typing import TYPE_CHECKING, Generic, TypeAlias, TypeVar
 
 if TYPE_CHECKING:
@@ -44,9 +41,9 @@ def _require_bool(value: bool, field_name: str) -> None:
 
 
 def _require_enum(value: object, enum_type: type[Enum], field_name: str) -> None:
-    if not isinstance(value, enum_type):
+    if type(value) is not enum_type:
         raise TypeError(f"{field_name} must be {enum_type.__name__}")
-    _require_immutable_enum(value, field_name)
+    _require_contract_enum(value, field_name)
 
 
 def _tuple(value: object, field_name: str) -> tuple:
@@ -58,249 +55,75 @@ def _tuple(value: object, field_name: str) -> tuple:
 _IMMUTABLE_PAYLOAD_ATOM_TYPES = frozenset(
     {str, bytes, int, float, complex, bool, type(None)}
 )
-_ENUM_MEMBER_STATE = frozenset({"_value_", "_name_", "__objclass__", "_sort_order_"})
-_POINTER_SIZE = struct.calcsize("P")
-_HEAP_TYPE_FLAG = 1 << 9
-_TYPE_NAMESPACE_DESCRIPTOR = type.__dict__["__dict__"]
-_TYPE_LAYOUT_DESCRIPTORS = MappingProxyType(
-    {
-        name: type.__dict__[name]
-        for name in (
-            "__base__",
-            "__basicsize__",
-            "__dictoffset__",
-            "__flags__",
-            "__itemsize__",
-            "__mro__",
-            "__weakrefoffset__",
-        )
-    }
-)
+_APPROVED_CONTRACT_ENUM_TYPES: set[type[Enum]] = set()
 
 
-def _type_layout_value(record_type: type[object], name: str) -> object:
-    descriptor = _TYPE_LAYOUT_DESCRIPTORS[name]
-    return MemberDescriptorType.__get__(descriptor, record_type, type)
+def _register_contract_enums(*enum_types: type[Enum]) -> None:
+    """Privately admit frozen public Enum projections to generic result payloads.
 
+    Slice modules call this only for their already-frozen public Enum classes.  Approval is
+    exact-class based: inheriting from ``Enum`` or reusing an approved scalar value does not
+    admit a caller-defined Enum.
+    """
 
-def _raw_type_namespace(record_type: type[object]) -> MappingProxyType:
-    return GetSetDescriptorType.__get__(
-        _TYPE_NAMESPACE_DESCRIPTOR, record_type, type
-    )
-
-
-def _descriptor_matches_owner(
-    descriptor: object, owner: type[object], name: str
-) -> bool:
-    return (
-        object.__getattribute__(descriptor, "__objclass__") is owner
-        and object.__getattribute__(descriptor, "__name__") == name
-    )
-
-
-def _require_member_storage_layout(
-    owner: type[object], member_count: int, field_name: str
-) -> None:
-    """Detect removed/replaced member descriptors without consulting ``__slots__``."""
-
-    base = _type_layout_value(owner, "__base__")
-    if base is None or not (_type_layout_value(owner, "__flags__") & _HEAP_TYPE_FLAG):
-        return
-    if (
-        _type_layout_value(owner, "__itemsize__") != 0
-        or _type_layout_value(base, "__itemsize__") != 0
-    ):
-        # Variable-size scalar Enum bases cannot add Python member slots.  Their fixed
-        # metadata remains covered through the canonical instance-dict descriptor below.
-        return
-
-    layout_bytes = _type_layout_value(owner, "__basicsize__") - _type_layout_value(
-        base, "__basicsize__"
-    )
-    if (
-        _type_layout_value(owner, "__weakrefoffset__")
-        and not _type_layout_value(base, "__weakrefoffset__")
-    ):
-        layout_bytes -= _POINTER_SIZE
-    if (
-        _type_layout_value(owner, "__dictoffset__") > 0
-        and not _type_layout_value(base, "__dictoffset__")
-    ):
-        layout_bytes -= _POINTER_SIZE
-
-    if (
-        layout_bytes < 0
-        or layout_bytes % _POINTER_SIZE
-        or layout_bytes // _POINTER_SIZE != member_count
-    ):
-        owner_name = type.__getattribute__(owner, "__name__")
-        raise TypeError(
-            f"{field_name} has inconsistent member storage layout in {owner_name}"
-        )
-
-
-def _storage_descriptors(
-    record_type: type[object], field_name: str
-) -> tuple[tuple[GetSetDescriptorType, ...], tuple[tuple[str, MemberDescriptorType], ...]]:
-    dict_descriptors: list[GetSetDescriptorType] = []
-    member_descriptors: list[tuple[str, MemberDescriptorType]] = []
-    for owner in _type_layout_value(record_type, "__mro__"):
-        namespace = _raw_type_namespace(owner)
-        if "__dict__" in namespace:
-            dict_descriptor = namespace["__dict__"]
+    for enum_type in enum_types:
+        if not isinstance(enum_type, EnumMeta):
+            raise TypeError("contract Enum approval requires an Enum class")
+        module_name = enum_type.__module__
+        if (
+            not (
+                module_name.startswith("hsx_debugger.")
+                or ".hsx_debugger." in module_name
+            )
+            or enum_type.__name__.startswith("_")
+        ):
+            raise TypeError("contract Enum approval requires a public hsx_debugger Enum")
+        for declared_name, member in enum_type.__members__.items():
             if (
-                type(dict_descriptor) is not GetSetDescriptorType
-                or not _descriptor_matches_owner(dict_descriptor, owner, "__dict__")
+                type(member) is not enum_type
+                or enum_type.__members__[declared_name] is not member
             ):
-                owner_name = type.__getattribute__(owner, "__name__")
-                raise TypeError(
-                    f"{field_name} has a custom or shadowing __dict__ storage "
-                    f"descriptor in {owner_name}"
-                )
-            dict_descriptors.append(dict_descriptor)
-
-        owner_members: list[tuple[str, MemberDescriptorType]] = []
-        for name, descriptor in namespace.items():
-            if type(descriptor) is not MemberDescriptorType:
-                continue
-            if not _descriptor_matches_owner(descriptor, owner, name):
-                owner_name = type.__getattribute__(owner, "__name__")
-                raise TypeError(
-                    f"{field_name} has a shadowing member storage descriptor "
-                    f"in {owner_name}: {name}"
-                )
-            owner_members.append((name, descriptor))
-        _require_member_storage_layout(owner, len(owner_members), field_name)
-        member_descriptors.extend(owner_members)
-
-    has_instance_dict = _type_layout_value(record_type, "__dictoffset__") != 0
-    if has_instance_dict != bool(dict_descriptors):
-        raise TypeError(f"{field_name} has inconsistent __dict__ storage descriptor layout")
-    return tuple(dict_descriptors), tuple(member_descriptors)
-
-
-def _require_default_attribute_access(
-    record_type: type[object], field_name: str
-) -> None:
-    """Reject dataclass DTOs whose MRO can conceal their stored instance state."""
-
-    for owner in _type_layout_value(record_type, "__mro__"):
-        namespace = _raw_type_namespace(owner)
-        custom_names = {
-            name
-            for name in ("__getattribute__", "__getattr__")
-            if name in namespace and not (owner is object and name == "__getattribute__")
-        }
-        if custom_names:
-            names = ", ".join(sorted(custom_names))
-            owner_name = type.__getattribute__(owner, "__name__")
-            raise TypeError(
-                f"{field_name} dataclass payload must not define custom attribute access "
-                f"in {owner_name}: {names}"
+                raise TypeError("contract Enum members must retain exact canonical identity")
+            schema_value = member.value
+            frozen_value = _deep_freeze(
+                schema_value, f"{enum_type.__name__}.{declared_name}.value"
             )
+            if frozen_value is not schema_value:
+                raise TypeError(
+                    "contract Enum schema-visible values must already be contract-safe immutable"
+                )
+        _APPROVED_CONTRACT_ENUM_TYPES.add(enum_type)
 
 
-def _require_declared_instance_state(
-    value: object,
-    field_name: str,
-    declared_names: frozenset[str],
-) -> dict[str, tuple[object, ...]]:
-    dict_descriptors, member_descriptors = _storage_descriptors(
-        type(value), field_name
-    )
-    storage: dict[str, list[object]] = {}
-    raw_state: dict[str, object] | None = None
-    for descriptor in dict_descriptors:
-        state = GetSetDescriptorType.__get__(descriptor, value, type(value))
-        if type(state) is not dict:
-            raise TypeError(f"{field_name} must expose exact raw instance state")
-        if raw_state is None:
-            raw_state = state
-        elif raw_state is not state:
-            raise TypeError(f"{field_name} has inconsistent __dict__ storage descriptors")
-
-    if raw_state is not None:
-        undeclared = set(raw_state).difference(declared_names)
-        if undeclared:
-            names = ", ".join(sorted(undeclared))
-            raise TypeError(f"{field_name} has undeclared instance state: {names}")
-        for name, member in raw_state.items():
-            storage.setdefault(name, []).append(member)
-
-    undeclared_members = {
-        name for name, _ in member_descriptors if name not in declared_names
-    }
-    if undeclared_members:
-        names = ", ".join(sorted(undeclared_members))
-        raise TypeError(
-            f"{field_name} has undeclared slots (undeclared member storage): {names}"
-        )
-    for name, descriptor in member_descriptors:
-        try:
-            member = MemberDescriptorType.__get__(descriptor, value, type(value))
-        except AttributeError:
-            continue
-        storage.setdefault(name, []).append(member)
-    return {name: tuple(members) for name, members in storage.items()}
-
-
-def _require_immutable_enum(value: Enum, field_name: str) -> None:
-    """Accept conventional scalar enum members without accepting scalar subclasses generally."""
-
-    storage = _require_declared_instance_state(value, field_name, _ENUM_MEMBER_STATE)
-    for name in _ENUM_MEMBER_STATE:
-        if len(storage.get(name, ())) != 1:
-            raise TypeError(
-                f"{field_name} enum metadata {name} must have exact raw storage"
-            )
-
-    stored_value = storage["_value_"][0]
-    if type(stored_value) not in _IMMUTABLE_PAYLOAD_ATOM_TYPES:
-        raise TypeError(f"{field_name} enum value must be an exact immutable scalar")
-
-    stored_name = storage["_name_"][0]
-    if type(stored_name) is not str or not stored_name:
-        raise TypeError(f"{field_name} enum name must be an exact non-empty string")
-
+def _require_contract_enum(value: Enum, field_name: str) -> None:
     enum_type = type(value)
-    if storage["__objclass__"][0] is not enum_type:
-        raise TypeError(f"{field_name} enum object class must match its exact type")
-
-    stored_sort_order = storage["_sort_order_"][0]
-    if (
-        type(stored_sort_order) is not int
-        or stored_sort_order < 0
-    ):
-        raise TypeError(f"{field_name} enum sort order must be an exact non-negative integer")
-
-    enum_namespace = _raw_type_namespace(enum_type)
-    member_names = enum_namespace.get("_member_names_")
-    member_map = enum_namespace.get("_member_map_")
-    if (
-        type(member_names) is not list
-        or type(member_map) is not dict
-        or stored_sort_order >= len(member_names)
-        or member_names[stored_sort_order] != stored_name
-        or member_map.get(stored_name) is not value
-        or enum_namespace.get(stored_name) is not value
-    ):
-        raise TypeError(f"{field_name} enum name/type/order metadata is inconsistent")
+    if enum_type not in _APPROVED_CONTRACT_ENUM_TYPES:
+        raise TypeError(f"{field_name} must be an approved closed contract Enum")
+    member = enum_type.__members__.get(value.name)
+    if member is not value:
+        raise TypeError(f"{field_name} must retain exact canonical Enum member identity")
+    schema_value = value.value
+    frozen_value = _deep_freeze(schema_value, f"{field_name}.value")
+    if frozen_value is not schema_value:
+        raise TypeError(
+            f"{field_name} Enum schema-visible value must be contract-safe immutable"
+        )
 
 
 def _deep_freeze(value: object, field_name: str, active: set[int] | None = None) -> object:
     """Copy supported generic payload containers into deeply immutable values.
 
     Result envelopes are generic, so their constructors cannot validate one static DTO type.
-    They instead accept immutable scalar values, frozen dataclass DTOs, and the standard
-    container forms that can be copied to tuples, frozensets, and detached read-only mappings.
-    Mutable or structurally duck-typed objects outside those forms are rejected.
+    They instead accept exact immutable scalar values, approved closed Enum atoms, frozen
+    dataclass DTOs, and the exact container forms normalized by interface 1.1.  Mutable or
+    structurally duck-typed objects outside those forms are rejected.
     """
 
     if type(value) in _IMMUTABLE_PAYLOAD_ATOM_TYPES:
         return value
 
     if isinstance(value, Enum):
-        _require_immutable_enum(value, field_name)
+        _require_contract_enum(value, field_name)
         return value
 
     if active is None:
@@ -309,7 +132,7 @@ def _deep_freeze(value: object, field_name: str, active: set[int] | None = None)
     if identity in active:
         raise ValueError(f"{field_name} must not contain a reference cycle")
 
-    if isinstance(value, (tuple, list)):
+    if type(value) in (tuple, list):
         active.add(identity)
         try:
             frozen_items = tuple(
@@ -324,7 +147,7 @@ def _deep_freeze(value: object, field_name: str, active: set[int] | None = None)
             return value
         return frozen_items
 
-    if isinstance(value, (set, frozenset)):
+    if type(value) in (set, frozenset):
         active.add(identity)
         try:
             frozen_items = tuple(
@@ -341,20 +164,19 @@ def _deep_freeze(value: object, field_name: str, active: set[int] | None = None)
         except TypeError as exc:
             raise TypeError(f"{field_name} contains an unhashable frozen value") from exc
 
-    if isinstance(value, Mapping):
+    if type(value) is dict:
         active.add(identity)
         try:
-            frozen_mapping: dict[object, object] = {}
-            for key, item in value.items():
-                frozen_key = _deep_freeze(key, f"{field_name} key", active)
-                if not isinstance(frozen_key, Hashable):
-                    raise TypeError(f"{field_name} contains an unhashable frozen key")
-                frozen_mapping[frozen_key] = _deep_freeze(
-                    item, f"{field_name}[{key!r}]", active
+            frozen_items = tuple(
+                (
+                    _deep_freeze(key, f"{field_name} key", active),
+                    _deep_freeze(item, f"{field_name}[{key!r}]", active),
                 )
+                for key, item in value.items()
+            )
         finally:
             active.remove(identity)
-        return MappingProxyType(frozen_mapping)
+        return frozen_items
 
     if is_dataclass(value) and not isinstance(value, type):
         concrete_type = type(value)
@@ -367,22 +189,11 @@ def _deep_freeze(value: object, field_name: str, active: set[int] | None = None)
             )
         if not dataclass_parameters.frozen:
             raise TypeError(f"{field_name} dataclass payload must be frozen")
-        _require_default_attribute_access(concrete_type, field_name)
         record_fields = fields(concrete_type)
-        record_field_names = frozenset(record_field.name for record_field in record_fields)
-        raw_storage = _require_declared_instance_state(
-            value, field_name, record_field_names
-        )
         active.add(identity)
         try:
             for record_field in record_fields:
-                stored_members = raw_storage.get(record_field.name, ())
-                if len(stored_members) != 1:
-                    raise TypeError(
-                        f"{field_name}.{record_field.name} must have exactly one raw "
-                        "dataclass storage cell"
-                    )
-                member = stored_members[0]
+                member = object.__getattribute__(value, record_field.name)
                 frozen_member = _deep_freeze(
                     member, f"{field_name}.{record_field.name}", active
                 )
@@ -481,6 +292,21 @@ class ExpressionKind(str, Enum):
 class MemorySegmentStatus(str, Enum):
     COMPLETE = "complete"
     UNAVAILABLE = "unavailable"
+
+
+_register_contract_enums(
+    ResolutionStatus,
+    InspectionStatus,
+    ContextBindingStatus,
+    InspectionOpenStatus,
+    InvalidationStatus,
+    ServiceCloseStatus,
+    AddressStatus,
+    ValueAvailability,
+    ValuePieceStatus,
+    ExpressionKind,
+    MemorySegmentStatus,
+)
 
 
 @dataclass(frozen=True, slots=True)

@@ -4,7 +4,7 @@ from dataclasses import FrozenInstanceError, dataclass, replace
 from enum import Enum
 from pathlib import Path
 import sys
-from types import MemberDescriptorType, SimpleNamespace
+from types import SimpleNamespace
 
 import pytest
 
@@ -14,7 +14,16 @@ PYTHON_SRC = REPO_ROOT / "python"
 if str(PYTHON_SRC) not in sys.path:
     sys.path.insert(0, str(PYTHON_SRC))
 
-from hsx_debugger.addresses import ByteOrder, HsxAddress, HsxAddressRange, AddressSpaceId, Permission
+from hsx_debugger.addresses import (
+    AddressArithmeticMode,
+    AddressSpaceId,
+    ArithmeticMode,
+    ByteOrder,
+    HsxAddress,
+    HsxAddressRange,
+    Permission,
+    WrapPolicy,
+)
 from hsx_debugger.contracts import EvidenceGrade, GenerationStamp
 from hsx_debugger.identity import (
     ArtifactRef,
@@ -56,13 +65,17 @@ from hsx_debugger.results import (
     EvaluatedValue,
     ExpressionKind,
     ExpressionValue,
+    AddressStatus,
+    InspectionOpenStatus,
     InspectionResult,
     InspectionStatus,
+    InvalidationStatus,
     MemoryBlock,
     MemorySegment,
     MemorySegmentStatus,
     ResolutionResult,
     ResolutionStatus,
+    ServiceCloseStatus,
     ValueAvailability,
     ValuePiece,
     ValuePieceStatus,
@@ -229,7 +242,7 @@ def test_result_envelopes_enforce_status_cardinality_and_structured_diagnostics(
         ContextBindingResult(ContextBindingStatus.STALE, context, (diagnostic,))
 
 
-def test_generic_result_payloads_are_deeply_frozen_after_construction() -> None:
+def test_cs_imm_002_003_004_generic_containers_are_normalized_and_detached() -> None:
     _, context = refs()
     source = {"outer": [{"numbers": [1, 2], "labels": {"a", "b"}}]}
     inspection = InspectionResult(InspectionStatus.COMPLETE, context, source, ())
@@ -239,21 +252,30 @@ def test_generic_result_payloads_are_deeply_frozen_after_construction() -> None:
     source["outer"][0]["labels"].add("c")
     source["new"] = []
 
-    for payload in (inspection.value, resolution.values[0]):
-        assert payload["outer"][0]["numbers"] == (1, 2)
-        assert payload["outer"][0]["labels"] == frozenset({"a", "b"})
-        assert "new" not in payload
-        with pytest.raises(TypeError):
-            payload["new"] = "mutation"  # type: ignore[index]
+    expected = (
+        (
+            "outer",
+            ((("numbers", (1, 2)), ("labels", frozenset({"a", "b"}))),),
+        ),
+    )
+    assert inspection.value == expected
+    assert resolution.values == (expected,)
+    assert not isinstance(inspection.value, dict)
 
 
-def test_generic_result_payloads_reject_mutable_duck_objects() -> None:
+def test_cs_imm_101_102_generic_results_reject_mutable_records_and_ducks() -> None:
     _, context = refs()
+
+    @dataclass
+    class MutableImplementationRecord:
+        value: int
+
     duck = SimpleNamespace(value=1)
-    with pytest.raises(TypeError, match="immutable scalars"):
-        InspectionResult(InspectionStatus.COMPLETE, context, duck, ())
-    with pytest.raises(TypeError, match="immutable scalars"):
-        ResolutionResult(ResolutionStatus.RESOLVED, None, (duck,), ())
+    for value in (MutableImplementationRecord(1), duck):
+        with pytest.raises(TypeError):
+            InspectionResult(InspectionStatus.COMPLETE, context, value, ())
+        with pytest.raises(TypeError):
+            ResolutionResult(ResolutionStatus.RESOLVED, None, (value,), ())
 
 
 def test_generic_results_reject_mutable_scalar_subclasses() -> None:
@@ -277,342 +299,23 @@ def test_generic_results_reject_mutable_scalar_subclasses() -> None:
             ResolutionResult(ResolutionStatus.RESOLVED, None, (value,), ())
 
 
-def test_generic_results_reject_inherited_frozen_dataclasses_with_extra_state() -> None:
+def test_cs_imm_103_arbitrary_and_mutable_value_enums_are_not_approved() -> None:
     _, context = refs()
 
-    @dataclass(frozen=True)
-    class FrozenDictBase:
-        value: int
+    class CallerEnum(Enum):
+        ITEM = "item"
 
-    class MutableDictChild(FrozenDictBase):
-        def __init__(self, value: int) -> None:
-            super().__init__(value)
-            self.mutable_state = []
-
-    @dataclass(frozen=True, slots=True)
-    class FrozenSlotsBase:
-        value: int
-
-    class MutableSlotsChild(FrozenSlotsBase):
-        __slots__ = ("mutable_state",)
-
-        def __init__(self, value: int) -> None:
-            super().__init__(value)
-            object.__setattr__(self, "mutable_state", [])
-
-    for value in (MutableDictChild(1), MutableSlotsChild(2)):
-        with pytest.raises(TypeError, match="directly declared as a dataclass"):
-            InspectionResult(InspectionStatus.COMPLETE, context, value, ())
-        value.mutable_state.append("visible mutation")
-        with pytest.raises(TypeError, match="directly declared as a dataclass"):
-            ResolutionResult(ResolutionStatus.RESOLVED, None, (value,), ())
-
-
-def test_generic_results_reject_undeclared_state_on_direct_frozen_dataclasses() -> None:
-    _, context = refs()
-
-    @dataclass(frozen=True)
-    class DictPayload:
-        value: int
-
-    @dataclass(frozen=True)
-    class SlotPayload:
-        __slots__ = ("value", "mutable_state")
-
-        value: int
-
-    @dataclass(frozen=True)
-    class MutableFieldPayload:
-        values: list[int]
-
-    dict_payload = DictPayload(1)
-    object.__setattr__(dict_payload, "mutable_state", [])
-    slot_payload = SlotPayload(2)
-    object.__setattr__(slot_payload, "mutable_state", [])
-    mutable_values = [3]
-
-    with pytest.raises(TypeError, match="undeclared instance state"):
-        InspectionResult(InspectionStatus.COMPLETE, context, dict_payload, ())
-    with pytest.raises(TypeError, match="undeclared slots"):
-        ResolutionResult(ResolutionStatus.RESOLVED, None, (slot_payload,), ())
-    with pytest.raises(TypeError, match="deeply immutable"):
-        InspectionResult(
-            InspectionStatus.COMPLETE,
-            context,
-            MutableFieldPayload(mutable_values),
-            (),
-        )
-    mutable_values.append(4)
-    assert mutable_values == [3, 4]
-
-
-def test_generic_results_reject_custom_attribute_access_concealment() -> None:
-    _, context = refs()
-
-    @dataclass(frozen=True)
-    class HiddenExtraPayload:
-        value: int
-
-        def __getattribute__(self, name: str):
-            if name == "__dict__":
-                raw_state = object.__getattribute__(self, "__dict__")
-                return {"value": raw_state["value"]}
-            return object.__getattribute__(self, name)
-
-    @dataclass(frozen=True)
-    class ConcealingBase:
-        values: list[int]
-
-        def __getattribute__(self, name: str):
-            if name == "values":
-                return tuple(object.__getattribute__(self, name))
-            return object.__getattribute__(self, name)
-
-    @dataclass(frozen=True)
-    class ConcealingDerived(ConcealingBase):
-        label: str
-
-    @dataclass(frozen=True, slots=True)
-    class FallbackPayload:
-        value: int
-
-        def __getattr__(self, name: str):
-            return (name,)
-
-    hidden_extra = HiddenExtraPayload(1)
-    object.__setattr__(hidden_extra, "mutable_state", [])
-    hidden_values = [2]
-    hidden_field = ConcealingDerived(hidden_values, "derived")
-
-    assert "mutable_state" not in hidden_extra.__dict__
-    assert hidden_field.values == (2,)
-    assert object.__getattribute__(hidden_field, "values") is hidden_values
-
-    for value in (hidden_extra, hidden_field, FallbackPayload(3)):
-        with pytest.raises(TypeError, match="custom attribute access"):
-            InspectionResult(InspectionStatus.COMPLETE, context, value, ())
-        with pytest.raises(TypeError, match="custom attribute access"):
-            ResolutionResult(ResolutionStatus.RESOLVED, None, (value,), ())
-
-    hidden_values.append(4)
-    object.__getattribute__(hidden_extra, "mutable_state").append("raw mutation")
-    assert object.__getattribute__(hidden_field, "values") == [2, 4]
-    assert object.__getattribute__(hidden_extra, "mutable_state") == ["raw mutation"]
-
-
-def test_generic_results_reject_filtering_dict_descriptor_with_mutable_state() -> None:
-    _, context = refs()
-
-    @dataclass(frozen=True)
-    class FilteringDictPayload:
-        value: int
-
-        @property
-        def __dict__(self):
-            return {"value": object.__getattribute__(self, "value")}
-
-    payload = FilteringDictPayload(1)
-    object.__setattr__(payload, "mutable_state", [])
-
-    assert object.__getattribute__(payload, "__dict__") == {"value": 1}
-    assert object.__getattribute__(payload, "mutable_state") == []
-    for factory in (
-        lambda: InspectionResult(InspectionStatus.COMPLETE, context, payload, ()),
-        lambda: ResolutionResult(ResolutionStatus.RESOLVED, None, (payload,), ()),
-    ):
-        with pytest.raises(TypeError, match="__dict__ storage descriptor"):
-            factory()
-
-
-def test_generic_results_ignore_mutated_slots_metadata_and_find_real_storage() -> None:
-    _, context = refs()
-
-    class SlotBase:
-        __slots__ = ("mutable_state",)
-
-    @dataclass(frozen=True, slots=True)
-    class SlotPayload(SlotBase):
-        value: int
-
-    class SlotEnum(Enum):
-        __slots__ = ("mutable_state",)
-
-        ITEM = 1
-
-    payload = SlotPayload(2)
-    object.__setattr__(payload, "mutable_state", [])
-    object.__setattr__(SlotEnum.ITEM, "mutable_state", [])
-    SlotBase.__slots__ = ()
-    SlotEnum.__slots__ = ()
-
-    for value in (payload, SlotEnum.ITEM):
-        with pytest.raises(TypeError, match="undeclared member storage"):
-            InspectionResult(InspectionStatus.COMPLETE, context, value, ())
-        with pytest.raises(TypeError, match="undeclared member storage"):
-            ResolutionResult(ResolutionStatus.RESOLVED, None, (value,), ())
-        object.__getattribute__(value, "mutable_state").append("live mutation")
-        assert object.__getattribute__(value, "mutable_state") == ["live mutation"]
-
-
-@pytest.mark.parametrize("descriptor_action", ["delete", "replace"])
-def test_generic_results_reject_concealed_removed_dataclass_member_descriptor(
-    descriptor_action: str,
-) -> None:
-    _, context = refs()
-
-    class SlotBase:
-        __slots__ = ("mutable_state",)
-
-    @dataclass(frozen=True, slots=True)
-    class SlotPayload(SlotBase):
-        value: int
-
-    payload = SlotPayload(3)
-    descriptor = type.__getattribute__(SlotBase, "__dict__")["mutable_state"]
-    assert type(descriptor) is MemberDescriptorType
-    MemberDescriptorType.__set__(descriptor, payload, [])
-    SlotBase.__slots__ = ()
-    if descriptor_action == "delete":
-        del SlotBase.mutable_state
-    else:
-        SlotBase.mutable_state = property(lambda self: ())
-
-    assert MemberDescriptorType.__get__(descriptor, payload, SlotPayload) == []
-    with pytest.raises(TypeError, match="member storage layout"):
-        InspectionResult(InspectionStatus.COMPLETE, context, payload, ())
-    with pytest.raises(TypeError, match="member storage layout"):
-        ResolutionResult(ResolutionStatus.RESOLVED, None, (payload,), ())
-
-
-@pytest.mark.parametrize("descriptor_action", ["delete", "replace"])
-def test_generic_results_reject_concealed_removed_enum_member_descriptor(
-    descriptor_action: str,
-) -> None:
-    _, context = refs()
-
-    class SlotEnum(Enum):
-        __slots__ = ("mutable_state",)
-
-        ITEM = 1
-
-    descriptor = type.__getattribute__(SlotEnum, "__dict__")["mutable_state"]
-    assert type(descriptor) is MemberDescriptorType
-    MemberDescriptorType.__set__(descriptor, SlotEnum.ITEM, [])
-    SlotEnum.__slots__ = ()
-    if descriptor_action == "delete":
-        del SlotEnum.mutable_state
-    else:
-        SlotEnum.mutable_state = property(lambda self: ())
-
-    assert MemberDescriptorType.__get__(descriptor, SlotEnum.ITEM, SlotEnum) == []
-    with pytest.raises(TypeError, match="member storage layout"):
-        InspectionResult(InspectionStatus.COMPLETE, context, SlotEnum.ITEM, ())
-    with pytest.raises(TypeError, match="member storage layout"):
-        ResolutionResult(ResolutionStatus.RESOLVED, None, (SlotEnum.ITEM,), ())
-
-
-def test_generic_results_inspect_raw_enum_value_behind_custom_access() -> None:
-    _, context = refs()
-
-    class ConcealingEnum(Enum):
+    class MutableValueEnum(Enum):
         ITEM = [1]
 
-        def __getattribute__(self, name: str):
-            if name == "value":
-                return tuple(object.__getattribute__(self, "_value_"))
-            return object.__getattribute__(self, name)
-
-    assert ConcealingEnum.ITEM.value == (1,)
-    with pytest.raises(TypeError, match="exact immutable scalar"):
-        InspectionResult(InspectionStatus.COMPLETE, context, ConcealingEnum.ITEM, ())
-    with pytest.raises(TypeError, match="exact immutable scalar"):
-        ResolutionResult(ResolutionStatus.RESOLVED, None, (ConcealingEnum.ITEM,), ())
+    for member in (CallerEnum.ITEM, MutableValueEnum.ITEM, EvidenceGrade.PORTABLE):
+        with pytest.raises(TypeError, match="approved closed contract Enum"):
+            InspectionResult(InspectionStatus.COMPLETE, context, member, ())
+        with pytest.raises(TypeError, match="approved closed contract Enum"):
+            ResolutionResult(ResolutionStatus.RESOLVED, None, (member,), ())
 
 
-@pytest.mark.parametrize(
-    ("field_name", "replacement", "message"),
-    [
-        ("_name_", [], "enum name"),
-        ("_sort_order_", [], "enum sort order"),
-        ("__objclass__", [], "enum object class"),
-        ("_name_", "RENAMED", "metadata is inconsistent"),
-        ("_sort_order_", 99, "metadata is inconsistent"),
-        ("__objclass__", Enum, "enum object class"),
-    ],
-)
-def test_generic_results_reject_mutable_or_inconsistent_enum_metadata(
-    field_name: str, replacement: object, message: str
-) -> None:
-    _, context = refs()
-
-    class MetadataEnum(Enum):
-        ITEM = 1
-
-    object.__setattr__(MetadataEnum.ITEM, field_name, replacement)
-    for factory in (
-        lambda: InspectionResult(
-            InspectionStatus.COMPLETE, context, MetadataEnum.ITEM, ()
-        ),
-        lambda: ResolutionResult(
-            ResolutionStatus.RESOLVED, None, (MetadataEnum.ITEM,), ()
-        ),
-    ):
-        with pytest.raises(TypeError, match=message):
-            factory()
-
-
-def test_generic_results_reject_extra_enum_dict_and_slot_storage() -> None:
-    _, context = refs()
-
-    class DictStateEnum(Enum):
-        ITEM = 1
-
-    class SlotStateEnum(Enum):
-        __slots__ = ("extra_state",)
-
-        ITEM = 1
-
-    object.__setattr__(DictStateEnum.ITEM, "extra_state", [])
-    object.__setattr__(SlotStateEnum.ITEM, "extra_state", [])
-
-    with pytest.raises(TypeError, match="undeclared instance state"):
-        InspectionResult(InspectionStatus.COMPLETE, context, DictStateEnum.ITEM, ())
-    with pytest.raises(TypeError, match="undeclared member storage"):
-        ResolutionResult(
-            ResolutionStatus.RESOLVED, None, (SlotStateEnum.ITEM,), ()
-        )
-
-
-def test_generic_results_recheck_enum_storage_after_member_construction() -> None:
-    _, context = refs()
-
-    class ConstructedEnum(Enum):
-        ITEM = 1
-
-    accepted = ResolutionResult(
-        ResolutionStatus.RESOLVED, None, (ConstructedEnum.ITEM,), ()
-    )
-    assert accepted.values == (ConstructedEnum.ITEM,)
-
-    object.__setattr__(ConstructedEnum.ITEM, "_sort_order_", [])
-    with pytest.raises(TypeError, match="enum sort order"):
-        InspectionResult(InspectionStatus.COMPLETE, context, ConstructedEnum.ITEM, ())
-
-
-def test_result_status_fields_enforce_enum_storage_invariant() -> None:
-    status = ResolutionStatus.RESOLVED
-    original_sort_order = object.__getattribute__(status, "_sort_order_")
-    try:
-        object.__setattr__(status, "_sort_order_", [])
-        with pytest.raises(TypeError, match="enum sort order"):
-            ResolutionResult(status, None, (1,), ())
-    finally:
-        object.__setattr__(status, "_sort_order_", original_sort_order)
-
-    assert ResolutionResult(status, None, (1,), ()).status is status
-
-
-def test_generic_results_accept_direct_deeply_frozen_dataclasses() -> None:
+def test_cs_imm_004_frozen_contract_safe_dto_graph_is_accepted_unchanged() -> None:
     _, context = refs()
 
     @dataclass(frozen=True, slots=True)
@@ -634,55 +337,117 @@ def test_generic_results_accept_direct_deeply_frozen_dataclasses() -> None:
     class FrozenDerived(FrozenBase):
         label: str
 
-    class ScalarEnum(Enum):
-        ITEM = "item"
-
-    class StringEnum(str, Enum):
-        ITEM = "item"
-
-    class AliasedEnum(Enum):
-        PRIMARY = 1
-        ALIAS = 1
-
     payload = FrozenPayload("valid", FrozenChild(1), (2, 3), frozenset({"a", "b"}))
     derived = FrozenDerived(4, "derived")
     diagnostic = Diagnostic("valid", "valid public DTO")
     segment = MemorySegment(0, 1, b"x", MemorySegmentStatus.COMPLETE)
-    legitimate_enums = (
-        ScalarEnum.ITEM,
-        StringEnum.ITEM,
-        AliasedEnum.ALIAS,
-        EvidenceGrade.PORTABLE,
-        ByteOrder.LITTLE,
-        SymbolKind.GLOBAL,
-        ResolutionStatus.RESOLVED,
-        InspectionStatus.COMPLETE,
-    )
     inspection = InspectionResult(InspectionStatus.COMPLETE, context, payload, ())
     resolution = ResolutionResult(
         ResolutionStatus.RESOLVED,
         None,
-        (payload, derived, diagnostic, segment, *legitimate_enums),
+        (payload, derived, diagnostic, segment),
         (),
     )
 
     assert inspection.value is payload
-    assert resolution.values == (
-        payload,
-        derived,
-        diagnostic,
-        segment,
-        *legitimate_enums,
+    assert resolution.values == (payload, derived, diagnostic, segment)
+
+
+def test_cs_imm_001_006_007_approved_enum_catalog_preserves_exact_identity() -> None:
+    _, context = refs()
+    approved_members = (
+        SnapshotStability.IMMUTABLE,
+        ByteOrder.LITTLE,
+        WrapPolicy.FORBIDDEN,
+        AddressArithmeticMode.CHECKED,
+        Permission.READ,
+        ResolutionStatus.RESOLVED,
+        InspectionStatus.COMPLETE,
+        ContextBindingStatus.BOUND,
+        InspectionOpenStatus.OPENED,
+        InvalidationStatus.INVALIDATED,
+        ServiceCloseStatus.CLOSED,
+        AddressStatus.VALID,
+        ValueAvailability.AVAILABLE,
+        ValuePieceStatus.AVAILABLE,
+        ExpressionKind.REGISTER,
+        MemorySegmentStatus.COMPLETE,
+        SymbolKind.FUNCTION,
+        TypeKind.INTEGER,
+        InstructionClassification.USER,
     )
-    for member in legitimate_enums:
-        raw_state = object.__getattribute__(member, "__dict__")
-        member_type = type(member)
-        member_names = type.__getattribute__(member_type, "__dict__")["_member_names_"]
-        member_map = type.__getattribute__(member_type, "__dict__")["_member_map_"]
-        assert set(raw_state) == {"_value_", "_name_", "__objclass__", "_sort_order_"}
-        assert raw_state["__objclass__"] is member_type
-        assert member_names[raw_state["_sort_order_"]] == raw_state["_name_"]
-        assert member_map[raw_state["_name_"]] is member
+
+    result = ResolutionResult(
+        ResolutionStatus.RESOLVED, None, approved_members, ()
+    )
+    assert len({type(member) for member in approved_members}) == 19
+    assert ArithmeticMode is AddressArithmeticMode
+    assert result.status is ResolutionStatus.RESOLVED
+    for accepted, canonical in zip(result.values, approved_members):
+        assert accepted is canonical
+        assert type(accepted) is type(canonical)
+    assert InspectionResult(
+        InspectionStatus.COMPLETE, context, SnapshotStability.IMMUTABLE, ()
+    ).value is SnapshotStability.IMMUTABLE
+
+
+def test_cs_imm_005_supported_field_reassignment_is_rejected() -> None:
+    _, context = refs()
+    result = InspectionResult(InspectionStatus.COMPLETE, context, TypeKind.INTEGER, ())
+    member = TypeMember("field", "u8", 0, 8)
+
+    with pytest.raises(FrozenInstanceError):
+        result.value = TypeKind.FLOAT  # type: ignore[misc]
+    with pytest.raises(FrozenInstanceError):
+        member.name = "renamed"  # type: ignore[misc]
+
+
+def test_cs_imm_008_named_frozen_dto_normalizes_mutable_construction_record() -> None:
+    _, context = refs()
+    record = SourceIdentityRecord(
+        "src/main.c", ContentDigest("sha256", ZERO), CanonicalUInt64(1), "text/x-c"
+    )
+    source_records = [record]
+    manifest = SourceIdentityManifest("hsx.source-identity-manifest/1", source_records)
+    result = InspectionResult(InspectionStatus.COMPLETE, context, manifest, ())
+
+    source_records.clear()
+    source_records.append(
+        SourceIdentityRecord(
+            "src/other.c", ContentDigest("sha256", "1" * 64), CanonicalUInt64(2)
+        )
+    )
+
+    assert result.value is manifest
+    assert manifest.records == (record,)
+
+
+def test_cs_imm_104_frozen_dto_with_mutable_declared_field_is_rejected() -> None:
+    _, context = refs()
+
+    @dataclass(frozen=True)
+    class FrozenButUnsafe:
+        values: list[int]
+
+    source = [1]
+    with pytest.raises(TypeError, match="already be deeply immutable"):
+        InspectionResult(
+            InspectionStatus.COMPLETE, context, FrozenButUnsafe(source), ()
+        )
+    source.append(2)
+    assert source == [1, 2]
+
+
+def test_cs_imm_105_nested_non_safe_leaf_and_cycles_reject_without_publication() -> None:
+    _, context = refs()
+    with pytest.raises(TypeError):
+        ResolutionResult(ResolutionStatus.RESOLVED, None, ([object()],), ())
+
+    cycle: list[object] = []
+    cycle.append(cycle)
+    with pytest.raises(ValueError, match="reference cycle"):
+        InspectionResult(InspectionStatus.COMPLETE, context, cycle, ())
+    assert cycle == [cycle]
 
 
 def test_memory_and_value_records_preserve_missing_segments_and_partial_pieces() -> None:

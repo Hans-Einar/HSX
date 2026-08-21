@@ -14,6 +14,7 @@ from .results import (
     Diagnostic,
     RegisterSelection,
     UnitCountResult,
+    _register_contract_enums,
 )
 
 
@@ -56,6 +57,9 @@ class Permission(str, Enum):
     READ = "read"
     WRITE = "write"
     EXECUTE = "execute"
+
+
+_register_contract_enums(ByteOrder, WrapPolicy, AddressArithmeticMode, Permission)
 
 
 @dataclass(frozen=True, slots=True, order=True)

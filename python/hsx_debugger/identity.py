@@ -19,6 +19,7 @@ from .results import (
     Diagnostic,
     ResolutionResult,
     ResolutionStatus,
+    _register_contract_enums,
 )
 
 
@@ -534,6 +535,9 @@ class SnapshotStability(str, Enum):
     IMMUTABLE = "immutable"
     REVISION_PINNED = "revision_pinned"
     BEST_EFFORT_LIVE = "best_effort_live"
+
+
+_register_contract_enums(SnapshotStability)
 
 
 @dataclass(frozen=True, slots=True)
