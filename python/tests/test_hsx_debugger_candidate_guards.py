@@ -26,6 +26,7 @@ def test_stack_requires_register_read_set_before_touching_snapshot_port() -> Non
         RecipeLimits(), RecipeRequestLimits(64, 16)
     )
     assert result.status is InspectionStatus.UNAVAILABLE
+    assert result.frames == ()
     assert result.diagnostics[0].code == "snapshot_read_set_unavailable"
     assert port.register_reads == 0
 
@@ -58,8 +59,8 @@ def test_checked_call_site_is_not_fabricated_without_instruction_evidence() -> N
         RecipeRequestLimits(64, 16),
     )
     assert result.status is InspectionStatus.COMPLETE
-    assert len(result.value) == 2
-    caller = result.value[1]
+    assert len(result.frames) == 2
+    caller = result.frames[1]
     assert caller.resume_pc == HsxAddress(f.code, 0x124)
     assert caller.call_site_pc is None
     assert caller.pc == HsxAddress(f.code, 0x124)
