@@ -4,7 +4,7 @@ from dataclasses import FrozenInstanceError, dataclass, replace
 from enum import Enum
 from pathlib import Path
 import sys
-from types import SimpleNamespace
+from types import MemberDescriptorType, SimpleNamespace
 
 import pytest
 
@@ -400,6 +400,117 @@ def test_generic_results_reject_custom_attribute_access_concealment() -> None:
     assert object.__getattribute__(hidden_extra, "mutable_state") == ["raw mutation"]
 
 
+def test_generic_results_reject_filtering_dict_descriptor_with_mutable_state() -> None:
+    _, context = refs()
+
+    @dataclass(frozen=True)
+    class FilteringDictPayload:
+        value: int
+
+        @property
+        def __dict__(self):
+            return {"value": object.__getattribute__(self, "value")}
+
+    payload = FilteringDictPayload(1)
+    object.__setattr__(payload, "mutable_state", [])
+
+    assert object.__getattribute__(payload, "__dict__") == {"value": 1}
+    assert object.__getattribute__(payload, "mutable_state") == []
+    for factory in (
+        lambda: InspectionResult(InspectionStatus.COMPLETE, context, payload, ()),
+        lambda: ResolutionResult(ResolutionStatus.RESOLVED, None, (payload,), ()),
+    ):
+        with pytest.raises(TypeError, match="__dict__ storage descriptor"):
+            factory()
+
+
+def test_generic_results_ignore_mutated_slots_metadata_and_find_real_storage() -> None:
+    _, context = refs()
+
+    class SlotBase:
+        __slots__ = ("mutable_state",)
+
+    @dataclass(frozen=True, slots=True)
+    class SlotPayload(SlotBase):
+        value: int
+
+    class SlotEnum(Enum):
+        __slots__ = ("mutable_state",)
+
+        ITEM = 1
+
+    payload = SlotPayload(2)
+    object.__setattr__(payload, "mutable_state", [])
+    object.__setattr__(SlotEnum.ITEM, "mutable_state", [])
+    SlotBase.__slots__ = ()
+    SlotEnum.__slots__ = ()
+
+    for value in (payload, SlotEnum.ITEM):
+        with pytest.raises(TypeError, match="undeclared member storage"):
+            InspectionResult(InspectionStatus.COMPLETE, context, value, ())
+        with pytest.raises(TypeError, match="undeclared member storage"):
+            ResolutionResult(ResolutionStatus.RESOLVED, None, (value,), ())
+        object.__getattribute__(value, "mutable_state").append("live mutation")
+        assert object.__getattribute__(value, "mutable_state") == ["live mutation"]
+
+
+@pytest.mark.parametrize("descriptor_action", ["delete", "replace"])
+def test_generic_results_reject_concealed_removed_dataclass_member_descriptor(
+    descriptor_action: str,
+) -> None:
+    _, context = refs()
+
+    class SlotBase:
+        __slots__ = ("mutable_state",)
+
+    @dataclass(frozen=True, slots=True)
+    class SlotPayload(SlotBase):
+        value: int
+
+    payload = SlotPayload(3)
+    descriptor = type.__getattribute__(SlotBase, "__dict__")["mutable_state"]
+    assert type(descriptor) is MemberDescriptorType
+    MemberDescriptorType.__set__(descriptor, payload, [])
+    SlotBase.__slots__ = ()
+    if descriptor_action == "delete":
+        del SlotBase.mutable_state
+    else:
+        SlotBase.mutable_state = property(lambda self: ())
+
+    assert MemberDescriptorType.__get__(descriptor, payload, SlotPayload) == []
+    with pytest.raises(TypeError, match="member storage layout"):
+        InspectionResult(InspectionStatus.COMPLETE, context, payload, ())
+    with pytest.raises(TypeError, match="member storage layout"):
+        ResolutionResult(ResolutionStatus.RESOLVED, None, (payload,), ())
+
+
+@pytest.mark.parametrize("descriptor_action", ["delete", "replace"])
+def test_generic_results_reject_concealed_removed_enum_member_descriptor(
+    descriptor_action: str,
+) -> None:
+    _, context = refs()
+
+    class SlotEnum(Enum):
+        __slots__ = ("mutable_state",)
+
+        ITEM = 1
+
+    descriptor = type.__getattribute__(SlotEnum, "__dict__")["mutable_state"]
+    assert type(descriptor) is MemberDescriptorType
+    MemberDescriptorType.__set__(descriptor, SlotEnum.ITEM, [])
+    SlotEnum.__slots__ = ()
+    if descriptor_action == "delete":
+        del SlotEnum.mutable_state
+    else:
+        SlotEnum.mutable_state = property(lambda self: ())
+
+    assert MemberDescriptorType.__get__(descriptor, SlotEnum.ITEM, SlotEnum) == []
+    with pytest.raises(TypeError, match="member storage layout"):
+        InspectionResult(InspectionStatus.COMPLETE, context, SlotEnum.ITEM, ())
+    with pytest.raises(TypeError, match="member storage layout"):
+        ResolutionResult(ResolutionStatus.RESOLVED, None, (SlotEnum.ITEM,), ())
+
+
 def test_generic_results_inspect_raw_enum_value_behind_custom_access() -> None:
     _, context = refs()
 
@@ -440,13 +551,24 @@ def test_generic_results_accept_direct_deeply_frozen_dataclasses() -> None:
     class FrozenDerived(FrozenBase):
         label: str
 
+    class ScalarEnum(Enum):
+        ITEM = "item"
+
+    class StringEnum(str, Enum):
+        ITEM = "item"
+
     payload = FrozenPayload("valid", FrozenChild(1), (2, 3), frozenset({"a", "b"}))
     derived = FrozenDerived(4, "derived")
     inspection = InspectionResult(InspectionStatus.COMPLETE, context, payload, ())
-    resolution = ResolutionResult(ResolutionStatus.RESOLVED, None, (payload, derived), ())
+    resolution = ResolutionResult(
+        ResolutionStatus.RESOLVED,
+        None,
+        (payload, derived, ScalarEnum.ITEM, StringEnum.ITEM),
+        (),
+    )
 
     assert inspection.value is payload
-    assert resolution.values == (payload, derived)
+    assert resolution.values == (payload, derived, ScalarEnum.ITEM, StringEnum.ITEM)
 
 
 def test_memory_and_value_records_preserve_missing_segments_and_partial_pieces() -> None:

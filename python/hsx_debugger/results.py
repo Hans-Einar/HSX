@@ -10,7 +10,8 @@ from __future__ import annotations
 from collections.abc import Hashable, Mapping
 from dataclasses import dataclass, fields, is_dataclass
 from enum import Enum
-from types import MappingProxyType
+import struct
+from types import GetSetDescriptorType, MappingProxyType, MemberDescriptorType
 from typing import TYPE_CHECKING, Generic, TypeAlias, TypeVar
 
 if TYPE_CHECKING:
@@ -57,22 +58,124 @@ _IMMUTABLE_PAYLOAD_ATOM_TYPES = frozenset(
     {str, bytes, int, float, complex, bool, type(None)}
 )
 _ENUM_MEMBER_STATE = frozenset({"_value_", "_name_", "__objclass__", "_sort_order_"})
+_POINTER_SIZE = struct.calcsize("P")
+_HEAP_TYPE_FLAG = 1 << 9
+_TYPE_NAMESPACE_DESCRIPTOR = type.__dict__["__dict__"]
+_TYPE_LAYOUT_DESCRIPTORS = MappingProxyType(
+    {
+        name: type.__dict__[name]
+        for name in (
+            "__base__",
+            "__basicsize__",
+            "__dictoffset__",
+            "__flags__",
+            "__itemsize__",
+            "__mro__",
+            "__weakrefoffset__",
+        )
+    }
+)
 
 
-def _slot_storage_names(record_type: type[object]) -> tuple[str, ...]:
-    names: list[str] = []
-    for owner in type.__getattribute__(record_type, "__mro__"):
-        namespace = type.__getattribute__(owner, "__dict__")
-        declared = namespace.get("__slots__", ())
-        if isinstance(declared, str):
-            declared = (declared,)
-        for name in declared:
-            if name in {"__dict__", "__weakref__"}:
+def _type_layout_value(record_type: type[object], name: str) -> object:
+    descriptor = _TYPE_LAYOUT_DESCRIPTORS[name]
+    return MemberDescriptorType.__get__(descriptor, record_type, type)
+
+
+def _raw_type_namespace(record_type: type[object]) -> MappingProxyType:
+    return GetSetDescriptorType.__get__(
+        _TYPE_NAMESPACE_DESCRIPTOR, record_type, type
+    )
+
+
+def _descriptor_matches_owner(
+    descriptor: object, owner: type[object], name: str
+) -> bool:
+    return (
+        object.__getattribute__(descriptor, "__objclass__") is owner
+        and object.__getattribute__(descriptor, "__name__") == name
+    )
+
+
+def _require_member_storage_layout(
+    owner: type[object], member_count: int, field_name: str
+) -> None:
+    """Detect removed/replaced member descriptors without consulting ``__slots__``."""
+
+    base = _type_layout_value(owner, "__base__")
+    if base is None or not (_type_layout_value(owner, "__flags__") & _HEAP_TYPE_FLAG):
+        return
+    if (
+        _type_layout_value(owner, "__itemsize__") != 0
+        or _type_layout_value(base, "__itemsize__") != 0
+    ):
+        # Variable-size scalar Enum bases cannot add Python member slots.  Their fixed
+        # metadata remains covered through the canonical instance-dict descriptor below.
+        return
+
+    layout_bytes = _type_layout_value(owner, "__basicsize__") - _type_layout_value(
+        base, "__basicsize__"
+    )
+    if (
+        _type_layout_value(owner, "__weakrefoffset__")
+        and not _type_layout_value(base, "__weakrefoffset__")
+    ):
+        layout_bytes -= _POINTER_SIZE
+    if (
+        _type_layout_value(owner, "__dictoffset__") > 0
+        and not _type_layout_value(base, "__dictoffset__")
+    ):
+        layout_bytes -= _POINTER_SIZE
+
+    if (
+        layout_bytes < 0
+        or layout_bytes % _POINTER_SIZE
+        or layout_bytes // _POINTER_SIZE != member_count
+    ):
+        owner_name = type.__getattribute__(owner, "__name__")
+        raise TypeError(
+            f"{field_name} has inconsistent member storage layout in {owner_name}"
+        )
+
+
+def _storage_descriptors(
+    record_type: type[object], field_name: str
+) -> tuple[tuple[GetSetDescriptorType, ...], tuple[tuple[str, MemberDescriptorType], ...]]:
+    dict_descriptors: list[GetSetDescriptorType] = []
+    member_descriptors: list[tuple[str, MemberDescriptorType]] = []
+    for owner in _type_layout_value(record_type, "__mro__"):
+        namespace = _raw_type_namespace(owner)
+        if "__dict__" in namespace:
+            dict_descriptor = namespace["__dict__"]
+            if (
+                type(dict_descriptor) is not GetSetDescriptorType
+                or not _descriptor_matches_owner(dict_descriptor, owner, "__dict__")
+            ):
+                owner_name = type.__getattribute__(owner, "__name__")
+                raise TypeError(
+                    f"{field_name} has a custom or shadowing __dict__ storage "
+                    f"descriptor in {owner_name}"
+                )
+            dict_descriptors.append(dict_descriptor)
+
+        owner_members: list[tuple[str, MemberDescriptorType]] = []
+        for name, descriptor in namespace.items():
+            if type(descriptor) is not MemberDescriptorType:
                 continue
-            if name.startswith("__") and not name.endswith("__"):
-                name = f"_{owner.__name__.lstrip('_')}{name}"
-            names.append(name)
-    return tuple(names)
+            if not _descriptor_matches_owner(descriptor, owner, name):
+                owner_name = type.__getattribute__(owner, "__name__")
+                raise TypeError(
+                    f"{field_name} has a shadowing member storage descriptor "
+                    f"in {owner_name}: {name}"
+                )
+            owner_members.append((name, descriptor))
+        _require_member_storage_layout(owner, len(owner_members), field_name)
+        member_descriptors.extend(owner_members)
+
+    has_instance_dict = _type_layout_value(record_type, "__dictoffset__") != 0
+    if has_instance_dict != bool(dict_descriptors):
+        raise TypeError(f"{field_name} has inconsistent __dict__ storage descriptor layout")
+    return tuple(dict_descriptors), tuple(member_descriptors)
 
 
 def _require_default_attribute_access(
@@ -80,8 +183,8 @@ def _require_default_attribute_access(
 ) -> None:
     """Reject dataclass DTOs whose MRO can conceal their stored instance state."""
 
-    for owner in type.__getattribute__(record_type, "__mro__"):
-        namespace = type.__getattribute__(owner, "__dict__")
+    for owner in _type_layout_value(record_type, "__mro__"):
+        namespace = _raw_type_namespace(owner)
         custom_names = {
             name
             for name in ("__getattribute__", "__getattr__")
@@ -100,31 +203,54 @@ def _require_declared_instance_state(
     value: object,
     field_name: str,
     declared_names: frozenset[str],
-) -> dict[str, object] | None:
-    try:
-        state = object.__getattribute__(value, "__dict__")
-    except AttributeError:
-        state = None
-    if state is not None:
+) -> dict[str, tuple[object, ...]]:
+    dict_descriptors, member_descriptors = _storage_descriptors(
+        type(value), field_name
+    )
+    storage: dict[str, list[object]] = {}
+    raw_state: dict[str, object] | None = None
+    for descriptor in dict_descriptors:
+        state = GetSetDescriptorType.__get__(descriptor, value, type(value))
         if type(state) is not dict:
             raise TypeError(f"{field_name} must expose exact raw instance state")
-        undeclared = set(state).difference(declared_names)
+        if raw_state is None:
+            raw_state = state
+        elif raw_state is not state:
+            raise TypeError(f"{field_name} has inconsistent __dict__ storage descriptors")
+
+    if raw_state is not None:
+        undeclared = set(raw_state).difference(declared_names)
         if undeclared:
             names = ", ".join(sorted(undeclared))
             raise TypeError(f"{field_name} has undeclared instance state: {names}")
+        for name, member in raw_state.items():
+            storage.setdefault(name, []).append(member)
 
-    undeclared_slots = set(_slot_storage_names(type(value))).difference(declared_names)
-    if undeclared_slots:
-        names = ", ".join(sorted(undeclared_slots))
-        raise TypeError(f"{field_name} has undeclared slots: {names}")
-    return state
+    undeclared_members = {
+        name for name, _ in member_descriptors if name not in declared_names
+    }
+    if undeclared_members:
+        names = ", ".join(sorted(undeclared_members))
+        raise TypeError(
+            f"{field_name} has undeclared slots (undeclared member storage): {names}"
+        )
+    for name, descriptor in member_descriptors:
+        try:
+            member = MemberDescriptorType.__get__(descriptor, value, type(value))
+        except AttributeError:
+            continue
+        storage.setdefault(name, []).append(member)
+    return {name: tuple(members) for name, members in storage.items()}
 
 
 def _require_immutable_enum(value: Enum, field_name: str) -> None:
     """Accept conventional scalar enum members without accepting scalar subclasses generally."""
 
-    _require_declared_instance_state(value, field_name, _ENUM_MEMBER_STATE)
-    stored_value = object.__getattribute__(value, "_value_")
+    storage = _require_declared_instance_state(value, field_name, _ENUM_MEMBER_STATE)
+    stored_values = storage.get("_value_", ())
+    if len(stored_values) != 1:
+        raise TypeError(f"{field_name} enum value must have exact raw storage")
+    stored_value = stored_values[0]
     if type(stored_value) not in _IMMUTABLE_PAYLOAD_ATOM_TYPES:
         raise TypeError(f"{field_name} enum value must be an exact immutable scalar")
 
@@ -212,27 +338,19 @@ def _deep_freeze(value: object, field_name: str, active: set[int] | None = None)
         _require_default_attribute_access(concrete_type, field_name)
         record_fields = fields(concrete_type)
         record_field_names = frozenset(record_field.name for record_field in record_fields)
-        raw_state = _require_declared_instance_state(
+        raw_storage = _require_declared_instance_state(
             value, field_name, record_field_names
         )
-        slot_names = frozenset(_slot_storage_names(concrete_type))
         active.add(identity)
         try:
             for record_field in record_fields:
-                if raw_state is not None and record_field.name in raw_state:
-                    member = raw_state[record_field.name]
-                elif record_field.name in slot_names:
-                    try:
-                        member = object.__getattribute__(value, record_field.name)
-                    except AttributeError as exc:
-                        raise TypeError(
-                            f"{field_name}.{record_field.name} must be stored on the "
-                            "dataclass"
-                        ) from exc
-                else:
+                stored_members = raw_storage.get(record_field.name, ())
+                if len(stored_members) != 1:
                     raise TypeError(
-                        f"{field_name}.{record_field.name} must be stored on the dataclass"
+                        f"{field_name}.{record_field.name} must have exactly one raw "
+                        "dataclass storage cell"
                     )
+                member = stored_members[0]
                 frozen_member = _deep_freeze(
                     member, f"{field_name}.{record_field.name}", active
                 )
