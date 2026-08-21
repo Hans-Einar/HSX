@@ -86,7 +86,8 @@ track IDs rather than silently renamed in historical documents.
 - `DBG-RVW-001-005-014` — interface review attempt 7, REWORK
 - `DBG-RVW-001-005-015` — interface review attempt 8, REWORK
 - `DBG-RVW-001-005-016` — interface review attempt 9, REWORK
-- `DBG-RVW-001-005-017` — fresh interface review attempt 10
+- `DBG-RVW-001-005-017` — interface review attempt 10, REWORK
+- `DBG-RVW-001-005-018` — fresh interface review attempt 11
 - `DBG-VER-001-005-001..DBG-VER-001-005-007` — formal Slice verifications
 - `DBG-RVW-004-001-001` / `DBG-VER-004-001-001` — RF-004 parent review/verification
 

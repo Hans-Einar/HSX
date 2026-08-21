@@ -32,6 +32,8 @@ Legacy `python/hsx_dbg/symbols.py`, source mapping, runtime and frontend files a
 - reject artifact, bundle, binding, architecture, ABI, recipe or component mismatch without
   publishing an index;
 - preserve all duplicate symbol/name/line candidates and exact source identity/spelling;
+- keep FUNCTION/LABEL addresses separate from addressless LOCAL/GLOBAL/CONSTANT variable
+  identities; represent every variable location only through exact nullable-scope LocationRow;
 - expose typed functions, symbols, instructions, SourceRefs, memory regions, unwind rows and
   location rows using typed addresses/ranges, plus type records, lexical scopes and exact
   scope/global variable enumeration;

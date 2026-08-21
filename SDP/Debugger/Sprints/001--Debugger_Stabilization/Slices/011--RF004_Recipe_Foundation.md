@@ -35,6 +35,8 @@ inspection, legacy product/runtime and frontend files are read-only.
   future artifact-module import cycle exists;
 - require exact AbiDescriptorRef on both row types and reject evaluator row/ABI mismatch before
   any opcode/read;
+- validate nullable LocationRow function/scope exactly against LOCAL, GLOBAL or CONSTANT
+  SymbolRecord kind invariants; no address sentinel is permitted;
 - reject unknown mandatory schema/field/opcode as unsupported and malformed
   arity/type/width/stack/address/piece coverage as corrupt;
 - enforce exact profile limits; every exhaustion is `UNSUPPORTED` with diagnostic

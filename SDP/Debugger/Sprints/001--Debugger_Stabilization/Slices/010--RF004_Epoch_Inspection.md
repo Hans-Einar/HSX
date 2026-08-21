@@ -49,6 +49,8 @@ gateway, Executive, DAP/CLI and VS Code modules are read-only.
   unknown even when it reuses the same opaque epoch string;
 - no fallback to current/top/first frame and no handle reuse across epochs;
 - variables use exact selected frame and location row; partial pieces stay partial;
+- locals/globals/constants resolve through LocationRow using exact non-null or None/None
+  function/scope IDs; stack/register/constant forms require no synthetic address;
 - scopes/variables follow the frozen register/local/global composition and artifact
   source/type/lexical-scope/variable queries; Watch requests use separate ExpressionValue;
 - REGISTERS return RegisterVariableRecord without synthetic symbols/addresses; LOCALS/GLOBALS

@@ -1,6 +1,6 @@
 # DBG-RF-004 — Typed Artifact, Source, Address, Stack, and Inspection
 
-- Status: **ACTIVE — REVIEWS 007..010/012..016 REWORK CORRECTED / REVIEW 017 PENDING**
+- Status: **ACTIVE — REVIEWS 007..010/012..017 REWORK CORRECTED / REVIEW 018 PENDING**
 - Steering authority: issue #38 comment `5362514094`
 - Dependency clarification: issue #42 comment `5362515750`
 - Sprint/iteration: `DBG-SPR-001` / `DBG-IT-001-005`
@@ -12,8 +12,8 @@
   `DBG-D-004`, `DBG-D-009`
 - Portable inputs: `HSX-D-001..HSX-D-003`, especially `HSX-D-002`
 - Frozen interface: `dbg.resolver-inspection/1`
-- Interface reviews: `DBG-RVW-001-005-007..010` and `...012..016` REWORK; fresh
-  `DBG-RVW-001-005-017` pending (`...011` is Slice 007 review)
+- Interface reviews: `DBG-RVW-001-005-007..010` and `...012..017` REWORK; fresh
+  `DBG-RVW-001-005-018` pending (`...011` is Slice 007 review)
 - Product base: `69a54aeb3394d3cd4792bce620748e15bab69f1f`
 
 ## Objective
@@ -32,9 +32,10 @@ Dependency direction is:
 ```text
 portable identities/descriptors
   -> typed identities/addresses/results
+  -> bounded recipe/location DTO validator/evaluator
   -> verified artifact index
   -> source resolver
-  -> bounded recipes/location/stack
+  -> snapshot-bound stack
   -> epoch inspection composition
   -> later RF-005/RF-006/RF-007 consumers (still blocked)
 ```
@@ -55,7 +56,7 @@ into a resolver/inspection monolith.
 | 003 artifact/index | `artifacts.py`, `legacy_symbols.py`, `test_hsx_debugger_artifacts.py` | signed Slices 001-002/007; legacy SymbolIndex read-only |
 | 004 source resolver | `sources.py`, `test_hsx_debugger_sources.py` | signed Slices 001-003/007; legacy SourceMap read-only |
 | 005 stack | `stack.py`, `test_hsx_debugger_stack.py` | signed Slices 001-004/007; recipes read-only |
-| 006 inspection | `handles.py`, `inspection.py`, `test_hsx_debugger_inspection.py` | signed Slices 001-005; existing epoch/controller contracts read-only |
+| 006 inspection | `handles.py`, `inspection.py`, `test_hsx_debugger_inspection.py` | signed Slices 001-005/007; existing epoch/controller contracts read-only |
 
 `python/hsx_debugger/__init__.py` is the sole append-only shared exception: each Slice may add
 only exports for its own implementation and may not edit/remove/reorder prior exports or add
@@ -135,7 +136,7 @@ At minimum, evidence across the seven Slices covers:
 
 Formal verification records are `DBG-VER-001-005-001..007`. Planned Slice reviews are
 `DBG-RVW-001-005-001..006` plus `DBG-RVW-001-005-011` for Slice 007; interface reviews
-007..010/012..016 are REWORK and fresh review 017 is pending.
+007..010/012..017 are REWORK and fresh review 018 is pending.
 Parent final review and
 verification are `DBG-RVW-004-001-001` and `DBG-VER-004-001-001`.
 

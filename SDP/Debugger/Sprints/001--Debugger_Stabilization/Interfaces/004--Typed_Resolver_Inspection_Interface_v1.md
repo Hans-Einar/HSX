@@ -1,6 +1,6 @@
 # `dbg.resolver-inspection/1` — Typed Resolver and Inspection Interface
 
-- Status: **REFROZEN CANDIDATE — REVIEWS 007..010/012..016 REWORK / REVIEW 017 PENDING**
+- Status: **REFROZEN CANDIDATE — REVIEWS 007..010/012..017 REWORK / REVIEW 018 PENDING**
 - Iteration: `DBG-IT-001-005`
 - Parent Refactor: `DBG-RF-004`
 - Steering authority: issue #38 comment `5362514094`
@@ -16,7 +16,8 @@
 - Review `DBG-RVW-001-005-014`: REWORK at `96daa3a5dffa6b80b2b5687b9cd0429ffaa402c8`
 - Review `DBG-RVW-001-005-015`: REWORK at `18c0a26cad4c2d82e4a23ef0ec3e6409b022cb95`
 - Review `DBG-RVW-001-005-016`: REWORK at `e330a7b344715dfdbae0de46e44f4720b4387d4e`
-- Fresh independent re-review: `DBG-RVW-001-005-017` (`...011` is reserved for Slice 007)
+- Review `DBG-RVW-001-005-017`: REWORK at `cb88b62b7c45ea6ebfe31c40e522daa3adcf8896`
+- Fresh independent re-review: `DBG-RVW-001-005-018` (`...011` is reserved for Slice 007)
 - Public interface ID: `dbg.resolver-inspection/1`
 
 This document freezes the public Python-domain interface to be implemented by the seven bounded
@@ -326,7 +327,10 @@ bundle_identity's canonical digest and first-match returns:
 
 | Condition | ResolutionStatus | Diagnostic code |
 |---|---|---|
+| loaded-image ArtifactRef != bundle-ref ArtifactRef | `ARTIFACT_MISMATCH` | `artifact_ref_mismatch` |
+| bundle-identity ArtifactRef != bundle-ref ArtifactRef | `ARTIFACT_MISMATCH` | `artifact_ref_mismatch` |
 | recomputed bundle digest != binding payload bundle ref digest | `ARTIFACT_MISMATCH` | `bundle_digest_mismatch` |
+| recomputed canonical binding payload digest != binding.binding_digest | `ARTIFACT_MISMATCH` | `binding_digest_mismatch` |
 | binding accepted architecture ref != architecture.ref.ref | `ARTIFACT_MISMATCH` | `binding_architecture_ref_mismatch` |
 | bundle identity architecture ref or digest != architecture.ref | `ARTIFACT_MISMATCH` | `bundle_architecture_mismatch` |
 | binding accepted ABI ref != abi.ref | `ARTIFACT_MISMATCH` | `binding_abi_ref_mismatch` |
@@ -472,7 +476,7 @@ FunctionRecord { function_id: str, name: str, linkage_name: str | None,
                  definition: SourceLocation | None }
 SymbolRecord { symbol_id: str, name: str,
                kind: FUNCTION | LABEL | GLOBAL | LOCAL | CONSTANT,
-               address: HsxAddress, byte_size: int >= 0,
+               address: HsxAddress | None, byte_size: int >= 0,
                function_id: str | None, lexical_scope_id: str | None,
                type_id: str | None, declaration_order: int >= 0 }
 SourceLocation { source: SourceRef, line: int >= 1, column: int >= 1 | None,
@@ -500,12 +504,28 @@ UnwindRow { row_id: str, binding: ImageDebugBinding, pc_range: HsxAddressRange,
             boundary: ORDINARY | ENTRY | EPILOGUE | TERMINAL | UNSUPPORTED,
             call_site_adjustment: int | None }
 LocationRow { row_id: str, binding: ImageDebugBinding, symbol_id: str,
-              lexical_scope_id: str, function_id: str,
+              lexical_scope_id: str | None, function_id: str | None,
               pc_range: HsxAddressRange, declared_type_id: str | None,
               declared_bit_size: int >= 1, abi: AbiDescriptorRef,
+              frame_binding: SELECTED_FRAME,
               schema: RecipeSchemaRef,
               location_form: LocationForm }
 ```
+
+Symbol kind invariants are exact. FUNCTION requires address, non-null function_id resolving
+to the exact FunctionRecord and lexical_scope_id=None. LABEL requires address; its optional
+function_id must resolve to a FunctionRecord, and lexical_scope_id may be non-null only when
+it resolves inside that same function. FUNCTION/LABEL have no LocationRow. LOCAL requires
+address=None plus non-null function_id/lexical_scope_id. GLOBAL requires
+address=None plus function_id=None/lexical_scope_id=None. CONSTANT requires address=None and
+either both function/scope IDs non-null or both None. Every GLOBAL/LOCAL/CONSTANT value is
+obtained only through a matching LocationRow form (`static_address`, register/frame expression,
+value, pieces, optimized_out or unavailable); no static/sentinel address is stored in
+SymbolRecord. SymbolExpression is valid only for address-bearing FUNCTION/LABEL; variable
+kinds use VariableExpression and LocationEvaluator.
+LocationRow is static metadata and `frame_binding=SELECTED_FRAME` is the only v1 value;
+LocationEvaluator binds it to the explicit UnwindFrame argument and requires matching context,
+function and frame PC. No current/top-frame lookup or runtime handle is stored in the artifact.
 
 Pagination and inspection record schemas:
 
@@ -697,7 +717,8 @@ instruction_at(address: HsxAddress) -> ResolutionResult[InstructionRecord]
 source_locations(source: SourceRef, line: int, column: int | None) -> ResolutionResult[InstructionRecord]
 memory_regions() -> tuple[MemoryRegion, ...]
 unwind_rows(pc: HsxAddress, function_id: str | None) -> ResolutionResult[UnwindRow]
-location_rows(symbol_id: str, lexical_scope_id: str,
+location_rows(symbol_id: str, function_id: str | None,
+              lexical_scope_id: str | None,
               frame_pc: HsxAddress) -> ResolutionResult[LocationRow]
 
 LegacyDebugArtifactIndex.provenance() -> LegacyArtifactProvenance
@@ -714,7 +735,7 @@ LegacyDebugArtifactIndex.memory_regions() -> tuple[MemoryRegion, ...]
 
 Index ordering is observable and fixed: functions by `(space.value,
 range.start.unsigned_value, function_id)`; symbol candidates by
-`(space.value, address.unsigned_value, symbol_kind_rank, symbol_id)` where ranks are
+`(symbol_kind_rank, symbol_id)` where ranks are
 FUNCTION=0, LABEL=1, GLOBAL=2, LOCAL=3, CONSTANT=4; instructions/source-location candidates by
 `(space.value, address.unsigned_value, instruction_id)`; memory regions by
 `(space.value, range.start.unsigned_value, region_id)`; unwind/location rows by
@@ -732,8 +753,9 @@ set, so it is UNAVAILABLE for zero and RESOLVED with the ordered one-or-more set
 chooses one address.
 
 `SymbolRecord.symbol_id` is the sole variable identity. Every LocationRow.symbol_id must
-resolve to exactly one LOCAL or GLOBAL SymbolRecord; its function/lexical-scope fields must
-equal that record and every variables_in_scope result must have the requested scope. Missing,
+resolve to exactly one LOCAL, GLOBAL or CONSTANT SymbolRecord; its nullable function/lexical-
+scope fields must exactly equal that record and every variables_in_scope result must have the
+requested non-null scope while global_variables returns only GLOBAL or global CONSTANT. Missing,
 duplicate or cross-scope joins make the portable component/index `CORRUPT`. VariableExpression,
 EvaluatedValue, SymbolVariableRecord, location_rows and symbol VARIABLE handle keys all carry that same
 symbol_id unchanged; no secondary variable-ID namespace exists.
@@ -1076,7 +1098,9 @@ explicit diagnostic. There is no WATCH scope: each standard Watch/hover/evaluate
 to RegisterVariableRecord without synthesizing SymbolRecord/address; LOCALS come from
 `lexical_scopes()` plus `variables_in_scope()` for the selected frame PC, and GLOBALS from
 `global_variables()`. Local/global variables select exactly one applicable LocationRow and use
-LocationEvaluator; zero rows is unavailable and overlap is corrupt. No scope query invents a
+LocationEvaluator using the SymbolRecord's exact nullable function/scope IDs and selected frame
+PC; globals pass None/None, locals pass both non-null. Zero rows is unavailable and overlap is
+corrupt. No scope query invents a
 variable, reads the current top frame or creates a persistent live watch.
 
 Registers, stack, variables, snapshot expressions, memory and disassembly returned for one context must use one exact

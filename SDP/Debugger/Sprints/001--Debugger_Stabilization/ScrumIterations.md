@@ -498,8 +498,8 @@ frontend mapping remain separate responsibilities.
 
 Interface review `DBG-RVW-001-005-007` returned REWORK at exact remote-published head
 `82154c614a31284723bf3e6a337c5bedfb8aba5d`. Master corrected only the candidate interface,
-Slice ownership and live traceability. Reviews 008..010 and 012..016 also returned REWORK;
-fresh `DBG-RVW-001-005-017` must PASS before product
+Slice ownership and live traceability. Reviews 008..010 and 012..017 also returned REWORK;
+fresh `DBG-RVW-001-005-018` must PASS before product
 dispatch. A finding requiring an accepted DBG/HSX design change returns to Steering.
 
 ### Frozen execution units
@@ -534,7 +534,7 @@ exact-head sign-off before the next Slice starts.
 - Requirements: `DBG-R-004`, `DBG-R-021..DBG-R-028`, `DBG-R-034..DBG-R-036`.
 - Design: `DBG-D-003`, `DBG-D-004`, `DBG-D-009`; portable `HSX-D-001..003`.
 - Slice reviews: `DBG-RVW-001-005-001..006` and `DBG-RVW-001-005-011`; interface
-  reviews: `DBG-RVW-001-005-007..010`, then `...012..017`; verifications
+  reviews: `DBG-RVW-001-005-007..010`, then `...012..018`; verifications
   `DBG-VER-001-005-001..007`.
 - Parent final: `DBG-RVW-004-001-001`, `DBG-VER-004-001-001`.
 - RF-005 explicitly depends on RF-004's accepted `dbg.resolver-inspection/1`; partial/frozen
@@ -694,3 +694,18 @@ then returned REWORK for one High: LocationRow required `row.abi == ABI` but lac
 field. Master added exact AbiDescriptorRef to LocationRow and row-construction/evaluator
 verification. No product file changed. Fresh exact-head review is
 `DBG-RVW-001-005-017`.
+
+### Interface review attempt 10
+
+Fresh read-only `DBG-RVW-001-005-017` reviewed exact remote head `cb88b62b7…`. It confirmed
+LocationRow ABI and all prior closures, then returned REWORK:
+
+- High: the binding validator omitted exact ArtifactRef agreement and recomputed binding_digest;
+- High: variable SymbolRecord/LocationRow nullability/address rules could not represent normal
+  global or stack/register/constant local locations without sentinels;
+- Medium: RF-004 dependency diagram and inspection row retained the old pre-Slice-007 order.
+
+Master completed the validator matrix, made variable symbols addressless and location-row-
+owned with exact nullable kind rules/query joins, and synchronized the diagram/inspection
+dependency to `001→002→007→003→004→005→006`. No product file changed. Fresh exact-head review
+is `DBG-RVW-001-005-018`.
