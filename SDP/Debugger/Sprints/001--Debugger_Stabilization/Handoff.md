@@ -1,6 +1,6 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf004_slice007_review_pass_verification_007_pending`
+Status: `rf004_slices001_002_007_signed_slice003_worker_pending`
 
 Steering escalation: issue #38 comment `5369244294`.
 Steering frame-evidence refreeze: issue #38 comment `5370574104`.
@@ -20,8 +20,8 @@ The accepted first-wave gate is closed. Execute only `DBG-RF-004` through the se
 Historical versions `1`/`1.1` passed reviews019/030; Slices001–002 are signed. Steering accepted
 `DBG-BLK-001-005-002` and selected frame-carried recovered evidence in comment `5370574104`.
 Review031 returned REWORK trace-only; review032 passed exact head `f79eb629…`. Slice007 review011
-returned REWORK; review033 returned REWORK trace-only; review034 passed. Formal verification007
-is pending. RF-005..009 and
+returned REWORK; review033 returned REWORK trace-only; review034/verification007/sign-off passed.
+Artifact Slice003 is next. RF-005..009 and
 Executive/VM/AVR/frontend migration remain blocked.
 
 ## Authority
@@ -196,7 +196,7 @@ Executive/VM/AVR/frontend migration remain blocked.
 
 ## Exact next step
 
-Dispatch formal verifier007 against exact head `3228c9b23dcd8fa08a81499181e2ea9b55a0f5f0`.
+Dispatch fresh artifact Slice003 worker; then review003/verification003/sign-off.
 Do not start verification007 or Slice003 before PASS.
 
 ## Traceability state
@@ -281,7 +281,7 @@ Do not start verification007 or Slice003 before PASS.
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: `DBG-VER-001-005-007` at `3228c9b2…`
+- Active gate: fresh Slice003 worker
 - Blocker authority: issue #38 comment `5369244294`
 - Refreeze authority: issue #38 comment `5370574104`
 - Blocker authority: issue #38 comment `5365959417`

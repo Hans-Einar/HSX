@@ -420,7 +420,15 @@ relations:
   - from: DBG-SL-001-005-007
     type: verified_by
     to: [DBG-VER-001-005-007]
-    status: planned
+    status: pass
+    implementation_head: 3228c9b23dcd8fa08a81499181e2ea9b55a0f5f0
+    coordination_head: 86f43d8241f8ff504c7fd25afceed43d2f9c0b77
+    record: SDP/Debugger/Verification/DBG-VER-001-005-007.md
+  - from: DBG-SL-001-005-007
+    type: signed_at
+    to: [3228c9b23dcd8fa08a81499181e2ea9b55a0f5f0]
+    status: pass
+    record: SDP/Debugger/Verification/DBG-SL-001-005-007--Master_Signoff.md
   - from: DBG-SL-001-005-001
     type: prerequisite_for
     to: [DBG-SL-001-005-002]

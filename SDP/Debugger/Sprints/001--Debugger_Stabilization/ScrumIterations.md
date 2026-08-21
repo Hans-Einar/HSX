@@ -474,7 +474,7 @@ traceability and no product drift after the combined signed head. Steering accep
 
 ## DBG-IT-001-005 — Typed Resolver and Inspection
 
-Status: ACTIVE — SLICE 007 VERIFICATION PENDING
+Status: ACTIVE — SLICES 001,002,007 SIGNED / SLICE 003 ACTIVE
 
 ### Authority and goal
 
@@ -1095,3 +1095,5 @@ review fields only; product head `3228c9b2…` is unchanged. Fresh review034 is 
 
 Fresh review034 passed unchanged product head `3228c9b2…` with zero findings and reproduced
 owned39/Slice00247/broad223+1 plus strict trace/scope/git. Formal verification007 is next.
+
+Formal verification007 passed `3228c9b2…`; Master sign-off completed and activates only Slice003.

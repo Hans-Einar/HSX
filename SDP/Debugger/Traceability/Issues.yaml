@@ -273,7 +273,7 @@ issues:
     steering_completion_comment: 5362514094
   DBG-RF-004:
     issue: 41
-    status: slice007_review_pass_verification_007_pending
+    status: slices001_002_007_signed_slice003_worker_pending
     iteration: DBG-IT-001-005
     slices: DBG-SL-001-005-001..DBG-SL-001-005-007
     execution_order: DBG-SL-001-005-001,DBG-SL-001-005-002,DBG-SL-001-005-007,DBG-SL-001-005-003,DBG-SL-001-005-004,DBG-SL-001-005-005,DBG-SL-001-005-006
@@ -293,12 +293,15 @@ issues:
     slice001_final_verification_status: pass
     slice001_signoff_status: pass
     slice001_signed_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
-    active_slice: DBG-SL-001-005-007
-    active_slice_status: review_pass_verification_007_pending
-    active_slice_review: DBG-RVW-001-005-034
-    active_slice_review_status: pass
-    active_slice_review_coordination_head: d045fb29dd7c94535d99134779cef07943b5196f
-    active_slice_verification: DBG-VER-001-005-007
+    active_slice: DBG-SL-001-005-003
+    active_slice_status: active_fresh_worker_pending
+    active_slice_review: DBG-RVW-001-005-003
+    active_slice_review_status: planned
+    active_slice_verification: DBG-VER-001-005-003
+    slice007_verification_status: pass
+    slice007_verification_coordination_head: 86f43d8241f8ff504c7fd25afceed43d2f9c0b77
+    slice007_signoff_status: pass
+    slice007_signed_head: 3228c9b23dcd8fa08a81499181e2ea9b55a0f5f0
     active_slice_implementation_head: ec75c4eb22333368cbe4847920dc4420fe8231cf
     active_slice_initial_review: DBG-RVW-001-005-011
     active_slice_initial_review_status: rework

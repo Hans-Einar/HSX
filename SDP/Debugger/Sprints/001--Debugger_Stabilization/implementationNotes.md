@@ -83,3 +83,15 @@ Windows symlink behavior remains degraded/unverified on this host; no symlink PA
 
 Windows symlink behavior remains the sole degraded skip. Slice 002 has Master exact-head
 sign-off and authorizes only Slice 007 recipe foundation next.
+
+## DBG-SL-001-005-007 verified recipe foundation
+
+- exact signed product head: `3228c9b23dcd8fa08a81499181e2ea9b55a0f5f0`;
+- interface1.2 review032, product review034 and formal verification007: PASS;
+- closed recipe DTO/parser/row+frame validator, bounded RecipeEvaluator and LocationEvaluator;
+- recovered-frame evidence and no-fallback rules verified; current-profile non-top PSW explicit
+  unavailable without an accepted HSX rule seam;
+- owned39, Slice00247, broad223+1, compile/import/export170/41 and strict trace/git PASS;
+- initial three-file and corrective two-file scopes exact.
+
+WinError1314 symlink behavior remains degraded. Slice007 sign-off authorizes only Slice003.
