@@ -272,6 +272,7 @@ relations:
     type: reviewed_by
     to: [DBG-RVW-001-005-027]
     status: planned_post_refreeze_product_only
+    candidate_head: c7bc39057469f1aa62a78f409753ec0213631214
   - from: DBG-SL-001-005-002
     type: blocked_by
     to: [DBG-BLK-001-005-001]

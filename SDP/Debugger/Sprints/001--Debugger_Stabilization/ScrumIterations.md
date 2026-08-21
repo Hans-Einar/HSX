@@ -474,7 +474,7 @@ traceability and no product drift after the combined signed head. Steering accep
 
 ## DBG-IT-001-005 — Typed Resolver and Inspection
 
-Status: ACTIVE — INTERFACE 1.1 REVIEW 030 PASS / SLICE 002 CORRECTION
+Status: ACTIVE — INTERFACE 1.1 PASS / SLICE 002 REVIEW 027 PENDING
 
 ### Authority and goal
 
@@ -992,3 +992,14 @@ Steering semantics, fixtures, review028/029 closures and full trace mechanics pa
 closes `DBG-BLK-001-005-001` and resumes only Slice 002 with a fresh corrective worker under
 existing ownership. Review 026 remains historical REWORK; review 027 is product-only and must
 review the new post-refreeze head before formal verification or any later Slice.
+
+### Slice 002 post-refreeze corrective result
+
+Fresh worker committed `c7bc39057469f1aa62a78f409753ec0213631214` under the existing
+Slice ownership, changing five owned files. The exact 19-type private Enum registry preserves
+canonical members; list/dict/set normalize to tuple/ordered tuple-pairs/frozenset; recursively
+contract-safe frozen DTOs pass; arbitrary Enums, mutable/duck records, unsafe leaves and cycles
+reject. Reflection/type-system isolation tests are retired exactly as Steering required. Public
+surface and 129 exports match `0bedb2d…`. Focused 47, debugger 184+1, mandated 39+1, oracle
+16+1, canonical 2, hashseed 0/1 and full scope/git gates pass. Fresh product-only review 027 is
+the sole active gate.

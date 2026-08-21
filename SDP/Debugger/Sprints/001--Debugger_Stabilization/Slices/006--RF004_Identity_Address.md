@@ -1,9 +1,10 @@
 # DBG-SL-001-005-002 — RF-004 Typed Identity, Binding, Address, and Result Foundation
 
-- Status: **REWORK / POST-REFREEZE CORRECTIVE WORKER PENDING**
+- Status: **POST-REFREEZE CORRECTED / REVIEW 027 PENDING**
 - Implementation head: `4b5837644dc1196accfd8608bc3dbd20980476bb`
 - Corrected head: `4280bc6008385042bdff923bd8e5392a1c290fdc`
 - Corrected head 2: `6c933ea6b11e42d58da52faf0997f8c978dad54b`
+- Post-refreeze corrected head: `c7bc39057469f1aa62a78f409753ec0213631214`
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
 - Depends on signed: `DBG-SL-001-005-001`
@@ -142,6 +143,15 @@ unchanged. Review 028 returned REWORK on the fixture/trace candidate; product co
 stopped until fresh interface review 030 PASS. Review 030 passed at `ae49435…`; a fresh
 post-refreeze corrective worker may now start. Historical review 026 remains REWORK; review 027
 is reserved only for the new product head.
+
+Fresh post-refreeze worker committed `c7bc39057469f1aa62a78f409753ec0213631214`, changing only
+`results.py`, the owning identity/address/metadata Enum registration points and the owned
+metadata test. The private registry contains the exact 19 approved types; canonical Enum
+identity, list/dict/set normalization, recursive frozen DTO admission and unsafe payload
+rejection follow `DBG-CF-001-005-001`. Reflection/type-system assertions were retired. Public
+surface/129 exports are unchanged. Evidence: focused 47; debugger 184+1 classified skip;
+mandated 39+1; oracle 16+1; canonical 2; hashseed 0/1 each 26; compile/import/scope/git PASS.
+Fresh product-only review is `DBG-RVW-001-005-027`.
 
 Second correction: exact atom types; directly declared frozen dataclasses only; all fields
 deep-traversed; undeclared dict/slot state rejected. Focused 43, debugger 180+1 skip, mandated
