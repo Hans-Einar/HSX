@@ -1,6 +1,6 @@
 # DBG-SL-001-005-007 — RF-004 Recipe Schema and Evaluator Foundation
 
-- Status: **REWORK / FRESH CORRECTIVE WORKER PENDING**
+- Status: **CORRECTED / REVIEW 033 PENDING**
 
 - Implementation head: `ec75c4eb22333368cbe4847920dc4420fe8231cf`
 
@@ -114,3 +114,11 @@ signed Slice002 47; broad debugger 218+1 classified WinError1314 skip; compile/i
 unavailable register terminals rejected, exact bool/float/schema parsing gaps, and widened
 LocationEvaluator index annotation. Fresh corrective worker owns the same three files; next
 review is `DBG-RVW-001-005-033`.
+
+## Corrective result
+
+Fresh worker committed `3228c9b23dcd8fa08a81499181e2ea9b55a0f5f0`, changing only
+`recipes.py` and the owned recipe test. Shared pure/runtime postfix validation, aggregate limits,
+unavailable GPR terminals, exact integer/schema parsing and DebugArtifactIndex annotation close
+review011. Owned39, Slice00247, broad223+1, compile/import/export/signature/scope/git PASS.
+Fresh review033 is next.

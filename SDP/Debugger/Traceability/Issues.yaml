@@ -273,7 +273,7 @@ issues:
     steering_completion_comment: 5362514094
   DBG-RF-004:
     issue: 41
-    status: interface_1_2_pass_slice007_review_011_rework_worker_pending
+    status: interface_1_2_pass_slice007_corrected_review_033_pending
     iteration: DBG-IT-001-005
     slices: DBG-SL-001-005-001..DBG-SL-001-005-007
     execution_order: DBG-SL-001-005-001,DBG-SL-001-005-002,DBG-SL-001-005-007,DBG-SL-001-005-003,DBG-SL-001-005-004,DBG-SL-001-005-005,DBG-SL-001-005-006
@@ -294,7 +294,7 @@ issues:
     slice001_signoff_status: pass
     slice001_signed_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
     active_slice: DBG-SL-001-005-007
-    active_slice_status: rework_corrective_worker_pending
+    active_slice_status: corrected_review_033_pending
     active_slice_review: DBG-RVW-001-005-011
     active_slice_review_status: planned
     active_slice_verification: DBG-VER-001-005-007
@@ -302,6 +302,7 @@ issues:
     active_slice_review_status: rework
     active_slice_corrective_review: DBG-RVW-001-005-033
     active_slice_corrective_review_status: planned
+    active_slice_corrected_head: 3228c9b23dcd8fa08a81499181e2ea9b55a0f5f0
     active_slice_blocker: DBG-BLK-001-005-002
     active_slice_blocker_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/007--RF004_Location_Frame_Evidence_Steering_Blocker.md
     active_slice_blocker_comment: 5369244294

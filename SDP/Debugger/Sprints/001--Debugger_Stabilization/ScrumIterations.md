@@ -474,7 +474,7 @@ traceability and no product drift after the combined signed head. Steering accep
 
 ## DBG-IT-001-005 — Typed Resolver and Inspection
 
-Status: ACTIVE — INTERFACE 1.2 PASS / SLICE 007 REWORK
+Status: ACTIVE — INTERFACE 1.2 PASS / SLICE 007 REVIEW 033 PENDING
 
 ### Authority and goal
 
@@ -1077,3 +1077,10 @@ omitted normative postfix/finality/limit checks; valid unavailable GPR terminals
 bool/float and unknown-schema parsing were misclassified; and LocationEvaluator exposed
 `index: object`. Binding/no-fallback/ownership and all existing suites otherwise passed. Fresh
 corrective worker is bounded to the same three files; review033 is next.
+
+### Slice007 corrective result
+
+Fresh worker committed `3228c9b2…`, changing only recipe implementation/test. The shared
+abstract validator now rejects malformed postfix/finality/limits before artifact acceptance;
+explicit unavailable GPR terminals pass; integer/schema classification and public annotation
+are exact. Owned39, Slice00247, broad223+1 and all mechanical gates pass. Review033 is next.
