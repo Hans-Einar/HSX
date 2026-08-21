@@ -1,6 +1,6 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf004_slices001_002_007_signed_slice003_rereview_pending`
+Status: `rf004_slices001_002_007_signed_slice003_verification_pending`
 
 Steering escalation: issue #38 comment `5369244294`.
 Steering frame-evidence refreeze: issue #38 comment `5370574104`.
@@ -25,7 +25,8 @@ Review031 returned REWORK trace-only; review032 passed exact head `f79eb629…`.
 returned REWORK; review033 returned REWORK trace-only; review034/verification007/sign-off passed.
 Draft PR #50 and Steering progress comment `5372569290` expose the exact signed heads and next
 gate. Artifact Slice003 review003 returned REWORK; bounded corrections completed at
-`a335789759a68dfd8bef01dbdf59591b096307d3`. Fresh review035 is next. RF-005..009 and
+`a335789759a68dfd8bef01dbdf59591b096307d3` and review035 passed. Formal verification003 is
+next. RF-005..009 and
 Executive/VM/AVR/frontend migration remain blocked.
 
 ## Authority
@@ -200,9 +201,9 @@ Executive/VM/AVR/frontend migration remain blocked.
 
 ## Exact next step
 
-Dispatch fresh independent `DBG-RVW-001-005-035` against exact corrected product head
-`a335789759a68dfd8bef01dbdf59591b096307d3`. Only review PASS may open verification003;
-no Slice004 work begins before Slice003 exact-head sign-off.
+Run formal `DBG-VER-001-005-003` against exact corrected product head
+`a335789759a68dfd8bef01dbdf59591b096307d3` and review035 PASS. No Slice004 work begins before
+Slice003 Master exact-head sign-off.
 
 ## Traceability state
 
@@ -285,7 +286,7 @@ no Slice004 work begins before Slice003 exact-head sign-off.
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: fresh independent Slice003 corrective review035
+- Active gate: formal Slice003 verification `DBG-VER-001-005-003`
 - Blocker authority: issue #38 comment `5369244294`
 - Refreeze authority: issue #38 comment `5370574104`
 - Blocker authority: issue #38 comment `5365959417`

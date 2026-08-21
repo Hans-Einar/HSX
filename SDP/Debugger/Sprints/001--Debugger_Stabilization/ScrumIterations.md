@@ -1122,3 +1122,10 @@ Recursive legacy generic payload normalization/rejection now uses the accepted c
 boundary; recipe `limit_exceeded` maps to artifact `SCHEMA_UNSUPPORTED`, while other malformed
 validator diagnostics remain `CORRUPT`. Focused artifact evidence is 31 passed and exact scope
 is three owned files. Fresh review035 is the only next gate.
+
+### Slice003 review035 PASS
+
+Fresh independent review035 passed corrected product head `a335789759…` with zero findings.
+All review003 closures, original artifact/index responsibilities, degraded legacy boundary,
+focused31, broad254+1, legacy22+2, strict trace and exact Git scope pass. Formal verification003
+is next; Slice004 remains stopped.

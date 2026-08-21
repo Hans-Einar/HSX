@@ -1,6 +1,6 @@
 # DBG-SL-001-005-003 — RF-004 Verified Debug Artifact Index
 
-- Status: **CORRECTED / INDEPENDENT REVIEW035 PENDING**
+- Status: **REVIEW035 PASS / FORMAL VERIFICATION003 PENDING**
 - Product head: `196111030e0f25e861d03f5dffd159f52c10622a`
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
@@ -88,3 +88,9 @@ No other product Blocking/High/Medium finding exists. Corrective review035 is re
 - Focused artifact tests: `31 passed`.
 - Compile/import/export, diff check and Git connectivity: PASS.
 - No frozen-contract or HSX-semantic blocker.
+
+## Review035 decision
+
+Fresh review035 passed exact corrected head `a335789759…` with zero findings. Focused31,
+broad254+1, legacy22+2, adversarial closure, compile/exports/signatures, strict trace, exact
+scope and Git integrity pass. Skips are the existing classified WinError1314 evidence.
