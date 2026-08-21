@@ -1,6 +1,7 @@
 # DBG-SL-001-005-003 — RF-004 Verified Debug Artifact Index
 
-- Status: **ACTIVE / FRESH WORKER PENDING**
+- Status: **IMPLEMENTED / INDEPENDENT REVIEW PENDING**
+- Product head: `196111030e0f25e861d03f5dffd159f52c10622a`
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
 - Depends on signed: `DBG-SL-001-005-001..002`, `DBG-SL-001-005-007`
@@ -62,3 +63,10 @@ Test canonical binding/component success and every mismatch, malformed/unsupport
 multiple spaces/widths, duplicate symbols/basenames, multiple line addresses, memory regions,
 row overlaps and exact legacy-golden preservation/change cases. Run legacy SymbolIndex tests
 unchanged. Close only after exact-head review, formal verification and Master sign-off.
+
+## Worker evidence
+
+- Focused artifact tests: `29 passed`.
+- Compile/import/export/signature checks: PASS; `179` unique package exports.
+- Exact four-file ownership, diff check, clean worktree and Git connectivity: PASS.
+- Broad regression is intentionally deferred to review/verification.

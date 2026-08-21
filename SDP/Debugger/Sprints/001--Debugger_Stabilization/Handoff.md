@@ -1,6 +1,6 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf004_slices001_002_007_signed_slice003_worker_pending`
+Status: `rf004_slices001_002_007_signed_slice003_review_pending`
 
 Steering escalation: issue #38 comment `5369244294`.
 Steering frame-evidence refreeze: issue #38 comment `5370574104`.
@@ -24,7 +24,8 @@ Historical versions `1`/`1.1` passed reviews019/030; Slices001–002 are signed.
 Review031 returned REWORK trace-only; review032 passed exact head `f79eb629…`. Slice007 review011
 returned REWORK; review033 returned REWORK trace-only; review034/verification007/sign-off passed.
 Draft PR #50 and Steering progress comment `5372569290` expose the exact signed heads and next
-gate. Artifact Slice003 is next. RF-005..009 and
+gate. Artifact Slice003 is implemented at `196111030e0f25e861d03f5dffd159f52c10622a`;
+fresh exact-head review003 is next. RF-005..009 and
 Executive/VM/AVR/frontend migration remain blocked.
 
 ## Authority
@@ -199,8 +200,9 @@ Executive/VM/AVR/frontend migration remain blocked.
 
 ## Exact next step
 
-Dispatch fresh artifact Slice003 worker; then review003/verification003/sign-off.
-Do not start verification007 or Slice003 before PASS.
+Dispatch fresh independent `DBG-RVW-001-005-003` against exact product head
+`196111030e0f25e861d03f5dffd159f52c10622a`. Only review PASS may open
+verification003; no Slice004 work begins before Slice003 exact-head sign-off.
 
 ## Traceability state
 
@@ -284,7 +286,7 @@ Do not start verification007 or Slice003 before PASS.
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: fresh Slice003 worker
+- Active gate: fresh independent Slice003 review `DBG-RVW-001-005-003`
 - Blocker authority: issue #38 comment `5369244294`
 - Refreeze authority: issue #38 comment `5370574104`
 - Blocker authority: issue #38 comment `5365959417`
