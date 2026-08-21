@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "hxe_path": "artifacts/version-two.hxe",
+  "hxe_crc": 286331153,
+  "symbols": {
+    "functions": [
+      {
+        "name": "version_two",
+        "address": 16
+      }
+    ]
+  },
+  "instructions": [],
+  "memory_regions": []
+}

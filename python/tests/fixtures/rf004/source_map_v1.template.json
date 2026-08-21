@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "project_root": "project_root",
+  "prefix_map": "build_root=.",
+  "sources": [
+    {
+      "case_id": "source_exact_requested_path",
+      "file": "src/exact.c",
+      "path": "project_root/src/exact.c",
+      "relative": "./src/exact.c",
+      "oracle_content": "int exact(void) { return 1; }\n",
+      "oracle_existing_locators": [
+        "project_root/src/exact.c"
+      ]
+    },
+    {
+      "case_id": "source_prefix_map",
+      "file": "src/prefix.c",
+      "path": "build_root/src/prefix.c",
+      "relative": "./src/prefix.c",
+      "oracle_content": "int prefix(void) { return 2; }\n",
+      "oracle_existing_locators": [
+        "build_root/src/prefix.c"
+      ]
+    },
+    {
+      "case_id": "source_relocated_root",
+      "file": "src/relocated.c",
+      "path": "old_root/src/relocated.c",
+      "relative": "./src/relocated.c",
+      "oracle_content": "int relocated(void) { return 3; }\n",
+      "oracle_existing_locators": [
+        "new_root/src/relocated.c"
+      ]
+    },
+    {
+      "case_id": "source_symlink",
+      "file": "src/symlink.c",
+      "path": "old_root/src/symlink.c",
+      "relative": "./src/symlink.c",
+      "oracle_content": "int symlinked(void) { return 4; }\n",
+      "oracle_existing_locators": []
+    },
+    {
+      "case_id": "source_first_candidate",
+      "file": "src/ambiguous.c",
+      "path": "candidate_a/src/ambiguous.c",
+      "relative": "./src/ambiguous.c",
+      "oracle_content": "int candidate_a(void) { return 5; }\n",
+      "oracle_existing_locators": [
+        "candidate_a/src/ambiguous.c"
+      ]
+    },
+    {
+      "case_id": "source_first_candidate",
+      "file": "src/ambiguous.c",
+      "path": "candidate_b/src/ambiguous.c",
+      "relative": "./src/ambiguous.c",
+      "oracle_content": "int candidate_b(void) { return 6; }\n",
+      "oracle_existing_locators": [
+        "candidate_b/src/ambiguous.c"
+      ]
+    }
+  ]
+}
