@@ -1,6 +1,6 @@
 # DBG-CF-001-005-001 — `dbg.resolver-inspection/1.1` Immutability Conformance
 
-- Status: **CONTRACT PASS / TRACE-CORRECTED CANDIDATE / REVIEW 030 PENDING**
+- Status: **FROZEN / REVIEW 030 PASS**
 - Authority: issue #38 comment `5368017338`
 - Interface: `dbg.resolver-inspection/1.1`
 - Scope: supported-mutation and recursively contract-safe immutable semantics only
@@ -86,3 +86,5 @@ matrix/interface semantics plus reconciled trace. Product
 implementation remains stopped until that review passes. After PASS, a fresh Slice 002 worker
 updates only its existing owned files and test fixtures; historical `DBG-RVW-001-005-026`
 remains REWORK, and `DBG-RVW-001-005-027` reviews only the new post-refreeze product head.
+
+`DBG-RVW-001-005-030` passed exact content head `ae49435…`; the Slice 002 worker gate is open.

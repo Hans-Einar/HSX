@@ -1,6 +1,6 @@
 # DBG-SL-001-005-002 — RF-004 Typed Identity, Binding, Address, and Result Foundation
 
-- Status: **BLOCKED PENDING INTERFACE REVIEW 030**
+- Status: **REWORK / POST-REFREEZE CORRECTIVE WORKER PENDING**
 - Implementation head: `4b5837644dc1196accfd8608bc3dbd20980476bb`
 - Corrected head: `4280bc6008385042bdff923bd8e5392a1c290fdc`
 - Corrected head 2: `6c933ea6b11e42d58da52faf0997f8c978dad54b`
@@ -139,8 +139,9 @@ verification and later Slices are not started.
 Steering comment `5368017338` accepts the blocker and refreezes supported-mutation /
 contract-safe immutability as interface `1.1` with every public schema and exact Enum member
 unchanged. Review 028 returned REWORK on the fixture/trace candidate; product correction remains
-stopped until fresh interface review 030 PASS. Historical
-review 026 remains REWORK; review 027 is reserved only for a new post-refreeze product head.
+stopped until fresh interface review 030 PASS. Review 030 passed at `ae49435…`; a fresh
+post-refreeze corrective worker may now start. Historical review 026 remains REWORK; review 027
+is reserved only for the new product head.
 
 Second correction: exact atom types; directly declared frozen dataclasses only; all fields
 deep-traversed; undeclared dict/slot state rejected. Focused 43, debugger 180+1 skip, mandated

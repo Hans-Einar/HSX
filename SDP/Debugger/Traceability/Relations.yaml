@@ -187,7 +187,7 @@ relations:
     type: produces_interface
     to:
       - dbg.resolver-inspection/1.1
-    status: refrozen_reviews_028_029_rework_review_030_pending_implementation_stopped
+    status: frozen_review_030_pass_implementation_resumed_slice002_only
   - from: DBG-SL-001-005-001
     type: reviewed_by
     to: [DBG-RVW-001-005-001]
@@ -271,16 +271,16 @@ relations:
   - from: DBG-SL-001-005-002
     type: reviewed_by
     to: [DBG-RVW-001-005-027]
-    status: not_started_pending_interface_review_030_pass
+    status: planned_post_refreeze_product_only
   - from: DBG-SL-001-005-002
     type: blocked_by
     to: [DBG-BLK-001-005-001]
-    status: steering_accepted_refreeze_review_pending
+    status: resolved_refreeze_review_030_pass
     record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/005--RF004_Enum_Immutability_Steering_Blocker.md
   - from: DBG-BLK-001-005-001
     type: requires_steering_decision_on
     to: [dbg.resolver-inspection/1.1]
-    status: resolved_by_steering_refreeze_pending_interface_review
+    status: resolved_by_steering_refreeze_and_review_030_pass
     issue: 38
     escalation_comment: 5365959417
     resolution_comment: 5368017338
@@ -305,12 +305,14 @@ relations:
   - from: dbg.resolver-inspection/1.1
     type: reviewed_by
     to: [DBG-RVW-001-005-030]
-    status: planned
+    status: pass
     candidate_head: ae49435ebb24198ad1fb2017e5998bbad305792f
+    coordination_head: 39f6a2efca83a584b554ecd818c9d31319304143
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/052--RF004_Interface_1_1_Final_Review.md
   - from: DBG-SL-001-005-002
     type: resumes_after
     to: [DBG-RVW-001-005-030]
-    status: blocked_pending_review_pass
+    status: satisfied
   - from: DBG-SL-001-005-002
     type: verified_by
     to: [DBG-VER-001-005-002]

@@ -1,6 +1,6 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf004_interface_1_1_reviews_028_029_rework_review_030_pending_product_stopped`
+Status: `rf004_interface_1_1_pass_slice002_post_refreeze_worker_pending`
 
 Steering escalation: issue #38 comment `5365959417`.
 Steering refreeze: issue #38 comment `5368017338`.
@@ -16,7 +16,8 @@ The accepted first-wave gate is closed. Execute only `DBG-RF-004` through the se
 `058c338…` for historical version `1`. Steering accepted `DBG-BLK-001-005-001` and refroze only
 immutability semantics in comment `5368017338`. Review 028 returned REWORK for two Medium
 interface/trace findings. Slice 001 is signed; Slice 002 product work is stopped pending fresh
-interface review 030. RF-005..009 and Executive/VM/AVR/frontend migration remain blocked.
+fresh Slice 002 post-refreeze corrective work and product review 027. RF-005..009 and
+Executive/VM/AVR/frontend migration remain blocked.
 
 ## Authority
 
@@ -180,17 +181,17 @@ interface review 030. RF-005..009 and Executive/VM/AVR/frontend migration remain
   Review 026 confirmed pre-construction closure but returned REWORK because the retained Enum
   singleton can still expose post-construction changes.
 - `DBG-RVW-001-005-019` passed exact contract head `058c338…` after the prior REWORK chain.
-- `DBG-RVW-001-005-028` returned REWORK; review 029 returned REWORK trace-only; fresh review 030 remains open. Product
-  review 027 has not started and remains reserved for a new post-refreeze product head.
+- `DBG-RVW-001-005-028` returned REWORK; review 029 returned REWORK trace-only; review 030
+  passed exact content head `ae49435…`. Product review 027 remains reserved for the new
+  post-refreeze product head.
 - Six RF-004 Slice loops and the parent gate remain open.
 - RF-005..009 remain blocked; no Executive/VM/AVR or DAP/CLI/VS Code migration is authorized.
 
 ## Exact next step
 
-Dispatch fresh independent `DBG-RVW-001-005-030` against exact candidate
-`ae49435ebb24198ad1fb2017e5998bbad305792f`.
-Do not start a Slice 002 worker unless that
-interface review passes.
+Dispatch a fresh Slice 002 corrective worker under existing ownership. Then publish its exact
+product head and run product-only `DBG-RVW-001-005-027`; no formal verification or later Slice
+starts before that review passes.
 
 ## Traceability state
 
@@ -203,7 +204,7 @@ interface review passes.
   `fefd4b0c427dfa71d637e4f4cce9e4a345912591`.
 - CurrentIndex, Issues, sprint records, Relations, Ledger, and Handoff are current through
   Steering refreeze comment `5368017338`, candidate `1.1`/`DBG-CF-001-005-001`, and planned
-  reviews 028–029 REWORK and trace-corrected interface review 030 pending.
+  reviews 028–029 REWORK, review 030 PASS, and Slice 002 worker activation.
 - Accepted architecture direction: `DBG-DA-001`, `DBG-A-001..DBG-A-008`
 - Completed Design Studies: `DBG-ST-002..DBG-ST-005`
 - Architecture review: `DBG-RVW-001-002-001` — REWORK at `f8b8097`
@@ -223,7 +224,7 @@ interface review passes.
 - Active Refactor: `DBG-RF-004`
 - Frozen Slices: `DBG-SL-001-005-001..007`
 - Historical interface: `dbg.resolver-inspection/1`, review 019 PASS at `058c338…`
-- Refrozen interface: `dbg.resolver-inspection/1.1`, reviews 028–029 REWORK / review 030 pending
+- Refrozen interface: `dbg.resolver-inspection/1.1`, review 030 PASS at `ae49435…`
 - Refrozen conformance: `DBG-CF-001-005-001`
 - Interface review `DBG-RVW-001-005-007`: REWORK at `82154c614…`
 - Interface review `DBG-RVW-001-005-008`: REWORK at `8d6c0f571…`
@@ -272,7 +273,7 @@ interface review passes.
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: fresh exact-head `DBG-RVW-001-005-030`
+- Active gate: fresh Slice 002 post-refreeze corrective worker, then review 027
 - Blocker authority: issue #38 comment `5365959417`
 - Refreeze authority: issue #38 comment `5368017338`
 
@@ -280,7 +281,7 @@ interface review passes.
 
 The prior design/portable-contract chain and RF-002/RF-003/integration wave are complete,
 Steering-accepted and remotely reconstructable. RF-004 `1.1` is a refrozen interface candidate;
-product workers and verification remain stopped pending review 030. Controlled work is on
+only the bounded Slice 002 corrective worker is open; verification/later Slices remain stopped. Controlled work is on
 `codex/dbg-rf-004` from exact base `69a54aeb3394d3cd4792bce620748e15bab69f1f`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.

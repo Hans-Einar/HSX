@@ -222,7 +222,9 @@ issues:
     rf004_refreeze_rereviewed_coordination_head: ed23423814d58fe3c03b252084d43d2464a46118
     rf004_trace_corrected_refreeze_candidate_head: ae49435ebb24198ad1fb2017e5998bbad305792f
     rf004_refreeze_review_3: DBG-RVW-001-005-030
-    rf004_refreeze_review_3_status: planned
+    rf004_refreeze_review_3_status: pass
+    rf004_refreeze_review_3_coordination_head: 39f6a2efca83a584b554ecd818c9d31319304143
+    rf004_interface_frozen_head_1_1: ae49435ebb24198ad1fb2017e5998bbad305792f
     rf004_refreeze_conformance: DBG-CF-001-005-001
     rf005_dependency_clarification_issue: 42
     rf005_dependency_clarification_comment: 5362515750
@@ -259,7 +261,7 @@ issues:
     steering_completion_comment: 5362514094
   DBG-RF-004:
     issue: 41
-    status: interface_1_1_reviews_028_029_rework_review_030_pending_product_stopped
+    status: interface_1_1_pass_slice002_post_refreeze_worker_pending
     iteration: DBG-IT-001-005
     slices: DBG-SL-001-005-001..DBG-SL-001-005-007
     execution_order: DBG-SL-001-005-001,DBG-SL-001-005-002,DBG-SL-001-005-007,DBG-SL-001-005-003,DBG-SL-001-005-004,DBG-SL-001-005-005,DBG-SL-001-005-006
@@ -280,7 +282,7 @@ issues:
     slice001_signoff_status: pass
     slice001_signed_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
     active_slice: DBG-SL-001-005-002
-    active_slice_status: blocked_pending_interface_review_030
+    active_slice_status: rework_post_refreeze_corrective_worker_pending
     active_slice_review: DBG-RVW-001-005-002
     active_slice_verification: DBG-VER-001-005-002
     active_slice_implementation_head: 4b5837644dc1196accfd8608bc3dbd20980476bb
@@ -306,12 +308,12 @@ issues:
     active_slice_corrective_review_6_status: rework
     active_slice_corrective_reviewed_head_6: 0bedb2d110147f3f34c5846d14ee9b9581926f2d
     active_slice_corrective_review_7: DBG-RVW-001-005-027
-    active_slice_corrective_review_7_status: not_started_pending_interface_review_030_pass
+    active_slice_corrective_review_7_status: planned_post_refreeze_product_only
     steering_blocker: DBG-BLK-001-005-001
     steering_blocker_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/005--RF004_Enum_Immutability_Steering_Blocker.md
     steering_blocker_comment: 5365959417
     steering_refreeze_comment: 5368017338
-    steering_blocker_status: accepted_refreeze_review_030_pending
+    steering_blocker_status: closed_refreeze_review_pass
     refreeze_interface_review: DBG-RVW-001-005-028
     refreeze_interface_review_status: rework
     refreeze_reviewed_content_head: 94a59f3738fadc0b6230fc3dc69cf36ca8b9202e
@@ -322,7 +324,10 @@ issues:
     refreeze_rereviewed_coordination_head: ed23423814d58fe3c03b252084d43d2464a46118
     trace_corrected_refreeze_candidate_head: ae49435ebb24198ad1fb2017e5998bbad305792f
     refreeze_interface_review_3: DBG-RVW-001-005-030
-    refreeze_interface_review_3_status: planned
+    refreeze_interface_review_3_status: pass
+    refreeze_review_3_content_head: ae49435ebb24198ad1fb2017e5998bbad305792f
+    refreeze_review_3_coordination_head: 39f6a2efca83a584b554ecd818c9d31319304143
+    interface_frozen_head_1_1: ae49435ebb24198ad1fb2017e5998bbad305792f
     refreeze_conformance: DBG-CF-001-005-001
     interface_review: DBG-RVW-001-005-007
     interface_review_status: rework

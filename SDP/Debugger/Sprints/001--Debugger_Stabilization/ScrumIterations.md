@@ -474,7 +474,7 @@ traceability and no product drift after the combined signed head. Steering accep
 
 ## DBG-IT-001-005 — Typed Resolver and Inspection
 
-Status: ACTIVE — INTERFACE 1.1 REVIEWS 028–029 REWORK / REVIEW 030 PENDING
+Status: ACTIVE — INTERFACE 1.1 REVIEW 030 PASS / SLICE 002 CORRECTION
 
 ### Authority and goal
 
@@ -983,3 +983,12 @@ still named review028 as the current gate. Master corrected the RF-004 interface
 status and product-review-027 restart dependency to fresh review030. Contract semantics and
 product files are unchanged; review030 is the only active gate.
 The trace-corrected remote candidate is `ae49435ebb24198ad1fb2017e5998bbad305792f`.
+
+### Interface 1.1 review 030 PASS / Slice 002 restart
+
+Fresh `DBG-RVW-001-005-030` passed exact content head `ae49435…` at coordination `39f6a2e…`
+with zero findings. All public schemas/methods/Enum members remain byte-identical to v1;
+Steering semantics, fixtures, review028/029 closures and full trace mechanics passed. Master
+closes `DBG-BLK-001-005-001` and resumes only Slice 002 with a fresh corrective worker under
+existing ownership. Review 026 remains historical REWORK; review 027 is product-only and must
+review the new post-refreeze head before formal verification or any later Slice.

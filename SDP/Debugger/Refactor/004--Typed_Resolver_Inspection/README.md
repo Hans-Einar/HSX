@@ -1,6 +1,6 @@
 # DBG-RF-004 — Typed Artifact, Source, Address, Stack, and Inspection
 
-- Status: **ACTIVE — INTERFACE 1.1 REVIEWS 028–029 REWORK / REVIEW 030 PENDING**
+- Status: **ACTIVE — INTERFACE 1.1 REVIEW PASS / SLICE 002 CORRECTIVE WORKER PENDING**
 - Steering authority: issue #38 comment `5362514094`
 - Dependency clarification: issue #42 comment `5362515750`
 - Immutability refreeze: issue #38 comment `5368017338`
@@ -16,6 +16,8 @@
 - Refreeze conformance: `DBG-CF-001-005-001`
 - Interface reviews: `DBG-RVW-001-005-007..010` and `...012..018` REWORK;
   `DBG-RVW-001-005-019` PASS at `058c338…` (`...011` is Slice 007 review)
+- Refreeze reviews: `DBG-RVW-001-005-028` REWORK, `...029` REWORK trace-only,
+  `...030` PASS at `ae49435…`
 - Product base: `69a54aeb3394d3cd4792bce620748e15bab69f1f`
 
 ## Objective
