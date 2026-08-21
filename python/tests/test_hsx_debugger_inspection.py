@@ -11,6 +11,7 @@ from hsx_debugger.inspection import (
     EpochInspectionSession,
     InspectionService,
     RegisterVariableRecord,
+    StackPageResult,
     SymbolVariableRecord,
 )
 
@@ -195,7 +196,21 @@ class StaticStack:
         frame = index.f.frame
         if frame.context != context:
             frame = replace(frame, context=context)
-        return InspectionResult(InspectionStatus.COMPLETE, context, (frame,), ())
+        return StackWalkResult(InspectionStatus.COMPLETE, context, (frame,), ())
+
+
+class PrefixCorruptStack:
+    @staticmethod
+    def unwind(context, index, read_port, architecture, abi, profile_limits, request_limits):
+        frame = index.f.frame
+        if frame.context != context:
+            frame = replace(frame, context=context)
+        return StackWalkResult(
+            InspectionStatus.CORRUPT,
+            context,
+            (frame,),
+            (Diagnostic("injected_stack_corrupt", "continuation corrupt", component="test"),),
+        )
 
 
 class SnapshotPort:
@@ -251,19 +266,19 @@ class BlockingMemoryPort(SnapshotPort):
         return super().read_memory(context, address, byte_length)
 
 
-def make_service(f=None, port=None, index=None):
+def make_service(f=None, port=None, index=None, stack_service=StaticStack):
     f = f or foundation()
     port = port or SnapshotPort(f)
     index = index or IndexDouble(f)
     created = InspectionService.create(
-        index, port, f.architecture, f.abi, RecipeLimits(), StaticStack, LocationEvaluator
+        index, port, f.architecture, f.abi, RecipeLimits(), stack_service, LocationEvaluator
     )
     assert created.status is ResolutionStatus.RESOLVED
     return f, index, port, created.service
 
 
-def open_session(f=None, port=None, index=None):
-    f, index, port, service = make_service(f, port, index)
+def open_session(f=None, port=None, index=None, stack_service=StaticStack):
+    f, index, port, service = make_service(f, port, index, stack_service)
     opened = service.open_epoch(f.context, RecipeRequestLimits(64, 16))
     assert opened.status is InspectionOpenStatus.OPENED
     return f, index, port, service, opened.session
@@ -272,7 +287,7 @@ def open_session(f=None, port=None, index=None):
 def first_frame(session):
     page = session.stack(PageRequest(0, 16))
     assert page.status is InspectionStatus.COMPLETE
-    return page.value.frames[0]
+    return page.page.frames[0]
 
 
 def scope_by_kind(session, frame_handle, kind):
@@ -368,9 +383,25 @@ def test_stack_pagination_reuses_exact_frame_handle() -> None:
     first = session.stack(PageRequest(0, 1))
     again = session.stack(PageRequest(0, 1))
     empty = session.stack(PageRequest(1, 1))
-    assert first.value.total_frames == again.value.total_frames == empty.value.total_frames == 1
-    assert first.value.frames[0].handle == again.value.frames[0].handle
-    assert empty.value.frames == ()
+    assert first.page.total_frames == again.page.total_frames == empty.page.total_frames == 1
+    assert first.page.frames[0].handle == again.page.frames[0].handle
+    assert empty.page.frames == ()
+
+
+def test_corrupt_stack_page_preserves_proven_frame_and_handle_remains_usable() -> None:
+    _, _, _, _, session = open_session(stack_service=PrefixCorruptStack)
+    result = session.stack(PageRequest(0, 16))
+    assert isinstance(result, StackPageResult)
+    assert result.status is InspectionStatus.CORRUPT
+    assert result.page.total_frames == 1
+    assert len(result.page.frames) == 1
+    assert result.diagnostics[0].code == "injected_stack_corrupt"
+    frame = result.page.frames[0]
+    scopes = session.scopes(frame.handle)
+    assert scopes.status is InspectionStatus.COMPLETE
+    assert [item.kind for item in scopes.value.scopes] == [
+        ScopeKind.REGISTERS, ScopeKind.LOCALS, ScopeKind.GLOBALS
+    ]
 
 
 def test_scopes_are_fixed_order_and_handles_are_stable() -> None:
@@ -484,5 +515,5 @@ def test_concurrent_repeated_stack_queries_intern_one_frame_handle() -> None:
     with ThreadPoolExecutor(max_workers=8) as pool:
         pages = tuple(pool.map(lambda _: session.stack(PageRequest(0, 1)), range(32)))
     assert all(item.status is InspectionStatus.COMPLETE for item in pages)
-    handles = {item.value.frames[0].handle.serial for item in pages}
+    handles = {item.page.frames[0].handle.serial for item in pages}
     assert len(handles) == 1
