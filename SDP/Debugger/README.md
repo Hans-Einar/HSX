@@ -39,9 +39,9 @@ Read in this order:
 
 `DBG-ST-006` and `DBG-IT-001-004` are complete. Active work is `DBG-IT-001-005` /
 `DBG-RF-004` with frozen Slices `DBG-SL-001-005-001..007`; public interface
-`dbg.resolver-inspection/1.1` passed final review 030 at `ae49435…`. Slice 001 is signed and
-Slices 001–002 are exact-head signed; RF-004 is stopped at `DBG-BLK-001-005-002` awaiting
-Steering on the LocationEvaluator recovered-frame evidence seam.
+`dbg.resolver-inspection/1.1` passed review030 at `ae49435…`; Slices 001–002 are signed.
+Steering accepted blocker002 and refroze
+`dbg.resolver-inspection/1.2`. Slice 007 product work is stopped pending interface review 031.
 Existing Executive behavior remains
 `hsx.python-debug-legacy/1`; RF-005..009, Executive/VM/AVR and frontend migration remain
 blocked.

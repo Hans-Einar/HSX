@@ -5,6 +5,7 @@
 - Interface: `dbg.resolver-inspection/1.1`
 - Scope: supported-mutation and recursively contract-safe immutable semantics only
 - Public schema delta from version `1`: none
+- Inherited by `dbg.resolver-inspection/1.2` without immutability-semantic change
 
 ## Contract-safe accepted values
 

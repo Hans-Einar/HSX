@@ -1,12 +1,14 @@
 # DBG-BLK-001-005-002 — RF-004 Location Frame Evidence Steering Blocker
 
-- Status: **AWAITING STEERING DECISION**
+- Status: **SUPERSEDED BY `dbg.resolver-inspection/1.2` / REVIEW PENDING**
 - Refactor/Iteration/Slice: `DBG-RF-004` / `DBG-IT-001-005` / `DBG-SL-001-005-007`
-- Frozen interface: `dbg.resolver-inspection/1.1`
+- Frozen interface at discovery: `dbg.resolver-inspection/1.1`
+- Steering resolution: `dbg.resolver-inspection/1.2`
 - Last signed dependency: Slice 002 at `c7bc39057469f1aa62a78f409753ec0213631214`
 - Discovery/coordination head: `269d0bb962f85241633e1af8489b459357f2ff77`
 - Product changes during discovery: none
 - Steering escalation: issue #38 comment `5369244294`
+- Steering refreeze: issue #38 comment `5370574104`
 
 ## Frozen contradiction
 
@@ -35,16 +37,17 @@ The frozen inputs therefore cannot supply the evidence needed to implement the f
   public method non-deterministic/incomplete.
 - A subclass or hidden extra `UnwindFrame` field violates the exact frozen public DTO schema.
 
-## Steering decision required
+## Steering decision
 
-Steering must refreeze an explicit evidence seam. Minimal directions are:
+Steering selected option 1 in comment `5370574104`:
 
-1. add exact recovered-register evidence to `UnwindFrame` (and PSW evidence if recovered
-   `special_value PSW` is required);
-2. pass `RecipeEvaluationContext` or another exact frozen frame-evidence DTO to
-   `LocationEvaluator.evaluate`;
-3. add a frame-aware immutable recovered-state operation to `SnapshotReadPort`.
+1. add `recovered_registers: RegisterSet` and low-level `recovered_psw: RegisterValue` to
+   UnwindFrame;
+2. keep LocationEvaluator and SnapshotReadPort signatures unchanged;
+3. require complete deterministic architecture-order availability evidence and exact
+   snapshot/unwind/SAME provenance with no fallback.
 
-Master makes no choice and changes no frozen interface. Slice 007 worker made zero edits.
-Review 011, verification 007, artifact Slice 003 and all later RF-004 Slices are not started.
+Master refreezes only that public projection as `1.2` plus `DBG-CF-001-005-002`. Slice 007
+worker made zero edits. Fresh interface review 031 must pass before restart. Review 011,
+verification 007, artifact Slice 003 and all later RF-004 Slices are not started.
 RF-005..009 and Executive/VM/AVR/frontend work remain blocked.

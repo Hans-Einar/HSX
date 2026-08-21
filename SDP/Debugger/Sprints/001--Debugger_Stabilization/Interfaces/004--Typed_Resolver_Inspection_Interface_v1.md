@@ -1,6 +1,6 @@
-# `dbg.resolver-inspection/1.1` — Typed Resolver and Inspection Interface
+# `dbg.resolver-inspection/1.2` — Typed Resolver and Inspection Interface
 
-- Status: **FROZEN / INDEPENDENT REVIEW 030 PASS**
+- Status: **STEERING REFROZEN / INDEPENDENT REVIEW 031 PENDING**
 - Iteration: `DBG-IT-001-005`
 - Parent Refactor: `DBG-RF-004`
 - Steering authority: issue #38 comment `5362514094`
@@ -20,11 +20,15 @@
 - Review `DBG-RVW-001-005-018`: REWORK at `08719457a341b01ca8f64ea568e1ab04678dd10d`
 - Review `DBG-RVW-001-005-019`: PASS at `058c3383593553aa1497d024d41285d44d9c67a8`
 - Steering refreeze: issue #38 comment `5368017338`
-- Prior public interface/review: `dbg.resolver-inspection/1` / `DBG-RVW-001-005-019` PASS
-- Public interface ID: `dbg.resolver-inspection/1.1`
-- Conformance fixture matrix: `DBG-CF-001-005-001`
+- Version `1` interface/review: `dbg.resolver-inspection/1` / `DBG-RVW-001-005-019` PASS
+- Prior public interface ID: `dbg.resolver-inspection/1.1`
+- Inherited immutability conformance: `DBG-CF-001-005-001`
 - Final refreeze review: `DBG-RVW-001-005-030` PASS at content head
   `ae49435ebb24198ad1fb2017e5998bbad305792f`
+- Frame-evidence refreeze: issue #38 comment `5370574104`
+- Version `1.1` interface/review: `dbg.resolver-inspection/1.1` / `DBG-RVW-001-005-030` PASS
+- Public interface ID: `dbg.resolver-inspection/1.2`
+- Recovered-frame conformance: `DBG-CF-001-005-002`
 
 This document freezes the public Python-domain interface to be implemented by the seven bounded
 RF-004 Slices. It is frontend-neutral and side-by-side: it does not migrate DAP, CLI, VS Code,
@@ -34,6 +38,11 @@ Version `1.1` preserves every public DTO/result schema, exact typed Enum member,
 coherence/address/outcome rule, ownership boundary and public method from version `1`. The only
 normative change is the supported-mutation/contract-safe immutability definition and its
 conformance fixtures. The stable filename is retained for review-history continuity.
+
+Version `1.2` is a Debugger public-projection refreeze only. It adds exact recovered-register
+and recovered-PSW evidence to `UnwindFrame` so LocationEvaluator can construct the selected
+frame's RecipeEvaluationContext exclusively from explicit inputs. Every other public schema,
+method, ownership boundary, HSX portable contract and Executive/VM protocol remains unchanged.
 
 Any implementation discovery that requires changing an identity field, coherence rule,
 address rule, result category, ownership boundary, or public method below stops the active
@@ -601,6 +610,8 @@ RegisterSet { registers: tuple[RegisterValue, ...] }
 
 UnwindFrame { context: InspectionContext, frame_index: int >= 0,
               pc: HsxAddress, sp: HsxAddress, cfa: HsxAddress,
+              recovered_registers: RegisterSet,
+              recovered_psw: RegisterValue,
               frame_base: HsxAddress | None, resume_pc: HsxAddress | None,
               call_site_pc: HsxAddress | None, function: FunctionRecord | None,
               source: SourceLocation | None, terminal: bool,
@@ -648,6 +659,46 @@ DisassembledInstruction { address: HsxAddress, encoded: bytes,
 DisassemblyBlock { start: HsxAddress, requested_count: int >= 1,
                    instructions: tuple[DisassembledInstruction, ...] }
 ```
+
+### Recovered-frame evidence
+
+`UnwindFrame` is the authoritative immutable recovered machine-state evidence for its selected
+frame, not presentation metadata. For the exact ArchitectureDescriptor used by StackService:
+
+- `recovered_registers.registers` contains exactly one RegisterValue for every ID in
+  `architecture.register_order`, in that order, and contains no PC/SP/PSW entry;
+- every GPR RegisterValue has exact `architecture.register_width_bits`; `available=true`
+  requires one fitting unsigned_value, while `available=false` requires unsigned_value=None;
+- `recovered_psw` has register_id=`"PSW"`, bit_width=`architecture.psw_width_bits`, and the
+  same exact available/value consistency;
+- `pc`, `sp`, `cfa`, `frame_base`, `resume_pc` and `call_site_pc` retain their existing exact
+  typed semantics.
+
+Top-frame `pc`, `sp`, GPR and PSW evidence is seeded only from one read of the exact
+InspectionContext snapshot. StackService splits the all-declared snapshot result into explicit
+pc/sp, architecture-order recovered GPR entries and recovered_psw; missing exact values remain
+explicitly unavailable. It does not substitute a later/live read.
+
+For every caller frame, StackService produces architecture-complete GPR evidence deterministically:
+
+- an exact applicable GPR EXPRESSION rule has role=REGISTER, required_result=REGISTER and may
+  publish only a RecipeRegister with the matching register ID and exact GPR width;
+- exact SAME copies the corresponding younger-frame evidence, preserving unavailable as
+  unavailable; SAME is evidence only when explicitly present in the accepted row;
+- UNDEFINED, UNAVAILABLE, OPTIMIZED_OUT, a missing rule or failed evaluation publishes an
+  unavailable RegisterValue;
+- no ABI-preservation default is inferred, and a caller-clobbered value is never copied merely
+  because the younger frame has it.
+
+`UnwindRow.register_rules` names architecture GPRs. The exact special key `"PSW"` is consumed
+only when the already accepted HSX unwind schema/profile explicitly admits PSW as caller-state
+rule evidence; version 1.2 does not expand the HSX schema. PC/SP remain owned by
+caller_pc_rule/caller_sp_rule and are forbidden in register_rules. Duplicate/unknown keys are
+CORRUPT. An admitted PSW EXPRESSION has role=REGISTER, required_result=UNSIGNED_SCALAR and must
+return exact `psw_width_bits`; PSW SAME copies recovered_psw exactly. When the accepted HSX
+schema/profile supplies no PSW rule seam, or the rule is missing/terminal/undefined/
+unavailable/optimized-out/failed, recovered_psw is unavailable. No current-frame PSW
+substitution is permitted.
 
 `RegisterSelection` requires exactly one of `all_declared=true` with no IDs, or
 `all_declared=false` with unique explicit IDs. Explicit register results follow request order;
@@ -1056,7 +1107,8 @@ architecture: ArchitectureDescriptor, abi: AbiDescriptorRef,
 profile_limits: RecipeLimits,
 request_limits: RecipeRequestLimits) ->
 InspectionResult[tuple[UnwindFrame, ...]]` returns handle-free immutable frames bound to the
-same context. Each frame has typed PC/SP/CFA/frame-base values,
+same context. Each frame has typed PC/SP/CFA/frame-base values plus the complete recovered GPR
+and PSW evidence defined above,
 function/source metadata where resolved, resume PC distinct from checked call-site PC, and
 per-frame diagnostics. Terminal top level is explicit. Missing data returns partial/unavailable;
 unsupported, corrupt and stale remain distinct. Every bound exhaustion is status
@@ -1074,6 +1126,14 @@ InspectionResult[EvaluatedValue]` selects the exact
 half-open PC row for the selected frame and returns register, address, value, bounded pieces,
 optimized-out or unavailable results with declared width/endian/type preserved. A non-top-frame
 local is evaluated from that frame/context, never current live registers.
+
+Before evaluation, LocationEvaluator requires `frame.context == context`, validates the existing
+binding/index/architecture/ABI inputs, and constructs RecipeEvaluationContext exactly as follows:
+context/frame_index/pc/sp/cfa/frame_base come from the selected frame; recovered_registers is
+the frame's exact RegisterSet; available recovered_psw becomes unsigned RecipeScalar of exact
+PSW width and unavailable recovered_psw becomes psw=None. No other source is consulted.
+LocationEvaluator may use SnapshotReadPort only for exact-context memory dereference performed
+by recipe opcodes; it never calls a current-register read to replace frame evidence.
 
 ## 9. Epoch-bound inspection service and handles
 
@@ -1251,7 +1311,7 @@ and a later Steering authorization.
 
 ## 12. Interface completion signal
 
-`dbg.resolver-inspection/1.1` is accepted only when all seven Slices and RF-004 parent review,
+`dbg.resolver-inspection/1.2` is accepted only when all seven Slices and RF-004 parent review,
 verification and exact-head Master sign-off pass on remote-resolvable history. The decision
 package must state exact interfaces, address/source/stack/variables/memory/disassembly
 coverage, legacy reuse/retirement, degraded behavior and every review/verification/sign-off

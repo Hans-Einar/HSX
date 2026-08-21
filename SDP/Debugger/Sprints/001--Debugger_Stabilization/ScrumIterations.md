@@ -474,13 +474,14 @@ traceability and no product drift after the combined signed head. Steering accep
 
 ## DBG-IT-001-005 — Typed Resolver and Inspection
 
-Status: BLOCKED — AWAITING STEERING ON `DBG-BLK-001-005-002`
+Status: ACTIVE — INTERFACE 1.2 REVIEW 031 PENDING / PRODUCT STOPPED
 
 ### Authority and goal
 
 - Steering authority: issue #38 comment `5362514094`.
 - Dependency clarification: issue #42 comment `5362515750`.
 - Immutability refreeze: issue #38 comment `5368017338`.
+- Frame-evidence refreeze: issue #38 comment `5370574104`.
 - Authorized product domain: `DBG-RF-004` only.
 - Goal: frontend-neutral artifact/source/address/stack/variables/memory/disassembly services
   under `DBG-D-003`, `DBG-D-004`, `DBG-D-009` and frozen portable HSX contracts.
@@ -491,7 +492,7 @@ Status: BLOCKED — AWAITING STEERING ON `DBG-BLK-001-005-002`
 ### Frozen public interface
 
 `Interfaces/004--Typed_Resolver_Inspection_Interface_v1.md` now refreezes
-`dbg.resolver-inspection/1.1`; the stable path preserves version-1 review history. Every
+`dbg.resolver-inspection/1.2`; the stable path preserves prior review history. Every
 successful/partial inspection result carries the exact
 TargetRef, LoadedImageRef, StopEpochId, StopToken and InspectionSnapshotRef. Typed HSX
 addresses use descriptor-checked spaces/ranges; best-effort live reads are explicitly degraded
@@ -505,8 +506,10 @@ Slice ownership and live traceability. Reviews 007..010 and 012..018 returned RE
 signed product Slice. Steering comment `5368017338` changes only the immutability definition:
 supported debugger/caller-input mutation and recursively contract-safe values, with exact
 typed Enum members retained. `DBG-CF-001-005-001` freezes the conformance matrix. Review 028
-returned REWORK; review 029 returned REWORK trace-only; fresh `DBG-RVW-001-005-030` must pass
-before Slice 002 product work resumes.
+returned REWORK; review 029 returned REWORK trace-only; review030 passed version1.1.
+Steering comment `5370574104` now adds only exact recovered GPR/PSW evidence to UnwindFrame as
+version1.2; `DBG-CF-001-005-002` freezes the evidence rules. Fresh interface review031 must
+pass before Slice007 restarts.
 
 ### Frozen execution units
 
@@ -541,10 +544,10 @@ exact-head sign-off before the next Slice starts.
 - Design: `DBG-D-003`, `DBG-D-004`, `DBG-D-009`; portable `HSX-D-001..003`.
 - Slice reviews: `DBG-RVW-001-005-001..006` and `DBG-RVW-001-005-011`; interface
   reviews: `DBG-RVW-001-005-007..010`, then `...012..019`, plus refreeze reviews
-  `DBG-RVW-001-005-028..030`; conformance `DBG-CF-001-005-001`; verifications
+  `DBG-RVW-001-005-028..031`; conformance `DBG-CF-001-005-001..002`; verifications
   `DBG-VER-001-005-001..007`.
 - Parent final: `DBG-RVW-004-001-001`, `DBG-VER-004-001-001`.
-- RF-005 explicitly depends on RF-004's accepted `dbg.resolver-inspection/1.1`; partial/frozen
+- RF-005 explicitly depends on RF-004's accepted `dbg.resolver-inspection/1.2`; partial/frozen
   implementation does not satisfy the dependency and no RF-005 worker is authorized.
 
 ### Verification and exit signal
@@ -1028,3 +1031,14 @@ signature accepts no frame-evidence context, and SnapshotReadPort has no frame-a
 read. Using current registers, hidden state or inferred ABI values violates frozen no-fallback
 semantics. Worker made zero edits at clean remote head `269d0bb…`. Master opened
 `DBG-BLK-001-005-002`; review011, verification007, Slice003 and later work remain unstarted.
+
+### Steering frame-evidence refreeze / interface 1.2 candidate
+
+Steering comment `5370574104` accepts blocker002 and selects frame-carried evidence. Interface
+1.2 adds only `UnwindFrame.recovered_registers: RegisterSet` and
+`recovered_psw: RegisterValue`; existing frame fields and LocationEvaluator/SnapshotReadPort
+signatures remain unchanged. GPR evidence is architecture-complete and ordered, unavailable is
+explicit, top evidence comes only from the exact snapshot, and caller evidence only from
+accepted EXPRESSION/SAME rules. Missing/clobbered/unsupported state never falls back. Master
+published `DBG-CF-001-005-002`; interface review031 is the sole gate. Product review011 remains
+reserved and Slice007 has no product changes.

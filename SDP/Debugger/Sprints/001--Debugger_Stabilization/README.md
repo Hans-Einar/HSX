@@ -1,6 +1,6 @@
 # DBG-SPR-001 — Debugger Stabilization
 
-- Status: ITERATION 005 BLOCKED — `DBG-BLK-001-005-002`
+- Status: ITERATION 005 ACTIVE — INTERFACE 1.2 REVIEW 031 PENDING / PRODUCT STOPPED
 - Owning track: Debugger
 - Owning GapAnalysis: `DBG-GAP-001`
 
@@ -69,17 +69,18 @@ Steering accepted `DBG-A-001..DBG-A-008` as target architecture direction in com
 
 - `DBG-IT-001-005` — typed artifact/source/address/stack/inspection
 - Authorized Refactor: `DBG-RF-004` only
-- Refrozen interface: `dbg.resolver-inspection/1.1`
+- Refrozen interface: `dbg.resolver-inspection/1.2`
 - Immutability conformance: `DBG-CF-001-005-001`
+- Recovered-frame conformance: `DBG-CF-001-005-002`
 - Frozen Slices: `DBG-SL-001-005-001..DBG-SL-001-005-007`
 - Frozen execution order: `001 -> 002 -> 007 -> 003 -> 004 -> 005 -> 006`
 - Interface reviews 007..010/012..018: REWORK; `DBG-RVW-001-005-019`: PASS at
   `058c3383593553aa1497d024d41285d44d9c67a8`
 - Exact product base: `69a54aeb3394d3cd4792bce620748e15bab69f1f`
-- Active gate: Steering decision on selected-frame recovered-register/PSW evidence for
-  `LocationEvaluator`
+- Active gate: fresh exact-head `DBG-RVW-001-005-031` of the complete `1.2` refreeze
 - Authority: issue #38 comment `5362514094`
 - Refreeze authority: issue #38 comment `5368017338`
+- Frame-evidence refreeze authority: issue #38 comment `5370574104`
 - Dependency clarification: issue #42 comment `5362515750`
 - Still blocked: `DBG-RF-005..DBG-RF-009`
 

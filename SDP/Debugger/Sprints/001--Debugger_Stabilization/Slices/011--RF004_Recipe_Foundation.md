@@ -1,6 +1,6 @@
 # DBG-SL-001-005-007 — RF-004 Recipe Schema and Evaluator Foundation
 
-- Status: **BLOCKED / AWAITING STEERING — `DBG-BLK-001-005-002`**
+- Status: **BLOCKED PENDING INTERFACE REVIEW 031**
 
 - Discovery head: `269d0bb962f85241633e1af8489b459357f2ff77`
 - Product changes: none
@@ -29,7 +29,7 @@ inspection, legacy product/runtime and frontend files are read-only.
 ## Required behavior
 
 - implement the exact frozen opcode/rule/location-piece/evaluation-context/budget/result DTOs
-  and RecipeEvaluator/LocationEvaluator signatures from `dbg.resolver-inspection/1.1`;
+  and RecipeEvaluator/LocationEvaluator signatures from `dbg.resolver-inspection/1.2`;
 - implement every frozen postfix pop/push, signedness/width propagation, final-stack/result
   rule and exact corrupt/unavailable/unsupported classification;
 - enforce expression roles: CFA forbids recursive `cfa`; dependent roles require computed CFA;
@@ -49,6 +49,13 @@ inspection, legacy product/runtime and frontend files are read-only.
 - keep scalar absence unavailable and allow partial only for structural pieces with exact
   available/missing ranges;
 - use SnapshotReadPort only through exact InspectionContext and checked typed addresses;
+- define UnwindFrame with architecture-complete recovered_registers plus explicit recovered_psw
+  exactly as `DBG-CF-001-005-002`, preserving unavailable entries and deterministic order;
+- seed top-frame recovered evidence only from its exact context snapshot; propagate caller GPR/
+  PSW evidence only through accepted unwind EXPRESSION/SAME rules, never implicit ABI/clobber
+  copying or current-frame substitution;
+- construct LocationEvaluator RecipeEvaluationContext solely from the selected UnwindFrame and
+  existing explicit binding/index/architecture/ABI inputs;
 - carry exact ArchitectureDescriptor in RecipeEvaluationContext for all register/special/
   address/alignment/serialization behavior;
 - carry exact binding+bundle identity/architecture/ABI in RecipeEvaluationContext and call
@@ -66,11 +73,12 @@ inspection, legacy product/runtime and frontend files are read-only.
 
 `DBG-R-021..DBG-R-025`, `DBG-R-028`, `DBG-R-035..DBG-R-036`;
 `DBG-F-007`, `DBG-F-015`; `DBG-D-003`, `DBG-D-004`; `HSX-D-002..HSX-D-003`;
-interface `dbg.resolver-inspection/1.1`.
+interface `dbg.resolver-inspection/1.2`; recovered-frame conformance `DBG-CF-001-005-002`.
 
 ## Verification and completion signal
 
-Test every opcode/rule/location form, exact result type, unknown/malformed input, evaluator
+Test every opcode/rule/location form, `DBG-CF-001-005-002` recovered-frame matrix, exact result
+type, unknown/malformed input, evaluator
 stack/deref/byte/total/piece bounds, `unsupported(limit_exceeded)`, endian/width/address
 failure, stale context and structural partial pieces. Run signed identity/address regressions.
 Close only after exact-head review, formal verification and Master sign-off.
@@ -83,3 +91,7 @@ frame evidence, and SnapshotReadPort has no frame-aware recovered-state read. Cu
 registers are a forbidden fallback. See
 `Interfaces/007--RF004_Location_Frame_Evidence_Steering_Blocker.md`. Worker stopped with zero
 edits; review011/verification007 did not start.
+
+Steering comment `5370574104` accepts blocker002 and refreezes frame-carried recovered evidence
+in Interface 1.2. Product remains stopped until fresh interface review031 PASS; product review
+identity 011 remains reserved.

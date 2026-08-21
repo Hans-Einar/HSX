@@ -1,8 +1,9 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf004_blocked_awaiting_steering_location_frame_evidence`
+Status: `rf004_interface_1_2_refrozen_review_031_pending_product_stopped`
 
 Steering escalation: issue #38 comment `5369244294`.
+Steering frame-evidence refreeze: issue #38 comment `5370574104`.
 
 Steering escalation: issue #38 comment `5365959417`.
 Steering refreeze: issue #38 comment `5368017338`.
@@ -13,13 +14,10 @@ Trace-corrected refreeze head: `ae49435ebb24198ad1fb2017e5998bbad305792f`.
 ## Current objective
 
 The accepted first-wave gate is closed. Execute only `DBG-RF-004` through the seven frozen
-`DBG-SL-001-005-001..007` contracts and refrozen `dbg.resolver-inspection/1.1` interface. Reviews
-007 through 010 and 012..018 returned REWORK; review 019 passed exact contract head
-`058c338…` for historical version `1`. Steering accepted `DBG-BLK-001-005-001` and refroze only
-immutability semantics in comment `5368017338`. Review 028 returned REWORK for two Medium
-interface/trace findings. Slice 001 is signed; Slice 002 product work is stopped pending fresh
-Steering decision on `DBG-BLK-001-005-002` after the fresh Slice 007 worker found a frozen
-LocationEvaluator frame-evidence contradiction with zero edits. RF-005..009 and
+`DBG-SL-001-005-001..007` contracts and refrozen `dbg.resolver-inspection/1.2` interface.
+Historical versions `1`/`1.1` passed reviews019/030; Slices001–002 are signed. Steering accepted
+`DBG-BLK-001-005-002` and selected frame-carried recovered evidence in comment `5370574104`.
+Slice007 product remains stopped pending fresh exact-head interface review031. RF-005..009 and
 Executive/VM/AVR/frontend migration remain blocked.
 
 ## Authority
@@ -32,6 +30,7 @@ Executive/VM/AVR/frontend migration remain blocked.
 - issue #38 comment `5362514094` — accepted first wave complete and authorized RF-004 only
 - issue #42 comment `5362515750` — RF-005 depends on RF-004's accepted typed interface
 - issue #38 comment `5368017338` — accepted blocker and refroze `dbg.resolver-inspection/1.1`
+- issue #38 comment `5370574104` — accepted blocker002 and refroze frame evidence as `1.2`
 - `SDP/Debugger/Traceability/CurrentIndex.yaml`
 - `SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md`
 - `SDP/Debugger/04--Architecture/001--Modular_Debugger_Architecture.md`
@@ -40,6 +39,7 @@ Executive/VM/AVR/frontend migration remain blocked.
 - `SDP/Debugger/Refactor/004--Typed_Resolver_Inspection/README.md`
 - `SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/004--Typed_Resolver_Inspection_Interface_v1.md`
 - `SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/006--Typed_Resolver_Inspection_Immutability_Conformance_v1_1.md`
+- `SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/008--RF004_Recovered_Frame_Evidence_Conformance_v1_2.md`
 - issues #36/#37 and `DBG-RF-001` records are completed provenance only
 
 ## Done
@@ -192,8 +192,8 @@ Executive/VM/AVR/frontend migration remain blocked.
 
 ## Exact next step
 
-Stop for Steering. Do not start another worker, review011, verification007, artifact Slice003
-or any later Slice until an exact public frame-evidence seam is refrozen and reviewed.
+Publish the exact Interface1.2/fixture/trace candidate, then dispatch fresh independent
+interface review031. Do not restart Slice007 or use product review011 before PASS.
 
 ## Traceability state
 
@@ -206,7 +206,7 @@ or any later Slice until an exact public frame-evidence seam is refrozen and rev
   `fefd4b0c427dfa71d637e4f4cce9e4a345912591`.
 - CurrentIndex, Issues, sprint records, Relations, Ledger, and Handoff are current through
   Steering refreeze comment `5368017338`, candidate `1.1`/`DBG-CF-001-005-001`, and planned
-  interface review 030 PASS, Slice 002 review/verification/sign-off, and new blocker 002.
+  interface review030 PASS, Slice002 sign-off, blocker002 accepted and 1.2 review031 pending.
 - Accepted architecture direction: `DBG-DA-001`, `DBG-A-001..DBG-A-008`
 - Completed Design Studies: `DBG-ST-002..DBG-ST-005`
 - Architecture review: `DBG-RVW-001-002-001` — REWORK at `f8b8097`
@@ -226,7 +226,9 @@ or any later Slice until an exact public frame-evidence seam is refrozen and rev
 - Active Refactor: `DBG-RF-004`
 - Frozen Slices: `DBG-SL-001-005-001..007`
 - Historical interface: `dbg.resolver-inspection/1`, review 019 PASS at `058c338…`
-- Refrozen interface: `dbg.resolver-inspection/1.1`, review 030 PASS at `ae49435…`
+- Prior interface: `dbg.resolver-inspection/1.1`, review030 PASS at `ae49435…`
+- Refrozen interface candidate: `dbg.resolver-inspection/1.2`, review031 pending
+- Recovered-frame conformance: `DBG-CF-001-005-002`
 - Refrozen conformance: `DBG-CF-001-005-001`
 - Interface review `DBG-RVW-001-005-007`: REWORK at `82154c614…`
 - Interface review `DBG-RVW-001-005-008`: REWORK at `8d6c0f571…`
@@ -275,8 +277,9 @@ or any later Slice until an exact public frame-evidence seam is refrozen and rev
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: Steering decision on `DBG-BLK-001-005-002`
+- Active gate: `DBG-RVW-001-005-031`
 - Blocker authority: issue #38 comment `5369244294`
+- Refreeze authority: issue #38 comment `5370574104`
 - Blocker authority: issue #38 comment `5365959417`
 - Refreeze authority: issue #38 comment `5368017338`
 
@@ -284,7 +287,7 @@ or any later Slice until an exact public frame-evidence seam is refrozen and rev
 
 The prior design/portable-contract chain and RF-002/RF-003/integration wave are complete,
 Steering-accepted and remotely reconstructable. RF-004 `1.1` is a refrozen interface candidate;
-workers/reviewers/verifiers are stopped pending Steering. Controlled work is on
+product workers/reviewers/verifiers are stopped pending interface review031. Controlled work is on
 `codex/dbg-rf-004` from exact base `69a54aeb3394d3cd4792bce620748e15bab69f1f`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.
@@ -292,7 +295,7 @@ the user's original dirty
 ## Risks
 
 - `DBG-RF-005..DBG-RF-009` remain explicitly blocked; RF-005 additionally requires accepted
-  `dbg.resolver-inspection/1.1` plus later Steering authorization.
+  `dbg.resolver-inspection/1.2` plus later Steering authorization.
 - A frozen identity/result/address/public-method contradiction is a Steering stop, not worker
   discretion.
 - Legacy `.sym`/SourceMap reuse is prohibited until Slice 001 produces classified golden

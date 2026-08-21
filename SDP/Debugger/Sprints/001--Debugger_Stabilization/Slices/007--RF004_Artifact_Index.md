@@ -54,7 +54,7 @@ Legacy `python/hsx_dbg/symbols.py`, source mapping, runtime and frontend files a
 
 `DBG-R-021`, `DBG-R-023..DBG-R-025`, `DBG-R-028`, `DBG-R-034..DBG-R-036`;
 `DBG-F-015`, `DBG-F-019`, `DBG-F-020`; `DBG-D-003`, `DBG-D-004`, `DBG-D-009`;
-`HSX-D-002`; interface `dbg.resolver-inspection/1.1`.
+`HSX-D-002`; interface `dbg.resolver-inspection/1.2`.
 
 ## Verification and completion signal
 

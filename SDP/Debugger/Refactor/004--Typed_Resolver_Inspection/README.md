@@ -1,9 +1,10 @@
 # DBG-RF-004 — Typed Artifact, Source, Address, Stack, and Inspection
 
-- Status: **BLOCKED — AWAITING STEERING ON LOCATION FRAME EVIDENCE**
+- Status: **ACTIVE — INTERFACE 1.2 REFROZEN / REVIEW 031 PENDING / PRODUCT STOPPED**
 - Steering authority: issue #38 comment `5362514094`
 - Dependency clarification: issue #42 comment `5362515750`
 - Immutability refreeze: issue #38 comment `5368017338`
+- Recovered-frame refreeze: issue #38 comment `5370574104`
 - Sprint/iteration: `DBG-SPR-001` / `DBG-IT-001-005`
 - Slices: `DBG-SL-001-005-001..DBG-SL-001-005-007`
 - Requirements: `DBG-R-004`, `DBG-R-021..DBG-R-028`, `DBG-R-034..DBG-R-036`
@@ -12,8 +13,9 @@
 - Architecture/design: `DBG-A-003`, `DBG-A-004`, `DBG-A-008`, `DBG-D-003`,
   `DBG-D-004`, `DBG-D-009`
 - Portable inputs: `HSX-D-001..HSX-D-003`, especially `HSX-D-002`
-- Refrozen interface: `dbg.resolver-inspection/1.1`
+- Refrozen interface: `dbg.resolver-inspection/1.2`
 - Refreeze conformance: `DBG-CF-001-005-001`
+- Recovered-frame conformance: `DBG-CF-001-005-002`
 - Interface reviews: `DBG-RVW-001-005-007..010` and `...012..018` REWORK;
   `DBG-RVW-001-005-019` PASS at `058c338…` (`...011` is Slice 007 review)
 - Refreeze reviews: `DBG-RVW-001-005-028` REWORK, `...029` REWORK trace-only,
@@ -44,7 +46,7 @@ portable identities/descriptors
   -> later RF-005/RF-006/RF-007 consumers (still blocked)
 ```
 
-`DBG-RF-005` explicitly depends on RF-004's **accepted** `dbg.resolver-inspection/1.1` interface.
+`DBG-RF-005` explicitly depends on RF-004's **accepted** `dbg.resolver-inspection/1.2` interface.
 Frozen-for-implementation or partially signed Slice state does not satisfy that dependency.
 
 ## Anti-monolith and file ownership
@@ -160,7 +162,7 @@ adapter and all intentional-change cases produce the frozen typed result.
 ## Parent completion signal
 
 RF-004 completes only when all seven Slices are exact-head signed; the combined head passes
-fresh independent parent review and formal verification; `dbg.resolver-inspection/1.1` coverage
+fresh independent parent review and formal verification; `dbg.resolver-inspection/1.2` coverage
 for address/source/stack/variables/snapshot expressions/memory/disassembly is durable; remaining degraded behavior
 is explicit; traceability and Handoff agree; and the full signed chain is published remotely.
 
