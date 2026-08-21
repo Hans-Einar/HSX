@@ -474,7 +474,7 @@ traceability and no product drift after the combined signed head. Steering accep
 
 ## DBG-IT-001-005 — Typed Resolver and Inspection
 
-Status: ACTIVE — INTERFACE 1.1 REVIEW 028 PENDING / PRODUCT STOPPED
+Status: ACTIVE — INTERFACE 1.1 REVIEW 028 REWORK / REVIEW 029 PENDING
 
 ### Authority and goal
 
@@ -504,8 +504,8 @@ Slice ownership and live traceability. Reviews 007..010 and 012..018 returned RE
 `DBG-RVW-001-005-019` passed exact contract head `058c338…`. Slice 001 is the only authorized
 signed product Slice. Steering comment `5368017338` changes only the immutability definition:
 supported debugger/caller-input mutation and recursively contract-safe values, with exact
-typed Enum members retained. `DBG-CF-001-005-001` freezes the conformance matrix. Fresh
-`DBG-RVW-001-005-028` must pass before Slice 002 product work resumes.
+typed Enum members retained. `DBG-CF-001-005-001` freezes the conformance matrix. Review 028
+returned REWORK; fresh `DBG-RVW-001-005-029` must pass before Slice 002 product work resumes.
 
 ### Frozen execution units
 
@@ -539,8 +539,8 @@ exact-head sign-off before the next Slice starts.
 - Requirements: `DBG-R-004`, `DBG-R-021..DBG-R-028`, `DBG-R-034..DBG-R-036`.
 - Design: `DBG-D-003`, `DBG-D-004`, `DBG-D-009`; portable `HSX-D-001..003`.
 - Slice reviews: `DBG-RVW-001-005-001..006` and `DBG-RVW-001-005-011`; interface
-  reviews: `DBG-RVW-001-005-007..010`, then `...012..019`, plus refreeze review
-  `DBG-RVW-001-005-028`; conformance `DBG-CF-001-005-001`; verifications
+  reviews: `DBG-RVW-001-005-007..010`, then `...012..019`, plus refreeze reviews
+  `DBG-RVW-001-005-028..029`; conformance `DBG-CF-001-005-001`; verifications
   `DBG-VER-001-005-001..007`.
 - Parent final: `DBG-RVW-004-001-001`, `DBG-VER-004-001-001`.
 - RF-005 explicitly depends on RF-004's accepted `dbg.resolver-inspection/1.1`; partial/frozen
@@ -963,3 +963,12 @@ explicit non-conformance cases. Master published Interface 004 plus
 `DBG-CF-001-005-001`; fresh exact-head interface review 028 is the sole active gate. Historical
 review 026 remains REWORK, product review 027 remains unstarted, and no later Slice is active.
 The exact remote-published refreeze content head is `94a59f3738fadc0b6230fc3dc69cf36ca8b9202e`.
+
+### Interface 1.1 review 028 / corrected candidate
+
+Fresh `DBG-RVW-001-005-028` returned REWORK with two Medium findings and no schema/Enum/member/
+method drift: Interface 006 published an unnamed read-only mapping outside the closed payload
+domain, and IdScheme still described review 027 using the rejected private-snapshot premise.
+Master corrected dict normalization to an insertion-ordered tuple of recursively frozen pairs,
+removed mapping output, and reserved review 027 solely for a new post-refreeze product head.
+Fresh exact-head interface review 029 is the only active gate; product remains stopped.

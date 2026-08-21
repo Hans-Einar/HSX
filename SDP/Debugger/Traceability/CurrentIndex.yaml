@@ -1,7 +1,7 @@
 schema_version: 1
 track: Debugger
 namespace: DBG
-status: debugger_rf004_interface_1_1_refrozen_review_028_pending_product_stopped
+status: debugger_rf004_interface_1_1_review_028_rework_review_029_pending_product_stopped
 baseline:
   repository: Hans-Einar/HSX
   implementation_branch: Implementation/vscode
@@ -94,7 +94,7 @@ active_gate:
   iteration:
     id: DBG-IT-001-005
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/ScrumIterations.md
-    status: interface_1_1_refrozen_review_028_pending_product_stopped
+    status: interface_1_1_review_028_rework_review_029_pending_product_stopped
   architecture_review:
     id: DBG-RVW-001-002-001
     status: rework
@@ -124,7 +124,7 @@ active_gate:
     first_wave_status: complete_steering_accepted
     first_wave_acceptance_comment: 5362514094
     next_authorized_refactor: DBG-RF-004
-    next_wave_status: rf004_interface_1_1_review_028_pending
+    next_wave_status: rf004_interface_1_1_review_029_pending
     rf004_authorization_comment: 5362514094
     rf005_dependency_clarification_comment: 5362515750
   portable_contract_study:
@@ -373,17 +373,17 @@ active_rf004:
   refactor:
     id: DBG-RF-004
     path: SDP/Debugger/Refactor/004--Typed_Resolver_Inspection/README.md
-    status: interface_1_1_refrozen_review_028_pending_product_stopped
+    status: interface_1_1_review_028_rework_review_029_pending_product_stopped
     steering_authority_comment: 5362514094
     steering_refreeze_comment: 5368017338
   iteration:
     id: DBG-IT-001-005
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/ScrumIterations.md
-    status: interface_1_1_refrozen_review_028_pending_product_stopped
+    status: interface_1_1_review_028_rework_review_029_pending_product_stopped
   interface:
     id: dbg.resolver-inspection/1.1
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/004--Typed_Resolver_Inspection_Interface_v1.md
-    status: refrozen_candidate_review_028_pending
+    status: corrected_refrozen_candidate_review_029_pending
     steering_refreeze_comment: 5368017338
     prior_interface_id: dbg.resolver-inspection/1
     prior_interface_review: DBG-RVW-001-005-019
@@ -440,7 +440,12 @@ active_rf004:
     prior_frozen_contract_head: 058c3383593553aa1497d024d41285d44d9c67a8
     refreeze_candidate_head: 94a59f3738fadc0b6230fc3dc69cf36ca8b9202e
     refreeze_review: DBG-RVW-001-005-028
-    refreeze_review_status: planned
+    refreeze_review_status: rework
+    refreeze_reviewed_content_head: 94a59f3738fadc0b6230fc3dc69cf36ca8b9202e
+    refreeze_reviewed_coordination_head: 7998e0a55c2a1bd648e43ca667a9678dc8af0642
+    corrected_refreeze_candidate_head: pending_publication
+    refreeze_rereview: DBG-RVW-001-005-029
+    refreeze_rereview_status: planned
     conformance_id: DBG-CF-001-005-001
     conformance_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/006--Typed_Resolver_Inspection_Immutability_Conformance_v1_1.md
     master_refreeze_status: pending_interface_review
@@ -479,7 +484,7 @@ active_rf004:
       verification: DBG-VER-001-005-001
     - id: DBG-SL-001-005-002
       path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/006--RF004_Identity_Address.md
-      status: blocked_pending_interface_review_028
+      status: blocked_pending_interface_review_029
       implementation_head: 4b5837644dc1196accfd8608bc3dbd20980476bb
       prior_review: DBG-RVW-001-005-002
       prior_review_status: rework
@@ -505,12 +510,12 @@ active_rf004:
       corrective_review_6_status: rework
       corrective_reviewed_head_6: 0bedb2d110147f3f34c5846d14ee9b9581926f2d
       corrective_review_7: DBG-RVW-001-005-027
-      corrective_review_7_status: not_started_pending_interface_pass
+      corrective_review_7_status: not_started_pending_interface_review_029_pass
       blocker: DBG-BLK-001-005-001
       blocker_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/005--RF004_Enum_Immutability_Steering_Blocker.md
       steering_blocker_comment: 5365959417
       steering_refreeze_comment: 5368017338
-      blocker_status: steering_accepted_refreeze_review_pending
+      blocker_status: steering_accepted_refreeze_review_029_pending
       review: DBG-RVW-001-005-002
       verification: DBG-VER-001-005-002
     - id: DBG-SL-001-005-003
@@ -542,7 +547,7 @@ active_rf004:
   parent_verification: DBG-VER-004-001-001
   product_base: 69a54aeb3394d3cd4792bce620748e15bab69f1f
   runtime_profile: hsx.python-debug-legacy/1
-  current_gate: DBG-RVW-001-005-028
+  current_gate: DBG-RVW-001-005-029
 structural_gate:
   rule: Only Steering-authorized Refactors with frozen Slice/interface contracts may execute.
   authorized_refactors:

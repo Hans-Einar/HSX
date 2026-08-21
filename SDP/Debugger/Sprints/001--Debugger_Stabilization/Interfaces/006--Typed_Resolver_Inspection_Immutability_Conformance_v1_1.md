@@ -1,6 +1,6 @@
 # DBG-CF-001-005-001 — `dbg.resolver-inspection/1.1` Immutability Conformance
 
-- Status: **REFROZEN CANDIDATE / INTERFACE REVIEW 028 PENDING**
+- Status: **CORRECTED REFROZEN CANDIDATE / REVIEW 029 PENDING**
 - Authority: issue #38 comment `5368017338`
 - Interface: `dbg.resolver-inspection/1.1`
 - Scope: supported-mutation and recursively contract-safe immutable semantics only
@@ -17,8 +17,9 @@ The generic/result boundary accepts only recursively contract-safe immutable val
 - tuples and frozensets containing only recursively contract-safe values;
 - explicitly frozen value objects admitted by a named Interface 004 schema.
 
-Caller-owned lists, dicts, sets or other mutable containers must be copied/normalized into the
-declared tuple, read-only mapping or frozenset representation before publication. Mutable
+Caller-owned lists, dicts, sets or other mutable containers must be copied/normalized before
+publication: list to same-order tuple, dict to insertion-ordered tuple of recursively frozen
+`(key, value)` tuples, and set to frozenset. No unnamed read-only mapping is published. Mutable
 implementation records, arbitrary caller Enums, objects with mutable non-schema state and
 unapproved duck-typed DTOs are rejected.
 
@@ -43,7 +44,7 @@ never implicitly approved by subclassing `Enum` or by using scalar values.
 |---|---|---|
 | `CS-IMM-001` | Result/status/public DTO contains a closed contract Enum | Exact Enum type and canonical member identity are preserved. |
 | `CS-IMM-002` | Caller supplies a list that is normalized to a tuple | Later ordinary list mutation does not change the accepted result. |
-| `CS-IMM-003` | Caller supplies a dict/set admitted for normalization | Later ordinary source mutation does not change the read-only mapping/frozenset result. |
+| `CS-IMM-003` | Caller supplies a dict/set admitted for normalization | Dict becomes an insertion-ordered tuple of frozen `(key, value)` tuples; set becomes frozenset; later ordinary source mutation changes neither result. |
 | `CS-IMM-004` | Nested tuple/frozenset/frozen public DTO graph | Every declared field remains stable after ordinary mutation of all original caller containers. |
 | `CS-IMM-005` | Result and nested frozen DTO fields | Supported field reassignment raises the normal frozen/attribute error. |
 | `CS-IMM-006` | Closed contract Enum with scalar or recursively contract-safe tuple value | Construction succeeds without clone/proxy/token replacement. |
@@ -78,7 +79,9 @@ or Python type definition after acceptance and call that a snapshot-isolation fa
 
 ## Review and product gates
 
-Fresh `DBG-RVW-001-005-028` reviews this matrix and the exact Interface 004 `1.1` head. Product
+Review `DBG-RVW-001-005-028` returned REWORK for unnamed mapping output and stale review-027
+allocation text. Fresh `DBG-RVW-001-005-029` reviews the corrected matrix and exact Interface
+004 `1.1` head. Product
 implementation remains stopped until that review passes. After PASS, a fresh Slice 002 worker
 updates only its existing owned files and test fixtures; historical `DBG-RVW-001-005-026`
 remains REWORK, and `DBG-RVW-001-005-027` reviews only the new post-refreeze product head.

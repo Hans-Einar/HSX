@@ -291,11 +291,17 @@ relations:
   - from: dbg.resolver-inspection/1.1
     type: reviewed_by
     to: [DBG-RVW-001-005-028]
-    status: planned
+    status: rework
     candidate_head: 94a59f3738fadc0b6230fc3dc69cf36ca8b9202e
+    coordination_head: 7998e0a55c2a1bd648e43ca667a9678dc8af0642
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/050--RF004_Interface_1_1_Review.md
+  - from: dbg.resolver-inspection/1.1
+    type: reviewed_by
+    to: [DBG-RVW-001-005-029]
+    status: planned
   - from: DBG-SL-001-005-002
     type: resumes_after
-    to: [DBG-RVW-001-005-028]
+    to: [DBG-RVW-001-005-029]
     status: blocked_pending_review_pass
   - from: DBG-SL-001-005-002
     type: verified_by

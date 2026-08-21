@@ -1,6 +1,6 @@
 # `dbg.resolver-inspection/1.1` — Typed Resolver and Inspection Interface
 
-- Status: **STEERING REFROZEN / INDEPENDENT REVIEW 028 PENDING**
+- Status: **STEERING REFROZEN / REVIEW 028 REWORK / REVIEW 029 PENDING**
 - Iteration: `DBG-IT-001-005`
 - Parent Refactor: `DBG-RF-004`
 - Steering authority: issue #38 comment `5362514094`
@@ -433,6 +433,12 @@ immutable values:
 - frozen value/identity DTOs whose every declared field is contract-safe;
 - tuples and frozensets whose members are recursively contract-safe;
 - explicitly frozen value objects admitted by a named public schema in this interface.
+
+Generic container normalization is exact: a list becomes a same-order tuple; a set becomes a
+frozenset; and a dict becomes a tuple of recursively contract-safe `(key, value)` tuples in the
+dict's insertion order. No unnamed read-only mapping type is published. When a public field
+declares a named frozen DTO rather than a generic container, normalization constructs that DTO
+or rejects the input.
 
 An approved closed Enum is a contract-safe immutable atom when the exact canonical member is
 retained, its schema-visible value is an immutable scalar or recursively contract-safe

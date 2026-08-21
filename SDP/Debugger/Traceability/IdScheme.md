@@ -98,8 +98,9 @@ track IDs rather than silently renamed in historical documents.
 - `DBG-RVW-001-005-024` — Slice 002 review attempt 5, REWORK
 - `DBG-RVW-001-005-025` — Slice 002 review attempt 6, REWORK
 - `DBG-RVW-001-005-026` — Slice 002 review attempt 7, REWORK
-- `DBG-RVW-001-005-027` — conditional Slice 002 review after private Enum snapshot correction
+- `DBG-RVW-001-005-027` — Slice 002 review of the new post-refreeze corrected product head
 - `DBG-RVW-001-005-028` — fresh exact-head `dbg.resolver-inspection/1.1` refreeze review
+- `DBG-RVW-001-005-029` — fresh exact-head corrected `dbg.resolver-inspection/1.1` refreeze review
 - `DBG-BLK-001-005-001` — RF-004 frozen Enum immutability/interface Steering blocker
 - `DBG-CF-001-005-001` — `dbg.resolver-inspection/1.1` contract-safe immutability fixtures
 - `DBG-VER-001-005-001..DBG-VER-001-005-007` — formal Slice verifications
