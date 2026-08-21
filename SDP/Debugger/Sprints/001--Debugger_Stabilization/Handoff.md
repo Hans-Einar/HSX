@@ -1,6 +1,6 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf004_slices001_002_003_004_007_signed_slice005_worker_pending`
+Status: `rf004_slice005_blocked_awaiting_steering_recipe_result_decision`
 
 Steering escalation: issue #38 comment `5369244294`.
 Steering frame-evidence refreeze: issue #38 comment `5370574104`.
@@ -31,7 +31,9 @@ SourceResolver Slice004 review004 returned one bounded finding; correction `3d1f
 review036 passed. Verification004 failed trace-only; current Handoff is normalized and fresh
 verification011 passed that correction but found one later stale summary; it is corrected and
 verification012 passed; Master signed exact SourceResolver head. Frozen StackService Slice005
-is next. RF-005..009 and
+proved frozen conflict `DBG-BLK-001-005-003`: required caller R7 memory recovery produces a
+RecipeScalar while Interface1.2 requires RecipeRegister. All product drafts were removed.
+RF-005..009 and
 Executive/VM/AVR/frontend migration remain blocked.
 
 ## Authority
@@ -204,9 +206,9 @@ Executive/VM/AVR/frontend migration remain blocked.
 
 ## Exact next step
 
-Dispatch fresh bounded snapshot-bound StackService Slice005 worker with ownership only over
-`stack.py`, additive exports and owned stack tests. Then review005/verification005/sign-off;
-no Slice006 work begins before Slice005 exact-head sign-off.
+Await Steering decision in issue #38 on `DBG-BLK-001-005-003`. Do not resume Slice005, start
+review005/verification005/Slice006, or implement a workaround before an accepted refreeze or
+degraded-profile decision is durably recorded and independently reviewed.
 
 ## Traceability state
 
@@ -218,7 +220,7 @@ no Slice006 work begins before Slice005 exact-head sign-off.
   `208063e344b767f82790ce579eba6327e2cdd0ce` and repository head tested
   `fefd4b0c427dfa71d637e4f4cce9e4a345912591`.
 - CurrentIndex, Issues, sprint records, Relations, Ledger, and Handoff are current through
-  Slice003 sign-off and Slice004 review036/verification012/Master sign-off; Slice005 is active.
+  Slice003/004 sign-off and open blocker `DBG-BLK-001-005-003`; product work is stopped.
 - Accepted architecture direction: `DBG-DA-001`, `DBG-A-001..DBG-A-008`
 - Completed Design Studies: `DBG-ST-002..DBG-ST-005`
 - Architecture review: `DBG-RVW-001-002-001` — REWORK at `f8b8097`
@@ -289,7 +291,7 @@ no Slice006 work begins before Slice005 exact-head sign-off.
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: fresh bounded snapshot-bound StackService Slice005 worker
+- Active gate: Steering decision for `DBG-BLK-001-005-003` in issue #38
 - Blocker authority: issue #38 comment `5369244294`
 - Refreeze authority: issue #38 comment `5370574104`
 - Blocker authority: issue #38 comment `5365959417`
@@ -300,7 +302,7 @@ no Slice006 work begins before Slice005 exact-head sign-off.
 The prior design/portable-contract chain and RF-002/RF-003/integration wave are complete,
 Steering-accepted and remotely reconstructable. RF-004 `1.2` passed review032; Slice007 is
 signed; Slice003 review035/verification010/Master exact-head sign-off passed. Slice004 is
-signed; Slice005 alone is active. Later Slices remain stopped. Controlled work is on
+signed; Slice005 is blocked with no product commit. Later Slices remain stopped. Controlled work is on
 `codex/dbg-rf-004` from exact base `69a54aeb3394d3cd4792bce620748e15bab69f1f`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.

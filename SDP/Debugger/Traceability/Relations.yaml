@@ -435,6 +435,17 @@ relations:
     status: satisfied_exact_head_signed
     signed_dependency_head: 3d1f2e8a98308835162702c579dda1dc3ef40900
   - from: DBG-SL-001-005-005
+    type: requires_steering_decision_on
+    to: [DBG-BLK-001-005-003]
+    status: open_awaiting_steering
+    issue: 38
+  - from: DBG-BLK-001-005-003
+    type: conflicts_between
+    to:
+      - HSX-D-002
+      - dbg.resolver-inspection/1.2
+    topic: caller_register_memory_recipe_result_type
+  - from: DBG-SL-001-005-005
     type: reviewed_by
     to: [DBG-RVW-001-005-005]
     status: planned

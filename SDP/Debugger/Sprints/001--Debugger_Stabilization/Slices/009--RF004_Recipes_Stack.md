@@ -1,6 +1,6 @@
 # DBG-SL-001-005-005 — RF-004 Snapshot-Bound Stack Service
 
-- Status: **ACTIVE / FRESH WORKER PENDING**
+- Status: **BLOCKED / AWAITING STEERING — DBG-BLK-001-005-003**
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
 - Depends on signed: `DBG-SL-001-005-001..004`, `DBG-SL-001-005-007`
@@ -55,3 +55,10 @@ Test current ABI entry/body/epilogue rows, terminal top-level, cycles/non-progre
 budgets, endian/width/address failures propagated from the signed evaluator, partial frame
 prefixes, stale context and no fixed-R7 fallback. Run legacy stack diagnostics as an oracle.
 Close only after exact-head review, formal verification and Master sign-off.
+
+## Frozen conflict
+
+Current HSX rows require body caller R7 = `deref_u(CFA-8,4,little)`, which evaluates to a
+RecipeScalar. Interface1.2 requires every GPR EXPRESSION to return a matching RecipeRegister,
+but the closed opcode set has no scalar-to-register constructor. See blocker009. Product drafts
+were removed; no review/verification/later Slice may start before Steering resolution.

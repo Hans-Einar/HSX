@@ -1189,3 +1189,11 @@ that sentence. Fresh verification012 is required; Slice005 remains stopped.
 Fresh verification012 passed unchanged product `3d1f2e8a…`, review036, all Handoff corrections,
 focused30/3, oracle16/1, broad280/3, M1 tiers7, static public surface, exact scopes and remote
 integrity. Master signs exact head and activates only snapshot-bound StackService Slice005.
+
+### Slice005 STOP — frozen recipe result conflict
+
+Fresh worker proved `DBG-BLK-001-005-003` before product commit. HSX-D-002/ST007 requires body
+caller R7 from `deref_u(CFA-8,4,little)`; the value is RecipeScalar, while Interface1.2 requires
+a matching RecipeRegister and the closed schema has no conversion. SAME is false and unavailable
+would violate current-profile coverage. All drafts were removed. Steering options A/B/C are in
+Interface blocker009; review005, verification005, Slice006 and parent work are stopped.

@@ -273,7 +273,7 @@ issues:
     steering_completion_comment: 5362514094
   DBG-RF-004:
     issue: 41
-    status: slices001_002_003_004_007_signed_slice005_worker_pending
+    status: slice005_blocked_awaiting_steering_recipe_result_decision
     draft_pull_request: 50
     draft_pull_request_url: https://github.com/Hans-Einar/HSX/pull/50
     draft_pull_request_base: codex/dbg-rf-002-003
@@ -300,7 +300,12 @@ issues:
     slice001_signoff_status: pass
     slice001_signed_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
     active_slice: DBG-SL-001-005-005
-    active_slice_status: active_fresh_worker_pending
+    active_slice_status: blocked_frozen_hsx_recipe_result_conflict
+    active_slice_discovery_head: 943b8d4d111304638989e429863bece8323b4b08
+    active_slice_blocker: DBG-BLK-001-005-003
+    active_slice_blocker_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/009--RF004_Stack_Register_Result_Steering_Blocker.md
+    active_slice_blocker_status: awaiting_steering
+    active_slice_product_changes: none
     slice004_implementation_head: c0f975c4a278cecd89e19d332ca5601b074a115e
     slice004_implementation_parent: d575299e81b1d1d29f75c9f0a5d2d43005fa8d11
     slice004_focused_evidence: 29_passed_3_classified_skips
