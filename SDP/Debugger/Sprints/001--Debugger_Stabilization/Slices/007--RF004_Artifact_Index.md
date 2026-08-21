@@ -1,6 +1,6 @@
 # DBG-SL-001-005-003 — RF-004 Verified Debug Artifact Index
 
-- Status: **REVIEW035 PASS / VERIFICATION003 TRACE-FAIL CORRECTED / VERIFICATION010 PENDING**
+- Status: **COMPLETE / EXACT-HEAD SIGNED**
 - Product head: `196111030e0f25e861d03f5dffd159f52c10622a`
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
@@ -100,3 +100,9 @@ scope and Git integrity pass. Skips are the existing classified WinError1314 evi
 Product evidence passed, but verification003 failed trace-only because Handoff stopped at
 review003 and Issues used stale generic active-Slice names for Slice007 history. Master
 normalized only those fields. Fresh verification010 is required; product head is unchanged.
+
+## Final verification and sign-off
+
+Fresh verification010 passed unchanged product head `a335789759…` with artifact31,
+broad254+1, legacy22+2, M1/M2 adversarial2, compile/exports/signatures, strict trace, exact
+scope and remote integrity. Master signed the exact product head and authorized only Slice004.

@@ -1,6 +1,6 @@
 # DBG-SL-001-005-004 — RF-004 Exact Source Resolver
 
-- Status: **FROZEN / PLANNED**
+- Status: **ACTIVE / FRESH WORKER PENDING**
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
 - Depends on signed: `DBG-SL-001-005-001..003`, `DBG-SL-001-005-007`

@@ -273,7 +273,7 @@ issues:
     steering_completion_comment: 5362514094
   DBG-RF-004:
     issue: 41
-    status: slices001_002_007_signed_slice003_reverification_pending
+    status: slices001_002_003_007_signed_slice004_worker_pending
     draft_pull_request: 50
     draft_pull_request_url: https://github.com/Hans-Einar/HSX/pull/50
     draft_pull_request_base: codex/dbg-rf-002-003
@@ -299,14 +299,14 @@ issues:
     slice001_final_verification_status: pass
     slice001_signoff_status: pass
     slice001_signed_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
-    active_slice: DBG-SL-001-005-003
-    active_slice_status: review035_pass_verification003_fail_trace_corrected_verification010_pending
+    active_slice: DBG-SL-001-005-004
+    active_slice_status: active_fresh_worker_pending
     slice003_implementation_head: 196111030e0f25e861d03f5dffd159f52c10622a
     slice003_implementation_parent: fdd6e4635615b2fc203a4de312b8ef4edc4fba45
     slice003_focused_evidence: 29_passed
-    active_slice_review: DBG-RVW-001-005-003
-    active_slice_review_status: rework
-    active_slice_review_coordination_head: 4af2250436687ea62f783989d8f486504ad1adf8
+    slice003_initial_review: DBG-RVW-001-005-003
+    slice003_initial_review_status: rework
+    slice003_initial_review_coordination_head: 4af2250436687ea62f783989d8f486504ad1adf8
     slice003_corrected_head: a335789759a68dfd8bef01dbdf59591b096307d3
     slice003_corrective_focused_evidence: 31_passed
     slice003_corrective_review: DBG-RVW-001-005-035
@@ -315,7 +315,14 @@ issues:
     slice003_verification_attempt_1: DBG-VER-001-005-003
     slice003_verification_attempt_1_status: fail_trace_only
     slice003_verification_attempt_1_coordination_head: f7a772b580ba0dfa99d3c12693119242ccbe2792
-    active_slice_verification: DBG-VER-001-005-010
+    slice003_final_verification: DBG-VER-001-005-010
+    slice003_final_verification_status: pass
+    slice003_final_verification_coordination_head: fffe766b8d4257bef4375973e16ff01364befca5
+    slice003_signoff_status: pass
+    slice003_signed_head: a335789759a68dfd8bef01dbdf59591b096307d3
+    active_slice_review: DBG-RVW-001-005-004
+    active_slice_review_status: planned
+    active_slice_verification: DBG-VER-001-005-004
     slice007_verification_status: pass
     slice007_verification_coordination_head: 86f43d8241f8ff504c7fd25afceed43d2f9c0b77
     slice007_signoff_status: pass

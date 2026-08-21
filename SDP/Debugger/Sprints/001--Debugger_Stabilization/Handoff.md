@@ -1,6 +1,6 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf004_slices001_002_007_signed_slice003_reverification_pending`
+Status: `rf004_slices001_002_003_007_signed_slice004_worker_pending`
 
 Steering escalation: issue #38 comment `5369244294`.
 Steering frame-evidence refreeze: issue #38 comment `5370574104`.
@@ -26,8 +26,8 @@ returned REWORK; review033 returned REWORK trace-only; review034/verification007
 Draft PR #50 and Steering progress comment `5372569290` expose the exact signed heads and next
 gate. Artifact Slice003 review003 returned REWORK; bounded corrections completed at
 `a335789759a68dfd8bef01dbdf59591b096307d3` and review035 passed. Verification003 failed
-trace-only; the exact Handoff/Issues fields are normalized and fresh verification010 is next.
-RF-005..009 and
+trace-only; verification010 passed and Master signed the exact product head. Frozen exact
+SourceResolver Slice004 is next. RF-005..009 and
 Executive/VM/AVR/frontend migration remain blocked.
 
 ## Authority
@@ -202,9 +202,9 @@ Executive/VM/AVR/frontend migration remain blocked.
 
 ## Exact next step
 
-Run fresh formal `DBG-VER-001-005-010` against exact corrected product head
-`a335789759a68dfd8bef01dbdf59591b096307d3`, review035 PASS and the bounded trace correction.
-No Slice004 work begins before Slice003 Master exact-head sign-off.
+Dispatch a fresh bounded SourceResolver Slice004 worker with ownership limited to `sources.py`,
+additive package exports and its owned source tests. Then review004/verification004/sign-off;
+no Slice005 work begins before Slice004 exact-head sign-off.
 
 ## Traceability state
 
@@ -287,7 +287,7 @@ No Slice004 work begins before Slice003 Master exact-head sign-off.
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: fresh formal Slice003 verification `DBG-VER-001-005-010`
+- Active gate: fresh bounded SourceResolver Slice004 worker
 - Blocker authority: issue #38 comment `5369244294`
 - Refreeze authority: issue #38 comment `5370574104`
 - Blocker authority: issue #38 comment `5365959417`
@@ -297,8 +297,8 @@ No Slice004 work begins before Slice003 Master exact-head sign-off.
 
 The prior design/portable-contract chain and RF-002/RF-003/integration wave are complete,
 Steering-accepted and remotely reconstructable. RF-004 `1.2` passed review032; Slice007 is
-signed; Slice003 review035 passed and verification003 failed trace-only. Fresh verification010
-is required. Later Slices remain stopped. Controlled work is on
+signed; Slice003 review035/verification010/Master exact-head sign-off passed. Slice004 alone is
+active. Later Slices remain stopped. Controlled work is on
 `codex/dbg-rf-004` from exact base `69a54aeb3394d3cd4792bce620748e15bab69f1f`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.

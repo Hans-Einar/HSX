@@ -387,7 +387,15 @@ relations:
   - from: DBG-SL-001-005-003
     type: final_verified_by
     to: [DBG-VER-001-005-010]
-    status: pending_after_trace_correction
+    status: pass
+    product_head: a335789759a68dfd8bef01dbdf59591b096307d3
+    coordination_head: fffe766b8d4257bef4375973e16ff01364befca5
+    record: SDP/Debugger/Verification/DBG-VER-001-005-010.md
+  - from: DBG-SL-001-005-004
+    type: resumes_after
+    to: [DBG-SL-001-005-003]
+    status: satisfied_exact_head_signed
+    signed_dependency_head: a335789759a68dfd8bef01dbdf59591b096307d3
   - from: DBG-SL-001-005-004
     type: reviewed_by
     to: [DBG-RVW-001-005-004]
