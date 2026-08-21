@@ -382,7 +382,7 @@ active_rf004:
   interface:
     id: dbg.resolver-inspection/1
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/004--Typed_Resolver_Inspection_Interface_v1.md
-    status: refrozen_candidate_pending_review_013
+    status: refrozen_candidate_pending_review_014
     prior_review: DBG-RVW-001-005-007
     prior_review_status: rework
     prior_reviewed_head: 82154c614a31284723bf3e6a337c5bedfb8aba5d
@@ -403,7 +403,11 @@ active_rf004:
     review_attempt_5_status: rework
     review_attempt_5_head: 573f396e29de728f69abb0961e9b79a2fdb3c29d
     review_attempt_5_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/033--RF004_Interface_Review_Attempt5.md
-    planned_review: DBG-RVW-001-005-013
+    review_attempt_6: DBG-RVW-001-005-013
+    review_attempt_6_status: rework
+    review_attempt_6_head: 1e8fb7e74c92a69711bd48809696552cf2f982db
+    review_attempt_6_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/034--RF004_Interface_Review_Attempt6.md
+    planned_review: DBG-RVW-001-005-014
     implementation_owner: DBG-RF-004
     blocked_consumer: DBG-RF-005
   execution_order:
@@ -454,7 +458,7 @@ active_rf004:
   parent_verification: DBG-VER-004-001-001
   product_base: 69a54aeb3394d3cd4792bce620748e15bab69f1f
   runtime_profile: hsx.python-debug-legacy/1
-  current_gate: publish_corrected_candidate_and_pass_review_013_before_slice_001_worker
+  current_gate: publish_corrected_candidate_and_pass_review_014_before_slice_001_worker
 structural_gate:
   rule: Only Steering-authorized Refactors with frozen Slice/interface contracts may execute.
   authorized_refactors:

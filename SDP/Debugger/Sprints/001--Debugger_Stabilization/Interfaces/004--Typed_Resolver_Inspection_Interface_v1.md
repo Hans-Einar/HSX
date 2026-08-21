@@ -1,6 +1,6 @@
 # `dbg.resolver-inspection/1` — Typed Resolver and Inspection Interface
 
-- Status: **REFROZEN CANDIDATE — REVIEWS 007..010/012 REWORK / REVIEW 013 PENDING**
+- Status: **REFROZEN CANDIDATE — REVIEWS 007..010/012..013 REWORK / REVIEW 014 PENDING**
 - Iteration: `DBG-IT-001-005`
 - Parent Refactor: `DBG-RF-004`
 - Steering authority: issue #38 comment `5362514094`
@@ -12,7 +12,8 @@
 - Review `DBG-RVW-001-005-009`: REWORK at `07f7e16040bec1c225d263c682066f65b173e6aa`
 - Review `DBG-RVW-001-005-010`: REWORK at `72b06ad0bae53b70bc3d64edad91591998d2408d`
 - Review `DBG-RVW-001-005-012`: REWORK at `573f396e29de728f69abb0961e9b79a2fdb3c29d`
-- Fresh independent re-review: `DBG-RVW-001-005-013` (`...011` is reserved for Slice 007)
+- Review `DBG-RVW-001-005-013`: REWORK at `1e8fb7e74c92a69711bd48809696552cf2f982db`
+- Fresh independent re-review: `DBG-RVW-001-005-014` (`...011` is reserved for Slice 007)
 - Public interface ID: `dbg.resolver-inspection/1`
 
 This document freezes the public Python-domain interface to be implemented by the seven bounded
@@ -211,8 +212,17 @@ AddressSpaceDescriptor { space: AddressSpaceId, unit: str, width_bits: int >= 1,
                          wrap_policy: FORBIDDEN | EXPLICIT,
                          permissions: frozenset[READ | WRITE | EXECUTE] }
 ArchitectureDescriptor { ref: ArchitectureDescriptorRef,
+                         descriptor_version: CanonicalUInt64,
+                         instruction_encoding: str,
+                         container_header_byte_order: LITTLE | BIG,
+                         instruction_serialization_byte_order: LITTLE | BIG,
+                         register_width_bits: int >= 1,
+                         register_count: int >= 1,
                          spaces: tuple[AddressSpaceDescriptor, ...],
                          register_order: tuple[str, ...],
+                         pc_space: AddressSpaceId,
+                         sp_space: AddressSpaceId,
+                         psw_width_bits: int >= 1,
                          instruction_alignment: int >= 1 }
 ```
 
@@ -253,6 +263,18 @@ the complete TargetRef as its Python field, but `canonical_payload()` emits
 `target_ref.canonical_ref` for the scalar `target_ref` key exactly as canonical vector 4.
 Within one accepted identity registry, reuse of one canonical_ref with different TargetRef
 fields is `CORRUPT`; absence of canonical_ref prevents canonical LoadedImageRef construction.
+
+ArchitectureDescriptor.register_order contains exactly register_count unique GPR IDs, every
+listed GPR value uses register_width_bits, and
+pc_space/sp_space must name declared address spaces. `instruction_encoding` is the exact
+opaque accepted encoding/profile ID; container-header and instruction serialization byte order
+are independent from guest data/register/stack space byte order. Missing/unknown version,
+encoding or serialization fields make the descriptor unsupported and it cannot drive address,
+register or disassembly behavior.
+The declared register order exposed to RegisterSelection is
+`register_order + ("PC", "SP", "PSW")`. PC width is pc_space.width_bits, SP width is
+sp_space.width_bits, PSW width is psw_width_bits, and GPRs use register_width_bits. Explicit
+selection accepts only those declared IDs.
 
 `StopEpochId` is one opaque non-empty exact string; it is never parsed for generation.
 `supported_read_sets` uses the frozen names `registers`, `memory`, `disassembly`, `stack`, and
@@ -478,13 +500,16 @@ ExpressionValue { expression_kind: REGISTER | VARIABLE | SYMBOL | CONSTANT | MEM
                   raw_bytes: bytes | None, bit_size: int >= 1,
                   status: AVAILABLE | PARTIAL | OPTIMIZED_OUT | UNAVAILABLE,
                   pieces: tuple[ValuePiece, ...] }
-VariableRecord { context: InspectionContext, handle: DomainHandle,
-                 scope_handle: DomainHandle, symbol_id: str,
-                 declaration_order: int >= 0, evaluated: EvaluatedValue,
-                 child_scope_handle: DomainHandle | None }
+SymbolVariableRecord { context: InspectionContext, handle: DomainHandle,
+                       scope_handle: DomainHandle, symbol_id: str,
+                       declaration_order: int >= 0, evaluated: EvaluatedValue }
+RegisterVariableRecord { context: InspectionContext, handle: DomainHandle,
+                         scope_handle: DomainHandle, register_id: str,
+                         register_order: int >= 0, evaluated: ExpressionValue }
+ScopeValueRecord = SymbolVariableRecord | RegisterVariableRecord
 VariablePage { scope_handle: DomainHandle, total_variables: int >= 0,
                offset: int >= 0,
-               variables: tuple[VariableRecord, ...] }
+               variables: tuple[ScopeValueRecord, ...] }
 MemorySegment { offset: int >= 0, requested_length: int >= 1,
                 data: bytes, status: COMPLETE | UNAVAILABLE }
 MemoryBlock { start: HsxAddress, requested_length: int >= 1,
@@ -498,9 +523,10 @@ DisassemblyBlock { start: HsxAddress, requested_count: int >= 1,
 
 `RegisterSelection` requires exactly one of `all_declared=true` with no IDs, or
 `all_declared=false` with unique explicit IDs. Explicit register results follow request order;
-all-declared results follow ArchitectureDescriptor `register_order`. Stack frames are ordered
+all-declared results follow the descriptor GPR order then PC, SP, PSW. Stack frames are ordered
 top-first by ascending frame_index; scopes are ordered REGISTERS, LOCALS, GLOBALS;
-variables are ordered by `(declaration_order, symbol_id)`; disassembly is ordered by checked
+symbol variables are ordered by `(declaration_order, symbol_id)` and register variables by
+`register_order`; disassembly is ordered by checked
 ascending code address. `PageRequest` slices the complete ordered collection as
 `[offset:min(offset+limit,total)]`; offset at/beyond total returns an empty tuple with the same
 total, and every non-empty page contains exactly that slice. Pagination returns the same total
@@ -513,8 +539,12 @@ empty. `PARTIAL` is legal only for a structural pieces location: `raw_bytes` is 
 ValuePieces have non-overlapping destination ranges within declared `bit_size`, every missing
 piece is retained with `UNAVAILABLE` plus reason, and available pieces retain exact source and
 destination bit ranges without padding. `OPTIMIZED_OUT`/`UNAVAILABLE` have no raw bytes and no
-fabricated piece. VariableRecord always returns its exact SymbolRecord.symbol_id and VARIABLE handle;
-duplicate display names therefore remain distinct.
+fabricated piece. SymbolVariableRecord always returns its exact SymbolRecord.symbol_id and
+VARIABLE handle; duplicate display names therefore remain distinct. RegisterVariableRecord
+uses the exact descriptor register_id/order, ExpressionValue(kind=REGISTER,
+source_id=register_id), no symbol/address, and its own VARIABLE handle. RF-004 returns no child
+scope handle; compound layout remains available through TypeRecord.members without an invented
+handle traversal contract.
 
 `SnapshotExpression` is a closed typed union:
 
@@ -653,7 +683,7 @@ chooses one address.
 resolve to exactly one LOCAL or GLOBAL SymbolRecord; its function/lexical-scope fields must
 equal that record and every variables_in_scope result must have the requested scope. Missing,
 duplicate or cross-scope joins make the portable component/index `CORRUPT`. VariableExpression,
-EvaluatedValue, VariableRecord, location_rows and VARIABLE handle keys all carry that same
+EvaluatedValue, SymbolVariableRecord, location_rows and symbol VARIABLE handle keys all carry that same
 symbol_id unchanged; no secondary variable-ID namespace exists.
 
 Duplicate symbol names and multiple executable addresses remain candidate sets. Source records
@@ -757,6 +787,7 @@ RecipeRegister { register_id: str, bit_width: int >= 1, unsigned_value: int }
 RecipeValue = RecipeScalar | RecipeAddress | RecipeRegister
 RecipeEvaluationContext { context: InspectionContext, frame_index: int >= 0,
                           pc: HsxAddress, sp: HsxAddress,
+                          psw: RecipeScalar | None,
                           recovered_registers: RegisterSet,
                           cfa: HsxAddress | None, frame_base: HsxAddress | None }
 RecipeBudget { opcodes_remaining: int >= 0, dereferences_remaining: int >= 0,
@@ -773,6 +804,31 @@ OPTIMIZED_OUT alone have a reason; SAME/UNDEFINED have neither. ADDRESS/VALUE fo
 expression, PIECES has 1..16 pieces, and terminal location forms have only a reason. Piece
 destinations are non-overlapping and within declared result size. Unknown opcode/field is
 `UNSUPPORTED`; wrong arity/type/width/stack/address/piece coverage is `CORRUPT`.
+
+Postfix stack transitions and value propagation are normative:
+
+| Opcode | Stack input | Stack output / rule |
+|---|---|---|
+| `reg_value` | none | Push RecipeRegister with exact recovered register ID, descriptor width and unsigned bits; missing recovery is UNAVAILABLE. |
+| `special_value PC` / `SP` | none | Push RecipeAddress in ArchitectureDescriptor pc_space/sp_space from the selected frame; absent value is UNAVAILABLE. |
+| `special_value PSW` | none | Push unsigned RecipeScalar of exact psw_width_bits; absent value is UNAVAILABLE. |
+| `const_u` | none | Push unsigned RecipeScalar; value must fit `0..2^bit_width-1`. |
+| `const_s` | none | Push signed RecipeScalar; value must fit the two's-complement range for bit_width. |
+| `static_address` | none | Validate the supplied address against its exact descriptor space/range/alignment and push RecipeAddress. |
+| `to_address` | one RecipeScalar | Scalar must be non-negative; validate in the named space and push RecipeAddress. RecipeRegister is not implicitly cast. |
+| `cfa` / `frame_base` | none | Push the applicable RecipeEvaluationContext address; absent context value is UNAVAILABLE. |
+| `add_sconst_checked` | one RecipeAddress or RecipeScalar | Checked add preserves address space or scalar signedness/bit_width; under/overflow, range hole or wrong type is CORRUPT. |
+| `deref_u` | one RecipeAddress | SnapshotReadPort reads exactly byte_length with declared byte_order; push unsigned RecipeScalar of `byte_length*8`; missing bytes are UNAVAILABLE. |
+| `bit_slice` | one RecipeScalar or RecipeRegister | Require `source_bit_offset+bit_size <= input width`; push unsigned RecipeScalar of bit_size. |
+
+Each opcode pops exactly the listed inputs and pushes exactly one output. Stack underflow,
+extra/wrong input kind, depth overflow or invalid width/value is CORRUPT at that opcode index.
+Opcode/dereference/byte-budget exhaustion is UNSUPPORTED with `limit_exceeded` before the
+operation. Evaluation succeeds only when all opcodes are consumed and the stack contains
+exactly one value matching required_result: RecipeAddress with required_bit_width=None;
+signed/unsigned RecipeScalar with exact required_bit_width and signedness; or RecipeRegister
+with exact required_bit_width. Zero/multiple final values or any other result kind is CORRUPT.
+No implicit extension, truncation, sign change, host endian or address/register cast occurs.
 
 ```text
 RecipeLimits {
@@ -910,8 +966,9 @@ handles without owning their lifetime.
 
 Every DomainHandle embeds the store's complete InspectionContext. Within one epoch the store
 interns exact object keys: FRAME uses frame_index; SCOPE uses
-`(frame_handle.serial, scope_kind)`; VARIABLE uses
-`(scope_handle.serial, declaration_order, symbol_id)`. Repeating the same query returns the
+`(frame_handle.serial, scope_kind)`; symbol VARIABLE uses
+`(scope_handle.serial, "symbol", declaration_order, symbol_id)` and register VARIABLE uses
+`(scope_handle.serial, "register", register_order, register_id)`. Repeating the same query returns the
 same handle; a new exact key receives the next never-reused serial. A handle kind/key mismatch
 is `UNKNOWN_HANDLE`; a known serial from an invalidated epoch is `STALE`.
 `intern` rejects a key not matching its declared kind as CORRUPT without allocating a serial;
@@ -936,7 +993,8 @@ declares register coverage, LOCALS when the frame resolves to exact function/PC 
 and GLOBALS when the index has globals; absent capabilities/data omit that scope and add an
 explicit diagnostic. There is no WATCH scope: each standard Watch/hover/evaluate request calls
 `evaluate_snapshot()` independently. `variables()` maps REGISTERS in descriptor order, LOCALS
-from `lexical_scopes()` plus `variables_in_scope()` for the selected frame PC, and GLOBALS from
+to RegisterVariableRecord without synthesizing SymbolRecord/address, LOCALS from
+`lexical_scopes()` plus `variables_in_scope()` for the selected frame PC, and GLOBALS from
 `global_variables()`. Local/global variables select exactly one applicable LocationRow and use
 LocationEvaluator; zero rows is unavailable and overlap is corrupt. No scope query invents a
 variable, reads the current top frame or creates a persistent live watch.

@@ -49,6 +49,8 @@ gateway, Executive, DAP/CLI and VS Code modules are read-only.
 - variables use exact selected frame and location row; partial pieces stay partial;
 - scopes/variables follow the frozen register/local/global composition and artifact
   source/type/lexical-scope/variable queries; Watch requests use separate ExpressionValue;
+- REGISTERS return RegisterVariableRecord without synthetic symbols/addresses; LOCALS/GLOBALS
+  return SymbolVariableRecord keyed only by SymbolRecord.symbol_id; no child-scope handle;
 - snapshot expressions are typed/side-effect-free, selected-frame-bound, and never create a
   persistent live watch or delegate a raw string to runtime;
 - memory/disassembly validate typed spaces/ranges/permissions and preserve unavailable bytes;

@@ -27,6 +27,8 @@ inspection, legacy product/runtime and frontend files are read-only.
 
 - implement the exact frozen opcode/rule/location-piece/evaluation-context/budget/result DTOs
   and RecipeEvaluator/LocationEvaluator signatures from `dbg.resolver-inspection/1`;
+- implement every frozen postfix pop/push, signedness/width propagation, final-stack/result
+  rule and exact corrupt/unavailable/unsupported classification;
 - own UnwindRow/LocationRow DTOs and consume Slice 002 metadata SymbolRecord read-only, so no
   future artifact-module import cycle exists;
 - reject unknown mandatory schema/field/opcode as unsupported and malformed

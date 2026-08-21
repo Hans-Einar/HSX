@@ -190,6 +190,9 @@ issues:
     rf004_interface_review_attempt_5_status: rework
     rf004_interface_review_attempt_5_head: 573f396e29de728f69abb0961e9b79a2fdb3c29d
     rf004_interface_review_attempt_6: DBG-RVW-001-005-013
+    rf004_interface_review_attempt_6_status: rework
+    rf004_interface_review_attempt_6_head: 1e8fb7e74c92a69711bd48809696552cf2f982db
+    rf004_interface_review_attempt_7: DBG-RVW-001-005-014
     rf005_dependency_clarification_issue: 42
     rf005_dependency_clarification_comment: 5362515750
     portable_contract_gate: complete_accepted_frozen
@@ -246,6 +249,9 @@ issues:
     interface_review_attempt_5_status: rework
     interface_review_attempt_5_head: 573f396e29de728f69abb0961e9b79a2fdb3c29d
     interface_review_attempt_6: DBG-RVW-001-005-013
+    interface_review_attempt_6_status: rework
+    interface_review_attempt_6_head: 1e8fb7e74c92a69711bd48809696552cf2f982db
+    interface_review_attempt_7: DBG-RVW-001-005-014
     steering_authority_comment: 5362514094
   DBG-RF-005:
     issue: 42

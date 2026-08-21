@@ -39,6 +39,8 @@ Existing `contracts.py`, controller/model/epochs/gateway/runtime files are read-
 - equality is exact and case-sensitive; only frozen digest fields require lowercase Hex64;
 - descriptor operations validate named spaces, widths, units, half-open ranges, alignment,
   permissions and explicit wrap policy;
+- ArchitectureDescriptor requires version, encoding, independent container/instruction
+  serialization, GPR width/count/order, PC/SP spaces and PSW width;
 - checked arithmetic returns typed overflow/underflow/wrong-space/misalignment/range failures;
 - result envelopes enforce candidate/cardinality/status rules and retain structured diagnostics;
 - pure metadata DTOs freeze source/function/symbol/type/scope/instruction/memory records without
@@ -62,8 +64,9 @@ interface `dbg.resolver-inspection/1`.
 
 ## Verification and completion signal
 
-Test exact mismatch matrices, immutability, digest/logical-ID validation, multiple widths and
-spaces, the frozen StopEpoch binding status/code matrix, every checked
+Test exact mismatch matrices, immutability, digest/logical-ID validation, complete descriptor
+version/encoding/serialization/register/special fields, multiple widths and
+spaces, GPR+PC/SP/PSW ordering/widths, the frozen StopEpoch binding status/code matrix, every checked
 arithmetic/range/alignment failure, explicit wrap selection, result
 cardinality and degraded coherence guards. Run earlier RF-002/RF-003 contract/epoch regressions.
 Close only after exact-head review, formal verification and Master sign-off.
