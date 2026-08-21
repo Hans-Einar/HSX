@@ -273,7 +273,7 @@ issues:
     steering_completion_comment: 5362514094
   DBG-RF-004:
     issue: 41
-    status: slices001_002_007_signed_slice003_rework_pending
+    status: slices001_002_007_signed_slice003_rereview_pending
     draft_pull_request: 50
     draft_pull_request_url: https://github.com/Hans-Einar/HSX/pull/50
     draft_pull_request_base: codex/dbg-rf-002-003
@@ -300,15 +300,17 @@ issues:
     slice001_signoff_status: pass
     slice001_signed_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
     active_slice: DBG-SL-001-005-003
-    active_slice_status: review_rework_corrective_worker_pending
+    active_slice_status: corrected_review035_pending
     slice003_implementation_head: 196111030e0f25e861d03f5dffd159f52c10622a
     slice003_implementation_parent: fdd6e4635615b2fc203a4de312b8ef4edc4fba45
     slice003_focused_evidence: 29_passed
     active_slice_review: DBG-RVW-001-005-003
     active_slice_review_status: rework
     active_slice_review_coordination_head: 4af2250436687ea62f783989d8f486504ad1adf8
+    slice003_corrected_head: a335789759a68dfd8bef01dbdf59591b096307d3
+    slice003_corrective_focused_evidence: 31_passed
     slice003_corrective_review: DBG-RVW-001-005-035
-    slice003_corrective_review_status: planned
+    slice003_corrective_review_status: pending
     active_slice_verification: DBG-VER-001-005-003
     slice007_verification_status: pass
     slice007_verification_coordination_head: 86f43d8241f8ff504c7fd25afceed43d2f9c0b77

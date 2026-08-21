@@ -1114,3 +1114,11 @@ limited to recursively contract-safe legacy result payloads and preserving unsup
 limit classification at the artifact result boundary. The third finding is stale Handoff
 state, corrected by Master while recording the review. Fresh corrective review035 follows the
 bounded worker; verification003 and Slice004 remain stopped.
+
+### Slice003 bounded correction
+
+Fresh corrective worker closed only review003 M1/M2 at exact product head `a335789759…`.
+Recursive legacy generic payload normalization/rejection now uses the accepted contract-safe
+boundary; recipe `limit_exceeded` maps to artifact `SCHEMA_UNSUPPORTED`, while other malformed
+validator diagnostics remain `CORRUPT`. Focused artifact evidence is 31 passed and exact scope
+is three owned files. Fresh review035 is the only next gate.

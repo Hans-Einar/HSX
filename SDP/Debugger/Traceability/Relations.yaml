@@ -374,7 +374,8 @@ relations:
   - from: DBG-SL-001-005-003
     type: corrective_reviewed_by
     to: [DBG-RVW-001-005-035]
-    status: planned_after_bounded_correction
+    status: pending_exact_corrected_head
+    product_head: a335789759a68dfd8bef01dbdf59591b096307d3
   - from: DBG-SL-001-005-003
     type: verified_by
     to: [DBG-VER-001-005-003]

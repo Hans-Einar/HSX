@@ -1,6 +1,6 @@
 # DBG-SL-001-005-003 — RF-004 Verified Debug Artifact Index
 
-- Status: **REWORK / BOUNDED CORRECTIVE WORKER PENDING**
+- Status: **CORRECTED / INDEPENDENT REVIEW035 PENDING**
 - Product head: `196111030e0f25e861d03f5dffd159f52c10622a`
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
@@ -80,3 +80,11 @@ unchanged. Close only after exact-head review, formal verification and Master si
 - Master corrected stale Handoff state while recording this review.
 
 No other product Blocking/High/Medium finding exists. Corrective review035 is reserved.
+
+## Corrective worker evidence
+
+- Corrected head: `a335789759a68dfd8bef01dbdf59591b096307d3`.
+- Exact scope: `artifacts.py`, `legacy_symbols.py`, owned artifact test.
+- Focused artifact tests: `31 passed`.
+- Compile/import/export, diff check and Git connectivity: PASS.
+- No frozen-contract or HSX-semantic blocker.
