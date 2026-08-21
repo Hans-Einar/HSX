@@ -1129,3 +1129,11 @@ Fresh independent review035 passed corrected product head `a335789759…` with z
 All review003 closures, original artifact/index responsibilities, degraded legacy boundary,
 focused31, broad254+1, legacy22+2, strict trace and exact Git scope pass. Formal verification003
 is next; Slice004 remains stopped.
+
+### Slice003 verification003 FAIL trace-only
+
+Formal verification003 passed product head `a335789759…`, focused31, broad254+1, legacy22+2,
+M1/M2 closure, compile/exports/signatures, scope and Git integrity. It failed current trace:
+two Handoff sentences stopped at review003 and Issues exposed Slice007 history as generic active
+Slice fields. Master normalized exactly those fields. Fresh verification010 is required;
+product is unchanged and Slice004 remains stopped.

@@ -1,6 +1,6 @@
 # DBG-SL-001-005-003 — RF-004 Verified Debug Artifact Index
 
-- Status: **REVIEW035 PASS / FORMAL VERIFICATION003 PENDING**
+- Status: **REVIEW035 PASS / VERIFICATION003 TRACE-FAIL CORRECTED / VERIFICATION010 PENDING**
 - Product head: `196111030e0f25e861d03f5dffd159f52c10622a`
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
@@ -94,3 +94,9 @@ No other product Blocking/High/Medium finding exists. Corrective review035 is re
 Fresh review035 passed exact corrected head `a335789759…` with zero findings. Focused31,
 broad254+1, legacy22+2, adversarial closure, compile/exports/signatures, strict trace, exact
 scope and Git integrity pass. Skips are the existing classified WinError1314 evidence.
+
+## Verification003 decision
+
+Product evidence passed, but verification003 failed trace-only because Handoff stopped at
+review003 and Issues used stale generic active-Slice names for Slice007 history. Master
+normalized only those fields. Fresh verification010 is required; product head is unchanged.

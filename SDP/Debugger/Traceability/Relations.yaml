@@ -381,7 +381,13 @@ relations:
   - from: DBG-SL-001-005-003
     type: verified_by
     to: [DBG-VER-001-005-003]
-    status: pending_after_review035_pass
+    status: fail_trace_only
+    coordination_head: f7a772b580ba0dfa99d3c12693119242ccbe2792
+    record: SDP/Debugger/Verification/DBG-VER-001-005-003.md
+  - from: DBG-SL-001-005-003
+    type: final_verified_by
+    to: [DBG-VER-001-005-010]
+    status: pending_after_trace_correction
   - from: DBG-SL-001-005-004
     type: reviewed_by
     to: [DBG-RVW-001-005-004]
