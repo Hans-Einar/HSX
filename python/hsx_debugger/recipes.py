@@ -1480,6 +1480,7 @@ def _validate_postfix_expression(
         )
     if (
         required_register_id is not None
+        and value.kind is RecipeResultKind.REGISTER
         and value.register_id != required_register_id
     ):
         return result(
@@ -1623,12 +1624,16 @@ class RecipeComponentValidator:
                 total_opcodes += validation.opcode_count
                 total_dereferenced_bytes += validation.dereferenced_bytes
                 if (
-                    expression.required_result is not RecipeResultKind.REGISTER
+                    expression.required_result
+                    not in {
+                        RecipeResultKind.REGISTER,
+                        RecipeResultKind.UNSIGNED_SCALAR,
+                    }
                     or expression.required_bit_width != architecture.register_width_bits
                 ):
                     return _invalid_address_diagnostic(
                         "invalid_register_rule_result",
-                        "GPR expressions require exact-width REGISTER results",
+                        "GPR expressions require exact-width REGISTER or UNSIGNED_SCALAR results",
                         row_id=row.row_id,
                     )
         if (
@@ -1651,7 +1656,7 @@ class RecipeComponentValidator:
         limits: RecipeLimits = RecipeLimits(),
     ) -> tuple[Diagnostic, ...]:
         if not isinstance(row, LocationRow):
-            raise TypeError("row must be LocationRow")
+            raise TypeError("row must be UnwindRow")
         if not isinstance(variable, SymbolRecord):
             raise TypeError("variable must be SymbolRecord")
         if not isinstance(architecture, ArchitectureDescriptor):
