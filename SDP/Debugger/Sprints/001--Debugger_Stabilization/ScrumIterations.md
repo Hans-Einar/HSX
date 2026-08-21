@@ -1171,3 +1171,9 @@ scope and compile/Black/signature/Git pass. Fresh review036 is next.
 Fresh review036 passed corrected product `3d1f2e8a…` with zero findings. M1 and all frozen
 SourceResolver tiers/content/case/symlink boundaries pass with focused30/3, oracle16/1,
 broad280/3 and exact trace/scope/Git evidence. Formal verification004 is next; Slice005 stops.
+
+### Slice004 verification004 FAIL trace-only
+
+Verification004 passed all SourceResolver product evidence but failed three stale Handoff
+sentences describing Slice002/six loops/review036 as open. Master normalized only those
+sentences. Fresh verification011 is required; product is unchanged and Slice005 remains stopped.

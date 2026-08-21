@@ -1,6 +1,6 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf004_slices001_002_003_007_signed_slice004_verification_pending`
+Status: `rf004_slices001_002_003_007_signed_slice004_reverification_pending`
 
 Steering escalation: issue #38 comment `5369244294`.
 Steering frame-evidence refreeze: issue #38 comment `5370574104`.
@@ -27,10 +27,9 @@ Draft PR #50 and Steering progress comment `5372569290` expose the exact signed 
 gate. Artifact Slice003 review003 returned REWORK; bounded corrections completed at
 `a335789759a68dfd8bef01dbdf59591b096307d3` and review035 passed. Verification003 failed
 trace-only; verification010 passed and Master signed the exact product head. Frozen exact
-SourceResolver Slice004 is implemented at `c0f975c4a278cecd89e19d332ca5601b074a115e`;
-review004 returned one bounded Windows join REWORK finding. Fresh corrective worker and
-corrected head `3d1f2e8a98308835162702c579dda1dc3ef40900`; fresh review036 is next.
-Review036 passed; formal verification004 is next. RF-005..009 and
+SourceResolver Slice004 review004 returned one bounded finding; correction `3d1f2e8a…` and
+review036 passed. Verification004 failed trace-only; current Handoff is normalized and fresh
+verification011 is next. RF-005..009 and
 Executive/VM/AVR/frontend migration remain blocked.
 
 ## Authority
@@ -181,9 +180,8 @@ Executive/VM/AVR/frontend migration remain blocked.
   trace. `DBG-VER-001-005-008` repeated all evidence and failed only the remaining normalized
   Issues status; both trace defects were corrected.
 - `DBG-VER-001-005-009` passed and Master signed exact head `8e566994…`; Slice 001 is complete.
-- Slice 002 is implemented at `4b5837644dc1196accfd8608bc3dbd20980476bb`; review,
-  `DBG-RVW-001-005-002` returned REWORK; correction, fresh review, verification and sign-off
-  remain open. Corrected head is `4280bc6008385042bdff923bd8e5392a1c290fdc`.
+- Slice002's historical rework chain converged after Steering refreeze. Review027,
+  verification002 and Master sign-off passed exact product head `c7bc39057469f1aa62a78f409753ec0213631214`.
 - `DBG-RVW-001-005-021` returned REWORK for scalar/dataclass subclass deep-immutability plus
   stale normalized summaries. Correction 2 is `6c933ea6b11e42d58da52faf0997f8c978dad54b`;
   review 022 confirmed code PASS and returned only normalized trace REWORK; trace is corrected.
@@ -197,17 +195,16 @@ Executive/VM/AVR/frontend migration remain blocked.
   Review 026 confirmed pre-construction closure but returned REWORK because the retained Enum
   singleton can still expose post-construction changes.
 - `DBG-RVW-001-005-019` passed exact contract head `058c338…` after the prior REWORK chain.
-- `DBG-RVW-001-005-028` returned REWORK; review 029 returned REWORK trace-only; review 030
-  passed exact content head `ae49435…`. Product review 027 remains reserved for the new
-  post-refreeze product head `c7bc39057469f1aa62a78f409753ec0213631214`.
-- Six RF-004 Slice loops and the parent gate remain open.
+- `DBG-RVW-001-005-028` returned REWORK; review029 returned REWORK trace-only; review030
+  passed exact interface content head `ae49435…`; product review027 subsequently passed.
+- Slice004, Slice005, Slice006 and the parent gate remain open; Slices001/002/003/007 are signed.
 - RF-005..009 remain blocked; no Executive/VM/AVR or DAP/CLI/VS Code migration is authorized.
 
 ## Exact next step
 
-Run formal verification004 against exact corrected SourceResolver head
-`3d1f2e8a98308835162702c579dda1dc3ef40900` and review036 PASS. No Slice005 work begins before
-Slice004 exact-head sign-off.
+Run fresh formal verification011 against unchanged SourceResolver head
+`3d1f2e8a98308835162702c579dda1dc3ef40900`, review036 PASS and the bounded Handoff correction.
+No Slice005 work begins before Slice004 exact-head sign-off.
 
 ## Traceability state
 
@@ -290,7 +287,7 @@ Slice004 exact-head sign-off.
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: formal SourceResolver verification004
+- Active gate: fresh formal SourceResolver verification011
 - Blocker authority: issue #38 comment `5369244294`
 - Refreeze authority: issue #38 comment `5370574104`
 - Blocker authority: issue #38 comment `5365959417`

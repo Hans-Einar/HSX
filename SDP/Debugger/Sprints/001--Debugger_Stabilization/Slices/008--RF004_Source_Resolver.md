@@ -1,6 +1,6 @@
 # DBG-SL-001-005-004 — RF-004 Exact Source Resolver
 
-- Status: **REVIEW036 PASS / FORMAL VERIFICATION004 PENDING**
+- Status: **REVIEW036 PASS / VERIFICATION004 TRACE-FAIL CORRECTED / VERIFICATION011 PENDING**
 - Product head: `c0f975c4a278cecd89e19d332ca5601b074a115e`
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
@@ -84,3 +84,9 @@ join and add the regression. All other SourceResolver behavior passed. Review036
 Fresh review036 passed exact corrected head `3d1f2e8a…` with zero findings. Focused30/3,
 oracle16/1, broad280/3, compile/exports/signatures, strict trace, exact scope and Git integrity
 pass. Skips remain classified Windows host/symlink degradation.
+
+## Verification004 decision
+
+Product evidence passed; verification004 failed stale Handoff prose only. Master normalized
+the exact Slice002/open-loop/review036 sentences. Fresh verification011 is required; product
+head remains unchanged.
