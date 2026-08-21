@@ -42,6 +42,8 @@ inspection, legacy product/runtime and frontend files are read-only.
 - use SnapshotReadPort only through exact InspectionContext and checked typed addresses;
 - carry exact ArchitectureDescriptor in RecipeEvaluationContext for all register/special/
   address/alignment/serialization behavior;
+- carry exact binding+bundle identity/architecture/ABI in RecipeEvaluationContext and call
+  the shared DebugBindingValidator before any opcode/read;
 - expose a pure row/component validator consumed read-only by the artifact Slice.
 
 ## Invariants and non-goals

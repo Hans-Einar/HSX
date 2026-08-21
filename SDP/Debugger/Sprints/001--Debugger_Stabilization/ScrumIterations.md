@@ -498,8 +498,8 @@ frontend mapping remain separate responsibilities.
 
 Interface review `DBG-RVW-001-005-007` returned REWORK at exact remote-published head
 `82154c614a31284723bf3e6a337c5bedfb8aba5d`. Master corrected only the candidate interface,
-Slice ownership and live traceability. Reviews 008..010 and 012..014 also returned REWORK;
-fresh `DBG-RVW-001-005-015` must PASS before product
+Slice ownership and live traceability. Reviews 008..010 and 012..015 also returned REWORK;
+fresh `DBG-RVW-001-005-016` must PASS before product
 dispatch. A finding requiring an accepted DBG/HSX design change returns to Steering.
 
 ### Frozen execution units
@@ -534,7 +534,7 @@ exact-head sign-off before the next Slice starts.
 - Requirements: `DBG-R-004`, `DBG-R-021..DBG-R-028`, `DBG-R-034..DBG-R-036`.
 - Design: `DBG-D-003`, `DBG-D-004`, `DBG-D-009`; portable `HSX-D-001..003`.
 - Slice reviews: `DBG-RVW-001-005-001..006` and `DBG-RVW-001-005-011`; interface
-  reviews: `DBG-RVW-001-005-007..010`, then `...012..015`; verifications
+  reviews: `DBG-RVW-001-005-007..010`, then `...012..016`; verifications
   `DBG-VER-001-005-001..007`.
 - Parent final: `DBG-RVW-004-001-001`, `DBG-VER-004-001-001`.
 - RF-005 explicitly depends on RF-004's accepted `dbg.resolver-inspection/1`; partial/frozen
@@ -670,3 +670,18 @@ Master corrected scope composition, threaded the exact descriptor through every 
 signature, unified handle status rules, added recipe roles/CFA corruption rules, and made
 addresses/ranges/arithmetic unit-based with checked byte conversion. No product file changed.
 Fresh exact-head review is `DBG-RVW-001-005-015`.
+
+### Interface review attempt 8
+
+Fresh read-only `DBG-RVW-001-005-015` reviewed exact remote head `18c0a26ca…`. It confirmed
+the scope/descriptor/CFA/unit and all earlier closures, then returned REWORK:
+
+- High: direct recipe/stack/location entrypoints accepted ArchitectureDescriptor without
+  independently matching exact binding/bundle ref+digest;
+- Medium: stale handle classification still matched stale history by opaque epoch string,
+  conflicting with foreign-context UNKNOWN_HANDLE.
+
+Master introduced one shared DebugBindingValidator used before artifact/recipe/stack/
+location/inspection work, added binding+bundle to recipe context and index to location
+evaluation, and made STALE require exact retained InspectionContext equality. No product file
+changed. Fresh exact-head review is `DBG-RVW-001-005-016`.

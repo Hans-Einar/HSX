@@ -45,7 +45,8 @@ gateway, Executive, DAP/CLI and VS Code modules are read-only.
 - all collections follow the frozen order/page-slice rules and exact object keys intern the
   same handle on repeated queries;
 - exact-context unknown/wrong-kind and foreign-context handles are `UNKNOWN_HANDLE`; service-
-  history invalidated handles/sessions are `STALE`;
+  history exact-context invalidated handles/sessions are `STALE`; a foreign handle remains
+  unknown even when it reuses the same opaque epoch string;
 - no fallback to current/top/first frame and no handle reuse across epochs;
 - variables use exact selected frame and location row; partial pieces stay partial;
 - scopes/variables follow the frozen register/local/global composition and artifact

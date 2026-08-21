@@ -32,6 +32,8 @@ Existing `contracts.py`, controller/model/epochs/gateway/runtime files are read-
 - all values and nested payloads are deeply immutable and validate exact portable fields;
 - ArtifactRef/bundle identity/ref/binding Python projections reproduce the frozen canonical
   key/digest model and golden vectors without folding component fields into a ref;
+- shared DebugBindingValidator freezes canonical bundle digest plus architecture/ABI
+  binding/ref/digest outcomes for every later public entrypoint;
 - `InspectionContext` rejects any target/image/epoch/stop/snapshot mismatch;
 - `ControllerEpochAdapter` consumes RF-002 `contracts.StopEpoch` read-only and binds only
   already-typed portable StopToken/SnapshotRef values with an exact GenerationStamp match;

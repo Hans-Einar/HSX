@@ -1,6 +1,6 @@
 # `dbg.resolver-inspection/1` — Typed Resolver and Inspection Interface
 
-- Status: **REFROZEN CANDIDATE — REVIEWS 007..010/012..014 REWORK / REVIEW 015 PENDING**
+- Status: **REFROZEN CANDIDATE — REVIEWS 007..010/012..015 REWORK / REVIEW 016 PENDING**
 - Iteration: `DBG-IT-001-005`
 - Parent Refactor: `DBG-RF-004`
 - Steering authority: issue #38 comment `5362514094`
@@ -14,7 +14,8 @@
 - Review `DBG-RVW-001-005-012`: REWORK at `573f396e29de728f69abb0961e9b79a2fdb3c29d`
 - Review `DBG-RVW-001-005-013`: REWORK at `1e8fb7e74c92a69711bd48809696552cf2f982db`
 - Review `DBG-RVW-001-005-014`: REWORK at `96daa3a5dffa6b80b2b5687b9cd0429ffaa402c8`
-- Fresh independent re-review: `DBG-RVW-001-005-015` (`...011` is reserved for Slice 007)
+- Review `DBG-RVW-001-005-015`: REWORK at `18c0a26cad4c2d82e4a23ef0ec3e6409b022cb95`
+- Fresh independent re-review: `DBG-RVW-001-005-016` (`...011` is reserved for Slice 007)
 - Public interface ID: `dbg.resolver-inspection/1`
 
 This document freezes the public Python-domain interface to be implemented by the seven bounded
@@ -33,7 +34,7 @@ boundaries:
 
 | Module boundary | Owns | Must not own |
 |---|---|---|
-| `identity.py` | Immutable target, image, artifact, bundle, binding, stop and snapshot references | Parsing, filesystem lookup, target reads, frontend IDs |
+| `identity.py` | Immutable target, image, artifact, bundle, binding, stop/snapshot refs and shared DebugBindingValidator | Parsing, filesystem lookup, target reads, frontend IDs |
 | `addresses.py` | Address-space descriptors, typed addresses/ranges, checked arithmetic and formatting | Symbol lookup, masks hidden in adapters, memory reads |
 | `results.py` | Typed resolver/inspection statuses, diagnostics and immutable result envelopes | Service algorithms or policy fallbacks |
 | `snapshot.py` | SnapshotReadPort Protocol and exact context/result fencing helpers | Runtime adapter, live reads, transport/retry |
@@ -293,6 +294,12 @@ range(start, length_units: int >= 0) -> AddressRangeResult
 units_for_bytes(space: AddressSpaceId, byte_length: int >= 0) -> UnitCountResult
 bytes_for_units(space: AddressSpaceId, length_units: int >= 0) -> ByteLengthResult
 format(address) -> str
+
+DebugBindingValidator.validate(binding: ImageDebugBinding,
+                               bundle_identity: ImageDebugBundleIdentityPayload,
+                               architecture: ArchitectureDescriptor,
+                               abi: AbiDescriptorRef)
+    -> ResolutionResult[ImageDebugBinding]
 ```
 
 No public or private RF-004 operation may apply `0xFFFF`, `0xFFFFFFFF`, modulo, truncation or
@@ -311,6 +318,21 @@ byte_length must be an exact multiple for units_for_bytes, and multiplication/di
 checked. Non-byte-aligned units return UNIT_CONVERSION_UNSUPPORTED; a non-multiple byte request
 returns MISALIGNED. Snapshot memory reads take byte_length and must perform this conversion
 before range validation; no delta is silently interpreted as bytes.
+
+DebugBindingValidator is the single public check used before artifact parsing,
+recipe/location evaluation, stack walking and inspection-service construction. It recomputes
+bundle_identity's canonical digest and first-match returns:
+
+| Condition | ResolutionStatus | Diagnostic code |
+|---|---|---|
+| recomputed bundle digest != binding payload bundle ref digest | `ARTIFACT_MISMATCH` | `bundle_digest_mismatch` |
+| binding accepted architecture ref != architecture.ref.ref | `ARTIFACT_MISMATCH` | `binding_architecture_ref_mismatch` |
+| bundle identity architecture ref or digest != architecture.ref | `ARTIFACT_MISMATCH` | `bundle_architecture_mismatch` |
+| binding accepted ABI ref != abi.ref | `ARTIFACT_MISMATCH` | `binding_abi_ref_mismatch` |
+| bundle identity ABI ref or digest != abi | `ARTIFACT_MISMATCH` | `bundle_abi_mismatch` |
+| every check matches | `RESOLVED` | none |
+
+Failure publishes no validated descriptor and the caller performs no parse/read/evaluation.
 
 ## 4. Typed outcome algebra
 
@@ -334,6 +356,7 @@ Domain failures are returned, not hidden by `None`, first-candidate selection or
 - `UNAVAILABLE`
 - `UNKNOWN_HANDLE`
 - `STALE`
+- `ARTIFACT_MISMATCH`
 - `UNSUPPORTED`
 - `CORRUPT`
 
@@ -635,6 +658,7 @@ DebugArtifactIndex.build(binding: ImageDebugBinding,
                          bundle_identity: ImageDebugBundleIdentityPayload,
                          source_manifest: SourceIdentityManifest,
                          architecture: ArchitectureDescriptor,
+                         abi: AbiDescriptorRef,
                          components: tuple[DebugComponentInput, ...])
     -> ResolutionResult[DebugArtifactIndex]
 LegacySymbolAdapter.build(sym_bytes: bytes,
@@ -643,10 +667,10 @@ LegacySymbolAdapter.build(sym_bytes: bytes,
     -> LegacyResolutionResult[LegacyDebugArtifactIndex]
 ```
 
-Portable build first requires binding/bundle accepted architecture ref+digest to equal
-ArchitectureDescriptor.ref, then rechecks each input byte digest/schema against the bundle
+Portable build first requires DebugBindingValidator RESOLVED for exact architecture and ABI,
+then rechecks each input byte digest/schema against the bundle
 before parsing and validates every typed address/range/row through that descriptor. Ref or
-digest mismatch is ARTIFACT_MISMATCH/`architecture_mismatch` and publishes no index.
+digest mismatch is returned by DebugBindingValidator and publishes no index.
 Legacy build requires `.sym` version 1 and exact `hxe_crc == expected_hxe_crc32`; it returns a
 different `LegacyDebugArtifactIndex` type with mandatory LegacyArtifactProvenance. That type
 has no ImageDebugBinding accessor, no SourceRef, no portable unwind/location rows and no
@@ -814,7 +838,10 @@ RecipeAddress { address: HsxAddress }
 RecipeRegister { register_id: str, bit_width: int >= 1, unsigned_value: int }
 RecipeValue = RecipeScalar | RecipeAddress | RecipeRegister
 RecipeEvaluationContext { context: InspectionContext, frame_index: int >= 0,
+                          binding: ImageDebugBinding,
+                          bundle_identity: ImageDebugBundleIdentityPayload,
                           architecture: ArchitectureDescriptor,
+                          abi: AbiDescriptorRef,
                           pc: HsxAddress, sp: HsxAddress,
                           psw: RecipeScalar | None,
                           recovered_registers: RegisterSet,
@@ -822,7 +849,7 @@ RecipeEvaluationContext { context: InspectionContext, frame_index: int >= 0,
 RecipeBudget { opcodes_remaining: int >= 0, dereferences_remaining: int >= 0,
                bytes_remaining: int >= 0 }
 RecipeEvaluationResult { status: COMPLETE | UNAVAILABLE | UNSUPPORTED | CORRUPT |
-                                STALE,
+                                STALE | ARTIFACT_MISMATCH,
                          context: InspectionContext, value: RecipeValue | None,
                          budget_after: RecipeBudget,
                          diagnostics: tuple[Diagnostic, ...] }
@@ -833,6 +860,15 @@ OPTIMIZED_OUT alone have a reason; SAME/UNDEFINED have neither. ADDRESS/VALUE fo
 expression, PIECES has 1..16 pieces, and terminal location forms have only a reason. Piece
 destinations are non-overlapping and within declared result size. Unknown opcode/field is
 `UNSUPPORTED`; wrong arity/type/width/stack/address/piece coverage is `CORRUPT`.
+
+Before the first opcode, RecipeEvaluator calls DebugBindingValidator with the
+evaluation binding/bundle/descriptor/ABI and requires binding.payload.loaded_image_ref ==
+evaluation.context.image. Failure returns ARTIFACT_MISMATCH with the validator diagnostic and
+executes no opcode/read. StackService performs the same validation from its DebugArtifactIndex,
+requires every selected UnwindRow.abi to equal the supplied ABI, then selects rows.
+LocationEvaluator requires row.binding == index.binding, validates
+index.bundle_identity()/architecture/ABI, requires row.abi == ABI, and performs no evaluation
+on mismatch.
 
 Postfix stack transitions and value propagation are normative:
 
@@ -894,7 +930,8 @@ must advertise a different degraded profile and cannot claim this one. A caller 
 the request's frame/piece maxima through `RecipeRequestLimits`; attempts to exceed the profile
 are `UNSUPPORTED`. `StackService.unwind(context: InspectionContext,
 index: DebugArtifactIndex, read_port: SnapshotReadPort,
-architecture: ArchitectureDescriptor, profile_limits: RecipeLimits,
+architecture: ArchitectureDescriptor, abi: AbiDescriptorRef,
+profile_limits: RecipeLimits,
 request_limits: RecipeRequestLimits) ->
 InspectionResult[tuple[UnwindFrame, ...]]` returns handle-free immutable frames bound to the
 same context. Each frame has typed PC/SP/CFA/frame-base values,
@@ -906,8 +943,10 @@ separate status or truncated result. The service never retries with
 a fixed R7 chain or invents a caller.
 
 `LocationEvaluator.evaluate(context: InspectionContext, frame: UnwindFrame,
-variable: SymbolRecord, row: LocationRow, read_port: SnapshotReadPort,
+index: DebugArtifactIndex, variable: SymbolRecord, row: LocationRow,
+read_port: SnapshotReadPort,
 architecture: ArchitectureDescriptor,
+abi: AbiDescriptorRef,
 profile_limits: RecipeLimits, request_limits: RecipeRequestLimits) ->
 InspectionResult[EvaluatedValue]` selects the exact
 half-open PC row for the selected frame and returns register, address, value, bounded pieces,
@@ -961,11 +1000,8 @@ EpochHandleStore.invalidate(reason: str) -> InvalidationResult
 
 | Condition | ResolutionStatus | Diagnostic code |
 |---|---|---|
+| DebugBindingValidator is not RESOLVED | propagate validator status | propagate validator code |
 | binding accepted capability profile is not exactly `hsx.portable-debug-runtime/1` | `SCHEMA_UNSUPPORTED` | `inspection_profile_unsupported` |
-| binding accepted architecture ref != `architecture.ref.ref` | `ARTIFACT_MISMATCH` | `binding_architecture_ref_mismatch` |
-| bundle identity architecture ref or digest != `architecture.ref` | `ARTIFACT_MISMATCH` | `bundle_architecture_mismatch` |
-| binding accepted ABI ref != `abi.ref` | `ARTIFACT_MISMATCH` | `binding_abi_ref_mismatch` |
-| bundle identity ABI ref or digest != `abi` | `ARTIFACT_MISMATCH` | `bundle_abi_mismatch` |
 | profile_limits differ from the exact accepted profile limits | `SCHEMA_UNSUPPORTED` | `recipe_profile_limits_mismatch` |
 | every check passes | `RESOLVED` | none |
 
@@ -1000,8 +1036,9 @@ complete evidence tuple. `EpochHandleStore` allocates opaque domain handles mono
 within one StopEpoch. Repeated/paged requests may
 allocate more handles without invalidating earlier handles in the same epoch. For the exact
 active context, an unknown serial or wrong kind returns `UNKNOWN_HANDLE`; an invalidated
-session or a handle whose epoch ID is recorded in this service's stale history returns `STALE`;
-a foreign context/epoch absent from that history returns `UNKNOWN_HANDLE`. No outcome falls back
+session or a handle whose exact InspectionContext is retained in this service's stale history
+returns `STALE`; every other foreign context returns `UNKNOWN_HANDLE`, including one with an
+equal opaque epoch string. No outcome falls back
 to a current/top/first frame. DAP integer IDs are outside this interface and later map to domain
 handles without owning their lifetime.
 
@@ -1014,8 +1051,8 @@ same handle; a new exact key receives the next never-reused serial. A handle kin
 is `UNKNOWN_HANDLE`; a known serial from an invalidated epoch is `STALE`.
 `intern` rejects a key not matching its declared kind as CORRUPT without allocating a serial;
 `resolve` returns the exact interned key only for COMPLETE. A handle whose context differs
-from the active store context is never looked up by serial: if its epoch ID belongs to this
-service's stale history the session returns STALE, otherwise it returns UNKNOWN_HANDLE. Thus
+from the active store context is never looked up by serial: if its complete context equals a
+retained stale context the session returns STALE, otherwise it returns UNKNOWN_HANDLE. Thus
 equal opaque epoch strings/serials in independent services/targets/images cannot alias.
 
 InspectionService and EpochHandleStore each serialize only lifecycle/handle-map mutations with

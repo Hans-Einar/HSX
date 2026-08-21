@@ -24,7 +24,8 @@ and legacy stack code are read-only.
 ## Required behavior
 
 - consume the signed Slice 007 recipe DTO/validator/evaluator without editing it;
-- require/pass the exact ArchitectureDescriptor explicitly to every evaluator call;
+- require/pass exact ArchitectureDescriptor/AbiDescriptorRef to every evaluator call;
+- validate index binding+bundle+architecture+ABI before selecting/evaluating any row;
 - enforce exact frame/total request bounds through the signed evaluator budget/results;
 - use descriptor byte order, declared widths and checked typed-address operations only;
 - select non-overlapping half-open rows by exact image/ABI/function/scope/frame/PC;
