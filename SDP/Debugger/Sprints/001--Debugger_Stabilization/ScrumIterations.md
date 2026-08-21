@@ -474,7 +474,7 @@ traceability and no product drift after the combined signed head. Steering accep
 
 ## DBG-IT-001-005 — Typed Resolver and Inspection
 
-Status: ACTIVE — CONTRACTS FROZEN / PRODUCT NOT STARTED
+Status: ACTIVE — INTERFACE PASS / SLICE 001 REVIEW PASS / REVERIFICATION PENDING
 
 ### Authority and goal
 
@@ -781,3 +781,12 @@ oracle 16 passed/1 WinError 1314 skip; SymbolIndex 2 passed; SourceMap 4 passed/
 focused 14 passed; hashseed 0/1 repeats; 29 unique classified/provenanced/non-target-
 conformant legacy outputs; exact correction/combined scope and trace PASS. No symlink PASS is
 claimed. Formal next gate is `DBG-VER-001-005-001`.
+
+### Slice 001 verification attempt 1
+
+Fresh `DBG-VER-001-005-001` returned FAIL trace-only at coordination head `705545b…`.
+All product/test/manifest/scope/head/connectivity evidence passed, with only the explicit
+WinError 1314 symlink skip and no symlink PASS. CurrentIndex active iteration/next-wave and
+this iteration header still said product-not-started despite interface/review/verification
+state. Master corrected only current-state trace and reserved fresh
+`DBG-VER-001-005-008`; implementation head `8e566994…` remains unchanged.

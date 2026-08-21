@@ -203,6 +203,13 @@ relations:
   - from: DBG-SL-001-005-001
     type: verified_by
     to: [DBG-VER-001-005-001]
+    status: fail_trace_only
+    implementation_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
+    coordination_head: 705545b38853185cba5904ea7d362683c3835fe6
+    record: SDP/Debugger/Verification/DBG-VER-001-005-001.md
+  - from: DBG-SL-001-005-001
+    type: verified_by
+    to: [DBG-VER-001-005-008]
     status: planned
   - from: DBG-SL-001-005-002
     type: reviewed_by
