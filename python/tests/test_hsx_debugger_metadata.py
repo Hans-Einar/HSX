@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError, dataclass, replace
+from enum import Enum
 from pathlib import Path
 import sys
 from types import SimpleNamespace
@@ -343,6 +344,78 @@ def test_generic_results_reject_undeclared_state_on_direct_frozen_dataclasses() 
         )
     mutable_values.append(4)
     assert mutable_values == [3, 4]
+
+
+def test_generic_results_reject_custom_attribute_access_concealment() -> None:
+    _, context = refs()
+
+    @dataclass(frozen=True)
+    class HiddenExtraPayload:
+        value: int
+
+        def __getattribute__(self, name: str):
+            if name == "__dict__":
+                raw_state = object.__getattribute__(self, "__dict__")
+                return {"value": raw_state["value"]}
+            return object.__getattribute__(self, name)
+
+    @dataclass(frozen=True)
+    class ConcealingBase:
+        values: list[int]
+
+        def __getattribute__(self, name: str):
+            if name == "values":
+                return tuple(object.__getattribute__(self, name))
+            return object.__getattribute__(self, name)
+
+    @dataclass(frozen=True)
+    class ConcealingDerived(ConcealingBase):
+        label: str
+
+    @dataclass(frozen=True, slots=True)
+    class FallbackPayload:
+        value: int
+
+        def __getattr__(self, name: str):
+            return (name,)
+
+    hidden_extra = HiddenExtraPayload(1)
+    object.__setattr__(hidden_extra, "mutable_state", [])
+    hidden_values = [2]
+    hidden_field = ConcealingDerived(hidden_values, "derived")
+
+    assert "mutable_state" not in hidden_extra.__dict__
+    assert hidden_field.values == (2,)
+    assert object.__getattribute__(hidden_field, "values") is hidden_values
+
+    for value in (hidden_extra, hidden_field, FallbackPayload(3)):
+        with pytest.raises(TypeError, match="custom attribute access"):
+            InspectionResult(InspectionStatus.COMPLETE, context, value, ())
+        with pytest.raises(TypeError, match="custom attribute access"):
+            ResolutionResult(ResolutionStatus.RESOLVED, None, (value,), ())
+
+    hidden_values.append(4)
+    object.__getattribute__(hidden_extra, "mutable_state").append("raw mutation")
+    assert object.__getattribute__(hidden_field, "values") == [2, 4]
+    assert object.__getattribute__(hidden_extra, "mutable_state") == ["raw mutation"]
+
+
+def test_generic_results_inspect_raw_enum_value_behind_custom_access() -> None:
+    _, context = refs()
+
+    class ConcealingEnum(Enum):
+        ITEM = [1]
+
+        def __getattribute__(self, name: str):
+            if name == "value":
+                return tuple(object.__getattribute__(self, "_value_"))
+            return object.__getattribute__(self, name)
+
+    assert ConcealingEnum.ITEM.value == (1,)
+    with pytest.raises(TypeError, match="exact immutable scalar"):
+        InspectionResult(InspectionStatus.COMPLETE, context, ConcealingEnum.ITEM, ())
+    with pytest.raises(TypeError, match="exact immutable scalar"):
+        ResolutionResult(ResolutionStatus.RESOLVED, None, (ConcealingEnum.ITEM,), ())
 
 
 def test_generic_results_accept_direct_deeply_frozen_dataclasses() -> None:

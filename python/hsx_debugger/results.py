@@ -61,8 +61,9 @@ _ENUM_MEMBER_STATE = frozenset({"_value_", "_name_", "__objclass__", "_sort_orde
 
 def _slot_storage_names(record_type: type[object]) -> tuple[str, ...]:
     names: list[str] = []
-    for owner in record_type.__mro__:
-        declared = owner.__dict__.get("__slots__", ())
+    for owner in type.__getattribute__(record_type, "__mro__"):
+        namespace = type.__getattribute__(owner, "__dict__")
+        declared = namespace.get("__slots__", ())
         if isinstance(declared, str):
             declared = (declared,)
         for name in declared:
@@ -74,13 +75,39 @@ def _slot_storage_names(record_type: type[object]) -> tuple[str, ...]:
     return tuple(names)
 
 
+def _require_default_attribute_access(
+    record_type: type[object], field_name: str
+) -> None:
+    """Reject dataclass DTOs whose MRO can conceal their stored instance state."""
+
+    for owner in type.__getattribute__(record_type, "__mro__"):
+        namespace = type.__getattribute__(owner, "__dict__")
+        custom_names = {
+            name
+            for name in ("__getattribute__", "__getattr__")
+            if name in namespace and not (owner is object and name == "__getattribute__")
+        }
+        if custom_names:
+            names = ", ".join(sorted(custom_names))
+            owner_name = type.__getattribute__(owner, "__name__")
+            raise TypeError(
+                f"{field_name} dataclass payload must not define custom attribute access "
+                f"in {owner_name}: {names}"
+            )
+
+
 def _require_declared_instance_state(
     value: object,
     field_name: str,
     declared_names: frozenset[str],
-) -> None:
-    state = getattr(value, "__dict__", None)
+) -> dict[str, object] | None:
+    try:
+        state = object.__getattribute__(value, "__dict__")
+    except AttributeError:
+        state = None
     if state is not None:
+        if type(state) is not dict:
+            raise TypeError(f"{field_name} must expose exact raw instance state")
         undeclared = set(state).difference(declared_names)
         if undeclared:
             names = ", ".join(sorted(undeclared))
@@ -90,13 +117,15 @@ def _require_declared_instance_state(
     if undeclared_slots:
         names = ", ".join(sorted(undeclared_slots))
         raise TypeError(f"{field_name} has undeclared slots: {names}")
+    return state
 
 
 def _require_immutable_enum(value: Enum, field_name: str) -> None:
     """Accept conventional scalar enum members without accepting scalar subclasses generally."""
 
     _require_declared_instance_state(value, field_name, _ENUM_MEMBER_STATE)
-    if type(value.value) not in _IMMUTABLE_PAYLOAD_ATOM_TYPES:
+    stored_value = object.__getattribute__(value, "_value_")
+    if type(stored_value) not in _IMMUTABLE_PAYLOAD_ATOM_TYPES:
         raise TypeError(f"{field_name} enum value must be an exact immutable scalar")
 
 
@@ -171,21 +200,39 @@ def _deep_freeze(value: object, field_name: str, active: set[int] | None = None)
 
     if is_dataclass(value) and not isinstance(value, type):
         concrete_type = type(value)
-        dataclass_parameters = concrete_type.__dict__.get("__dataclass_params__")
-        declared_fields = concrete_type.__dict__.get("__dataclass_fields__")
+        concrete_namespace = type.__getattribute__(concrete_type, "__dict__")
+        dataclass_parameters = concrete_namespace.get("__dataclass_params__")
+        declared_fields = concrete_namespace.get("__dataclass_fields__")
         if dataclass_parameters is None or declared_fields is None:
             raise TypeError(
                 f"{field_name} concrete type must be directly declared as a dataclass"
             )
         if not dataclass_parameters.frozen:
             raise TypeError(f"{field_name} dataclass payload must be frozen")
-        record_fields = fields(value)
+        _require_default_attribute_access(concrete_type, field_name)
+        record_fields = fields(concrete_type)
         record_field_names = frozenset(record_field.name for record_field in record_fields)
-        _require_declared_instance_state(value, field_name, record_field_names)
+        raw_state = _require_declared_instance_state(
+            value, field_name, record_field_names
+        )
+        slot_names = frozenset(_slot_storage_names(concrete_type))
         active.add(identity)
         try:
             for record_field in record_fields:
-                member = getattr(value, record_field.name)
+                if raw_state is not None and record_field.name in raw_state:
+                    member = raw_state[record_field.name]
+                elif record_field.name in slot_names:
+                    try:
+                        member = object.__getattribute__(value, record_field.name)
+                    except AttributeError as exc:
+                        raise TypeError(
+                            f"{field_name}.{record_field.name} must be stored on the "
+                            "dataclass"
+                        ) from exc
+                else:
+                    raise TypeError(
+                        f"{field_name}.{record_field.name} must be stored on the dataclass"
+                    )
                 frozen_member = _deep_freeze(
                     member, f"{field_name}.{record_field.name}", active
                 )
