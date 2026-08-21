@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
-from typing import TypeAlias
+from typing import TYPE_CHECKING, TypeAlias
 
 from .addresses import (
     AddressArithmeticMode,
@@ -50,6 +50,9 @@ from .results import (
 )
 from .snapshot import SnapshotReadPort, fence_snapshot_result, require_snapshot_read_set
 
+if TYPE_CHECKING:
+    from .artifacts import DebugArtifactIndex
+
 
 def _require_nonempty(value: str, field_name: str) -> None:
     if not isinstance(value, str) or not value:
@@ -62,7 +65,7 @@ def _require_optional_nonempty(value: str | None, field_name: str) -> None:
 
 
 def _require_int(value: int, field_name: str, *, minimum: int = 0) -> None:
-    if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+    if type(value) is not int or value < minimum:
         raise ValueError(f"{field_name} must be an integer >= {minimum}")
 
 
@@ -192,7 +195,7 @@ class ConstSOp:
     def __post_init__(self) -> None:
         if self.opcode != "const_s":
             raise ValueError("opcode must be 'const_s'")
-        if isinstance(self.value, bool) or not isinstance(self.value, int):
+        if type(self.value) is not int:
             raise TypeError("value must be an integer")
         _require_int(self.bit_width, "bit_width", minimum=1)
 
@@ -247,7 +250,7 @@ class AddSConstCheckedOp:
     def __post_init__(self) -> None:
         if self.opcode != "add_sconst_checked":
             raise ValueError("opcode must be 'add_sconst_checked'")
-        if isinstance(self.signed_delta, bool) or not isinstance(self.signed_delta, int):
+        if type(self.signed_delta) is not int:
             raise TypeError("signed_delta must be an integer")
 
 
@@ -260,6 +263,7 @@ class DerefUOp:
     def __post_init__(self) -> None:
         if self.opcode != "deref_u":
             raise ValueError("opcode must be 'deref_u'")
+        _require_int(self.byte_length, "byte_length", minimum=1)
         if self.byte_length not in {1, 2, 4, 8, 16}:
             raise ValueError("byte_length must be one of 1, 2, 4, 8, 16")
         if not isinstance(self.byte_order, ByteOrder):
@@ -385,7 +389,7 @@ class RecipeScalar:
         if not isinstance(self.signed, bool):
             raise TypeError("signed must be bool")
         _require_int(self.bit_width, "bit_width", minimum=1)
-        if isinstance(self.value, bool) or not isinstance(self.value, int):
+        if type(self.value) is not int:
             raise TypeError("value must be an integer")
         lower = -(1 << (self.bit_width - 1)) if self.signed else 0
         upper = (1 << (self.bit_width - (1 if self.signed else 0))) - 1
@@ -512,7 +516,10 @@ class RecipeLimits:
 
     def __post_init__(self) -> None:
         expected = (32, 8, 4, 16, 64, 4096, 1024, 16, 4096, 512)
-        if tuple(getattr(self, name) for name in self.__dataclass_fields__) != expected:
+        actual = tuple(getattr(self, name) for name in self.__dataclass_fields__)
+        for name, value in zip(self.__dataclass_fields__, actual, strict=True):
+            _require_int(value, name, minimum=1)
+        if actual != expected:
             raise ValueError("RecipeLimits must equal the exact accepted profile")
 
 
@@ -572,7 +579,7 @@ class UnwindRow:
             raise ValueError("register rule IDs must be unique")
         _require_exact_enum(self.boundary, UnwindBoundary, "boundary")
         if self.call_site_adjustment is not None and (
-            isinstance(self.call_site_adjustment, bool) or not isinstance(self.call_site_adjustment, int)
+            type(self.call_site_adjustment) is not int
         ):
             raise TypeError("call_site_adjustment must be an integer or None")
         object.__setattr__(self, "register_rules", tuple(checked))
@@ -737,6 +744,22 @@ def _parse_enum(value: object, enum_type: type[Enum], field_name: str) -> Enum:
         ) from exc
 
 
+def _parse_row_schema(value: object, expected: str, field_name: str) -> RecipeSchemaRef:
+    if not isinstance(value, RecipeSchemaRef):
+        raise _parse_failure(
+            RecipeEvaluationStatus.CORRUPT,
+            "malformed_recipe_field",
+            f"{field_name} must be RecipeSchemaRef",
+        )
+    if value.schema != expected:
+        raise _parse_failure(
+            RecipeEvaluationStatus.UNSUPPORTED,
+            "unsupported_recipe_schema",
+            f"{field_name} has unsupported schema {value.schema!r}",
+        )
+    return value
+
+
 def _construct(factory, *args):
     try:
         return factory(*args)
@@ -897,6 +920,9 @@ class RecipeParser:
             }
         )
         record = _strict_fields(payload, fields, "unwind row")
+        schema = _parse_row_schema(
+            record["schema"], "hsx.unwind-recipe/1", "unwind row schema"
+        )
         cfa = record["cfa_expression"]
         if not isinstance(cfa, RecipeExpression):
             cfa = RecipeParser.parse_expression(cfa)
@@ -930,7 +956,7 @@ class RecipeParser:
             record["binding"],
             record["pc_range"],
             record["abi"],
-            record["schema"],
+            schema,
             cfa,
             parsed_rule(record["caller_pc_rule"]),
             parsed_rule(record["caller_sp_rule"]),
@@ -960,6 +986,9 @@ class RecipeParser:
             }
         )
         record = _strict_fields(payload, fields, "location row")
+        schema = _parse_row_schema(
+            record["schema"], "hsx.location-recipe/1", "location row schema"
+        )
         form = record["location_form"]
         if not isinstance(form, LocationForm):
             form = RecipeParser.parse_location_form(form)
@@ -976,7 +1005,7 @@ class RecipeParser:
             record["abi"],
             _parse_enum(record["value_byte_order"], ByteOrder, "value_byte_order"),
             _parse_enum(record["frame_binding"], FrameBinding, "frame_binding"),
-            record["schema"],
+            schema,
             form,
         )
 
@@ -1018,6 +1047,456 @@ def _invalid_address_diagnostic(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class _AbstractRecipeValue:
+    kind: RecipeResultKind
+    bit_width: int | None
+    address_space: AddressSpaceId | None = None
+    known_scalar: int | None = None
+    known_address: HsxAddress | None = None
+    register_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _PostfixValidation:
+    status: RecipeEvaluationStatus
+    diagnostics: tuple[Diagnostic, ...]
+    opcode_count: int
+    dereference_count: int
+    dereferenced_bytes: int
+    final_value: _AbstractRecipeValue | None
+
+
+def _validate_postfix_expression(
+    expression: RecipeExpression,
+    expected_role: RecipeRole,
+    architecture: ArchitectureDescriptor,
+    limits: RecipeLimits,
+    *,
+    row_id: str | None = None,
+    required_register_id: str | None = None,
+) -> _PostfixValidation:
+    """Abstractly execute one closed postfix expression without snapshot access."""
+
+    def result(
+        status: RecipeEvaluationStatus,
+        code: str | None = None,
+        message: str = "",
+        *,
+        operation_index: int | None = None,
+        dereference_count: int = 0,
+        dereferenced_bytes: int = 0,
+        final_value: _AbstractRecipeValue | None = None,
+    ) -> _PostfixValidation:
+        diagnostics = (
+            ()
+            if code is None
+            else (
+                _recipe_diagnostic(
+                    code,
+                    message,
+                    row_id=row_id,
+                    operation_index=operation_index,
+                ),
+            )
+        )
+        return _PostfixValidation(
+            status,
+            diagnostics,
+            len(expression.opcodes),
+            dereference_count,
+            dereferenced_bytes,
+            final_value,
+        )
+
+    if expression.role is not expected_role:
+        return result(
+            RecipeEvaluationStatus.CORRUPT,
+            "recipe_role_mismatch",
+            f"expected role {expected_role.value!r}, got {expression.role.value!r}",
+        )
+    if len(expression.opcodes) > limits.opcodes_per_expression:
+        return result(
+            RecipeEvaluationStatus.UNSUPPORTED,
+            "limit_exceeded",
+            "expression exceeds opcodes_per_expression",
+        )
+    if expression.role is RecipeRole.CFA:
+        for index, opcode in enumerate(expression.opcodes):
+            if isinstance(opcode, CfaOp):
+                return result(
+                    RecipeEvaluationStatus.CORRUPT,
+                    "cyclic_cfa",
+                    "a CFA expression cannot recursively consume CFA",
+                    operation_index=index,
+                )
+
+    stack: list[_AbstractRecipeValue] = []
+    dereference_count = 0
+    dereferenced_bytes = 0
+
+    def failure(
+        code: str,
+        message: str,
+        operation_index: int,
+        *,
+        status: RecipeEvaluationStatus = RecipeEvaluationStatus.CORRUPT,
+    ) -> _PostfixValidation:
+        return result(
+            status,
+            code,
+            message,
+            operation_index=operation_index,
+            dereference_count=dereference_count,
+            dereferenced_bytes=dereferenced_bytes,
+        )
+
+    def pop(
+        operation_index: int, code_message: str
+    ) -> tuple[_AbstractRecipeValue | None, _PostfixValidation | None]:
+        if not stack:
+            return None, failure(
+                "recipe_stack_underflow", code_message, operation_index
+            )
+        return stack.pop(), None
+
+    def push(
+        value: _AbstractRecipeValue, operation_index: int
+    ) -> _PostfixValidation | None:
+        if len(stack) >= limits.evaluator_stack:
+            return failure(
+                "recipe_stack_overflow",
+                "recipe evaluator stack depth exceeded",
+                operation_index,
+            )
+        stack.append(value)
+        return None
+
+    for operation_index, opcode in enumerate(expression.opcodes):
+        output: _AbstractRecipeValue
+        if isinstance(opcode, RegValueOp):
+            if opcode.register_id not in architecture.register_order:
+                return failure(
+                    "unknown_register",
+                    "reg_value names an undeclared recovered GPR",
+                    operation_index,
+                )
+            output = _AbstractRecipeValue(
+                RecipeResultKind.REGISTER,
+                architecture.register_width_bits,
+                register_id=opcode.register_id,
+            )
+        elif isinstance(opcode, SpecialValueOp):
+            if opcode.special is RecipeSpecial.PC:
+                output = _AbstractRecipeValue(
+                    RecipeResultKind.ADDRESS, None, architecture.pc_space
+                )
+            elif opcode.special is RecipeSpecial.SP:
+                output = _AbstractRecipeValue(
+                    RecipeResultKind.ADDRESS, None, architecture.sp_space
+                )
+            else:
+                output = _AbstractRecipeValue(
+                    RecipeResultKind.UNSIGNED_SCALAR, architecture.psw_width_bits
+                )
+        elif isinstance(opcode, (ConstUOp, ConstSOp)):
+            signed = isinstance(opcode, ConstSOp)
+            lower = -(1 << (opcode.bit_width - 1)) if signed else 0
+            upper = (1 << (opcode.bit_width - (1 if signed else 0))) - 1
+            if not lower <= opcode.value <= upper:
+                return failure(
+                    "invalid_scalar",
+                    f"{opcode.opcode} does not fit its declared width",
+                    operation_index,
+                )
+            output = _AbstractRecipeValue(
+                (
+                    RecipeResultKind.SIGNED_SCALAR
+                    if signed
+                    else RecipeResultKind.UNSIGNED_SCALAR
+                ),
+                opcode.bit_width,
+                known_scalar=opcode.value,
+            )
+        elif isinstance(opcode, StaticAddressOp):
+            validated = architecture.validate(opcode.address)
+            if validated.status is not AddressStatus.VALID:
+                return failure(
+                    "invalid_static_address",
+                    validated.diagnostics[0].message,
+                    operation_index,
+                )
+            output = _AbstractRecipeValue(
+                RecipeResultKind.ADDRESS,
+                None,
+                opcode.address.space,
+                known_address=opcode.address,
+            )
+        elif isinstance(opcode, ToAddressOp):
+            source, invalid = pop(operation_index, "to_address requires one scalar")
+            if invalid is not None:
+                return invalid
+            if source.kind not in {
+                RecipeResultKind.UNSIGNED_SCALAR,
+                RecipeResultKind.SIGNED_SCALAR,
+            }:
+                return failure(
+                    "recipe_type_mismatch",
+                    "to_address requires RecipeScalar",
+                    operation_index,
+                )
+            if source.known_scalar is not None and source.known_scalar < 0:
+                return failure(
+                    "negative_address",
+                    "to_address requires a non-negative scalar",
+                    operation_index,
+                )
+            descriptor = architecture.space_descriptor(opcode.space)
+            if descriptor is None:
+                return failure(
+                    "invalid_address_conversion",
+                    "address space is not declared",
+                    operation_index,
+                )
+            known_address = None
+            if source.known_scalar is not None:
+                candidate = HsxAddress(opcode.space, source.known_scalar)
+                validated = architecture.validate(candidate)
+                if validated.status is not AddressStatus.VALID:
+                    return failure(
+                        "invalid_address_conversion",
+                        validated.diagnostics[0].message,
+                        operation_index,
+                    )
+                known_address = candidate
+            output = _AbstractRecipeValue(
+                RecipeResultKind.ADDRESS,
+                None,
+                opcode.space,
+                known_address=known_address,
+            )
+        elif isinstance(opcode, CfaOp):
+            output = _AbstractRecipeValue(
+                RecipeResultKind.ADDRESS, None, architecture.sp_space
+            )
+        elif isinstance(opcode, FrameBaseOp):
+            output = _AbstractRecipeValue(
+                RecipeResultKind.ADDRESS, None, architecture.sp_space
+            )
+        elif isinstance(opcode, AddSConstCheckedOp):
+            source, invalid = pop(
+                operation_index, "add_sconst_checked requires one value"
+            )
+            if invalid is not None:
+                return invalid
+            if source.kind is RecipeResultKind.ADDRESS:
+                known_address = None
+                if source.known_address is not None:
+                    if opcode.signed_delta < 0:
+                        checked = architecture.subtract(
+                            source.known_address,
+                            -opcode.signed_delta,
+                            AddressArithmeticMode.CHECKED,
+                        )
+                    else:
+                        checked = architecture.add(
+                            source.known_address,
+                            opcode.signed_delta,
+                            AddressArithmeticMode.CHECKED,
+                        )
+                    if checked.status is not AddressStatus.VALID:
+                        return failure(
+                            "checked_add_failed",
+                            checked.diagnostics[0].message,
+                            operation_index,
+                        )
+                    known_address = checked.value
+                output = _AbstractRecipeValue(
+                    RecipeResultKind.ADDRESS,
+                    None,
+                    source.address_space,
+                    known_address=known_address,
+                )
+            elif source.kind in {
+                RecipeResultKind.UNSIGNED_SCALAR,
+                RecipeResultKind.SIGNED_SCALAR,
+            }:
+                known_scalar = None
+                if source.known_scalar is not None:
+                    candidate = source.known_scalar + opcode.signed_delta
+                    signed = source.kind is RecipeResultKind.SIGNED_SCALAR
+                    lower = -(1 << (source.bit_width - 1)) if signed else 0
+                    upper = (1 << (source.bit_width - (1 if signed else 0))) - 1
+                    if not lower <= candidate <= upper:
+                        return failure(
+                            "checked_add_failed",
+                            "scalar addition exceeds its declared width",
+                            operation_index,
+                        )
+                    known_scalar = candidate
+                output = _AbstractRecipeValue(
+                    source.kind,
+                    source.bit_width,
+                    known_scalar=known_scalar,
+                )
+            else:
+                return failure(
+                    "recipe_type_mismatch",
+                    "add_sconst_checked accepts only address or scalar",
+                    operation_index,
+                )
+        elif isinstance(opcode, DerefUOp):
+            source, invalid = pop(operation_index, "deref_u requires one address")
+            if invalid is not None:
+                return invalid
+            if source.kind is not RecipeResultKind.ADDRESS:
+                return failure(
+                    "recipe_type_mismatch",
+                    "deref_u requires RecipeAddress",
+                    operation_index,
+                )
+            dereference_count += 1
+            dereferenced_bytes += opcode.byte_length
+            if (
+                dereference_count > limits.dereferences_per_expression
+                or opcode.byte_length > limits.bytes_per_dereference
+            ):
+                return failure(
+                    "limit_exceeded",
+                    "dereference or byte limit exceeded before operation",
+                    operation_index,
+                    status=RecipeEvaluationStatus.UNSUPPORTED,
+                )
+            units = architecture.units_for_bytes(
+                source.address_space, opcode.byte_length
+            )
+            if units.status is AddressStatus.UNIT_CONVERSION_UNSUPPORTED:
+                return failure(
+                    "unit_conversion_unsupported",
+                    units.diagnostics[0].message,
+                    operation_index,
+                    status=RecipeEvaluationStatus.UNSUPPORTED,
+                )
+            if units.status is not AddressStatus.VALID:
+                return failure(
+                    "invalid_dereference_length",
+                    units.diagnostics[0].message,
+                    operation_index,
+                )
+            if source.known_address is not None:
+                checked = architecture.range(
+                    source.known_address, units.value, Permission.READ
+                )
+                if checked.status is not AddressStatus.VALID:
+                    return failure(
+                        "invalid_dereference_address",
+                        checked.diagnostics[0].message,
+                        operation_index,
+                    )
+            output = _AbstractRecipeValue(
+                RecipeResultKind.UNSIGNED_SCALAR, opcode.byte_length * 8
+            )
+        elif isinstance(opcode, BitSliceOp):
+            source, invalid = pop(
+                operation_index, "bit_slice requires one scalar/register"
+            )
+            if invalid is not None:
+                return invalid
+            if source.kind not in {
+                RecipeResultKind.UNSIGNED_SCALAR,
+                RecipeResultKind.SIGNED_SCALAR,
+                RecipeResultKind.REGISTER,
+            }:
+                return failure(
+                    "recipe_type_mismatch",
+                    "bit_slice accepts only scalar/register",
+                    operation_index,
+                )
+            if opcode.source_bit_offset + opcode.bit_size > source.bit_width:
+                return failure(
+                    "invalid_bit_slice",
+                    "bit_slice exceeds its input width",
+                    operation_index,
+                )
+            known_scalar = None
+            if source.known_scalar is not None:
+                unsigned = source.known_scalar % (1 << source.bit_width)
+                known_scalar = (
+                    unsigned >> opcode.source_bit_offset
+                ) & ((1 << opcode.bit_size) - 1)
+            output = _AbstractRecipeValue(
+                RecipeResultKind.UNSIGNED_SCALAR,
+                opcode.bit_size,
+                known_scalar=known_scalar,
+            )
+        else:
+            return failure(
+                "unsupported_opcode",
+                "unsupported recipe opcode",
+                operation_index,
+                status=RecipeEvaluationStatus.UNSUPPORTED,
+            )
+
+        invalid = push(output, operation_index)
+        if invalid is not None:
+            return invalid
+
+    if len(stack) != 1:
+        return result(
+            RecipeEvaluationStatus.CORRUPT,
+            "invalid_final_stack",
+            "recipe must finish with exactly one value",
+            dereference_count=dereference_count,
+            dereferenced_bytes=dereferenced_bytes,
+        )
+    value = stack[0]
+    required_address_space = {
+        RecipeRole.CFA: architecture.sp_space,
+        RecipeRole.CALLER_PC: architecture.pc_space,
+        RecipeRole.CALLER_SP: architecture.sp_space,
+        RecipeRole.CALLER_FRAME_BASE: architecture.sp_space,
+    }.get(expected_role)
+    if (
+        value.kind is not expression.required_result
+        or (
+            expression.required_result is RecipeResultKind.ADDRESS
+            and expression.required_bit_width is not None
+        )
+        or (
+            expression.required_result is not RecipeResultKind.ADDRESS
+            and value.bit_width != expression.required_bit_width
+        )
+        or (
+            required_address_space is not None
+            and value.address_space != required_address_space
+        )
+    ):
+        return result(
+            RecipeEvaluationStatus.CORRUPT,
+            "recipe_result_mismatch",
+            "final recipe value does not match required_result/width",
+            dereference_count=dereference_count,
+            dereferenced_bytes=dereferenced_bytes,
+        )
+    if (
+        required_register_id is not None
+        and value.register_id != required_register_id
+    ):
+        return result(
+            RecipeEvaluationStatus.CORRUPT,
+            "invalid_register_rule_result",
+            "GPR expression returns a different recovered register",
+            dereference_count=dereference_count,
+            dereferenced_bytes=dereferenced_bytes,
+        )
+    return result(
+        RecipeEvaluationStatus.COMPLETE,
+        dereference_count=dereference_count,
+        dereferenced_bytes=dereferenced_bytes,
+        final_value=value,
+    )
+
+
 class RecipeComponentValidator:
     """Pure descriptor-aware row/frame checks shared with the later artifact/stack slices."""
 
@@ -1037,62 +1516,9 @@ class RecipeComponentValidator:
             raise TypeError("architecture must be ArchitectureDescriptor")
         if not isinstance(limits, RecipeLimits):
             raise TypeError("limits must be RecipeLimits")
-        if expression.role is not expected_role:
-            return _invalid_address_diagnostic(
-                "recipe_role_mismatch",
-                f"expected role {expected_role.value!r}, got {expression.role.value!r}",
-                row_id=row_id,
-            )
-        if len(expression.opcodes) > limits.opcodes_per_expression:
-            return _invalid_address_diagnostic(
-                "limit_exceeded",
-                "expression exceeds opcodes_per_expression",
-                row_id=row_id,
-            )
-        if expression.role is RecipeRole.CFA and any(
-            isinstance(opcode, CfaOp) for opcode in expression.opcodes
-        ):
-            index = next(
-                index for index, opcode in enumerate(expression.opcodes) if isinstance(opcode, CfaOp)
-            )
-            return _invalid_address_diagnostic(
-                "cyclic_cfa",
-                "a CFA expression cannot recursively consume CFA",
-                row_id=row_id,
-                operation_index=index,
-            )
-        for index, opcode in enumerate(expression.opcodes):
-            if isinstance(opcode, RegValueOp) and opcode.register_id not in architecture.register_order:
-                return _invalid_address_diagnostic(
-                    "unknown_register",
-                    "reg_value names an undeclared GPR",
-                    row_id=row_id,
-                    operation_index=index,
-                )
-            if isinstance(opcode, StaticAddressOp):
-                validated = architecture.validate(opcode.address)
-                if validated.status is not AddressStatus.VALID:
-                    return _invalid_address_diagnostic(
-                        "invalid_static_address",
-                        validated.diagnostics[0].message,
-                        row_id=row_id,
-                        operation_index=index,
-                    )
-            if isinstance(opcode, ToAddressOp) and architecture.space_descriptor(opcode.space) is None:
-                return _invalid_address_diagnostic(
-                    "unknown_address_space",
-                    "to_address names an undeclared address space",
-                    row_id=row_id,
-                    operation_index=index,
-                )
-            if isinstance(opcode, DerefUOp) and opcode.byte_length > limits.bytes_per_dereference:
-                return _invalid_address_diagnostic(
-                    "limit_exceeded",
-                    "deref_u exceeds bytes_per_dereference",
-                    row_id=row_id,
-                    operation_index=index,
-                )
-        return ()
+        return _validate_postfix_expression(
+            expression, expected_role, architecture, limits, row_id=row_id
+        ).diagnostics
 
     @staticmethod
     def validate_unwind_row(
@@ -1137,12 +1563,16 @@ class RecipeComponentValidator:
             return _invalid_address_diagnostic(
                 "invalid_cfa_result", "CFA expression must require ADDRESS", row_id=row.row_id
             )
+        total_opcodes = 0
+        total_dereferenced_bytes = 0
         for expression, role in checks:
-            diagnostics = RecipeComponentValidator.validate_expression(
+            validation = _validate_postfix_expression(
                 expression, role, architecture, limits, row_id=row.row_id
             )
-            if diagnostics:
-                return diagnostics
+            if validation.diagnostics:
+                return validation.diagnostics
+            total_opcodes += validation.opcode_count
+            total_dereferenced_bytes += validation.dereferenced_bytes
             if role in {
                 RecipeRole.CALLER_PC,
                 RecipeRole.CALLER_SP,
@@ -1178,19 +1608,20 @@ class RecipeComponentValidator:
                 return _invalid_address_diagnostic(
                     "unknown_register", "register rule names an undeclared GPR", row_id=row.row_id
                 )
-            if rule.kind not in {RecipeRuleKind.EXPRESSION, RecipeRuleKind.SAME}:
-                return _invalid_address_diagnostic(
-                    "unsupported_register_rule",
-                    "the selected HSX profile admits GPR EXPRESSION/SAME only",
-                    row_id=row.row_id,
-                )
             if rule.kind is RecipeRuleKind.EXPRESSION:
                 expression = rule.expression
-                diagnostics = RecipeComponentValidator.validate_expression(
-                    expression, RecipeRole.REGISTER, architecture, limits, row_id=row.row_id
+                validation = _validate_postfix_expression(
+                    expression,
+                    RecipeRole.REGISTER,
+                    architecture,
+                    limits,
+                    row_id=row.row_id,
+                    required_register_id=register_id,
                 )
-                if diagnostics:
-                    return diagnostics
+                if validation.diagnostics:
+                    return validation.diagnostics
+                total_opcodes += validation.opcode_count
+                total_dereferenced_bytes += validation.dereferenced_bytes
                 if (
                     expression.required_result is not RecipeResultKind.REGISTER
                     or expression.required_bit_width != architecture.register_width_bits
@@ -1200,6 +1631,15 @@ class RecipeComponentValidator:
                         "GPR expressions require exact-width REGISTER results",
                         row_id=row.row_id,
                     )
+        if (
+            total_opcodes > limits.unwind_total_opcodes
+            or total_dereferenced_bytes > limits.unwind_total_dereferenced_bytes
+        ):
+            return _invalid_address_diagnostic(
+                "limit_exceeded",
+                "unwind row exceeds aggregate opcode/dereference profile limits",
+                row_id=row.row_id,
+            )
         return ()
 
     @staticmethod
@@ -1260,16 +1700,42 @@ class RecipeComponentValidator:
                 "invalid_row_pc_range", range_result.diagnostics[0].message, row_id=row.row_id
             )
         form = row.location_form
+        if (
+            form.kind is LocationKind.PIECES
+            and len(form.pieces) > limits.location_pieces
+        ):
+            return _invalid_address_diagnostic(
+                "limit_exceeded",
+                "location form exceeds location_pieces",
+                row_id=row.row_id,
+            )
         expressions: list[RecipeExpression] = []
         if form.expression is not None:
             expressions.append(form.expression)
         expressions.extend(piece.expression for piece in form.pieces)
+        total_dereferenced_bytes = 0
+        form_expression_validation: _PostfixValidation | None = None
         for expression in expressions:
-            diagnostics = RecipeComponentValidator.validate_expression(
-                expression, RecipeRole.LOCATION, architecture, limits, row_id=row.row_id
+            validation = _validate_postfix_expression(
+                expression,
+                RecipeRole.LOCATION,
+                architecture,
+                limits,
+                row_id=row.row_id,
             )
-            if diagnostics:
-                return diagnostics
+            if validation.diagnostics:
+                return validation.diagnostics
+            if expression is form.expression:
+                form_expression_validation = validation
+            total_dereferenced_bytes += validation.dereferenced_bytes
+        if form.kind is LocationKind.ADDRESS:
+            total_dereferenced_bytes += (row.declared_bit_size + 7) // 8
+        if total_dereferenced_bytes > limits.location_total_dereferenced_bytes:
+            return _invalid_address_diagnostic(
+                "limit_exceeded",
+                "location row exceeds location_total_dereferenced_bytes",
+                row_id=row.row_id,
+            )
         if form.kind is LocationKind.ADDRESS:
             if form.expression.required_result is not RecipeResultKind.ADDRESS:
                 return _invalid_address_diagnostic(
@@ -1277,6 +1743,40 @@ class RecipeComponentValidator:
                     "ADDRESS location requires an address result",
                     row_id=row.row_id,
                 )
+            final_address = form_expression_validation.final_value
+            byte_length = (row.declared_bit_size + 7) // 8
+            units = architecture.units_for_bytes(
+                final_address.address_space, byte_length
+            )
+            if units.status is AddressStatus.UNIT_CONVERSION_UNSUPPORTED:
+                return _invalid_address_diagnostic(
+                    "unit_conversion_unsupported",
+                    units.diagnostics[0].message,
+                    row_id=row.row_id,
+                )
+            if units.status is not AddressStatus.VALID:
+                return _invalid_address_diagnostic(
+                    "invalid_location_read_length",
+                    units.diagnostics[0].message,
+                    row_id=row.row_id,
+                )
+            descriptor = architecture.space_descriptor(final_address.address_space)
+            if Permission.READ not in descriptor.permissions:
+                return _invalid_address_diagnostic(
+                    "invalid_location_read_address",
+                    "address space does not grant read permission",
+                    row_id=row.row_id,
+                )
+            if final_address.known_address is not None:
+                checked = architecture.range(
+                    final_address.known_address, units.value, Permission.READ
+                )
+                if checked.status is not AddressStatus.VALID:
+                    return _invalid_address_diagnostic(
+                        "invalid_location_read_address",
+                        checked.diagnostics[0].message,
+                        row_id=row.row_id,
+                    )
         elif form.kind is LocationKind.VALUE:
             expression = form.expression
             if (
@@ -1989,6 +2489,14 @@ class RecipeEvaluator:
         matches = False
         if expression.required_result is RecipeResultKind.ADDRESS:
             matches = isinstance(value, RecipeAddress) and expression.required_bit_width is None
+            required_space = {
+                RecipeRole.CFA: evaluation.architecture.sp_space,
+                RecipeRole.CALLER_PC: evaluation.architecture.pc_space,
+                RecipeRole.CALLER_SP: evaluation.architecture.sp_space,
+                RecipeRole.CALLER_FRAME_BASE: evaluation.architecture.sp_space,
+            }.get(expression.role)
+            if required_space is not None:
+                matches = matches and value.address.space == required_space
         elif expression.required_result is RecipeResultKind.REGISTER:
             matches = (
                 isinstance(value, RecipeRegister)
@@ -2242,7 +2750,7 @@ class LocationEvaluator:
     def evaluate(
         context: InspectionContext,
         frame: UnwindFrame,
-        index: object,
+        index: DebugArtifactIndex,
         variable: SymbolRecord,
         row: LocationRow,
         read_port: SnapshotReadPort,
@@ -2371,7 +2879,12 @@ class LocationEvaluator:
         if row_diagnostics:
             status = (
                 InspectionStatus.UNSUPPORTED
-                if row_diagnostics[0].code == "limit_exceeded"
+                if row_diagnostics[0].code
+                in {
+                    "limit_exceeded",
+                    "unit_conversion_unsupported",
+                    "unsupported_opcode",
+                }
                 else InspectionStatus.CORRUPT
             )
             return LocationEvaluator._inspection_failure(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import FrozenInstanceError, replace
+from dataclasses import FrozenInstanceError, fields as dataclass_fields, replace
+from inspect import signature
 from types import SimpleNamespace
 
 import pytest
@@ -179,6 +180,11 @@ def loc_eval(f, row, *, frame=None, variable=None, port=None, index=None, reques
     )
 
 
+def test_location_evaluator_keeps_exact_debug_artifact_index_annotation() -> None:
+    parameter = signature(LocationEvaluator.evaluate).parameters["index"]
+    assert parameter.annotation == "DebugArtifactIndex"
+
+
 def test_dtos_enums_and_parser_are_frozen_exact_and_strict() -> None:
     parsed = RecipeParser.parse_expression({
         "role": "location",
@@ -210,6 +216,12 @@ def test_rule_and_form_cardinality_is_exact() -> None:
     RecipeRule(RecipeRuleKind.UNAVAILABLE, None, "not saved")
     with pytest.raises(ValueError):
         RecipeRule(RecipeRuleKind.SAME, value, None)
+    with pytest.raises(ValueError):
+        RecipeRule(RecipeRuleKind.UNDEFINED, None, "unexpected")
+    with pytest.raises(ValueError):
+        RecipeRule(RecipeRuleKind.UNAVAILABLE, None, None)
+    with pytest.raises(ValueError):
+        RecipeRule(RecipeRuleKind.OPTIMIZED_OUT, None, None)
     with pytest.raises(ValueError):
         LocationForm(LocationKind.VALUE, value, (), "extra")
     with pytest.raises(ValueError):
@@ -257,12 +269,130 @@ def test_parser_unknown_enum_values_are_unsupported_and_terminals_round_trip() -
     ) == LocationForm(LocationKind.OPTIMIZED_OUT, None, (), "folded")
 
 
+def test_unknown_row_schemas_are_unsupported_but_malformed_schema_fields_are_corrupt() -> None:
+    f = foundation()
+    unwind = unwind_row(f)
+    location = loc_row(
+        f,
+        LocationForm(
+            LocationKind.VALUE,
+            expr(
+                RecipeRole.LOCATION,
+                (ConstUOp("const_u", 1, 16),),
+                RecipeResultKind.UNSIGNED_SCALAR,
+                16,
+            ),
+            (),
+            None,
+        ),
+    )
+
+    def unknown_schema(value: str) -> RecipeSchemaRef:
+        schema = object.__new__(RecipeSchemaRef)
+        object.__setattr__(schema, "schema", value)
+        object.__setattr__(schema, "digest", ZERO)
+        return schema
+
+    unwind_payload = {
+        field.name: getattr(unwind, field.name) for field in dataclass_fields(unwind)
+    }
+    location_payload = {
+        field.name: getattr(location, field.name) for field in dataclass_fields(location)
+    }
+    for parser, payload, schema_name in (
+        (RecipeParser.parse_unwind_row, unwind_payload, "hsx.unwind-recipe/2"),
+        (RecipeParser.parse_location_row, location_payload, "hsx.location-recipe/2"),
+    ):
+        candidate = dict(payload)
+        candidate["schema"] = unknown_schema(schema_name)
+        with pytest.raises(RecipeParseError) as unsupported:
+            parser(candidate)
+        assert (
+            unsupported.value.status,
+            unsupported.value.diagnostic.code,
+        ) == (
+            RecipeEvaluationStatus.UNSUPPORTED,
+            "unsupported_recipe_schema",
+        )
+
+        candidate["schema"] = schema_name
+        with pytest.raises(RecipeParseError) as corrupt:
+            parser(candidate)
+        assert (
+            corrupt.value.status,
+            corrupt.value.diagnostic.code,
+        ) == (
+            RecipeEvaluationStatus.CORRUPT,
+            "malformed_recipe_field",
+        )
+
+
 def test_profile_and_request_limit_dtos_keep_profile_vs_request_classification_separate() -> None:
     assert RecipeRequestLimits(65, 17) == RecipeRequestLimits(65, 17)
     with pytest.raises(ValueError):
         RecipeRequestLimits(0, 1)
     with pytest.raises(ValueError, match="exact accepted profile"):
         RecipeLimits(opcodes_per_expression=31)
+
+
+def test_every_recipe_integer_field_rejects_bool_and_float_exactly() -> None:
+    f = foundation()
+    scalar_expression = expr(
+        RecipeRole.LOCATION,
+        (ConstUOp("const_u", 1, 8),),
+        RecipeResultKind.UNSIGNED_SCALAR,
+        8,
+    )
+    piece = LocationPieceRule(0, 1, scalar_expression, 0)
+    for bad in (True, 1.0):
+        factories = (
+            lambda: ConstUOp("const_u", bad, 8),
+            lambda: ConstUOp("const_u", 1, bad),
+            lambda: ConstSOp("const_s", bad, 8),
+            lambda: ConstSOp("const_s", 1, bad),
+            lambda: AddSConstCheckedOp("add_sconst_checked", bad),
+            lambda: DerefUOp("deref_u", bad, ByteOrder.LITTLE),
+            lambda: BitSliceOp("bit_slice", bad, 1),
+            lambda: BitSliceOp("bit_slice", 0, bad),
+            lambda: replace(scalar_expression, required_bit_width=bad),
+            lambda: replace(piece, destination_bit_offset=bad),
+            lambda: replace(piece, bit_size=bad),
+            lambda: replace(piece, source_bit_offset=bad),
+            lambda: RecipeScalar(False, bad, 0),
+            lambda: RecipeScalar(False, 8, bad),
+            lambda: RecipeRegister("R0", bad, 0),
+            lambda: RecipeRegister("R0", 32, bad),
+            lambda: replace(f.evaluation, frame_index=bad),
+            lambda: RecipeBudget(bad, 1, 1),
+            lambda: RecipeBudget(1, bad, 1),
+            lambda: RecipeBudget(1, 1, bad),
+            lambda: RecipeRequestLimits(bad, 1),
+            lambda: RecipeRequestLimits(1, bad),
+            lambda: replace(unwind_row(f), call_site_adjustment=bad),
+            lambda: replace(
+                loc_row(
+                    f,
+                    LocationForm(LocationKind.PIECES, None, (piece,), None),
+                    bits=1,
+                ),
+                declared_bit_size=bad,
+            ),
+            lambda: replace(f.frame, frame_index=bad),
+        )
+        for factory in factories:
+            with pytest.raises((TypeError, ValueError)):
+                factory()
+
+    accepted = RecipeLimits()
+    accepted_values = {
+        field.name: getattr(accepted, field.name) for field in dataclass_fields(accepted)
+    }
+    for field_name, value in accepted_values.items():
+        for bad in (True, float(value)):
+            candidate = dict(accepted_values)
+            candidate[field_name] = bad
+            with pytest.raises((TypeError, ValueError)):
+                RecipeLimits(**candidate)
 
 
 def test_all_opcode_success_paths_preserve_exact_kind_width_and_signedness() -> None:
@@ -304,6 +434,208 @@ def test_all_opcode_success_paths_preserve_exact_kind_width_and_signedness() -> 
 def test_stack_type_width_address_role_failures_are_corrupt(recipe, code) -> None:
     result = evaluate(foundation(), recipe)
     assert (result.status, result.diagnostics[0].code) == (RecipeEvaluationStatus.CORRUPT, code)
+
+
+def test_pure_postfix_validator_matches_runtime_failure_classification() -> None:
+    f = foundation()
+    cases = (
+        expr(RecipeRole.LOCATION, (), RecipeResultKind.UNSIGNED_SCALAR, 8),
+        expr(
+            RecipeRole.LOCATION,
+            (ConstUOp("const_u", 1, 8), ConstUOp("const_u", 2, 8)),
+            RecipeResultKind.UNSIGNED_SCALAR,
+            8,
+        ),
+        expr(
+            RecipeRole.LOCATION,
+            (AddSConstCheckedOp("add_sconst_checked", 1),),
+            RecipeResultKind.UNSIGNED_SCALAR,
+            8,
+        ),
+        expr(
+            RecipeRole.LOCATION,
+            (
+                SpecialValueOp("special_value", RecipeSpecial.PC),
+                BitSliceOp("bit_slice", 0, 1),
+            ),
+            RecipeResultKind.UNSIGNED_SCALAR,
+            1,
+        ),
+        expr(
+            RecipeRole.LOCATION,
+            (ConstUOp("const_u", 256, 8),),
+            RecipeResultKind.UNSIGNED_SCALAR,
+            8,
+        ),
+        expr(
+            RecipeRole.LOCATION,
+            (
+                ConstSOp("const_s", -1, 8),
+                ToAddressOp("to_address", f.data),
+            ),
+            RecipeResultKind.ADDRESS,
+            None,
+        ),
+        expr(
+            RecipeRole.LOCATION,
+            (ConstUOp("const_u", 1, 8), BitSliceOp("bit_slice", 7, 2)),
+            RecipeResultKind.UNSIGNED_SCALAR,
+            2,
+        ),
+        expr(
+            RecipeRole.LOCATION,
+            (ConstUOp("const_u", 1, 8),),
+            RecipeResultKind.SIGNED_SCALAR,
+            8,
+        ),
+        expr(
+            RecipeRole.LOCATION,
+            (ConstUOp("const_u", 1, 8),) * 9,
+            RecipeResultKind.UNSIGNED_SCALAR,
+            8,
+        ),
+    )
+    for recipe in cases:
+        diagnostics = RecipeComponentValidator.validate_expression(
+            recipe, RecipeRole.LOCATION, f.architecture
+        )
+        runtime = evaluate(f, recipe)
+        assert diagnostics
+        assert (
+            runtime.status,
+            runtime.diagnostics[0].code,
+        ) == (
+            RecipeEvaluationStatus.CORRUPT,
+            diagnostics[0].code,
+        )
+
+    wrong_role_space = expr(
+        RecipeRole.CALLER_PC,
+        (SpecialValueOp("special_value", RecipeSpecial.SP),),
+        RecipeResultKind.ADDRESS,
+        None,
+    )
+    diagnostics = RecipeComponentValidator.validate_expression(
+        wrong_role_space, RecipeRole.CALLER_PC, f.architecture
+    )
+    runtime = evaluate(f, wrong_role_space)
+    assert (
+        diagnostics[0].code,
+        runtime.status,
+        runtime.diagnostics[0].code,
+    ) == (
+        "recipe_result_mismatch",
+        RecipeEvaluationStatus.CORRUPT,
+        "recipe_result_mismatch",
+    )
+
+
+def test_pure_validator_enforces_dereference_and_aggregate_location_limits() -> None:
+    f = foundation()
+
+    def dereference_chain(count: int) -> RecipeExpression:
+        operations = [StaticAddressOp("static_address", HsxAddress(f.data, 0x120))]
+        for index in range(count):
+            operations.append(DerefUOp("deref_u", 16, ByteOrder.LITTLE))
+            if index + 1 < count:
+                operations.append(ToAddressOp("to_address", f.data))
+        return expr(
+            RecipeRole.LOCATION,
+            operations,
+            RecipeResultKind.UNSIGNED_SCALAR,
+            128,
+        )
+
+    over_dereferenced = dereference_chain(5)
+    pure = RecipeComponentValidator.validate_expression(
+        over_dereferenced, RecipeRole.LOCATION, f.architecture
+    )
+    port = MemoryOnlyPort(
+        {
+            ("data", 0x120): bytes(16),
+            ("data", 0): bytes(16),
+        }
+    )
+    runtime = evaluate(f, over_dereferenced, port)
+    assert (pure[0].code, runtime.status, runtime.diagnostics[0].code) == (
+        "limit_exceeded",
+        RecipeEvaluationStatus.UNSUPPORTED,
+        "limit_exceeded",
+    )
+    assert len(port.memory_reads) == 4
+
+    pieces = tuple(
+        LocationPieceRule(index, 1, dereference_chain(4), 0) for index in range(9)
+    )
+    aggregate_row = loc_row(
+        f, LocationForm(LocationKind.PIECES, None, pieces, None), bits=9
+    )
+    aggregate = RecipeComponentValidator.validate_location_row(
+        aggregate_row, f.variable, f.architecture, f.abi
+    )
+    assert aggregate[0].code == "limit_exceeded"
+    aggregate_port = MemoryOnlyPort()
+    aggregate_runtime = loc_eval(
+        f,
+        aggregate_row,
+        port=aggregate_port,
+        request=RecipeRequestLimits(64, 9),
+    )
+    assert (
+        aggregate_runtime.status,
+        aggregate_runtime.diagnostics[0].code,
+        aggregate_port.memory_reads,
+    ) == (InspectionStatus.UNSUPPORTED, "limit_exceeded", [])
+
+    address_operations = [
+        StaticAddressOp("static_address", HsxAddress(f.data, 0x120))
+    ]
+    for _ in range(4):
+        address_operations.extend(
+            (
+                DerefUOp("deref_u", 16, ByteOrder.LITTLE),
+                ToAddressOp("to_address", f.data),
+            )
+        )
+    address_row = loc_row(
+        f,
+        LocationForm(
+            LocationKind.ADDRESS,
+            expr(
+                RecipeRole.LOCATION,
+                address_operations,
+                RecipeResultKind.ADDRESS,
+                None,
+            ),
+            (),
+            None,
+        ),
+        bits=4096,
+    )
+    assert RecipeComponentValidator.validate_location_row(
+        address_row, f.variable, f.architecture, f.abi
+    )[0].code == "limit_exceeded"
+
+    seventeen = tuple(
+        LocationPieceRule(
+            index,
+            1,
+            expr(
+                RecipeRole.LOCATION,
+                (ConstUOp("const_u", index & 1, 1),),
+                RecipeResultKind.UNSIGNED_SCALAR,
+                1,
+            ),
+            0,
+        )
+        for index in range(17)
+    )
+    piece_row = loc_row(
+        f, LocationForm(LocationKind.PIECES, None, seventeen, None), bits=17
+    )
+    assert RecipeComponentValidator.validate_location_row(
+        piece_row, f.variable, f.architecture, f.abi
+    )[0].code == "limit_exceeded"
 
 
 def test_unavailable_evidence_never_falls_back_and_cfa_absence_is_corrupt() -> None:
@@ -387,13 +719,57 @@ def unwind_row(f, rules=None):
     )
 
 
-def test_row_validator_enforces_roles_gpr_expression_same_and_rejects_psw_key() -> None:
+def test_row_validator_accepts_explicit_unavailable_gpr_evidence_and_rejects_psw_key() -> None:
     f = foundation()
     assert RecipeComponentValidator.validate_unwind_row(unwind_row(f), f.architecture, f.abi) == ()
     wrong = replace(unwind_row(f), cfa_expression=replace(unwind_row(f).cfa_expression, role=RecipeRole.LOCATION))
     assert RecipeComponentValidator.validate_unwind_row(wrong, f.architecture, f.abi)[0].code == "recipe_role_mismatch"
-    undefined = unwind_row(f, (("R7", RecipeRule(RecipeRuleKind.UNDEFINED, None, None)),))
-    assert RecipeComponentValidator.validate_unwind_row(undefined, f.architecture, f.abi)[0].code == "unsupported_register_rule"
+    wrong_pc_space = replace(
+        unwind_row(f),
+        caller_pc_rule=RecipeRule(
+            RecipeRuleKind.EXPRESSION,
+            expr(
+                RecipeRole.CALLER_PC,
+                (SpecialValueOp("special_value", RecipeSpecial.SP),),
+                RecipeResultKind.ADDRESS,
+                None,
+            ),
+            None,
+        ),
+    )
+    assert RecipeComponentValidator.validate_unwind_row(
+        wrong_pc_space, f.architecture, f.abi
+    )[0].code == "recipe_result_mismatch"
+    wrong_register = unwind_row(
+        f,
+        (
+            (
+                "R7",
+                RecipeRule(
+                    RecipeRuleKind.EXPRESSION,
+                    expr(
+                        RecipeRole.REGISTER,
+                        (RegValueOp("reg_value", "R0"),),
+                        RecipeResultKind.REGISTER,
+                        32,
+                    ),
+                    None,
+                ),
+            ),
+        ),
+    )
+    assert RecipeComponentValidator.validate_unwind_row(
+        wrong_register, f.architecture, f.abi
+    )[0].code == "invalid_register_rule_result"
+    for rule in (
+        RecipeRule(RecipeRuleKind.UNDEFINED, None, None),
+        RecipeRule(RecipeRuleKind.UNAVAILABLE, None, "not recoverable"),
+        RecipeRule(RecipeRuleKind.OPTIMIZED_OUT, None, "not materialized"),
+    ):
+        unavailable = unwind_row(f, (("R7", rule),))
+        assert RecipeComponentValidator.validate_unwind_row(
+            unavailable, f.architecture, f.abi
+        ) == ()
     psw = unwind_row(f, (("PSW", RecipeRule(RecipeRuleKind.SAME, None, None)),))
     assert RecipeComponentValidator.validate_unwind_row(psw, f.architecture, f.abi)[0].code == "psw_rule_unsupported"
     pc = unwind_row(f, (("PC", RecipeRule(RecipeRuleKind.SAME, None, None)),))
