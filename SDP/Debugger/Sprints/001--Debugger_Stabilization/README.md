@@ -1,6 +1,6 @@
 # DBG-SPR-001 — Debugger Stabilization
 
-- Status: ITERATION 005 ACTIVE — INTERFACE 1.2 REVIEW 031 PENDING / PRODUCT STOPPED
+- Status: ITERATION 005 ACTIVE — INTERFACE 1.2 REVIEW031 REWORK / REVIEW032 PENDING
 - Owning track: Debugger
 - Owning GapAnalysis: `DBG-GAP-001`
 
@@ -77,7 +77,7 @@ Steering accepted `DBG-A-001..DBG-A-008` as target architecture direction in com
 - Interface reviews 007..010/012..018: REWORK; `DBG-RVW-001-005-019`: PASS at
   `058c3383593553aa1497d024d41285d44d9c67a8`
 - Exact product base: `69a54aeb3394d3cd4792bce620748e15bab69f1f`
-- Active gate: fresh exact-head `DBG-RVW-001-005-031` of the complete `1.2` refreeze
+- Active gate: fresh exact-head `DBG-RVW-001-005-032` of the trace-corrected `1.2` refreeze
 - Authority: issue #38 comment `5362514094`
 - Refreeze authority: issue #38 comment `5368017338`
 - Frame-evidence refreeze authority: issue #38 comment `5370574104`

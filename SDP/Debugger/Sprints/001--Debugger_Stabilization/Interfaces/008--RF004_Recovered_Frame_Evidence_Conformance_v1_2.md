@@ -1,6 +1,6 @@
 # DBG-CF-001-005-002 — `dbg.resolver-inspection/1.2` Recovered-Frame Conformance
 
-- Status: **REFROZEN CANDIDATE / INTERFACE REVIEW 031 PENDING**
+- Status: **CONTRACT PASS / TRACE-CORRECTED CANDIDATE / REVIEW 032 PENDING**
 - Authority: issue #38 comment `5370574104`
 - Interface: `dbg.resolver-inspection/1.2`
 - Scope: UnwindFrame recovered GPR/PSW evidence and explicit LocationEvaluator consumption
@@ -51,6 +51,7 @@ implementation stops for Steering/HSX rather than adding a Debugger default.
 
 ## Gates
 
-Fresh `DBG-RVW-001-005-031` reviews the complete `1.2` interface/fixture head. Product review
+Review `DBG-RVW-001-005-031` passed contract content but returned REWORK trace-only. Fresh
+`DBG-RVW-001-005-032` reviews the unchanged `1.2` semantics plus corrected current trace. Product review
 identity `DBG-RVW-001-005-011` remains reserved for a later post-refreeze Slice-007 product
 head. No Slice-007 worker restarts before interface-review PASS.

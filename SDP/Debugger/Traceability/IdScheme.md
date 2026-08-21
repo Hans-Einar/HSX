@@ -103,6 +103,7 @@ track IDs rather than silently renamed in historical documents.
 - `DBG-RVW-001-005-029` — fresh exact-head corrected `dbg.resolver-inspection/1.1` refreeze review
 - `DBG-RVW-001-005-030` — final exact-head `dbg.resolver-inspection/1.1` review, PASS
 - `DBG-RVW-001-005-031` — fresh exact-head `dbg.resolver-inspection/1.2` interface review
+- `DBG-RVW-001-005-032` — fresh exact-head trace-corrected `dbg.resolver-inspection/1.2` review
 - `DBG-BLK-001-005-001` — RF-004 frozen Enum immutability/interface Steering blocker
 - `DBG-BLK-001-005-002` — RF-004 LocationEvaluator selected-frame evidence Steering blocker
 - `DBG-CF-001-005-001` — `dbg.resolver-inspection/1.1` contract-safe immutability fixtures

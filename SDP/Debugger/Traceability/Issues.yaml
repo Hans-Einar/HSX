@@ -174,7 +174,8 @@ issues:
     rf004_iteration: DBG-IT-001-005
     rf004_slices: DBG-SL-001-005-001..DBG-SL-001-005-007
     rf004_interface: dbg.resolver-inspection/1.2
-    rf004_prior_interface: dbg.resolver-inspection/1
+    rf004_prior_interface: dbg.resolver-inspection/1.1
+    rf004_historical_interface: dbg.resolver-inspection/1
     rf004_refreeze_comment: 5368017338
     rf004_frame_refreeze_comment: 5370574104
     rf004_interface_review: DBG-RVW-001-005-007
@@ -229,7 +230,11 @@ issues:
     rf004_refreeze_conformance: DBG-CF-001-005-001
     rf004_frame_refreeze_candidate_head: cb575ac0920bec8cc7ddd5565df9544b746f069b
     rf004_frame_refreeze_review: DBG-RVW-001-005-031
-    rf004_frame_refreeze_review_status: planned
+    rf004_frame_refreeze_review_status: rework_trace_only
+    rf004_frame_refreeze_reviewed_coordination_head: b4f95e4f3b4094f3bdfbc912207772f85c6c9a92
+    rf004_frame_trace_corrected_candidate_head: pending_publication
+    rf004_frame_refreeze_rereview: DBG-RVW-001-005-032
+    rf004_frame_refreeze_rereview_status: planned
     rf004_frame_refreeze_conformance: DBG-CF-001-005-002
     rf005_dependency_clarification_issue: 42
     rf005_dependency_clarification_comment: 5362515750
@@ -266,7 +271,7 @@ issues:
     steering_completion_comment: 5362514094
   DBG-RF-004:
     issue: 41
-    status: interface_1_2_refrozen_review_031_pending_product_stopped
+    status: interface_1_2_review031_rework_review032_pending_product_stopped
     iteration: DBG-IT-001-005
     slices: DBG-SL-001-005-001..DBG-SL-001-005-007
     execution_order: DBG-SL-001-005-001,DBG-SL-001-005-002,DBG-SL-001-005-007,DBG-SL-001-005-003,DBG-SL-001-005-004,DBG-SL-001-005-005,DBG-SL-001-005-006
@@ -287,7 +292,7 @@ issues:
     slice001_signoff_status: pass
     slice001_signed_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
     active_slice: DBG-SL-001-005-007
-    active_slice_status: blocked_pending_interface_review_031
+    active_slice_status: blocked_pending_interface_review_032
     active_slice_review: DBG-RVW-001-005-011
     active_slice_review_status: planned
     active_slice_verification: DBG-VER-001-005-007
@@ -296,10 +301,15 @@ issues:
     active_slice_blocker_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/007--RF004_Location_Frame_Evidence_Steering_Blocker.md
     active_slice_blocker_comment: 5369244294
     active_slice_refreeze_comment: 5370574104
-    active_slice_blocker_status: superseded_by_refreeze_review_pending
+    active_slice_blocker_status: superseded_by_refreeze_review032_pending
     frame_refreeze_candidate_head: cb575ac0920bec8cc7ddd5565df9544b746f069b
     frame_refreeze_interface_review: DBG-RVW-001-005-031
-    frame_refreeze_interface_review_status: planned
+    frame_refreeze_interface_review_status: rework_trace_only
+    frame_refreeze_reviewed_content_head: cb575ac0920bec8cc7ddd5565df9544b746f069b
+    frame_refreeze_reviewed_coordination_head: b4f95e4f3b4094f3bdfbc912207772f85c6c9a92
+    frame_trace_corrected_candidate_head: pending_publication
+    frame_refreeze_interface_rereview: DBG-RVW-001-005-032
+    frame_refreeze_interface_rereview_status: planned
     frame_refreeze_conformance: DBG-CF-001-005-002
     slice002_initial_implementation_head: 4b5837644dc1196accfd8608bc3dbd20980476bb
     slice002_initial_review: DBG-RVW-001-005-002

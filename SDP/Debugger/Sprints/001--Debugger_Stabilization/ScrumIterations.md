@@ -474,7 +474,7 @@ traceability and no product drift after the combined signed head. Steering accep
 
 ## DBG-IT-001-005 — Typed Resolver and Inspection
 
-Status: ACTIVE — INTERFACE 1.2 REVIEW 031 PENDING / PRODUCT STOPPED
+Status: ACTIVE — INTERFACE 1.2 REVIEW031 REWORK / REVIEW032 PENDING
 
 ### Authority and goal
 
@@ -1043,3 +1043,11 @@ accepted EXPRESSION/SAME rules. Missing/clobbered/unsupported state never falls 
 published `DBG-CF-001-005-002`; interface review031 is the sole gate. Product review011 remains
 reserved and Slice007 has no product changes.
 The exact remote-published refreeze content head is `cb575ac0920bec8cc7ddd5565df9544b746f069b`.
+
+### Interface 1.2 review031 / trace correction
+
+Fresh `DBG-RVW-001-005-031` passed every public schema/signature/recovery/fixture rule but
+returned REWORK trace-only: Handoff had one stale present-tense `1.1` candidate sentence,
+Slice007 resume cited blocker escalation instead of refreeze authority, and Issues did not name
+1.1 as the immediate prior interface. Master corrected only those current trace fields. Fresh
+interface review032 is the sole gate; Slice007 product remains untouched.

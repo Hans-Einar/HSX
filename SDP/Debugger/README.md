@@ -41,7 +41,8 @@ Read in this order:
 `DBG-RF-004` with frozen Slices `DBG-SL-001-005-001..007`; public interface
 `dbg.resolver-inspection/1.1` passed review030 at `ae49435…`; Slices 001–002 are signed.
 Steering accepted blocker002 and refroze
-`dbg.resolver-inspection/1.2`. Slice 007 product work is stopped pending interface review 031.
+`dbg.resolver-inspection/1.2`. Review031 returned REWORK trace-only; Slice007 product remains
+stopped pending review032.
 Existing Executive behavior remains
 `hsx.python-debug-legacy/1`; RF-005..009, Executive/VM/AVR and frontend migration remain
 blocked.

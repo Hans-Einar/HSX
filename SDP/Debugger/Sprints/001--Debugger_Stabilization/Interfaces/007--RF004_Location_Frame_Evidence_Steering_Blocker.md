@@ -1,6 +1,6 @@
 # DBG-BLK-001-005-002 — RF-004 Location Frame Evidence Steering Blocker
 
-- Status: **SUPERSEDED BY `dbg.resolver-inspection/1.2` / REVIEW PENDING**
+- Status: **SUPERSEDED BY `1.2` / REVIEW031 REWORK / REVIEW032 PENDING**
 - Refactor/Iteration/Slice: `DBG-RF-004` / `DBG-IT-001-005` / `DBG-SL-001-005-007`
 - Frozen interface at discovery: `dbg.resolver-inspection/1.1`
 - Steering resolution: `dbg.resolver-inspection/1.2`
@@ -49,6 +49,7 @@ Steering selected option 1 in comment `5370574104`:
    snapshot/unwind/SAME provenance with no fallback.
 
 Master refreezes only that public projection as `1.2` plus `DBG-CF-001-005-002`. Slice 007
-worker made zero edits. Fresh interface review 031 must pass before restart. Review 011,
+worker made zero edits. Review031 returned REWORK trace-only; fresh interface review032 must
+pass before restart. Review011,
 verification 007, artifact Slice 003 and all later RF-004 Slices are not started.
 RF-005..009 and Executive/VM/AVR/frontend work remain blocked.

@@ -1,6 +1,6 @@
 # DBG-SL-001-005-007 — RF-004 Recipe Schema and Evaluator Foundation
 
-- Status: **BLOCKED PENDING INTERFACE REVIEW 031**
+- Status: **BLOCKED PENDING INTERFACE REVIEW 032**
 
 - Discovery head: `269d0bb962f85241633e1af8489b459357f2ff77`
 - Product changes: none
@@ -93,5 +93,6 @@ registers are a forbidden fallback. See
 edits; review011/verification007 did not start.
 
 Steering comment `5370574104` accepts blocker002 and refreezes frame-carried recovered evidence
-in Interface 1.2. Product remains stopped until fresh interface review031 PASS; product review
+in Interface1.2. Review031 returned REWORK trace-only; product remains stopped until fresh
+interface review032 PASS; product review
 identity 011 remains reserved.

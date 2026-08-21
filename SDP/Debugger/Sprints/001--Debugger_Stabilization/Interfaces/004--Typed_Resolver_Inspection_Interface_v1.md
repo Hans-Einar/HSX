@@ -1,6 +1,6 @@
 # `dbg.resolver-inspection/1.2` — Typed Resolver and Inspection Interface
 
-- Status: **STEERING REFROZEN / INDEPENDENT REVIEW 031 PENDING**
+- Status: **STEERING REFROZEN / REVIEW 031 REWORK TRACE-ONLY / REVIEW 032 PENDING**
 - Iteration: `DBG-IT-001-005`
 - Parent Refactor: `DBG-RF-004`
 - Steering authority: issue #38 comment `5362514094`

@@ -187,7 +187,7 @@ relations:
     type: produces_interface
     to:
       - dbg.resolver-inspection/1.2
-    status: refrozen_review_031_pending_product_stopped
+    status: refrozen_review031_rework_review032_pending_product_stopped
   - from: DBG-SL-001-005-001
     type: reviewed_by
     to: [DBG-RVW-001-005-001]
@@ -347,14 +347,20 @@ relations:
   - from: dbg.resolver-inspection/1.2
     type: reviewed_by
     to: [DBG-RVW-001-005-031]
-    status: planned
+    status: rework_trace_only
     candidate_head: cb575ac0920bec8cc7ddd5565df9544b746f069b
+    coordination_head: b4f95e4f3b4094f3bdfbc912207772f85c6c9a92
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/054--RF004_Interface_1_2_Review.md
+  - from: dbg.resolver-inspection/1.2
+    type: reviewed_by
+    to: [DBG-RVW-001-005-032]
+    status: planned
   - from: DBG-SL-001-005-007
     type: resumes_after
-    to: [DBG-RVW-001-005-031]
+    to: [DBG-RVW-001-005-032]
     status: blocked_pending_review_pass
     issue: 38
-    comment: 5369244294
+    comment: 5370574104
   - from: DBG-SL-001-005-003
     type: reviewed_by
     to: [DBG-RVW-001-005-003]
