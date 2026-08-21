@@ -1,6 +1,6 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf004_slice001_review_rework_corrective_worker_pending`
+Status: `rf004_slice001_corrected_rereview_020_pending`
 
 ## Current objective
 
@@ -147,15 +147,15 @@ remain blocked.
 
 - Slice 001 implemented at `a9a22fc4750f22d774eade43810a499dd1992859`; review,
   `DBG-RVW-001-005-001` returned REWORK; correction, fresh review, verification and sign-off
-  remain open.
+  remain open. Correction is at `8e5669940dd5c23df532577c39dc10bd84692ad2`.
 - `DBG-RVW-001-005-019` passed exact contract head `058c338…` after the prior REWORK chain.
 - All seven RF-004 worker/review/verification/sign-off loops and the parent gate remain open.
 - RF-005..009 remain blocked; no Executive/VM/AVR or DAP/CLI/VS Code migration is authorized.
 
 ## Exact next step
 
-Fresh bounded corrective worker fixes only the five recorded oracle/test findings in the same
-seven owned files. No later Slice may start first.
+Fresh independent `DBG-RVW-001-005-020` inspects corrected exact head `8e566994…`. No later
+Slice may start first.
 
 ## Traceability state
 
@@ -234,7 +234,7 @@ seven owned files. No later Slice may start first.
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: Slice 001 corrective worker, then `DBG-RVW-001-005-020`
+- Active gate: `DBG-RVW-001-005-020`
 
 ## Agents and worktree
 

@@ -1,7 +1,8 @@
 # DBG-SL-001-005-001 — RF-004 Legacy Oracle Classification
 
-- Status: **REWORK / FRESH CORRECTIVE WORKER PENDING**
+- Status: **CORRECTED / FRESH RE-REVIEW PENDING**
 - Implementation head: `a9a22fc4750f22d774eade43810a499dd1992859`
+- Corrected head: `8e5669940dd5c23df532577c39dc10bd84692ad2`
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
 - Review: `DBG-RVW-001-005-001`
@@ -68,3 +69,7 @@ exact-head review, formal verification and Master sign-off.
 
 Review `DBG-RVW-001-005-001`: REWORK. Next gate after bounded correction:
 `DBG-RVW-001-005-020`.
+
+Corrective result: two owned files changed; 29 cases (13 preserve, 8 intentional-change,
+8 retire); new oracle 16 passed/1 WinError 1314 skip; SymbolIndex 2 passed; SourceMap 4 passed/
+1 same skip; focused 14 passed; hashseed 0/1 each 16 passed/1 skip; scope/diff/clean PASS.

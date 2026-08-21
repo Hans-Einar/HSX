@@ -760,3 +760,14 @@ and returned REWORK: one High descriptor-independent wide-address target, plus M
 identity/locator conflation, wrong BEST_EFFORT diagnostic, overly broad symlink skip and an
 unasserted function-qualified local golden. Product/scope/mechanical tests passed. Fresh
 corrective worker owns the same seven files; next review is `DBG-RVW-001-005-020`.
+
+### Slice 001 corrective result
+
+Fresh corrective worker committed `8e5669940dd5c23df532577c39dc10bd84692ad2`, changing only
+the manifest and oracle test. Descriptor-conditioned wide-address cases, separated source
+identity/locator outcomes, correct BEST_EFFORT diagnostic, exact WinError 1314/unsupported/
+other-OSError handling and exact local/global assertions are covered. The manifest now has
+29 cases (13 preserve, 8 intentional-change, 8 retire), all legacy outputs marked non-target-
+conformant. Evidence: new oracle 16 passed/1 skip; SymbolIndex 2 passed; SourceMap 4 passed/
+1 same skip; focused 14 passed; hashseed 0/1 repeat; scope/diff/clean PASS. Fresh re-review is
+`DBG-RVW-001-005-020`.
