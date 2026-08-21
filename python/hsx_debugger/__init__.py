@@ -21,6 +21,12 @@ from .legacy_symbols import *
 from .legacy_symbols import __all__ as _legacy_symbols_all
 from .sources import *
 from .sources import __all__ as _sources_all
+from .stack import *
+from .stack import __all__ as _stack_all
+from .handles import *
+from .handles import __all__ as _handles_all
+from .inspection import *
+from .inspection import __all__ as _inspection_all
 
 __all__ = [
     *__all__,
@@ -33,4 +39,7 @@ __all__ = [
     *_artifacts_all,
     *_legacy_symbols_all,
     *_sources_all,
+    *_stack_all,
+    *_handles_all,
+    *_inspection_all,
 ]
