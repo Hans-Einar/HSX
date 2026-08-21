@@ -46,7 +46,7 @@ def test_inspection_rejects_unknown_register_selection_before_port_io() -> None:
     assert port.register_reads == 0
 
 
-def test_checked_call_site_does_not_require_instruction_metadata_to_exist() -> None:
+def test_checked_call_site_is_not_fabricated_without_instruction_evidence() -> None:
     f = stack_foundation()
     result = StackService.unwind(
         f.context,
@@ -59,9 +59,14 @@ def test_checked_call_site_does_not_require_instruction_metadata_to_exist() -> N
     )
     assert result.status is InspectionStatus.COMPLETE
     assert len(result.value) == 2
-    assert result.value[1].resume_pc == HsxAddress(f.code, 0x124)
-    assert result.value[1].call_site_pc == HsxAddress(f.code, 0x120)
-    assert result.value[1].pc == HsxAddress(f.code, 0x120)
+    caller = result.value[1]
+    assert caller.resume_pc == HsxAddress(f.code, 0x124)
+    assert caller.call_site_pc is None
+    assert caller.pc == HsxAddress(f.code, 0x120)
+    assert any(
+        diagnostic.code in {"instruction_unavailable", "call_site_unavailable"}
+        for diagnostic in caller.diagnostics
+    )
 
 
 def test_location_validator_type_error_names_location_row() -> None:
