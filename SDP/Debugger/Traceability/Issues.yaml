@@ -261,7 +261,7 @@ issues:
     steering_completion_comment: 5362514094
   DBG-RF-004:
     issue: 41
-    status: interface_1_1_pass_slice002_review_pass_verification_pending
+    status: slices001_002_signed_slice007_worker_pending
     iteration: DBG-IT-001-005
     slices: DBG-SL-001-005-001..DBG-SL-001-005-007
     execution_order: DBG-SL-001-005-001,DBG-SL-001-005-002,DBG-SL-001-005-007,DBG-SL-001-005-003,DBG-SL-001-005-004,DBG-SL-001-005-005,DBG-SL-001-005-006
@@ -281,36 +281,43 @@ issues:
     slice001_final_verification_status: pass
     slice001_signoff_status: pass
     slice001_signed_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
-    active_slice: DBG-SL-001-005-002
-    active_slice_status: post_refreeze_review_pass_verification_pending
-    active_slice_review: DBG-RVW-001-005-002
-    active_slice_verification: DBG-VER-001-005-002
-    active_slice_implementation_head: 4b5837644dc1196accfd8608bc3dbd20980476bb
-    active_slice_review_status: rework
-    active_slice_corrective_review: DBG-RVW-001-005-021
-    active_slice_corrected_head: 4280bc6008385042bdff923bd8e5392a1c290fdc
-    active_slice_corrective_review_status: rework
-    active_slice_corrective_review_2: DBG-RVW-001-005-022
-    active_slice_corrected_head_2: 6c933ea6b11e42d58da52faf0997f8c978dad54b
-    active_slice_corrective_review_2_status: rework_trace_only
-    active_slice_corrective_review_3: DBG-RVW-001-005-023
-    active_slice_corrective_review_3_status: rework
-    active_slice_corrected_head_3: 373d786a983252d5b1735b599596293557adba5a
-    active_slice_corrective_review_4: DBG-RVW-001-005-024
-    active_slice_corrective_review_4_status: rework
-    active_slice_corrective_reviewed_head_4: 373d786a983252d5b1735b599596293557adba5a
-    active_slice_corrected_head_4: bbc5c8ba3be960bcb7d522edbf3d5ae12dbe8c2a
-    active_slice_corrective_review_5: DBG-RVW-001-005-025
-    active_slice_corrective_review_5_status: rework
-    active_slice_corrective_reviewed_head_5: bbc5c8ba3be960bcb7d522edbf3d5ae12dbe8c2a
-    active_slice_corrected_head_5: 0bedb2d110147f3f34c5846d14ee9b9581926f2d
-    active_slice_corrective_review_6: DBG-RVW-001-005-026
-    active_slice_corrective_review_6_status: rework
-    active_slice_corrective_reviewed_head_6: 0bedb2d110147f3f34c5846d14ee9b9581926f2d
-    active_slice_corrective_review_7: DBG-RVW-001-005-027
-    active_slice_corrective_review_7_status: pass
-    active_slice_corrective_review_7_coordination_head: 6779e241d9223c949ffe1addc70e86d4328b8f07
-    active_slice_post_refreeze_corrected_head: c7bc39057469f1aa62a78f409753ec0213631214
+    active_slice: DBG-SL-001-005-007
+    active_slice_status: active_fresh_worker_pending
+    active_slice_review: DBG-RVW-001-005-011
+    active_slice_review_status: planned
+    active_slice_verification: DBG-VER-001-005-007
+    active_slice_implementation_head: pending
+    slice002_initial_implementation_head: 4b5837644dc1196accfd8608bc3dbd20980476bb
+    slice002_initial_review: DBG-RVW-001-005-002
+    slice002_initial_review_status: rework
+    slice002_corrective_review: DBG-RVW-001-005-021
+    slice002_corrected_head: 4280bc6008385042bdff923bd8e5392a1c290fdc
+    slice002_corrective_review_status: rework
+    slice002_corrective_review_2: DBG-RVW-001-005-022
+    slice002_corrected_head_2: 6c933ea6b11e42d58da52faf0997f8c978dad54b
+    slice002_corrective_review_2_status: rework_trace_only
+    slice002_corrective_review_3: DBG-RVW-001-005-023
+    slice002_corrective_review_3_status: rework
+    slice002_corrected_head_3: 373d786a983252d5b1735b599596293557adba5a
+    slice002_corrective_review_4: DBG-RVW-001-005-024
+    slice002_corrective_review_4_status: rework
+    slice002_corrective_reviewed_head_4: 373d786a983252d5b1735b599596293557adba5a
+    slice002_corrected_head_4: bbc5c8ba3be960bcb7d522edbf3d5ae12dbe8c2a
+    slice002_corrective_review_5: DBG-RVW-001-005-025
+    slice002_corrective_review_5_status: rework
+    slice002_corrective_reviewed_head_5: bbc5c8ba3be960bcb7d522edbf3d5ae12dbe8c2a
+    slice002_corrected_head_5: 0bedb2d110147f3f34c5846d14ee9b9581926f2d
+    slice002_corrective_review_6: DBG-RVW-001-005-026
+    slice002_corrective_review_6_status: rework
+    slice002_corrective_reviewed_head_6: 0bedb2d110147f3f34c5846d14ee9b9581926f2d
+    slice002_corrective_review_7: DBG-RVW-001-005-027
+    slice002_corrective_review_7_status: pass
+    slice002_corrective_review_7_coordination_head: 6779e241d9223c949ffe1addc70e86d4328b8f07
+    slice002_post_refreeze_corrected_head: c7bc39057469f1aa62a78f409753ec0213631214
+    slice002_verification_status: pass
+    slice002_verification_coordination_head: db01d0a247f1ac04fbfb2b80e5f95bdc55080450
+    slice002_signoff_status: pass
+    slice002_signed_head: c7bc39057469f1aa62a78f409753ec0213631214
     steering_blocker: DBG-BLK-001-005-001
     steering_blocker_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/005--RF004_Enum_Immutability_Steering_Blocker.md
     steering_blocker_comment: 5365959417

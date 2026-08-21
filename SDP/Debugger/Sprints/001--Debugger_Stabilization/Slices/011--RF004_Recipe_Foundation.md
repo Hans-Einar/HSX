@@ -1,6 +1,6 @@
 # DBG-SL-001-005-007 — RF-004 Recipe Schema and Evaluator Foundation
 
-- Status: **FROZEN / PLANNED**
+- Status: **ACTIVE / FRESH WORKER PENDING**
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
 - Depends on signed: `DBG-SL-001-005-001..002`

@@ -69,3 +69,17 @@ with the Slice 001 record below.
   evidence: PASS.
 
 Windows symlink behavior remains degraded/unverified on this host; no symlink PASS is claimed.
+
+## DBG-SL-001-005-002 verified identity/address/result foundation
+
+- exact signed product head: `c7bc39057469f1aa62a78f409753ec0213631214`;
+- Steering-refrozen `dbg.resolver-inspection/1.1` review `DBG-RVW-001-005-030`: PASS;
+- post-refreeze product review `DBG-RVW-001-005-027`: PASS;
+- formal verification `DBG-VER-001-005-002`: PASS;
+- exact public schemas/classes/fields/Enum members/aliases and 129 exports preserved;
+- exact private 19-type Enum catalog and supported recursive contract-safe payload boundary;
+- focused 47, debugger 184+1, mandated 39+1, oracle 16+1, canonical 2, hashseed 0/1 PASS;
+- exact five-file correction scope, trace, ancestry, objects/connectivity and remote/clean PASS.
+
+Windows symlink behavior remains the sole degraded skip. Slice 002 has Master exact-head
+sign-off and authorizes only Slice 007 recipe foundation next.

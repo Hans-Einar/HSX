@@ -474,7 +474,7 @@ traceability and no product drift after the combined signed head. Steering accep
 
 ## DBG-IT-001-005 — Typed Resolver and Inspection
 
-Status: ACTIVE — INTERFACE 1.1 PASS / SLICE 002 VERIFICATION PENDING
+Status: ACTIVE — SLICES 001–002 SIGNED / SLICE 007 ACTIVE
 
 ### Authority and goal
 
@@ -1011,3 +1011,11 @@ with zero findings. Public AST/129 exports, both import paths, exact 19-type cat
 all prior supported closures, focused/debugger/mandated/oracle/golden/hashseed tests, exact
 scope and full trace/git mechanics passed. Formal `DBG-VER-001-005-002` is now the sole active
 gate; no sign-off or later Slice is active.
+
+### Slice 002 verification/sign-off / Slice 007 activation
+
+Fresh `DBG-VER-001-005-002` formally passed product head `c7bc390…` at coordination `db01d0a…`.
+Master exact-head sign-off completed with review027/interface030 PASS. The only degraded evidence
+is WinError 1314 symlink privilege; no symlink PASS is claimed. Slice 002 is complete. Master
+activates only `DBG-SL-001-005-007` recipe foundation under its frozen ownership; review011,
+verification007 and sign-off must pass before artifact Slice003.
