@@ -1,6 +1,6 @@
 # DBG-SL-001-005-002 — RF-004 Typed Identity, Binding, Address, and Result Foundation
 
-- Status: **BLOCKED / AWAITING STEERING — `DBG-BLK-001-005-001`**
+- Status: **BLOCKED PENDING INTERFACE REVIEW 028**
 - Implementation head: `4b5837644dc1196accfd8608bc3dbd20980476bb`
 - Corrected head: `4280bc6008385042bdff923bd8e5392a1c290fdc`
 - Corrected head 2: `6c933ea6b11e42d58da52faf0997f8c978dad54b`
@@ -32,7 +32,8 @@ Existing `contracts.py`, controller/model/epochs/gateway/runtime files are read-
 
 ## Required behavior
 
-- all values and nested payloads are deeply immutable and validate exact portable fields;
+- all values and nested payloads are recursively contract-safe immutable under the supported
+  mutation model and validate exact portable fields;
 - ArtifactRef/bundle identity/ref/binding Python projections reproduce the frozen canonical
   key/digest model and golden vectors without folding component fields into a ref;
 - shared DebugBindingValidator freezes canonical bundle digest plus architecture/ABI
@@ -67,17 +68,22 @@ Existing `contracts.py`, controller/model/epochs/gateway/runtime files are read-
 
 `DBG-R-004`, `DBG-R-021..DBG-R-025`, `DBG-R-028`, `DBG-R-035..DBG-R-036`;
 `DBG-F-007`, `DBG-F-019`; `DBG-D-003`, `DBG-D-004`; `HSX-D-001..HSX-D-003`;
-interface `dbg.resolver-inspection/1`.
+interface `dbg.resolver-inspection/1.1`; conformance `DBG-CF-001-005-001`.
 
 ## Verification and completion signal
 
-Test exact mismatch matrices, immutability, digest/logical-ID validation, complete descriptor
+Test exact mismatch matrices, `DBG-CF-001-005-001` supported-mutation immutability,
+caller-container detachment, exact approved Enum identity, non-contract-safe payload rejection,
+digest/logical-ID validation, complete descriptor
 version/encoding/serialization/register/special fields, multiple widths and
 spaces, GPR+PC/SP/PSW ordering/widths/register byte order, canonical scalar byte encoding and
 padding, the frozen StopEpoch binding status/code matrix, every checked
 arithmetic/range/alignment/unit-conversion failure, explicit wrap selection, result
 cardinality and degraded coherence guards. Run earlier RF-002/RF-003 contract/epoch regressions.
 Close only after exact-head review, formal verification and Master sign-off.
+
+No conformance fixture may require Enum cloning or isolation from reflection/monkey-patching of
+the Python type system, Enum class/member internals, descriptors or `object.__setattr__` bypasses.
 
 ## Worker result
 
@@ -129,6 +135,11 @@ Feasibility result: NEGATIVE with no edits. Exact Python Enum singleton identity
 independent post-construction immutable snapshot cannot both be preserved under the frozen
 schemas. See `Interfaces/005--RF004_Enum_Immutability_Steering_Blocker.md`. Review 027,
 verification and later Slices are not started.
+
+Steering comment `5368017338` accepts the blocker and refreezes supported-mutation /
+contract-safe immutability as interface `1.1` with every public schema and exact Enum member
+unchanged. Product correction remains stopped until fresh interface review 028 PASS. Historical
+review 026 remains REWORK; review 027 is reserved only for a new post-refreeze product head.
 
 Second correction: exact atom types; directly declared frozen dataclasses only; all fields
 deep-traversed; undeclared dict/slot state rejected. Focused 43, debugger 180+1 skip, mandated

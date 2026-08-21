@@ -80,7 +80,7 @@ gateway, Executive, DAP/CLI and VS Code modules are read-only.
 `DBG-R-004`, `DBG-R-021..DBG-R-028`, `DBG-R-034..DBG-R-036`;
 `DBG-F-007`, `DBG-F-015`, `DBG-F-017`, inspection portion of `DBG-F-026`;
 `DBG-D-003`, `DBG-D-004`, `DBG-D-009`; `HSX-D-001..HSX-D-003`;
-interface `dbg.resolver-inspection/1`.
+interface `dbg.resolver-inspection/1.1`.
 
 ## Verification and completion signal
 

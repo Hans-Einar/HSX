@@ -47,7 +47,7 @@ and legacy stack code are read-only.
 
 `DBG-R-021..DBG-R-025`, `DBG-R-028`, `DBG-R-035..DBG-R-036`;
 `DBG-F-007`, `DBG-F-015`; `DBG-D-003`, `DBG-D-004`; `HSX-D-002..HSX-D-003`;
-interface `dbg.resolver-inspection/1`.
+interface `dbg.resolver-inspection/1.1`.
 
 ## Verification and completion signal
 

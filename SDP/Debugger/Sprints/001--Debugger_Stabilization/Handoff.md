@@ -1,16 +1,18 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf004_blocked_awaiting_steering_enum_immutability`
+Status: `rf004_interface_1_1_refrozen_review_028_pending_product_stopped`
 
 Steering escalation: issue #38 comment `5365959417`.
+Steering refreeze: issue #38 comment `5368017338`.
 
 ## Current objective
 
 The accepted first-wave gate is closed. Execute only `DBG-RF-004` through the seven frozen
-`DBG-SL-001-005-001..007` contracts and public `dbg.resolver-inspection/1` interface. Reviews
+`DBG-SL-001-005-001..007` contracts and refrozen `dbg.resolver-inspection/1.1` interface. Reviews
 007 through 010 and 012..018 returned REWORK; review 019 passed exact contract head
-`058c338…`. Slice 001 is signed; Slice 002 is blocked by `DBG-BLK-001-005-001` awaiting
-Steering. RF-005..009 and Executive/VM/AVR/frontend migration remain blocked.
+`058c338…` for historical version `1`. Steering accepted `DBG-BLK-001-005-001` and refroze only
+immutability semantics in comment `5368017338`. Slice 001 is signed; Slice 002 product work is
+stopped pending fresh interface review 028. RF-005..009 and Executive/VM/AVR/frontend migration remain blocked.
 
 ## Authority
 
@@ -21,6 +23,7 @@ Steering. RF-005..009 and Executive/VM/AVR/frontend migration remain blocked.
 - issue #38 comment `5356745504` — corrected exact contract head before product edits
 - issue #38 comment `5362514094` — accepted first wave complete and authorized RF-004 only
 - issue #42 comment `5362515750` — RF-005 depends on RF-004's accepted typed interface
+- issue #38 comment `5368017338` — accepted blocker and refroze `dbg.resolver-inspection/1.1`
 - `SDP/Debugger/Traceability/CurrentIndex.yaml`
 - `SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md`
 - `SDP/Debugger/04--Architecture/001--Modular_Debugger_Architecture.md`
@@ -28,6 +31,7 @@ Steering. RF-005..009 and Executive/VM/AVR/frontend migration remain blocked.
 - `SDP/Debugger/Sprints/001--Debugger_Stabilization/ScrumIterations.md`
 - `SDP/Debugger/Refactor/004--Typed_Resolver_Inspection/README.md`
 - `SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/004--Typed_Resolver_Inspection_Interface_v1.md`
+- `SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/006--Typed_Resolver_Inspection_Immutability_Conformance_v1_1.md`
 - issues #36/#37 and `DBG-RF-001` records are completed provenance only
 
 ## Done
@@ -143,7 +147,9 @@ Steering. RF-005..009 and Executive/VM/AVR/frontend migration remain blocked.
 - Steering accepted iteration 004 complete and authorized RF-004 only in issue #38 comment
   `5362514094`; issue #42 comment `5362515750` clarifies the RF-005 dependency.
 - Master opened `DBG-IT-001-005`, froze seven bounded RF-004 Slice contracts and froze
-  `dbg.resolver-inspection/1`. These are planning/authority records, not verified product.
+  `dbg.resolver-inspection/1`; review 019 passed that historical interface.
+- Steering accepted the Enum blocker and authorized only the `dbg.resolver-inspection/1.1`
+  supported-mutation/contract-safe immutability refreeze with unchanged public schemas.
 
 ## Not done
 
@@ -170,14 +176,15 @@ Steering. RF-005..009 and Executive/VM/AVR/frontend migration remain blocked.
   Review 026 confirmed pre-construction closure but returned REWORK because the retained Enum
   singleton can still expose post-construction changes.
 - `DBG-RVW-001-005-019` passed exact contract head `058c338…` after the prior REWORK chain.
+- Fresh `DBG-RVW-001-005-028` of the `1.1` interface/fixture candidate remains open. Product
+  review 027 has not started and remains reserved for a new post-refreeze product head.
 - Six RF-004 Slice loops and the parent gate remain open.
 - RF-005..009 remain blocked; no Executive/VM/AVR or DAP/CLI/VS Code migration is authorized.
 
 ## Exact next step
 
-Stop for Steering. The feasibility worker proved that exact Enum singleton identity and an
-independent post-construction immutable snapshot cannot both be retained privately. Review 027,
-formal verification and every later Slice remain unstarted.
+Publish the exact `1.1` refreeze/fixture/trace head, then dispatch fresh independent
+`DBG-RVW-001-005-028`. Do not start a Slice 002 worker unless that interface review passes.
 
 ## Traceability state
 
@@ -189,7 +196,8 @@ formal verification and every later Slice remain unstarted.
   `208063e344b767f82790ce579eba6327e2cdd0ce` and repository head tested
   `fefd4b0c427dfa71d637e4f4cce9e4a345912591`.
 - CurrentIndex, Issues, sprint records, Relations, Ledger, and Handoff are current through
-  `DBG-RVW-001-005-026` REWORK and blocker `DBG-BLK-001-005-001`.
+  Steering refreeze comment `5368017338`, candidate `1.1`/`DBG-CF-001-005-001`, and planned
+  exact-head interface review 028.
 - Accepted architecture direction: `DBG-DA-001`, `DBG-A-001..DBG-A-008`
 - Completed Design Studies: `DBG-ST-002..DBG-ST-005`
 - Architecture review: `DBG-RVW-001-002-001` — REWORK at `f8b8097`
@@ -208,7 +216,9 @@ formal verification and every later Slice remain unstarted.
 - Active iteration: `DBG-IT-001-005`
 - Active Refactor: `DBG-RF-004`
 - Frozen Slices: `DBG-SL-001-005-001..007`
-- Frozen interface: `dbg.resolver-inspection/1`
+- Historical interface: `dbg.resolver-inspection/1`, review 019 PASS at `058c338…`
+- Refrozen interface: `dbg.resolver-inspection/1.1`, review 028 pending
+- Refrozen conformance: `DBG-CF-001-005-001`
 - Interface review `DBG-RVW-001-005-007`: REWORK at `82154c614…`
 - Interface review `DBG-RVW-001-005-008`: REWORK at `8d6c0f571…`
 - Interface review `DBG-RVW-001-005-009`: REWORK at `07f7e1604…`
@@ -256,14 +266,15 @@ formal verification and every later Slice remain unstarted.
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: Steering decision on `DBG-BLK-001-005-001`
+- Active gate: fresh exact-head `DBG-RVW-001-005-028`
 - Blocker authority: issue #38 comment `5365959417`
+- Refreeze authority: issue #38 comment `5368017338`
 
 ## Agents and worktree
 
 The prior design/portable-contract chain and RF-002/RF-003/integration wave are complete,
-Steering-accepted and remotely reconstructable. RF-004 contracts remain frozen; workers,
-reviewers and verification are stopped pending Steering. Controlled work is on
+Steering-accepted and remotely reconstructable. RF-004 `1.1` is a refrozen interface candidate;
+product workers and verification remain stopped pending review 028. Controlled work is on
 `codex/dbg-rf-004` from exact base `69a54aeb3394d3cd4792bce620748e15bab69f1f`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.
@@ -271,7 +282,7 @@ the user's original dirty
 ## Risks
 
 - `DBG-RF-005..DBG-RF-009` remain explicitly blocked; RF-005 additionally requires accepted
-  `dbg.resolver-inspection/1` plus later Steering authorization.
+  `dbg.resolver-inspection/1.1` plus later Steering authorization.
 - A frozen identity/result/address/public-method contradiction is a Steering stop, not worker
   discretion.
 - Legacy `.sym`/SourceMap reuse is prohibited until Slice 001 produces classified golden

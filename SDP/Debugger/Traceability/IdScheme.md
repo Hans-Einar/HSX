@@ -99,13 +99,16 @@ track IDs rather than silently renamed in historical documents.
 - `DBG-RVW-001-005-025` — Slice 002 review attempt 6, REWORK
 - `DBG-RVW-001-005-026` — Slice 002 review attempt 7, REWORK
 - `DBG-RVW-001-005-027` — conditional Slice 002 review after private Enum snapshot correction
+- `DBG-RVW-001-005-028` — fresh exact-head `dbg.resolver-inspection/1.1` refreeze review
 - `DBG-BLK-001-005-001` — RF-004 frozen Enum immutability/interface Steering blocker
+- `DBG-CF-001-005-001` — `dbg.resolver-inspection/1.1` contract-safe immutability fixtures
 - `DBG-VER-001-005-001..DBG-VER-001-005-007` — formal Slice verifications
 - `DBG-VER-001-005-001` — Slice 001 verification attempt, FAIL trace-only
 - `DBG-VER-001-005-008` — Slice 001 reverification attempt 2, FAIL trace-only
 - `DBG-VER-001-005-009` — Slice 001 final reverification, PASS
 - `DBG-RVW-004-001-001` / `DBG-VER-004-001-001` — RF-004 parent review/verification
 
-Public interface string `dbg.resolver-inspection/1` is a versioned contract identifier rather
-than a numeric execution ID. It is produced by `DBG-RF-004` and becomes a satisfied dependency
+Public interface string `dbg.resolver-inspection/1.1` is the current versioned contract identifier
+rather than a numeric execution ID; version `1` remains historical under review 019. Version `1.1`
+is produced by `DBG-RF-004` and becomes a satisfied dependency
 for RF-005 only after RF-004 parent sign-off and remote publication.

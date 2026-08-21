@@ -474,12 +474,13 @@ traceability and no product drift after the combined signed head. Steering accep
 
 ## DBG-IT-001-005 — Typed Resolver and Inspection
 
-Status: BLOCKED — AWAITING STEERING ON `DBG-BLK-001-005-001`
+Status: ACTIVE — INTERFACE 1.1 REVIEW 028 PENDING / PRODUCT STOPPED
 
 ### Authority and goal
 
 - Steering authority: issue #38 comment `5362514094`.
 - Dependency clarification: issue #42 comment `5362515750`.
+- Immutability refreeze: issue #38 comment `5368017338`.
 - Authorized product domain: `DBG-RF-004` only.
 - Goal: frontend-neutral artifact/source/address/stack/variables/memory/disassembly services
   under `DBG-D-003`, `DBG-D-004`, `DBG-D-009` and frozen portable HSX contracts.
@@ -489,8 +490,9 @@ Status: BLOCKED — AWAITING STEERING ON `DBG-BLK-001-005-001`
 
 ### Frozen public interface
 
-`Interfaces/004--Typed_Resolver_Inspection_Interface_v1.md` freezes
-`dbg.resolver-inspection/1`. Every successful/partial inspection result carries the exact
+`Interfaces/004--Typed_Resolver_Inspection_Interface_v1.md` now refreezes
+`dbg.resolver-inspection/1.1`; the stable path preserves version-1 review history. Every
+successful/partial inspection result carries the exact
 TargetRef, LoadedImageRef, StopEpochId, StopToken and InspectionSnapshotRef. Typed HSX
 addresses use descriptor-checked spaces/ranges; best-effort live reads are explicitly degraded
 and cannot be coherent. Artifact index, source resolver, recipes/stack, epoch inspection and
@@ -500,7 +502,10 @@ Interface review `DBG-RVW-001-005-007` returned REWORK at exact remote-published
 `82154c614a31284723bf3e6a337c5bedfb8aba5d`. Master corrected only the candidate interface,
 Slice ownership and live traceability. Reviews 007..010 and 012..018 returned REWORK;
 `DBG-RVW-001-005-019` passed exact contract head `058c338…`. Slice 001 is the only authorized
-next product dispatch. A finding requiring an accepted DBG/HSX design change returns to Steering.
+signed product Slice. Steering comment `5368017338` changes only the immutability definition:
+supported debugger/caller-input mutation and recursively contract-safe values, with exact
+typed Enum members retained. `DBG-CF-001-005-001` freezes the conformance matrix. Fresh
+`DBG-RVW-001-005-028` must pass before Slice 002 product work resumes.
 
 ### Frozen execution units
 
@@ -534,10 +539,11 @@ exact-head sign-off before the next Slice starts.
 - Requirements: `DBG-R-004`, `DBG-R-021..DBG-R-028`, `DBG-R-034..DBG-R-036`.
 - Design: `DBG-D-003`, `DBG-D-004`, `DBG-D-009`; portable `HSX-D-001..003`.
 - Slice reviews: `DBG-RVW-001-005-001..006` and `DBG-RVW-001-005-011`; interface
-  reviews: `DBG-RVW-001-005-007..010`, then `...012..019`; verifications
+  reviews: `DBG-RVW-001-005-007..010`, then `...012..019`, plus refreeze review
+  `DBG-RVW-001-005-028`; conformance `DBG-CF-001-005-001`; verifications
   `DBG-VER-001-005-001..007`.
 - Parent final: `DBG-RVW-004-001-001`, `DBG-VER-004-001-001`.
-- RF-005 explicitly depends on RF-004's accepted `dbg.resolver-inspection/1`; partial/frozen
+- RF-005 explicitly depends on RF-004's accepted `dbg.resolver-inspection/1.1`; partial/frozen
   implementation does not satisfy the dependency and no RF-005 worker is authorized.
 
 ### Verification and exit signal
@@ -944,3 +950,15 @@ Global sealing is not a private portable guarantee, and revalidation cannot revo
 reference. This conflicts with Interface 004's simultaneous exact typed Enum-bearing schemas
 and absolute post-construction immutable result requirement. Master opened
 `DBG-BLK-001-005-001`, stopped review 027/verification/later Slices, and returns to Steering.
+
+### Steering refreeze / interface 1.1 candidate
+
+Steering comment `5368017338` accepted the blocker and refroze the interface as
+`dbg.resolver-inspection/1.1`. Every public DTO/result schema and exact typed Enum member is
+unchanged. Only immutability semantics change: no supported debugger API or ordinary mutation
+of caller-owned construction inputs may change accepted declared value-state; generic/nested
+payloads are recursively contract-safe; approved closed contract Enums are exact canonical
+immutable atoms. Enum cloning and isolation from reflection/monkey-patching of Python types are
+explicit non-conformance cases. Master published Interface 004 plus
+`DBG-CF-001-005-001`; fresh exact-head interface review 028 is the sole active gate. Historical
+review 026 remains REWORK, product review 027 remains unstarted, and no later Slice is active.

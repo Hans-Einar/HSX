@@ -49,7 +49,7 @@ behavior is confined to the named legacy oracle and is never imported as target 
 ## Traceability
 
 `DBG-R-024`, `DBG-R-034`, `DBG-R-036`; `DBG-F-007`, `DBG-F-019`, `DBG-F-020`;
-`DBG-D-004`, `DBG-D-009`; interface `dbg.resolver-inspection/1`.
+`DBG-D-004`, `DBG-D-009`; interface `dbg.resolver-inspection/1.1` (no legacy-oracle schema delta).
 
 ## Verification and completion signal
 

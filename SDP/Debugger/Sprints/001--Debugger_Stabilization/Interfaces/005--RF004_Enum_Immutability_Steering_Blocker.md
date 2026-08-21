@@ -1,13 +1,15 @@
 # DBG-BLK-001-005-001 — RF-004 Typed Enum Immutability Steering Blocker
 
-- Status: **AWAITING STEERING DECISION**
+- Status: **STEERING ACCEPTED / REFREEZE 1.1 REVIEW PENDING**
 - Refactor/Iteration/Slice: `DBG-RF-004` / `DBG-IT-001-005` / `DBG-SL-001-005-002`
-- Frozen interface: `dbg.resolver-inspection/1`
+- Frozen interface at discovery: `dbg.resolver-inspection/1`
+- Steering resolution: `dbg.resolver-inspection/1.1`
 - Triggering review: `DBG-RVW-001-005-026` — REWORK
 - Last product head: `0bedb2d110147f3f34c5846d14ee9b9581926f2d`
 - Feasibility head: `71b471abc8544fa40b138a12e746b11b94e34e8c`
 - Product changes during feasibility: none
 - Steering escalation: issue #38 comment `5365959417`
+- Steering refreeze: issue #38 comment `5368017338`
 
 ## Frozen contradiction
 
@@ -39,17 +41,15 @@ Copying the outer DTO only retains the same Enum singleton.
 - Worktree, local/tracking/live remote remain clean and exact at `71b471a…`; feasibility made no
   product, test, interface or SDP change.
 
-## Steering decision required
+## Steering decision
 
-Steering must explicitly choose and refreeze one mutation/representation rule before RF-004 can
-continue. Non-exhaustive decision directions are:
+Steering selected the supported-mutation direction in comment `5368017338`:
 
-1. define closed contract Enum members as immutable atoms under a stated supported-mutation
-   model, exclude later reflective/member/class monkey-patching, and bound accepted generic `T`
-   to contract-safe DTO/atom types;
-2. replace public Enum-bearing result/record fields with a detached immutable value token or
-   literal representation and refreeze the affected schemas;
-3. otherwise revise the post-construction immutability requirement and its conformance tests.
+1. public DTO/result schemas and exact typed Enum members remain unchanged;
+2. closed contract Enums are contract-safe immutable atoms under the supported mutation model;
+3. generic/nested payloads are bounded to recursively contract-safe immutable values;
+4. reflection/type-system mutation is outside conformance.
 
-Master makes no choice and changes no frozen interface. `DBG-RVW-001-005-027`, formal
-verification, Slice 007 and every later RF-004 Slice are not started. RF-005..009 remain blocked.
+Master refreezes only those semantics as `1.1` plus `DBG-CF-001-005-001`. Fresh interface review
+`DBG-RVW-001-005-028` must pass before a Slice 002 worker starts. Historical review 026 remains
+REWORK; review 027 is reserved only for the later post-refreeze product head. RF-005..009 remain blocked.

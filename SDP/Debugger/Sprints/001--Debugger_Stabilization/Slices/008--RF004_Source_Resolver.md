@@ -46,7 +46,7 @@ separate from the artifact index and any frontend navigation policy.
 
 `DBG-R-024..DBG-R-025`, `DBG-R-028`, `DBG-R-034..DBG-R-036`;
 `DBG-F-020`; `DBG-D-004`, `DBG-D-009`; `HSX-D-002`;
-interface `dbg.resolver-inspection/1`.
+interface `dbg.resolver-inspection/1.1`.
 
 ## Verification and completion signal
 

@@ -1,6 +1,6 @@
-# `dbg.resolver-inspection/1` — Typed Resolver and Inspection Interface
+# `dbg.resolver-inspection/1.1` — Typed Resolver and Inspection Interface
 
-- Status: **FROZEN / INDEPENDENT REVIEW 019 PASS**
+- Status: **STEERING REFROZEN / INDEPENDENT REVIEW 028 PENDING**
 - Iteration: `DBG-IT-001-005`
 - Parent Refactor: `DBG-RF-004`
 - Steering authority: issue #38 comment `5362514094`
@@ -19,11 +19,19 @@
 - Review `DBG-RVW-001-005-017`: REWORK at `cb88b62b7c45ea6ebfe31c40e522daa3adcf8896`
 - Review `DBG-RVW-001-005-018`: REWORK at `08719457a341b01ca8f64ea568e1ab04678dd10d`
 - Review `DBG-RVW-001-005-019`: PASS at `058c3383593553aa1497d024d41285d44d9c67a8`
-- Public interface ID: `dbg.resolver-inspection/1`
+- Steering refreeze: issue #38 comment `5368017338`
+- Prior public interface/review: `dbg.resolver-inspection/1` / `DBG-RVW-001-005-019` PASS
+- Public interface ID: `dbg.resolver-inspection/1.1`
+- Conformance fixture matrix: `DBG-CF-001-005-001`
 
 This document freezes the public Python-domain interface to be implemented by the seven bounded
 RF-004 Slices. It is frontend-neutral and side-by-side: it does not migrate DAP, CLI, VS Code,
 the Executive, VM, or AVR paths.
+
+Version `1.1` preserves every public DTO/result schema, exact typed Enum member, identity,
+coherence/address/outcome rule, ownership boundary and public method from version `1`. The only
+normative change is the supported-mutation/contract-safe immutability definition and its
+conformance fixtures. The stable filename is retained for review-history continuity.
 
 Any implementation discovery that requires changing an identity field, coherence rule,
 address rule, result category, ownership boundary, or public method below stops the active
@@ -39,7 +47,7 @@ boundaries:
 |---|---|---|
 | `identity.py` | Immutable target, image, artifact, bundle, binding, stop/snapshot refs and shared DebugBindingValidator | Parsing, filesystem lookup, target reads, frontend IDs |
 | `addresses.py` | Address-space descriptors, typed addresses/ranges, checked arithmetic and formatting | Symbol lookup, masks hidden in adapters, memory reads |
-| `results.py` | Typed resolver/inspection statuses, diagnostics and immutable result envelopes | Service algorithms or policy fallbacks |
+| `results.py` | Typed resolver/inspection statuses, diagnostics and contract-safe immutable result envelopes | Service algorithms or policy fallbacks |
 | `snapshot.py` | SnapshotReadPort Protocol and exact context/result fencing helpers | Runtime adapter, live reads, transport/retry |
 | `metadata.py` | Pure source/function/symbol/type/scope/instruction/memory record DTOs | Parsing/indexes, recipe rows/evaluation, target reads |
 | `artifacts.py` | Verified bundle/component parsing and immutable debug indexes | Local source selection, live reads, stack walking, frontend mapping |
@@ -126,7 +134,7 @@ snapshot token, transition revision or inspection revision is `STALE`.
 
 ## 3. Identity and address value types
 
-All types are frozen value objects with exact equality. String identities are non-empty and
+All types are contract-safe frozen value objects with exact equality. String identities are non-empty and
 case-sensitive. Digest strings use the frozen lowercase Hex64 representation only where the
 portable contract specifies a digest; other identity strings are opaque and are not
 lowercased, path-normalized or parsed for meaning.
@@ -392,15 +400,56 @@ Domain failures are returned, not hidden by `None`, first-candidate selection or
 - `WRAP_FORBIDDEN`
 - `UNIT_CONVERSION_UNSUPPORTED`
 
-Every result is immutable and contains status, exact input/evidence identity, zero or more
-typed values/candidates, and ordered structured diagnostics. `RESOLVED`/`COMPLETE` requires
+Every result is contract-safe immutable under the supported mutation model and contains status,
+exact input/evidence identity, zero or more typed values/candidates, and ordered structured diagnostics. `RESOLVED`/`COMPLETE` requires
 exactly the evidence required by the service. `AMBIGUOUS` never contains a preferred or
 silently selected candidate. `PARTIAL` names the missing pieces and never pads, truncates or
 invents values.
 
+### Supported-mutation and contract-safe immutability model
+
+Post-construction immutability means that no supported debugger API operation or mutation of
+caller-owned construction inputs may change the declared value-state of an accepted result or
+DTO after construction. Mutable caller containers and mutable implementation records are
+copied/normalized into their declared frozen representation before publication. A generic or
+nested payload that cannot satisfy the boundary below fails construction/classification rather
+than publishing a mutable reference.
+
+It does not require isolation from hostile or reflection-level mutation of Python type
+definitions/runtime internals. The following are outside the supported mutation model and are
+not conformance failures for snapshot immutability:
+
+- monkey-patching/rebinding Enum classes, members or descriptors;
+- editing Enum internals such as `_member_map_`, `_value_` or other runtime metadata;
+- `object.__setattr__`-style bypasses of frozen/public assignment rules;
+- module/class replacement or equivalent Python runtime-internal mutation;
+- mutable external state reachable only through a non-contract custom property.
+
+Generic result payloads and nested public DTO fields contain only recursively contract-safe
+immutable values:
+
+- exact immutable scalar values and `bytes`;
+- approved closed Enum atoms named by this interface;
+- frozen value/identity DTOs whose every declared field is contract-safe;
+- tuples and frozensets whose members are recursively contract-safe;
+- explicitly frozen value objects admitted by a named public schema in this interface.
+
+An approved closed Enum is a contract-safe immutable atom when the exact canonical member is
+retained, its schema-visible value is an immutable scalar or recursively contract-safe
+tuple/value, and contract semantics depend only on exact Enum type/member identity plus the
+declared schema-visible name/value. Exact member identity is required; cloning, proxying,
+wrapping or token replacement is neither required nor permitted. Arbitrary caller Enum types,
+custom properties and mutable non-schema state do not become contract-safe merely by being an
+`Enum` instance.
+
+The public schemas below are unchanged from version `1`. If an RF-004 required public value
+cannot fit this contract-safe boundary without a schema change, implementation stops and
+returns to Steering. Normative cases and explicit non-cases are frozen in
+`DBG-CF-001-005-001`.
+
 ### Frozen envelope and record schemas
 
-All tuples below are ordered and immutable. IDs are opaque non-empty exact strings.
+All tuples below are ordered and contract-safe immutable. IDs are opaque non-empty exact strings.
 
 ```text
 Diagnostic {
@@ -526,7 +575,7 @@ obtained only through a matching LocationRow form (`static_address`, register/fr
 value, pieces, optimized_out or unavailable); no static/sentinel address is stored in
 SymbolRecord. SymbolExpression is valid only for address-bearing FUNCTION/LABEL; variable
 kinds use VariableExpression and LocationEvaluator.
-LocationRow is static metadata and `frame_binding=SELECTED_FRAME` is the only v1 value;
+LocationRow is static metadata and `frame_binding=SELECTED_FRAME` is the only `1.1` value;
 LocationEvaluator binds it to the explicit UnwindFrame argument and requires matching context,
 function and frame PC. No current/top-frame lookup or runtime handle is stored in the artifact.
 When declared_type_id is present it must resolve to exactly one TypeRecord whose bit_size and
@@ -858,7 +907,7 @@ SnapshotReadPort.read_disassembly(context: InspectionContext, address: HsxAddres
 
 Every call carries the complete `InspectionContext`; returned evidence must match it exactly.
 The port exposes no generic `request(dict)` and no live-current-frame method. Test fixtures may
-implement the port with immutable snapshot data. Runtime adapters belong to later authorized
+implement the port with contract-safe immutable snapshot data. Runtime adapters belong to later authorized
 work and may not be added in RF-004.
 
 ## 8. Recipes, locations and stack
@@ -1194,7 +1243,7 @@ and a later Steering authorization.
 
 ## 12. Interface completion signal
 
-`dbg.resolver-inspection/1` is accepted only when all seven Slices and RF-004 parent review,
+`dbg.resolver-inspection/1.1` is accepted only when all seven Slices and RF-004 parent review,
 verification and exact-head Master sign-off pass on remote-resolvable history. The decision
 package must state exact interfaces, address/source/stack/variables/memory/disassembly
 coverage, legacy reuse/retirement, degraded behavior and every review/verification/sign-off

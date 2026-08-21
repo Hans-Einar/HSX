@@ -186,8 +186,8 @@ relations:
   - from: DBG-RF-004
     type: produces_interface
     to:
-      - dbg.resolver-inspection/1
-    status: frozen_review_pass_implementation_pending
+      - dbg.resolver-inspection/1.1
+    status: refrozen_review_028_pending_implementation_stopped
   - from: DBG-SL-001-005-001
     type: reviewed_by
     to: [DBG-RVW-001-005-001]
@@ -271,18 +271,31 @@ relations:
   - from: DBG-SL-001-005-002
     type: reviewed_by
     to: [DBG-RVW-001-005-027]
-    status: not_started_blocked
+    status: not_started_pending_interface_review_028_pass
   - from: DBG-SL-001-005-002
     type: blocked_by
     to: [DBG-BLK-001-005-001]
-    status: awaiting_steering_decision
+    status: steering_accepted_refreeze_review_pending
     record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/005--RF004_Enum_Immutability_Steering_Blocker.md
   - from: DBG-BLK-001-005-001
     type: requires_steering_decision_on
-    to: [dbg.resolver-inspection/1]
-    status: open
+    to: [dbg.resolver-inspection/1.1]
+    status: resolved_by_steering_refreeze_pending_interface_review
     issue: 38
-    comment: 5365959417
+    escalation_comment: 5365959417
+    resolution_comment: 5368017338
+  - from: dbg.resolver-inspection/1.1
+    type: conforms_via
+    to: [DBG-CF-001-005-001]
+    status: refrozen_candidate
+  - from: dbg.resolver-inspection/1.1
+    type: reviewed_by
+    to: [DBG-RVW-001-005-028]
+    status: planned
+  - from: DBG-SL-001-005-002
+    type: resumes_after
+    to: [DBG-RVW-001-005-028]
+    status: blocked_pending_review_pass
   - from: DBG-SL-001-005-002
     type: verified_by
     to: [DBG-VER-001-005-002]
@@ -437,7 +450,7 @@ relations:
   - from: DBG-RF-005
     type: depends_on_accepted_interface
     to:
-      - dbg.resolver-inspection/1
+      - dbg.resolver-inspection/1.1
     status: blocked_pending_rf004_parent_signoff_and_steering
     authority_issue: 42
     authority_comment: 5362515750
@@ -776,7 +789,7 @@ proposed_dependency_changes:
       type: prerequisite_for
       to:
         - DBG-RF-005
-      required_interface: dbg.resolver-inspection/1
+      required_interface: dbg.resolver-inspection/1.1
       acceptance_gate: rf004_parent_signoff_remote_publication_and_later_steering_authorization
     - from: DBG-RF-005
       type: prerequisite_for
