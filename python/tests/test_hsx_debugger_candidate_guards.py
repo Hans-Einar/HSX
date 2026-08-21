@@ -82,10 +82,6 @@ def test_location_validator_type_error_names_location_row() -> None:
         )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="P001 promotion blocker: signed DebugArtifactIndex lacks exact symbol_by_id query",
-)
 def test_exact_symbol_id_query_is_present_on_real_artifact_index() -> None:
     assert hasattr(DebugArtifactIndex, "symbol_by_id")
     assert callable(getattr(DebugArtifactIndex, "symbol_by_id", None))
