@@ -1,6 +1,6 @@
 # DBG-SL-001-005-002 — RF-004 Typed Identity, Binding, Address, and Result Foundation
 
-- Status: **CORRECTED / FRESH RE-REVIEW PENDING**
+- Status: **REWORK 2 / FRESH CORRECTIVE WORKER PENDING**
 - Implementation head: `4b5837644dc1196accfd8608bc3dbd20980476bb`
 - Corrected head: `4280bc6008385042bdff923bd8e5392a1c290fdc`
 - Parent: `DBG-RF-004`
@@ -90,7 +90,7 @@ Close only after exact-head review, formal verification and Master sign-off.
 - diff-check, exact scope and clean status: PASS.
 
 Review `DBG-RVW-001-005-002`: REWORK. Next review after bounded correction:
-`DBG-RVW-001-005-021`.
+`DBG-RVW-001-005-021` — REWORK. Next fresh review after correction: `DBG-RVW-001-005-022`.
 
 Corrective result: `results.py` and owned metadata test only; focused 39 passed; all
 `test_hsx_debugger*.py` 176 passed/1 WinError 1314 skip; mandated 39 passed/1 same skip;

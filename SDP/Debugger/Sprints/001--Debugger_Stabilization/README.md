@@ -1,6 +1,6 @@
 # DBG-SPR-001 — Debugger Stabilization
 
-- Status: ITERATION 005 ACTIVE — SLICE 001 SIGNED / SLICE 002 RE-REVIEW
+- Status: ITERATION 005 ACTIVE — SLICE 001 SIGNED / SLICE 002 REWORK 2
 - Owning track: Debugger
 - Owning GapAnalysis: `DBG-GAP-001`
 

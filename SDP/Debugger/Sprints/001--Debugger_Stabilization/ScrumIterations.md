@@ -841,3 +841,12 @@ ValuePiece coverage is gap-free; MemoryBlock/result status is bidirectionally co
 adversarial probes are covered. Evidence: focused 39 passed; debugger 176 passed/1 skip;
 mandated 39 passed/1 skip; canonical 2 passed; compile/import/export 129 PASS; stdlib trace
 84/85/84/86/86%; scope/diff/clean PASS. Fresh re-review is `DBG-RVW-001-005-021`.
+
+### Slice 002 review attempt 2
+
+Fresh `DBG-RVW-001-005-021` reviewed `4280bc6008385042bdff923bd8e5392a1c290fdc`
+and returned REWORK: High scalar/frozen-dataclass subclasses could carry extra mutable state
+through generic result freeze; Medium normalized CurrentIndex/Issues summaries still said
+Slice-002-rework rather than corrected re-review. Exact DTO, piece, memory, tests, canonical,
+scope and trace mechanics otherwise passed. Fresh corrective worker fixes deep subtype rejection;
+next review is `DBG-RVW-001-005-022`.
