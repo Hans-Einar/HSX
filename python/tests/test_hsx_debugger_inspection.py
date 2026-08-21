@@ -461,7 +461,9 @@ def test_invalidate_and_close_are_exact_and_idempotent() -> None:
     again = service.close("again")
     assert closed.status is ServiceCloseStatus.CLOSED
     assert again.status is ServiceCloseStatus.ALREADY_CLOSED
-    assert service.open_epoch(f.context, RecipeRequestLimits(64, 16)).status is InspectionOpenStatus.STALE
+    reopened = service.open_epoch(f.context, RecipeRequestLimits(64, 16))
+    assert reopened.status is InspectionOpenStatus.UNAVAILABLE
+    assert reopened.diagnostics[0].code == "inspection_service_closed"
 
 
 def test_invalidation_wins_over_late_snapshot_read() -> None:
