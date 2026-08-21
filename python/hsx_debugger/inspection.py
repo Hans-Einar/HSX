@@ -52,7 +52,7 @@ from .results import (
     VariableExpression,
 )
 from .snapshot import SnapshotReadPort, fence_snapshot_result, require_snapshot_read_set
-from .stack import StackService
+from .stack import STACK_RESULT_STATUSES, StackService, StackWalkResult
 
 
 _ACCEPTED_PROFILE = "hsx.portable-debug-runtime/1"
@@ -155,6 +155,39 @@ class FramePage:
         if not all(isinstance(item, FrameRecord) for item in frames):
             raise TypeError("frames must contain FrameRecord values")
         object.__setattr__(self, "frames", frames)
+
+
+@dataclass(frozen=True, slots=True)
+class StackPageResult:
+    """Exact stack termination plus a paged handle view of the proven prefix."""
+
+    status: InspectionStatus
+    context: InspectionContext
+    page: FramePage
+    diagnostics: tuple[Diagnostic, ...] = ()
+
+    def __post_init__(self) -> None:
+        if type(self.status) is not InspectionStatus or self.status not in STACK_RESULT_STATUSES:
+            raise ValueError("status must be one frozen stack-result InspectionStatus")
+        if not isinstance(self.context, InspectionContext):
+            raise TypeError("context must be InspectionContext")
+        if not isinstance(self.page, FramePage):
+            raise TypeError("page must be FramePage")
+        diagnostics = _diagnostics(self.diagnostics)
+        if any(record.context != self.context for record in self.page.frames):
+            raise ValueError("every paged frame must retain the exact result context")
+        if self.status is InspectionStatus.COMPLETE:
+            if self.page.total_frames < 1 or diagnostics:
+                raise ValueError("COMPLETE stack page requires a proven prefix and no terminating diagnostic")
+        elif self.status is InspectionStatus.PARTIAL:
+            if self.page.total_frames < 1 or not diagnostics:
+                raise ValueError("PARTIAL stack page requires a proven prefix and diagnostic")
+        elif self.status is InspectionStatus.UNAVAILABLE:
+            if self.page.total_frames != 0 or not diagnostics:
+                raise ValueError("UNAVAILABLE stack page requires no proven frame and a diagnostic")
+        elif not diagnostics:
+            raise ValueError("terminating stack page failures require diagnostics")
+        object.__setattr__(self, "diagnostics", diagnostics)
 
 
 @dataclass(frozen=True, slots=True)
@@ -371,8 +404,6 @@ class InspectionService:
         if not isinstance(request_limits, RecipeRequestLimits):
             raise TypeError("request_limits must be RecipeRequestLimits")
 
-        # Close is terminal. Check once before pure validation and again at the linearization
-        # point so a concurrent close cannot be hidden by a later limit/binding classification.
         with self._lock:
             if self._closed:
                 return InspectionOpenResult(InspectionOpenStatus.UNAVAILABLE, None, (_diag("inspection_service_closed", "inspection service is closed"),))
@@ -482,6 +513,14 @@ class EpochInspectionSession:
     def _stale(self):
         return _failure(self._context, InspectionStatus.STALE, "inspection_session_stale", "inspection epoch is stale")
 
+    def _stale_stack_page(self, page: PageRequest, code: str = "inspection_session_stale") -> StackPageResult:
+        return StackPageResult(
+            InspectionStatus.STALE,
+            self._context,
+            FramePage(0, page.offset, ()),
+            (_diag(code, "inspection epoch is stale"),),
+        )
+
     def _resolve_handle(self, handle: DomainHandle, expected_kind: HandleKind) -> HandleResolution:
         if not isinstance(handle, DomainHandle):
             raise TypeError("handle must be DomainHandle")
@@ -491,7 +530,7 @@ class EpochInspectionSession:
             return HandleResolution(status, self._context, expected_kind, None, (_diag(code, "handle context is not active here"),))
         return self._store.resolve(handle, expected_kind)
 
-    def _stack_frames(self):
+    def _stack_frames(self) -> StackWalkResult:
         return self._service._stack_service.unwind(
             self._context,
             self._service._index,
@@ -507,12 +546,19 @@ class EpochInspectionSession:
         if resolution.status is not InspectionStatus.COMPLETE:
             return None, InspectionResult(resolution.status, self._context, None, resolution.diagnostics)
         frame_index = resolution.object_key[0]
-        stack = self._stack_frames()
-        if stack.status not in {InspectionStatus.COMPLETE, InspectionStatus.PARTIAL}:
-            return None, stack
-        if frame_index >= len(stack.value):
-            return None, _failure(self._context, InspectionStatus.STALE, "frame_no_longer_available", "interned frame is absent from exact snapshot walk")
-        return stack.value[frame_index], None
+        walk = self._stack_frames()
+        if not isinstance(walk, StackWalkResult):
+            return None, _failure(self._context, InspectionStatus.CORRUPT, "stack_service_contract", "StackService returned a non-StackWalkResult")
+        if frame_index < len(walk.frames):
+            return walk.frames[frame_index], None
+        if walk.status in {InspectionStatus.PARTIAL, InspectionStatus.UNAVAILABLE}:
+            status = InspectionStatus.UNAVAILABLE
+        elif walk.status is InspectionStatus.COMPLETE:
+            status = InspectionStatus.STALE
+        else:
+            status = walk.status
+        diagnostics = walk.diagnostics or (_diag("frame_no_longer_available", "interned frame is absent from exact repeated stack walk"),)
+        return None, InspectionResult(status, self._context, None, diagnostics)
 
     def registers(self, selection: RegisterSelection) -> InspectionResult[RegisterSet]:
         if not isinstance(selection, RegisterSelection):
@@ -547,29 +593,43 @@ class EpochInspectionSession:
                 return _failure(self._context, InspectionStatus.CORRUPT, "snapshot_register_width_mismatch", "register width differs from descriptor")
         return result
 
-    def stack(self, page: PageRequest) -> InspectionResult[FramePage]:
+    def stack(self, page: PageRequest) -> StackPageResult:
         if not isinstance(page, PageRequest):
             raise TypeError("page must be PageRequest")
         revision = self._begin()
         if revision is None:
-            return self._stale()
-        result = self._stack_frames()
-        if result.status not in {InspectionStatus.COMPLETE, InspectionStatus.PARTIAL}:
-            return result
+            return self._stale_stack_page(page)
+        walk = self._stack_frames()
+        if not isinstance(walk, StackWalkResult):
+            return StackPageResult(
+                InspectionStatus.CORRUPT,
+                self._context,
+                FramePage(0, page.offset, ()),
+                (_diag("stack_service_contract", "StackService returned a non-StackWalkResult"),),
+            )
         if not self._finish(revision):
-            return self._stale()
-        frames = result.value
+            return self._stale_stack_page(page, "stack_walk_invalidated")
+
+        frames = walk.frames
         start, end = _page_bounds(len(frames), page)
         records: list[FrameRecord] = []
         with self._lock:
             if not self._active or self._revision != revision:
-                return self._stale()
+                return self._stale_stack_page(page, "stack_handle_publication_invalidated")
             for frame in frames[start:end]:
                 interned = self._store.intern(HandleKind.FRAME, (frame.frame_index,))
                 if interned.status is not InspectionStatus.COMPLETE:
-                    return InspectionResult(interned.status, self._context, None, interned.diagnostics)
+                    status = interned.status if interned.status in STACK_RESULT_STATUSES else InspectionStatus.CORRUPT
+                    diagnostics = interned.diagnostics or (_diag("frame_handle_intern_failed", "frame handle interning failed"),)
+                    return StackPageResult(status, self._context, FramePage(len(frames), page.offset, tuple(records)), diagnostics)
                 records.append(FrameRecord(self._context, interned.value, frame))
-        return InspectionResult(result.status, self._context, FramePage(len(frames), page.offset, tuple(records)), result.diagnostics)
+
+        return StackPageResult(
+            walk.status,
+            self._context,
+            FramePage(len(frames), page.offset, tuple(records)),
+            walk.diagnostics,
+        )
 
     def scopes(self, frame_handle: DomainHandle) -> InspectionResult[ScopeSet]:
         revision = self._begin()
@@ -869,6 +929,7 @@ __all__ = [
     "ScopeSet",
     "ScopeValueRecord",
     "ServiceCloseResult",
+    "StackPageResult",
     "SymbolVariableRecord",
     "VariablePage",
 ]
