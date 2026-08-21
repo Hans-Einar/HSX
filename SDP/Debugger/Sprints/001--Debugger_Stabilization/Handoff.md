@@ -1,6 +1,6 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf004_slices001_002_signed_slice007_worker_pending`
+Status: `rf004_blocked_awaiting_steering_location_frame_evidence`
 
 Steering escalation: issue #38 comment `5365959417`.
 Steering refreeze: issue #38 comment `5368017338`.
@@ -16,7 +16,8 @@ The accepted first-wave gate is closed. Execute only `DBG-RF-004` through the se
 `058c338…` for historical version `1`. Steering accepted `DBG-BLK-001-005-001` and refroze only
 immutability semantics in comment `5368017338`. Review 028 returned REWORK for two Medium
 interface/trace findings. Slice 001 is signed; Slice 002 product work is stopped pending fresh
-fresh Slice 007 recipe-foundation worker after Slice 002 verification/sign-off. RF-005..009 and
+Steering decision on `DBG-BLK-001-005-002` after the fresh Slice 007 worker found a frozen
+LocationEvaluator frame-evidence contradiction with zero edits. RF-005..009 and
 Executive/VM/AVR/frontend migration remain blocked.
 
 ## Authority
@@ -189,8 +190,8 @@ Executive/VM/AVR/frontend migration remain blocked.
 
 ## Exact next step
 
-Dispatch fresh `DBG-SL-001-005-007` worker under its frozen `recipes.py`/test ownership. Then
-run review 011, verification 007 and Master sign-off before artifact Slice 003.
+Stop for Steering. Do not start another worker, review011, verification007, artifact Slice003
+or any later Slice until an exact public frame-evidence seam is refrozen and reviewed.
 
 ## Traceability state
 
@@ -203,8 +204,7 @@ run review 011, verification 007 and Master sign-off before artifact Slice 003.
   `fefd4b0c427dfa71d637e4f4cce9e4a345912591`.
 - CurrentIndex, Issues, sprint records, Relations, Ledger, and Handoff are current through
   Steering refreeze comment `5368017338`, candidate `1.1`/`DBG-CF-001-005-001`, and planned
-  interface review 030 PASS, product review 027 PASS, verification 002 PASS, Slice 002 sign-off,
-  and Slice 007 activation.
+  interface review 030 PASS, Slice 002 review/verification/sign-off, and new blocker 002.
 - Accepted architecture direction: `DBG-DA-001`, `DBG-A-001..DBG-A-008`
 - Completed Design Studies: `DBG-ST-002..DBG-ST-005`
 - Architecture review: `DBG-RVW-001-002-001` — REWORK at `f8b8097`
@@ -273,7 +273,7 @@ run review 011, verification 007 and Master sign-off before artifact Slice 003.
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: fresh Slice 007 worker
+- Active gate: Steering decision on `DBG-BLK-001-005-002`
 - Blocker authority: issue #38 comment `5365959417`
 - Refreeze authority: issue #38 comment `5368017338`
 
@@ -281,7 +281,7 @@ run review 011, verification 007 and Master sign-off before artifact Slice 003.
 
 The prior design/portable-contract chain and RF-002/RF-003/integration wave are complete,
 Steering-accepted and remotely reconstructable. RF-004 `1.1` is a refrozen interface candidate;
-only the bounded Slice 007 worker is open; later Slices remain stopped. Controlled work is on
+workers/reviewers/verifiers are stopped pending Steering. Controlled work is on
 `codex/dbg-rf-004` from exact base `69a54aeb3394d3cd4792bce620748e15bab69f1f`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.

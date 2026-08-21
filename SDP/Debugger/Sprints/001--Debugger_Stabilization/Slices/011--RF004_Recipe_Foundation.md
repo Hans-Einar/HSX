@@ -1,6 +1,9 @@
 # DBG-SL-001-005-007 — RF-004 Recipe Schema and Evaluator Foundation
 
-- Status: **ACTIVE / FRESH WORKER PENDING**
+- Status: **BLOCKED / AWAITING STEERING — `DBG-BLK-001-005-002`**
+
+- Discovery head: `269d0bb962f85241633e1af8489b459357f2ff77`
+- Product changes: none
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
 - Depends on signed: `DBG-SL-001-005-001..002`
@@ -71,3 +74,12 @@ Test every opcode/rule/location form, exact result type, unknown/malformed input
 stack/deref/byte/total/piece bounds, `unsupported(limit_exceeded)`, endian/width/address
 failure, stale context and structural partial pieces. Run signed identity/address regressions.
 Close only after exact-head review, formal verification and Master sign-off.
+
+## Frozen contradiction discovered before implementation
+
+The public LocationEvaluator inputs cannot construct the mandatory RecipeEvaluationContext for
+non-top-frame `reg_value`: UnwindFrame has no recovered registers/PSW, the method accepts no
+frame evidence, and SnapshotReadPort has no frame-aware recovered-state read. Current snapshot
+registers are a forbidden fallback. See
+`Interfaces/007--RF004_Location_Frame_Evidence_Steering_Blocker.md`. Worker stopped with zero
+edits; review011/verification007 did not start.

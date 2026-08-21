@@ -474,7 +474,7 @@ traceability and no product drift after the combined signed head. Steering accep
 
 ## DBG-IT-001-005 — Typed Resolver and Inspection
 
-Status: ACTIVE — SLICES 001–002 SIGNED / SLICE 007 ACTIVE
+Status: BLOCKED — AWAITING STEERING ON `DBG-BLK-001-005-002`
 
 ### Authority and goal
 
@@ -1019,3 +1019,12 @@ Master exact-head sign-off completed with review027/interface030 PASS. The only 
 is WinError 1314 symlink privilege; no symlink PASS is claimed. Slice 002 is complete. Master
 activates only `DBG-SL-001-005-007` recipe foundation under its frozen ownership; review011,
 verification007 and sign-off must pass before artifact Slice003.
+
+### Slice 007 frozen frame-evidence contradiction / Steering stop
+
+The fresh Slice 007 worker independently found that frozen LocationEvaluator cannot evaluate
+non-top-frame `reg_value`: UnwindFrame exposes no recovered registers/PSW, the evaluator
+signature accepts no frame-evidence context, and SnapshotReadPort has no frame-aware recovered
+read. Using current registers, hidden state or inferred ABI values violates frozen no-fallback
+semantics. Worker made zero edits at clean remote head `269d0bb…`. Master opened
+`DBG-BLK-001-005-002`; review011, verification007, Slice003 and later work remain unstarted.

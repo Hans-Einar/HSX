@@ -328,6 +328,15 @@ relations:
     to: [c7bc39057469f1aa62a78f409753ec0213631214]
     status: pass
     record: SDP/Debugger/Verification/DBG-SL-001-005-002--Master_Signoff.md
+  - from: DBG-SL-001-005-007
+    type: blocked_by
+    to: [DBG-BLK-001-005-002]
+    status: awaiting_steering_decision
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/007--RF004_Location_Frame_Evidence_Steering_Blocker.md
+  - from: DBG-BLK-001-005-002
+    type: requires_steering_decision_on
+    to: [dbg.resolver-inspection/1.1]
+    status: open
   - from: DBG-SL-001-005-003
     type: reviewed_by
     to: [DBG-RVW-001-005-003]

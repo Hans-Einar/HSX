@@ -1,6 +1,6 @@
 # DBG-RF-004 — Typed Artifact, Source, Address, Stack, and Inspection
 
-- Status: **ACTIVE — SLICES 001–002 SIGNED / SLICE 007 WORKER PENDING**
+- Status: **BLOCKED — AWAITING STEERING ON LOCATION FRAME EVIDENCE**
 - Steering authority: issue #38 comment `5362514094`
 - Dependency clarification: issue #42 comment `5362515750`
 - Immutability refreeze: issue #38 comment `5368017338`
