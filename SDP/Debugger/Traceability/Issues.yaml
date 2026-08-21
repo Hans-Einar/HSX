@@ -266,9 +266,10 @@ issues:
     slice001_signoff_status: pass
     slice001_signed_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
     active_slice: DBG-SL-001-005-002
-    active_slice_status: active_worker_dispatch
+    active_slice_status: implemented_pending_review
     active_slice_review: DBG-RVW-001-005-002
     active_slice_verification: DBG-VER-001-005-002
+    active_slice_implementation_head: 4b5837644dc1196accfd8608bc3dbd20980476bb
     interface_review: DBG-RVW-001-005-007
     interface_review_status: rework
     interface_reviewed_head: 82154c614a31284723bf3e6a337c5bedfb8aba5d
