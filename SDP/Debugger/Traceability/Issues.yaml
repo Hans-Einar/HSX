@@ -213,7 +213,7 @@ issues:
     rf004_interface_review_attempt_12_status: pass
     rf004_interface_review_attempt_12_head: 058c3383593553aa1497d024d41285d44d9c67a8
     rf004_prior_interface_frozen_head: 058c3383593553aa1497d024d41285d44d9c67a8
-    rf004_refreeze_candidate_head: pending_publication
+    rf004_refreeze_candidate_head: 94a59f3738fadc0b6230fc3dc69cf36ca8b9202e
     rf004_refreeze_review: DBG-RVW-001-005-028
     rf004_refreeze_review_status: planned
     rf004_refreeze_conformance: DBG-CF-001-005-001
@@ -345,7 +345,7 @@ issues:
     interface_review_attempt_12_status: pass
     interface_review_attempt_12_head: 058c3383593553aa1497d024d41285d44d9c67a8
     prior_interface_frozen_head: 058c3383593553aa1497d024d41285d44d9c67a8
-    refreeze_candidate_head: pending_publication
+    refreeze_candidate_head: 94a59f3738fadc0b6230fc3dc69cf36ca8b9202e
     steering_authority_comment: 5362514094
   DBG-RF-005:
     issue: 42

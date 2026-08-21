@@ -438,7 +438,7 @@ active_rf004:
     review_attempt_12_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/040--RF004_Interface_Final_Review.md
     prior_master_freeze_status: pass
     prior_frozen_contract_head: 058c3383593553aa1497d024d41285d44d9c67a8
-    refreeze_candidate_head: pending_publication
+    refreeze_candidate_head: 94a59f3738fadc0b6230fc3dc69cf36ca8b9202e
     refreeze_review: DBG-RVW-001-005-028
     refreeze_review_status: planned
     conformance_id: DBG-CF-001-005-001

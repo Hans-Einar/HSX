@@ -10,6 +10,7 @@
 - Product changes during feasibility: none
 - Steering escalation: issue #38 comment `5365959417`
 - Steering refreeze: issue #38 comment `5368017338`
+- Published refreeze content head: `94a59f3738fadc0b6230fc3dc69cf36ca8b9202e`
 
 ## Frozen contradiction
 

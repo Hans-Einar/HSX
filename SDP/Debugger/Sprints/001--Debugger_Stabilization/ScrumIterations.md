@@ -962,3 +962,4 @@ immutable atoms. Enum cloning and isolation from reflection/monkey-patching of P
 explicit non-conformance cases. Master published Interface 004 plus
 `DBG-CF-001-005-001`; fresh exact-head interface review 028 is the sole active gate. Historical
 review 026 remains REWORK, product review 027 remains unstarted, and no later Slice is active.
+The exact remote-published refreeze content head is `94a59f3738fadc0b6230fc3dc69cf36ca8b9202e`.

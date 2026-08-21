@@ -4,6 +4,7 @@ Status: `rf004_interface_1_1_refrozen_review_028_pending_product_stopped`
 
 Steering escalation: issue #38 comment `5365959417`.
 Steering refreeze: issue #38 comment `5368017338`.
+Published refreeze content head: `94a59f3738fadc0b6230fc3dc69cf36ca8b9202e`.
 
 ## Current objective
 
@@ -183,8 +184,9 @@ stopped pending fresh interface review 028. RF-005..009 and Executive/VM/AVR/fro
 
 ## Exact next step
 
-Publish the exact `1.1` refreeze/fixture/trace head, then dispatch fresh independent
-`DBG-RVW-001-005-028`. Do not start a Slice 002 worker unless that interface review passes.
+Dispatch fresh independent `DBG-RVW-001-005-028` against exact refreeze content head
+`94a59f3738fadc0b6230fc3dc69cf36ca8b9202e`. Do not start a Slice 002 worker unless that
+interface review passes.
 
 ## Traceability state
 
