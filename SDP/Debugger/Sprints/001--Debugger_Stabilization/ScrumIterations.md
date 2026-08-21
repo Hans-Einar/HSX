@@ -474,7 +474,7 @@ traceability and no product drift after the combined signed head. Steering accep
 
 ## DBG-IT-001-005 — Typed Resolver and Inspection
 
-Status: ACTIVE — INTERFACE PASS / SLICE 001 SIGNED / SLICE 002 CORRECTED 4 / REVIEW 025 PENDING
+Status: ACTIVE — INTERFACE PASS / SLICE 001 SIGNED / SLICE 002 REWORK 5
 
 ### Authority and goal
 
@@ -905,3 +905,12 @@ regressions now pass while legitimate frozen DTO/Enum cases remain accepted. Evi
 51 passed; debugger 188 passed/1 classified WinError 1314 skip; mandated 39 passed/1 same skip;
 canonical 2; targeted adversarial 7; compile/import/export 129 unique; exact scope/diff/fsck/
 ancestry/clean PASS. Fresh review is `DBG-RVW-001-005-025`; no later Slice is active.
+
+### Slice 002 review attempt 6
+
+Fresh `DBG-RVW-001-005-025` confirmed every review 024 dict/slot/member-descriptor finding
+closed at `bbc5c8ba…`, but returned REWORK because Enum validation traversed only `_value_`
+while retaining other possible mutable instance storage. Focused 51, debugger 188+1, mandated
+39+1, oracle 16+1, canonical 2, exports 129 and all scope/YAML/Ledger/git gates passed. Master
+also reconciled three stale Handoff narratives. Fresh corrective worker 5 must deep-validate
+every actual Enum storage cell; next review is `DBG-RVW-001-005-026`.

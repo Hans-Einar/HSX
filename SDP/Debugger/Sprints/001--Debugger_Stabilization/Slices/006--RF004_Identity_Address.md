@@ -110,6 +110,10 @@ dict descriptors plus slot metadata/descriptor concealment for dataclass and Enu
 debugger 188+1 classified skip, mandated 39+1 same skip, canonical 2, adversarial 7, exports 129,
 diff/fsck/exact scope/clean PASS. Review 025 is pending.
 
+Review 025: REWORK. Review 024 storage-descriptor findings are closed, but Enum validation
+must traverse every actual non-value instance storage cell before retaining the member. Fresh
+bounded correction 5 is followed by `DBG-RVW-001-005-026`.
+
 Second correction: exact atom types; directly declared frozen dataclasses only; all fields
 deep-traversed; undeclared dict/slot state rejected. Focused 43, debugger 180+1 skip, mandated
 39+1, canonical 2, compile/import/export 129, diff/fsck/scope/clean PASS.

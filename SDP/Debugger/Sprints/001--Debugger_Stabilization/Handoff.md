@@ -1,14 +1,14 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf004_slice001_signed_slice002_corrected_4_review_025_pending`
+Status: `rf004_slice001_signed_slice002_review_025_rework_corrective_worker_5_pending`
 
 ## Current objective
 
 The accepted first-wave gate is closed. Execute only `DBG-RF-004` through the seven frozen
 `DBG-SL-001-005-001..007` contracts and public `dbg.resolver-inspection/1` interface. Reviews
 007 through 010 and 012..018 returned REWORK; review 019 passed exact contract head
-`058c338…`. Dispatch only Slice 001. RF-005..009 and Executive/VM/AVR/frontend migration
-remain blocked.
+`058c338…`. Slice 001 is signed; dispatch only bounded Slice 002 corrective worker 5, then
+fresh review 026. RF-005..009 and Executive/VM/AVR/frontend migration remain blocked.
 
 ## Authority
 
@@ -162,15 +162,16 @@ remain blocked.
   correction 3 is `373d786a983252d5b1735b599596293557adba5a`, limited to `results.py`
   and the owned metadata test. `DBG-RVW-001-005-024` returned REWORK because a `__dict__`
   descriptor and mutated `__slots__` metadata still hide live raw storage. Correction 4 is
-  `bbc5c8ba3be960bcb7d522edbf3d5ae12dbe8c2a`, again limited to the two owned files.
+  `bbc5c8ba3be960bcb7d522edbf3d5ae12dbe8c2a`, again limited to the two owned files. Review 025
+  confirmed those closures but returned REWORK for incomplete Enum non-value storage validation.
 - `DBG-RVW-001-005-019` passed exact contract head `058c338…` after the prior REWORK chain.
 - Six RF-004 Slice loops and the parent gate remain open.
 - RF-005..009 remain blocked; no Executive/VM/AVR or DAP/CLI/VS Code migration is authorized.
 
 ## Exact next step
 
-Fresh `DBG-RVW-001-005-025` reviews exact corrected head `bbc5c8ba3be960bcb7d522edbf3d5ae12dbe8c2a`;
-no later Slice starts before review, verification and Master sign-off.
+Fresh corrective worker 5 deep-validates every actual Enum instance storage cell, then fresh
+`DBG-RVW-001-005-026`; no later Slice starts before review, verification and Master sign-off.
 
 ## Traceability state
 
@@ -182,7 +183,7 @@ no later Slice starts before review, verification and Master sign-off.
   `208063e344b767f82790ce579eba6327e2cdd0ce` and repository head tested
   `fefd4b0c427dfa71d637e4f4cce9e4a345912591`.
 - CurrentIndex, Issues, sprint records, Relations, Ledger, and Handoff are current through
-  review attempt 6 PASS and `HSX-VER-001-001-001` PASS.
+  `DBG-RVW-001-005-025` REWORK and Slice 002 corrective worker 5 dispatch.
 - Accepted architecture direction: `DBG-DA-001`, `DBG-A-001..DBG-A-008`
 - Completed Design Studies: `DBG-ST-002..DBG-ST-005`
 - Architecture review: `DBG-RVW-001-002-001` — REWORK at `f8b8097`
@@ -249,13 +250,13 @@ no later Slice starts before review, verification and Master sign-off.
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: `DBG-RVW-001-005-025` at Slice 002 corrected head `bbc5c8ba…`
+- Active gate: Slice 002 corrective worker 5, then `DBG-RVW-001-005-026`
 
 ## Agents and worktree
 
 The prior design/portable-contract chain and RF-002/RF-003/integration wave are complete,
-Steering-accepted and remotely reconstructable. RF-004 contracts are Master-frozen but no
-worker/reviewer is intentionally open yet. Controlled work is on
+Steering-accepted and remotely reconstructable. RF-004 contracts are Master-frozen; the only
+open dispatch is bounded Slice 002 corrective worker 5. Controlled work is on
 `codex/dbg-rf-004` from exact base `69a54aeb3394d3cd4792bce620748e15bab69f1f`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.
