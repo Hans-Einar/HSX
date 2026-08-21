@@ -1,6 +1,7 @@
 # DBG-SL-001-005-001 — RF-004 Legacy Oracle Classification
 
-- Status: **ACTIVE / FRESH WORKER DISPATCH**
+- Status: **IMPLEMENTED / INDEPENDENT REVIEW PENDING**
+- Implementation head: `a9a22fc4750f22d774eade43810a499dd1992859`
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
 - Review: `DBG-RVW-001-005-001`
@@ -54,3 +55,15 @@ behavior is confined to the named legacy oracle and is never imported as target 
 Run the new oracle test plus existing symbol/source/stack-oracle tests, validate fixture
 determinism and ensure the diff is test/fixture-only. The Slice completes only after fresh
 exact-head review, formal verification and Master sign-off.
+
+## Worker result
+
+- seven owned files only; no product/existing-test/SDP change;
+- 25 classified cases: 13 preserve, 5 change intentionally, 7 retire;
+- new oracle: 14 passed, 1 Windows symlink-privilege skip;
+- SymbolIndex: 2 passed; SourceMap: 4 passed, same skip;
+- focused stack/backend/location: 11 passed;
+- PYTHONHASHSEED 0/1: each 14 passed, 1 same skip;
+- diff-check/scope/clean status: PASS.
+
+Next gate: fresh exact-head `DBG-RVW-001-005-001`.

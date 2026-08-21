@@ -742,3 +742,13 @@ only `python/tests/fixtures/rf004/` and
 `python/tests/test_hsx_debugger_rf004_legacy_oracles.py`; all product modules, existing tests
 and shared SDP/traceability are read-only. Next gate is fresh exact-head
 `DBG-RVW-001-005-001`, then formal `DBG-VER-001-005-001` and Master sign-off.
+
+### Slice 001 worker result
+
+Fresh worker committed exact head `a9a22fc4750f22d774eade43810a499dd1992859` with seven
+owned test/fixture files only. The deterministic manifest contains 25 cases (13 preserve,
+5 change intentionally, 7 retire), with known-bad legacy outputs explicitly excluded from
+target conformance. Worker evidence: new oracle 14 passed/1 WinError 1314 symlink skip;
+SymbolIndex 2 passed; SourceMap 4 passed/1 same skip; focused stack/backend/location 11 passed;
+hash-seed 0/1 repeats each 14 passed/1 skip; diff/scope/clean PASS. Fresh exact-head review is
+`DBG-RVW-001-005-001`; no later Slice is active.
