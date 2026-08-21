@@ -1,6 +1,6 @@
 # DBG-SL-001-005-003 — RF-004 Verified Debug Artifact Index
 
-- Status: **IMPLEMENTED / INDEPENDENT REVIEW PENDING**
+- Status: **REWORK / BOUNDED CORRECTIVE WORKER PENDING**
 - Product head: `196111030e0f25e861d03f5dffd159f52c10622a`
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
@@ -70,3 +70,13 @@ unchanged. Close only after exact-head review, formal verification and Master si
 - Compile/import/export/signature checks: PASS; `179` unique package exports.
 - Exact four-file ownership, diff check, clean worktree and Git connectivity: PASS.
 - Broad regression is intentionally deferred to review/verification.
+
+## Review003 decision
+
+`DBG-RVW-001-005-003` returned REWORK at exact product head `196111030…`:
+
+- recursively freeze/reject nested generic values in `LegacyResolutionResult`;
+- map recipe `limit_exceeded` to artifact `SCHEMA_UNSUPPORTED`, not `CORRUPT`;
+- Master corrected stale Handoff state while recording this review.
+
+No other product Blocking/High/Medium finding exists. Corrective review035 is reserved.

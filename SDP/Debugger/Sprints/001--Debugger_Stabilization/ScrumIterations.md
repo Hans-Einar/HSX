@@ -1106,3 +1106,11 @@ limited to `artifacts.py`, the separate `legacy_symbols.py` adapter, additive pa
 and the owned artifact tests. Focused evidence is 29 passed; compile/import/export/signature,
 scope, diff and Git connectivity pass. No broad regression was run during iteration. Fresh
 independent `DBG-RVW-001-005-003` is the only next gate.
+
+### Slice003 review003 REWORK
+
+Fresh review003 returned 0 Blocking / 0 High / 3 Medium at `196111030…`. Product rework is
+limited to recursively contract-safe legacy result payloads and preserving unsupported recipe
+limit classification at the artifact result boundary. The third finding is stale Handoff
+state, corrected by Master while recording the review. Fresh corrective review035 follows the
+bounded worker; verification003 and Slice004 remain stopped.

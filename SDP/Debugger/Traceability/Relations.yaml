@@ -367,8 +367,14 @@ relations:
   - from: DBG-SL-001-005-003
     type: reviewed_by
     to: [DBG-RVW-001-005-003]
-    status: pending_exact_product_head
+    status: rework
     product_head: 196111030e0f25e861d03f5dffd159f52c10622a
+    coordination_head: 4af2250436687ea62f783989d8f486504ad1adf8
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/059--RF004_Artifact_Index_Review.md
+  - from: DBG-SL-001-005-003
+    type: corrective_reviewed_by
+    to: [DBG-RVW-001-005-035]
+    status: planned_after_bounded_correction
   - from: DBG-SL-001-005-003
     type: verified_by
     to: [DBG-VER-001-005-003]

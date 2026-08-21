@@ -1,6 +1,6 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf004_slices001_002_007_signed_slice003_review_pending`
+Status: `rf004_slices001_002_007_signed_slice003_rework_pending`
 
 Steering escalation: issue #38 comment `5369244294`.
 Steering frame-evidence refreeze: issue #38 comment `5370574104`.
@@ -24,8 +24,8 @@ Historical versions `1`/`1.1` passed reviews019/030; Slices001–002 are signed.
 Review031 returned REWORK trace-only; review032 passed exact head `f79eb629…`. Slice007 review011
 returned REWORK; review033 returned REWORK trace-only; review034/verification007/sign-off passed.
 Draft PR #50 and Steering progress comment `5372569290` expose the exact signed heads and next
-gate. Artifact Slice003 is implemented at `196111030e0f25e861d03f5dffd159f52c10622a`;
-fresh exact-head review003 is next. RF-005..009 and
+gate. Artifact Slice003 review003 returned REWORK with two bounded product findings and one
+stale-Handoff finding; fresh corrective worker and review035 are next. RF-005..009 and
 Executive/VM/AVR/frontend migration remain blocked.
 
 ## Authority
@@ -200,9 +200,10 @@ Executive/VM/AVR/frontend migration remain blocked.
 
 ## Exact next step
 
-Dispatch fresh independent `DBG-RVW-001-005-003` against exact product head
-`196111030e0f25e861d03f5dffd159f52c10622a`. Only review PASS may open
-verification003; no Slice004 work begins before Slice003 exact-head sign-off.
+Dispatch one fresh corrective Slice003 worker limited to recursive legacy-result immutability
+and unsupported recipe-limit classification. Then dispatch fresh independent
+`DBG-RVW-001-005-035`. Only review PASS may open verification003; no Slice004 work begins
+before Slice003 exact-head sign-off.
 
 ## Traceability state
 
@@ -214,8 +215,7 @@ verification003; no Slice004 work begins before Slice003 exact-head sign-off.
   `208063e344b767f82790ce579eba6327e2cdd0ce` and repository head tested
   `fefd4b0c427dfa71d637e4f4cce9e4a345912591`.
 - CurrentIndex, Issues, sprint records, Relations, Ledger, and Handoff are current through
-  interface review030 PASS, Slice002 sign-off, blocker002 accepted, review031 REWORK trace-only,
-  review032 PASS, Slice007 review011 REWORK, review033 REWORK trace-only and review034 pending.
+  Slice007 review034/verification007/sign-off and Slice003 review003 REWORK.
 - Accepted architecture direction: `DBG-DA-001`, `DBG-A-001..DBG-A-008`
 - Completed Design Studies: `DBG-ST-002..DBG-ST-005`
 - Architecture review: `DBG-RVW-001-002-001` — REWORK at `f8b8097`
@@ -286,7 +286,7 @@ verification003; no Slice004 work begins before Slice003 exact-head sign-off.
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: fresh independent Slice003 review `DBG-RVW-001-005-003`
+- Active gate: fresh bounded Slice003 corrective worker; then review035
 - Blocker authority: issue #38 comment `5369244294`
 - Refreeze authority: issue #38 comment `5370574104`
 - Blocker authority: issue #38 comment `5365959417`
@@ -295,8 +295,8 @@ verification003; no Slice004 work begins before Slice003 exact-head sign-off.
 ## Agents and worktree
 
 The prior design/portable-contract chain and RF-002/RF-003/integration wave are complete,
-Steering-accepted and remotely reconstructable. RF-004 `1.2` passed review032; only Slice007
-verification007 is open. Later Slices remain stopped. Controlled work is on
+Steering-accepted and remotely reconstructable. RF-004 `1.2` passed review032; Slice007 is
+signed and Slice003 review003 requires bounded rework. Later Slices remain stopped. Controlled work is on
 `codex/dbg-rf-004` from exact base `69a54aeb3394d3cd4792bce620748e15bab69f1f`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.
