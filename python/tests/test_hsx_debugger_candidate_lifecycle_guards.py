@@ -37,29 +37,22 @@ def test_closed_service_precedes_stale_context_and_request_limit_classification(
     assert opened.status is InspectionOpenStatus.OPENED
     assert service.close("done").status is ServiceCloseStatus.CLOSED
 
-    stale_context = replace(
-        f.context,
-        image=replace(f.image, loaded_image_id="other-image"),
-    )
-    # Rebuild stop/snapshot evidence so the context itself remains constructible while naming
-    # another loaded image. Closed lifecycle precedence must win before binding classification.
-    stale_stop = replace(
-        f.context.epoch.stop_token,
-        image=stale_context.image,
-    )
+    # Build a self-consistent but stale loaded-image context atomically. Constructing an
+    # intermediate InspectionContext with mismatched image/epoch evidence is intentionally
+    # forbidden by the DTO invariants.
+    stale_image = replace(f.image, loaded_image_id="other-image")
+    stale_stop = replace(f.context.epoch.stop_token, image=stale_image)
     stale_snapshot = replace(
         f.context.epoch.snapshot,
-        image=stale_context.image,
+        image=stale_image,
         stop_token=stale_stop,
     )
-    stale_context = replace(
-        stale_context,
-        epoch=replace(
-            f.context.epoch,
-            stop_token=stale_stop,
-            snapshot=stale_snapshot,
-        ),
+    stale_epoch = replace(
+        f.context.epoch,
+        stop_token=stale_stop,
+        snapshot=stale_snapshot,
     )
+    stale_context = InspectionContext(f.target, stale_image, stale_epoch)
 
     stale = service.open_epoch(stale_context, RecipeRequestLimits(64, 16))
     oversized = service.open_epoch(f.context, RecipeRequestLimits(65, 16))
