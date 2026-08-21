@@ -474,7 +474,7 @@ traceability and no product drift after the combined signed head. Steering accep
 
 ## DBG-IT-001-005 — Typed Resolver and Inspection
 
-Status: ACTIVE — INTERFACE PASS / SLICE 001 SIGNED / SLICE 002 REWORK 5
+Status: ACTIVE — INTERFACE PASS / SLICE 001 SIGNED / SLICE 002 CORRECTED 5 / REVIEW 026 PENDING
 
 ### Authority and goal
 
@@ -914,3 +914,13 @@ while retaining other possible mutable instance storage. Focused 51, debugger 18
 39+1, oracle 16+1, canonical 2, exports 129 and all scope/YAML/Ledger/git gates passed. Master
 also reconciled three stale Handoff narratives. Fresh corrective worker 5 must deep-validate
 every actual Enum storage cell; next review is `DBG-RVW-001-005-026`.
+
+### Slice 002 corrective result 5
+
+Fresh worker committed `0bedb2d110147f3f34c5846d14ee9b9581926f2d`, changing only
+`results.py` and the owned metadata test. Every actual Enum storage cell and status Enum now
+passes canonical member-name/class/order/map validation before retention; mutable/inconsistent
+metadata and extra dict/slot state are rejected while standard HSX/status Enums and public DTOs
+remain accepted. Evidence: focused 60; debugger 197+1 classified WinError 1314 skip; mandated
+39+1 same skip; oracle 16+1; canonical 2; compile/import/export 129; exact scope/diff/fsck/
+ancestry/clean PASS. Fresh review is `DBG-RVW-001-005-026`; no later Slice is active.

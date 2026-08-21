@@ -75,8 +75,8 @@ Steering accepted `DBG-A-001..DBG-A-008` as target architecture direction in com
 - Interface reviews 007..010/012..018: REWORK; `DBG-RVW-001-005-019`: PASS at
   `058c3383593553aa1497d024d41285d44d9c67a8`
 - Exact product base: `69a54aeb3394d3cd4792bce620748e15bab69f1f`
-- Active product gate: Slice 002 review 025 REWORK; fresh bounded corrective worker 5, then
-  `DBG-RVW-001-005-026`
+- Active product gate: Slice 002 corrected head `0bedb2d110147f3f34c5846d14ee9b9581926f2d`;
+  fresh `DBG-RVW-001-005-026` pending
 - Authority: issue #38 comment `5362514094`
 - Dependency clarification: issue #42 comment `5362515750`
 - Still blocked: `DBG-RF-005..DBG-RF-009`

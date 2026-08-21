@@ -1,14 +1,14 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf004_slice001_signed_slice002_review_025_rework_corrective_worker_5_pending`
+Status: `rf004_slice001_signed_slice002_corrected_5_review_026_pending`
 
 ## Current objective
 
 The accepted first-wave gate is closed. Execute only `DBG-RF-004` through the seven frozen
 `DBG-SL-001-005-001..007` contracts and public `dbg.resolver-inspection/1` interface. Reviews
 007 through 010 and 012..018 returned REWORK; review 019 passed exact contract head
-`058c338…`. Slice 001 is signed; dispatch only bounded Slice 002 corrective worker 5, then
-fresh review 026. RF-005..009 and Executive/VM/AVR/frontend migration remain blocked.
+`058c338…`. Slice 001 is signed; Slice 002 correction 5 awaits fresh review 026. RF-005..009
+and Executive/VM/AVR/frontend migration remain blocked.
 
 ## Authority
 
@@ -164,14 +164,15 @@ fresh review 026. RF-005..009 and Executive/VM/AVR/frontend migration remain blo
   descriptor and mutated `__slots__` metadata still hide live raw storage. Correction 4 is
   `bbc5c8ba3be960bcb7d522edbf3d5ae12dbe8c2a`, again limited to the two owned files. Review 025
   confirmed those closures but returned REWORK for incomplete Enum non-value storage validation.
+  Correction 5 is `0bedb2d110147f3f34c5846d14ee9b9581926f2d`, also limited to two files.
 - `DBG-RVW-001-005-019` passed exact contract head `058c338…` after the prior REWORK chain.
 - Six RF-004 Slice loops and the parent gate remain open.
 - RF-005..009 remain blocked; no Executive/VM/AVR or DAP/CLI/VS Code migration is authorized.
 
 ## Exact next step
 
-Fresh corrective worker 5 deep-validates every actual Enum instance storage cell, then fresh
-`DBG-RVW-001-005-026`; no later Slice starts before review, verification and Master sign-off.
+Fresh `DBG-RVW-001-005-026` reviews exact corrected head `0bedb2d110147f3f34c5846d14ee9b9581926f2d`;
+no later Slice starts before review, verification and Master sign-off.
 
 ## Traceability state
 
@@ -183,7 +184,7 @@ Fresh corrective worker 5 deep-validates every actual Enum instance storage cell
   `208063e344b767f82790ce579eba6327e2cdd0ce` and repository head tested
   `fefd4b0c427dfa71d637e4f4cce9e4a345912591`.
 - CurrentIndex, Issues, sprint records, Relations, Ledger, and Handoff are current through
-  `DBG-RVW-001-005-025` REWORK and Slice 002 corrective worker 5 dispatch.
+  Slice 002 corrected head `0bedb2d1…` and fresh `DBG-RVW-001-005-026` pending.
 - Accepted architecture direction: `DBG-DA-001`, `DBG-A-001..DBG-A-008`
 - Completed Design Studies: `DBG-ST-002..DBG-ST-005`
 - Architecture review: `DBG-RVW-001-002-001` — REWORK at `f8b8097`
@@ -250,13 +251,13 @@ Fresh corrective worker 5 deep-validates every actual Enum instance storage cell
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: Slice 002 corrective worker 5, then `DBG-RVW-001-005-026`
+- Active gate: `DBG-RVW-001-005-026` at Slice 002 corrected head `0bedb2d1…`
 
 ## Agents and worktree
 
 The prior design/portable-contract chain and RF-002/RF-003/integration wave are complete,
 Steering-accepted and remotely reconstructable. RF-004 contracts are Master-frozen; the only
-open dispatch is bounded Slice 002 corrective worker 5. Controlled work is on
+open dispatch is fresh Slice 002 review 026. Controlled work is on
 `codex/dbg-rf-004` from exact base `69a54aeb3394d3cd4792bce620748e15bab69f1f`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.

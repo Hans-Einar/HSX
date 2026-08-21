@@ -114,6 +114,12 @@ Review 025: REWORK. Review 024 storage-descriptor findings are closed, but Enum 
 must traverse every actual non-value instance storage cell before retaining the member. Fresh
 bounded correction 5 is followed by `DBG-RVW-001-005-026`.
 
+Fifth correction at `0bedb2d110147f3f34c5846d14ee9b9581926f2d`: complete canonical
+Enum/status storage validation, mutable/inconsistent metadata and extra-state rejection, with
+standard HSX/status Enum and public DTO acceptance. Focused 60, debugger 197+1 classified skip,
+mandated 39+1 same skip, oracle 16+1, canonical 2, exports 129, exact scope/git PASS. Review 026
+is pending.
+
 Second correction: exact atom types; directly declared frozen dataclasses only; all fields
 deep-traversed; undeclared dict/slot state rejected. Focused 43, debugger 180+1 skip, mandated
 39+1, canonical 2, compile/import/export 129, diff/fsck/scope/clean PASS.
