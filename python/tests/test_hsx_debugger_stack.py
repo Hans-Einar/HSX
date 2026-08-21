@@ -3,8 +3,10 @@ from __future__ import annotations
 from dataclasses import replace
 from types import SimpleNamespace
 
+import pytest
+
 from hsx_debugger import *
-from hsx_debugger.stack import StackService
+from hsx_debugger.stack import StackService, StackWalkResult
 
 
 ZERO = "0" * 64
@@ -110,10 +112,11 @@ class IndexDouble:
 
 
 class SnapshotPort:
-    def __init__(self, f, memory=None, registers=None):
+    def __init__(self, f, memory=None, registers=None, memory_status=None):
         self.f = f
         self.memory = dict(memory if memory is not None else {0x204: (0x124).to_bytes(4, "little"), 0x200: (0x180).to_bytes(4, "little")})
         self.registers = registers or f.registers
+        self.memory_status = memory_status
         self.register_reads = 0
         self.memory_reads = []
     def read_registers(self, context, selection):
@@ -123,6 +126,13 @@ class SnapshotPort:
         return InspectionResult(InspectionStatus.COMPLETE, context, self.registers, ())
     def read_memory(self, context, address, byte_length):
         self.memory_reads.append((address, byte_length))
+        if self.memory_status is not None:
+            return InspectionResult(
+                self.memory_status,
+                context,
+                None,
+                (Diagnostic("injected_memory_status", self.memory_status.value, component="test"),),
+            )
         raw = self.memory.get(address.unsigned_value)
         if raw is None or len(raw) != byte_length:
             return InspectionResult(InspectionStatus.UNAVAILABLE, context, None, (Diagnostic("memory_missing", "missing", component="test"),))
@@ -141,8 +151,9 @@ def rvalue(frame, register_id):
 
 def test_current_body_unwinds_scalar_bound_r7_into_terminal_caller() -> None:
     f = foundation(); port = SnapshotPort(f); result = unwind(f, port=port)
-    assert result.status is InspectionStatus.COMPLETE and len(result.value) == 2
-    top, caller = result.value
+    assert isinstance(result, StackWalkResult)
+    assert result.status is InspectionStatus.COMPLETE and len(result.frames) == 2
+    top, caller = result.frames
     assert (top.pc.unsigned_value, top.sp.unsigned_value, top.cfa.unsigned_value) == (0x100, 0x1E0, 0x208)
     assert top.frame_base == HsxAddress(f.data, 0x200) and not top.terminal
     assert (caller.pc.unsigned_value, caller.sp.unsigned_value, caller.cfa.unsigned_value) == (0x124, 0x208, 0x20C)
@@ -156,29 +167,41 @@ def test_current_body_unwinds_scalar_bound_r7_into_terminal_caller() -> None:
 
 def test_missing_required_caller_memory_returns_trustworthy_partial_prefix() -> None:
     f = foundation(); port = SnapshotPort(f, memory={}); result = unwind(f, port=port)
-    assert result.status is InspectionStatus.PARTIAL and len(result.value) == 1
-    assert result.value[0].pc == HsxAddress(f.code, 0x100)
+    assert result.status is InspectionStatus.PARTIAL and len(result.frames) == 1
+    assert result.frames[0].pc == HsxAddress(f.code, 0x100)
     assert result.diagnostics[0].code == "memory_missing" and port.register_reads == 1
+
+
+@pytest.mark.parametrize(
+    "status",
+    (InspectionStatus.CORRUPT, InspectionStatus.UNSUPPORTED, InspectionStatus.STALE),
+)
+def test_exact_terminating_failure_keeps_already_proven_top_frame(status) -> None:
+    f = foundation(); port = SnapshotPort(f, memory_status=status); result = unwind(f, port=port)
+    assert result.status is status
+    assert len(result.frames) == 1
+    assert result.frames[0].pc == HsxAddress(f.code, 0x100)
+    assert result.diagnostics[0].code == "injected_memory_status"
 
 
 def test_missing_gpr_rule_never_infers_current_abi_r7() -> None:
     f = foundation(); body = replace(f.body, register_rules=())
     result = unwind(f, index=IndexDouble(f, rows=(body, f.terminal)))
     assert result.status is InspectionStatus.COMPLETE
-    assert rvalue(result.value[1], "R7") == RegisterValue("R7", 32, None, False)
+    assert rvalue(result.frames[1], "R7") == RegisterValue("R7", 32, None, False)
 
 
 def test_explicit_same_is_the_only_younger_register_propagation() -> None:
     f = foundation(); same = replace(f.body, register_rules=(("R7", RecipeRule(RecipeRuleKind.SAME, None, None)),))
     result = unwind(f, index=IndexDouble(f, rows=(same, f.terminal)))
     assert result.status is InspectionStatus.COMPLETE
-    assert rvalue(result.value[1], "R7") == RegisterValue("R7", 32, 0x200, True)
+    assert rvalue(result.frames[1], "R7") == RegisterValue("R7", 32, 0x200, True)
 
 
 def test_requesting_one_frame_does_not_recover_or_read_the_caller() -> None:
     f = foundation(); port = SnapshotPort(f)
     result = unwind(f, port=port, request=RecipeRequestLimits(1, 16))
-    assert (result.status, len(result.value), port.register_reads, port.memory_reads) == (InspectionStatus.COMPLETE, 1, 1, [])
+    assert (result.status, len(result.frames), port.register_reads, port.memory_reads) == (InspectionStatus.COMPLETE, 1, 1, [])
 
 
 def test_call_site_is_optional_when_row_has_no_adjustment() -> None:
@@ -186,42 +209,43 @@ def test_call_site_is_optional_when_row_has_no_adjustment() -> None:
     terminal_at_resume = replace(f.terminal, pc_range=HsxAddressRange(HsxAddress(f.code, 0x124), 4))
     result = unwind(f, index=IndexDouble(f, rows=(body, terminal_at_resume), instructions={}))
     assert result.status is InspectionStatus.COMPLETE
-    caller = result.value[1]
+    caller = result.frames[1]
     assert caller.pc == caller.resume_pc == HsxAddress(f.code, 0x124)
     assert caller.call_site_pc is None
 
 
-def test_repeated_pc_sp_is_corrupt_not_a_fallback_walk() -> None:
+def test_repeated_pc_sp_is_corrupt_and_keeps_prior_prefix() -> None:
     f = foundation(); cyclic = replace(f.body, caller_pc_rule=RecipeRule(RecipeRuleKind.SAME, None, None), caller_sp_rule=RecipeRule(RecipeRuleKind.SAME, None, None), register_rules=(), call_site_adjustment=None)
     result = unwind(f, index=IndexDouble(f, rows=(cyclic,)))
     assert (result.status, result.diagnostics[0].code) == (InspectionStatus.CORRUPT, "unwind_cycle")
+    assert len(result.frames) == 1
 
 
 def test_profile_limit_rejection_happens_before_snapshot_read() -> None:
     f = foundation(); port = SnapshotPort(f); result = unwind(f, port=port, request=RecipeRequestLimits(65, 16))
-    assert (result.status, result.diagnostics[0].code, port.register_reads) == (InspectionStatus.UNSUPPORTED, "limit_exceeded", 0)
+    assert (result.status, result.diagnostics[0].code, port.register_reads, result.frames) == (InspectionStatus.UNSUPPORTED, "limit_exceeded", 0, ())
 
 
 def test_binding_mismatch_happens_before_snapshot_read() -> None:
     f = foundation(); port = SnapshotPort(f); bad_binding = replace(f.binding, binding_digest="f" * 64)
     result = unwind(f, index=IndexDouble(f, binding=bad_binding), port=port)
-    assert result.status is InspectionStatus.ARTIFACT_MISMATCH and port.register_reads == 0
+    assert result.status is InspectionStatus.ARTIFACT_MISMATCH and port.register_reads == 0 and result.frames == ()
 
 
 def test_all_declared_register_shape_is_exact() -> None:
     f = foundation(); port = SnapshotPort(f, registers=RegisterSet(tuple(reversed(f.registers.registers))))
     result = unwind(f, port=port)
-    assert (result.status, result.diagnostics[0].code) == (InspectionStatus.CORRUPT, "snapshot_register_shape_mismatch")
+    assert (result.status, result.diagnostics[0].code, result.frames) == (InspectionStatus.CORRUPT, "snapshot_register_shape_mismatch", ())
 
 
 def test_unavailable_gpr_expression_does_not_abort_an_otherwise_valid_caller() -> None:
     f = foundation(); port = SnapshotPort(f, memory={0x204: (0x124).to_bytes(4, "little")})
     result = unwind(f, port=port)
     assert result.status is InspectionStatus.COMPLETE
-    assert rvalue(result.value[1], "R7").available is False
+    assert rvalue(result.frames[1], "R7").available is False
 
 
 def test_explicit_unsupported_boundary_is_not_silently_walked() -> None:
     f = foundation(); unsupported = replace(f.body, boundary=UnwindBoundary.UNSUPPORTED); port = SnapshotPort(f)
     result = unwind(f, index=IndexDouble(f, rows=(unsupported,)), port=port)
-    assert (result.status, result.diagnostics[0].code, port.memory_reads) == (InspectionStatus.UNSUPPORTED, "unwind_boundary_unsupported", [])
+    assert (result.status, result.diagnostics[0].code, port.memory_reads, result.frames) == (InspectionStatus.UNSUPPORTED, "unwind_boundary_unsupported", [], ())
