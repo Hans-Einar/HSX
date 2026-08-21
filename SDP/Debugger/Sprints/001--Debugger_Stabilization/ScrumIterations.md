@@ -807,3 +807,11 @@ coordination `4e33f76…`: six YAML, Debugger 148/HSX 24 Ledger rows, all contra
 manifest, scope, python hash, ancestry/objects/connectivity and clean remote state passed. The
 only residual is explicit WinError 1314 symlink-degraded evidence; no symlink PASS is claimed.
 Master exact-head sign-off passed. Slice 001 is complete; Slice 002 is next.
+
+### Slice 002 activation
+
+Master activated `DBG-SL-001-005-002` after Slice 001 sign-off. Fresh worker owns only
+`identity.py`, `addresses.py`, `results.py`, `snapshot.py`, `metadata.py`, additive exports and
+the three new identity/address/metadata tests. Existing controller/contracts/gateway/runtime,
+later modules, frontends, runtime and shared SDP/trace are read-only. Next gate is fresh
+`DBG-RVW-001-005-002`, then `DBG-VER-001-005-002` and Master sign-off.

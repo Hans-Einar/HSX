@@ -1,6 +1,6 @@
 # DBG-SL-001-005-002 — RF-004 Typed Identity, Binding, Address, and Result Foundation
 
-- Status: **FROZEN / PLANNED**
+- Status: **ACTIVE / FRESH WORKER DISPATCH**
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
 - Depends on signed: `DBG-SL-001-005-001`

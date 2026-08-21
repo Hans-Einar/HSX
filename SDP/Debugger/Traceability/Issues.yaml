@@ -246,27 +246,29 @@ issues:
     steering_completion_comment: 5362514094
   DBG-RF-004:
     issue: 41
-    status: active_slice001_complete_slice002_ready
+    status: active_slice001_complete_slice002_worker_active
     iteration: DBG-IT-001-005
     slices: DBG-SL-001-005-001..DBG-SL-001-005-007
     execution_order: DBG-SL-001-005-001,DBG-SL-001-005-002,DBG-SL-001-005-007,DBG-SL-001-005-003,DBG-SL-001-005-004,DBG-SL-001-005-005,DBG-SL-001-005-006
     public_interface: dbg.resolver-inspection/1
-    active_slice: DBG-SL-001-005-001
-    active_slice_implementation_head: a9a22fc4750f22d774eade43810a499dd1992859
-    active_slice_review: DBG-RVW-001-005-001
-    active_slice_review_status: rework
-    active_slice_corrective_review: DBG-RVW-001-005-020
-    active_slice_corrected_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
-    active_slice_corrective_review_status: pass
-    active_slice_verification: DBG-VER-001-005-001
-    active_slice_verification_status: fail_trace_only
-    active_slice_reverification: DBG-VER-001-005-008
-    active_slice_reverification_status: fail_trace_only
-    active_slice_reverification_2: DBG-VER-001-005-009
-    active_slice_reverification_2_status: pass
-    active_slice_signoff_status: pass
-    active_slice_signed_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
-    next_slice: DBG-SL-001-005-002
+    slice001_implementation_head: a9a22fc4750f22d774eade43810a499dd1992859
+    slice001_initial_review: DBG-RVW-001-005-001
+    slice001_initial_review_status: rework
+    slice001_corrective_review: DBG-RVW-001-005-020
+    slice001_corrected_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
+    slice001_corrective_review_status: pass
+    slice001_verification_attempt_1: DBG-VER-001-005-001
+    slice001_verification_attempt_1_status: fail_trace_only
+    slice001_verification_attempt_2: DBG-VER-001-005-008
+    slice001_verification_attempt_2_status: fail_trace_only
+    slice001_final_verification: DBG-VER-001-005-009
+    slice001_final_verification_status: pass
+    slice001_signoff_status: pass
+    slice001_signed_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
+    active_slice: DBG-SL-001-005-002
+    active_slice_status: active_worker_dispatch
+    active_slice_review: DBG-RVW-001-005-002
+    active_slice_verification: DBG-VER-001-005-002
     interface_review: DBG-RVW-001-005-007
     interface_review_status: rework
     interface_reviewed_head: 82154c614a31284723bf3e6a337c5bedfb8aba5d

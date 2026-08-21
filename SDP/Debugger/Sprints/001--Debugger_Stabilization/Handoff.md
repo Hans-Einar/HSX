@@ -1,6 +1,6 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf004_slice001_signed_slice002_next`
+Status: `rf004_slice001_signed_slice002_worker_active`
 
 ## Current objective
 
@@ -158,7 +158,7 @@ remain blocked.
 
 ## Exact next step
 
-Master activates only `DBG-SL-001-005-002`; no later Slice may start first.
+Fresh bounded worker executes only `DBG-SL-001-005-002`; no later Slice may start first.
 
 ## Traceability state
 
@@ -237,7 +237,7 @@ Master activates only `DBG-SL-001-005-002`; no later Slice may start first.
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: activate Slice 002 with fresh worker
+- Active gate: Slice 002 worker result, then `DBG-RVW-001-005-002`
 
 ## Agents and worktree
 
