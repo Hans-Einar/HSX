@@ -15,6 +15,10 @@ from .recipes import *
 from .recipes import __all__ as _recipes_all
 from .snapshot import *
 from .snapshot import __all__ as _snapshot_all
+from .artifacts import *
+from .artifacts import __all__ as _artifacts_all
+from .legacy_symbols import *
+from .legacy_symbols import __all__ as _legacy_symbols_all
 
 __all__ = [
     *__all__,
@@ -24,4 +28,6 @@ __all__ = [
     *_metadata_all,
     *_recipes_all,
     *_snapshot_all,
+    *_artifacts_all,
+    *_legacy_symbols_all,
 ]
