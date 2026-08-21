@@ -39,8 +39,8 @@ Read in this order:
 
 `DBG-ST-006` and `DBG-IT-001-004` are complete. Active work is `DBG-IT-001-005` /
 `DBG-RF-004` with frozen Slices `DBG-SL-001-005-001..007`; public interface
-`dbg.resolver-inspection/1.1` is Steering-refrozen; review 028 returned REWORK and fresh review
-029 is pending. Slice 001
+`dbg.resolver-inspection/1.1` is Steering-refrozen; reviews 028–029 returned REWORK and fresh
+review 030 is pending. Slice 001
 is signed; Slice 002 product work remains stopped pending that interface review. Existing Executive behavior remains
 `hsx.python-debug-legacy/1`; RF-005..009, Executive/VM/AVR and frontend migration remain
 blocked.

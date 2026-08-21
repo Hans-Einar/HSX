@@ -1,6 +1,6 @@
 # DBG-BLK-001-005-001 — RF-004 Typed Enum Immutability Steering Blocker
 
-- Status: **STEERING ACCEPTED / REFREEZE REVIEW 028 REWORK / REVIEW 029 PENDING**
+- Status: **STEERING ACCEPTED / REVIEWS 028–029 REWORK / REVIEW 030 PENDING**
 - Refactor/Iteration/Slice: `DBG-RF-004` / `DBG-IT-001-005` / `DBG-SL-001-005-002`
 - Frozen interface at discovery: `dbg.resolver-inspection/1`
 - Steering resolution: `dbg.resolver-inspection/1.1`
@@ -53,5 +53,6 @@ Steering selected the supported-mutation direction in comment `5368017338`:
 4. reflection/type-system mutation is outside conformance.
 
 Master refreezes only those semantics as `1.1` plus `DBG-CF-001-005-001`. Review 028 returned
-REWORK and fresh interface review `DBG-RVW-001-005-029` must pass before a Slice 002 worker starts. Historical review 026 remains
+REWORK; review 029 passed contract semantics but returned REWORK trace-only. Fresh interface
+review `DBG-RVW-001-005-030` must pass before a Slice 002 worker starts. Historical review 026 remains
 REWORK; review 027 is reserved only for the later post-refreeze product head. RF-005..009 remain blocked.

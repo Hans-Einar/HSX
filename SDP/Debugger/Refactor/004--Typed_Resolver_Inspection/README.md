@@ -1,6 +1,6 @@
 # DBG-RF-004 — Typed Artifact, Source, Address, Stack, and Inspection
 
-- Status: **ACTIVE — INTERFACE 1.1 REVIEW 028 REWORK / REVIEW 029 PENDING / PRODUCT STOPPED**
+- Status: **ACTIVE — INTERFACE 1.1 REVIEWS 028–029 REWORK / REVIEW 030 PENDING**
 - Steering authority: issue #38 comment `5362514094`
 - Dependency clarification: issue #42 comment `5362515750`
 - Immutability refreeze: issue #38 comment `5368017338`

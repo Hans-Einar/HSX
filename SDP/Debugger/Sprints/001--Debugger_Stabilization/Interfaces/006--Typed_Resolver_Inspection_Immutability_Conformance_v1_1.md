@@ -1,6 +1,6 @@
 # DBG-CF-001-005-001 — `dbg.resolver-inspection/1.1` Immutability Conformance
 
-- Status: **CORRECTED REFROZEN CANDIDATE / REVIEW 029 PENDING**
+- Status: **CONTRACT PASS / TRACE-CORRECTED CANDIDATE / REVIEW 030 PENDING**
 - Authority: issue #38 comment `5368017338`
 - Interface: `dbg.resolver-inspection/1.1`
 - Scope: supported-mutation and recursively contract-safe immutable semantics only
@@ -80,8 +80,9 @@ or Python type definition after acceptance and call that a snapshot-isolation fa
 ## Review and product gates
 
 Review `DBG-RVW-001-005-028` returned REWORK for unnamed mapping output and stale review-027
-allocation text. Fresh `DBG-RVW-001-005-029` reviews the corrected matrix and exact Interface
-004 `1.1` head. Product
+allocation text. Review 029 confirmed those technical closures but returned REWORK trace-only
+for two stale Relations gates. Fresh `DBG-RVW-001-005-030` reviews the unchanged corrected
+matrix/interface semantics plus reconciled trace. Product
 implementation remains stopped until that review passes. After PASS, a fresh Slice 002 worker
 updates only its existing owned files and test fixtures; historical `DBG-RVW-001-005-026`
 remains REWORK, and `DBG-RVW-001-005-027` reviews only the new post-refreeze product head.

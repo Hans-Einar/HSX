@@ -474,7 +474,7 @@ traceability and no product drift after the combined signed head. Steering accep
 
 ## DBG-IT-001-005 — Typed Resolver and Inspection
 
-Status: ACTIVE — INTERFACE 1.1 REVIEW 028 REWORK / REVIEW 029 PENDING
+Status: ACTIVE — INTERFACE 1.1 REVIEWS 028–029 REWORK / REVIEW 030 PENDING
 
 ### Authority and goal
 
@@ -505,7 +505,8 @@ Slice ownership and live traceability. Reviews 007..010 and 012..018 returned RE
 signed product Slice. Steering comment `5368017338` changes only the immutability definition:
 supported debugger/caller-input mutation and recursively contract-safe values, with exact
 typed Enum members retained. `DBG-CF-001-005-001` freezes the conformance matrix. Review 028
-returned REWORK; fresh `DBG-RVW-001-005-029` must pass before Slice 002 product work resumes.
+returned REWORK; review 029 returned REWORK trace-only; fresh `DBG-RVW-001-005-030` must pass
+before Slice 002 product work resumes.
 
 ### Frozen execution units
 
@@ -540,7 +541,7 @@ exact-head sign-off before the next Slice starts.
 - Design: `DBG-D-003`, `DBG-D-004`, `DBG-D-009`; portable `HSX-D-001..003`.
 - Slice reviews: `DBG-RVW-001-005-001..006` and `DBG-RVW-001-005-011`; interface
   reviews: `DBG-RVW-001-005-007..010`, then `...012..019`, plus refreeze reviews
-  `DBG-RVW-001-005-028..029`; conformance `DBG-CF-001-005-001`; verifications
+  `DBG-RVW-001-005-028..030`; conformance `DBG-CF-001-005-001`; verifications
   `DBG-VER-001-005-001..007`.
 - Parent final: `DBG-RVW-004-001-001`, `DBG-VER-004-001-001`.
 - RF-005 explicitly depends on RF-004's accepted `dbg.resolver-inspection/1.1`; partial/frozen
@@ -973,3 +974,11 @@ Master corrected dict normalization to an insertion-ordered tuple of recursively
 removed mapping output, and reserved review 027 solely for a new post-refreeze product head.
 Fresh exact-head interface review 029 is the only active gate; product remains stopped.
 The corrected remote-published content head is `4c581a740ee95c3362aa77de85630ba001013e1c`.
+
+### Interface 1.1 review 029 / trace correction
+
+Fresh `DBG-RVW-001-005-029` confirmed every Steering/schema/Enum/fixture requirement and both
+review028 technical closures, but returned REWORK trace-only because two Relations entries
+still named review028 as the current gate. Master corrected the RF-004 interface production
+status and product-review-027 restart dependency to fresh review030. Contract semantics and
+product files are unchanged; review030 is the only active gate.

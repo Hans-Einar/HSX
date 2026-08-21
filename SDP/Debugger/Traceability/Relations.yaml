@@ -187,7 +187,7 @@ relations:
     type: produces_interface
     to:
       - dbg.resolver-inspection/1.1
-    status: refrozen_review_028_pending_implementation_stopped
+    status: refrozen_reviews_028_029_rework_review_030_pending_implementation_stopped
   - from: DBG-SL-001-005-001
     type: reviewed_by
     to: [DBG-RVW-001-005-001]
@@ -271,7 +271,7 @@ relations:
   - from: DBG-SL-001-005-002
     type: reviewed_by
     to: [DBG-RVW-001-005-027]
-    status: not_started_pending_interface_review_028_pass
+    status: not_started_pending_interface_review_030_pass
   - from: DBG-SL-001-005-002
     type: blocked_by
     to: [DBG-BLK-001-005-001]
@@ -298,11 +298,17 @@ relations:
   - from: dbg.resolver-inspection/1.1
     type: reviewed_by
     to: [DBG-RVW-001-005-029]
-    status: planned
+    status: rework_trace_only
     candidate_head: 4c581a740ee95c3362aa77de85630ba001013e1c
+    coordination_head: ed23423814d58fe3c03b252084d43d2464a46118
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/051--RF004_Interface_1_1_Rereview.md
+  - from: dbg.resolver-inspection/1.1
+    type: reviewed_by
+    to: [DBG-RVW-001-005-030]
+    status: planned
   - from: DBG-SL-001-005-002
     type: resumes_after
-    to: [DBG-RVW-001-005-029]
+    to: [DBG-RVW-001-005-030]
     status: blocked_pending_review_pass
   - from: DBG-SL-001-005-002
     type: verified_by
