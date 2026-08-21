@@ -2,6 +2,7 @@
 
 from .contracts import *
 from .contracts import __all__
+from .contracts import EvidenceGrade as _EvidenceGrade
 
 from .addresses import *
 from .addresses import __all__ as _addresses_all
@@ -11,6 +12,13 @@ from .metadata import *
 from .metadata import __all__ as _metadata_all
 from .results import *
 from .results import __all__ as _results_all
+from .results import _register_contract_enums as _register_result_contract_enums
+
+# InspectionContext embeds the RF-002 GenerationStamp. Register its closed EvidenceGrade
+# enum deterministically at package import so generic RF-004 result deep-freezing never
+# depends on test/import order.
+_register_result_contract_enums(_EvidenceGrade)
+
 from .recipes import *
 from .recipes import __all__ as _recipes_all
 from .snapshot import *
