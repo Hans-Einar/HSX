@@ -40,7 +40,7 @@ Read in this order:
 `DBG-ST-006` and `DBG-IT-001-004` are complete. Active work is `DBG-IT-001-005` /
 `DBG-RF-004` with frozen Slices `DBG-SL-001-005-001..007`; public interface
 `dbg.resolver-inspection/1.1` passed final review 030 at `ae49435…`. Slice 001 is signed and
-Slice 002 post-refreeze product head `c7bc390…` awaits fresh product review 027.
+Slice 002 post-refreeze product head `c7bc390…` passed review 027 and awaits formal verification.
 Existing Executive behavior remains
 `hsx.python-debug-legacy/1`; RF-005..009, Executive/VM/AVR and frontend migration remain
 blocked.

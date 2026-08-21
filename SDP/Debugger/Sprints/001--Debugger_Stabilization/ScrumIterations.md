@@ -474,7 +474,7 @@ traceability and no product drift after the combined signed head. Steering accep
 
 ## DBG-IT-001-005 — Typed Resolver and Inspection
 
-Status: ACTIVE — INTERFACE 1.1 PASS / SLICE 002 REVIEW 027 PENDING
+Status: ACTIVE — INTERFACE 1.1 PASS / SLICE 002 VERIFICATION PENDING
 
 ### Authority and goal
 
@@ -1003,3 +1003,11 @@ reject. Reflection/type-system isolation tests are retired exactly as Steering r
 surface and 129 exports match `0bedb2d…`. Focused 47, debugger 184+1, mandated 39+1, oracle
 16+1, canonical 2, hashseed 0/1 and full scope/git gates pass. Fresh product-only review 027 is
 the sole active gate.
+
+### Slice 002 post-refreeze review 027 PASS
+
+Fresh `DBG-RVW-001-005-027` passed exact product head `c7bc390…` at coordination `6779e24…`
+with zero findings. Public AST/129 exports, both import paths, exact 19-type catalog, CS-IMM,
+all prior supported closures, focused/debugger/mandated/oracle/golden/hashseed tests, exact
+scope and full trace/git mechanics passed. Formal `DBG-VER-001-005-002` is now the sole active
+gate; no sign-off or later Slice is active.
