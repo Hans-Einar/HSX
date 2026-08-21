@@ -1144,3 +1144,10 @@ Fresh verification010 passed unchanged product `a335789759…`, review035, corre
 trace, artifact31, broad254+1, legacy22+2, adversarial2, compile/exports/signatures, scope and
 remote integrity. Master accepts and signs exact product head. Only frozen SourceResolver
 Slice004 is activated next.
+
+### Slice004 implementation candidate
+
+Fresh bounded SourceResolver worker completed exact product head `c0f975c4…` over signed
+coordination base `d575299e…`. Scope is only `sources.py`, additive exports and owned source
+tests. Focused SourceResolver/legacy SourceMap evidence is 29 passed/3 classified platform
+skips; compile/import/signature/Black/scope/Git pass. Fresh review004 is the only next gate.

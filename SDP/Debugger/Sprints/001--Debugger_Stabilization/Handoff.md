@@ -1,6 +1,6 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf004_slices001_002_003_007_signed_slice004_worker_pending`
+Status: `rf004_slices001_002_003_007_signed_slice004_review_pending`
 
 Steering escalation: issue #38 comment `5369244294`.
 Steering frame-evidence refreeze: issue #38 comment `5370574104`.
@@ -27,7 +27,8 @@ Draft PR #50 and Steering progress comment `5372569290` expose the exact signed 
 gate. Artifact Slice003 review003 returned REWORK; bounded corrections completed at
 `a335789759a68dfd8bef01dbdf59591b096307d3` and review035 passed. Verification003 failed
 trace-only; verification010 passed and Master signed the exact product head. Frozen exact
-SourceResolver Slice004 is next. RF-005..009 and
+SourceResolver Slice004 is implemented at `c0f975c4a278cecd89e19d332ca5601b074a115e`;
+fresh review004 is next. RF-005..009 and
 Executive/VM/AVR/frontend migration remain blocked.
 
 ## Authority
@@ -202,9 +203,9 @@ Executive/VM/AVR/frontend migration remain blocked.
 
 ## Exact next step
 
-Dispatch a fresh bounded SourceResolver Slice004 worker with ownership limited to `sources.py`,
-additive package exports and its owned source tests. Then review004/verification004/sign-off;
-no Slice005 work begins before Slice004 exact-head sign-off.
+Dispatch fresh independent `DBG-RVW-001-005-004` against exact SourceResolver product head
+`c0f975c4a278cecd89e19d332ca5601b074a115e`. Only review PASS may open verification004; no
+Slice005 work begins before Slice004 exact-head sign-off.
 
 ## Traceability state
 
@@ -287,7 +288,7 @@ no Slice005 work begins before Slice004 exact-head sign-off.
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: fresh bounded SourceResolver Slice004 worker
+- Active gate: fresh independent SourceResolver review004
 - Blocker authority: issue #38 comment `5369244294`
 - Refreeze authority: issue #38 comment `5370574104`
 - Blocker authority: issue #38 comment `5365959417`

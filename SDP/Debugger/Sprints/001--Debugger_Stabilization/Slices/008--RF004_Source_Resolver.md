@@ -1,6 +1,7 @@
 # DBG-SL-001-005-004 — RF-004 Exact Source Resolver
 
-- Status: **ACTIVE / FRESH WORKER PENDING**
+- Status: **IMPLEMENTED / INDEPENDENT REVIEW004 PENDING**
+- Product head: `c0f975c4a278cecd89e19d332ca5601b074a115e`
 - Parent: `DBG-RF-004`
 - Iteration: `DBG-IT-001-005`
 - Depends on signed: `DBG-SL-001-005-001..003`, `DBG-SL-001-005-007`
@@ -54,3 +55,12 @@ Test exact current root, explicit relocation/prefix, explicit override, symlink,
 digest/length mismatch, duplicate basename, case-collision and case-distinct files. Include
 portable invalid logical IDs and ensure no CWD/basename/lowercase guess. Run legacy SourceMap
 tests unchanged. Close only after exact-head review, formal verification and Master sign-off.
+
+## Worker evidence
+
+- Focused SourceResolver + unchanged SourceMap: `29 passed, 3 skipped`.
+- Skips: case-distinct host behavior inapplicable on case-insensitive Windows; new and unchanged
+  legacy symlink cases both exact WinError1314 privilege degradation.
+- Compile/import/exports/exact resolve signature/Black: PASS.
+- Exact three-file scope, diff check and clean Git state: PASS.
+- Broad regression intentionally deferred to review/verification.
