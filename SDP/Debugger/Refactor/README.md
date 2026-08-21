@@ -8,7 +8,7 @@ worker -> reviewer -> verification -> exact-head sign-off loop.
 | `DBG-RF-001` | DAP Protocol Baseline Stabilization | COMPLETE at `208063e` | DBG-GAP-001 |
 | `DBG-RF-002` | Debugger Controller, State Machine, Stop Epochs | COMPLETE / STEERING ACCEPTED | frozen DBG-D-001/D-003 + shared interface |
 | `DBG-RF-003` | Session/Transport/Event Health/Recovery | COMPLETE / STEERING ACCEPTED | frozen DBG-D-002 + shared interface |
-| `DBG-RF-004` | Symbol/Source/Address/Inspection Model | ACTIVE / INTERFACE 1.2 PASS / SLICE 007 WORKER | DBG-D-003/D-004 + HSX-D-001..003 |
+| `DBG-RF-004` | Symbol/Source/Address/Inspection Model | ACTIVE / INTERFACE 1.2 PASS / SLICE 007 REVIEW 011 | DBG-D-003/D-004 + HSX-D-001..003 |
 | `DBG-RF-005` | Breakpoint/Watch Ownership/Reconciliation | BLOCKED | DBG-RF-002 + DBG-RF-003 + accepted `dbg.resolver-inspection/1.2` from DBG-RF-004 |
 | `DBG-RF-006` | Lifecycle and Execution/Stepping Semantics | BLOCKED | DBG-RF-002 + DBG-RF-003 + DBG-RF-004 |
 | `DBG-RF-007` | Thin Modular DAP Adapter | BLOCKED | DBG-RF-002..006 |

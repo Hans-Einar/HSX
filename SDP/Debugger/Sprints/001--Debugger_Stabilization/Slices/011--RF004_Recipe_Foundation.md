@@ -1,6 +1,8 @@
 # DBG-SL-001-005-007 — RF-004 Recipe Schema and Evaluator Foundation
 
-- Status: **ACTIVE / FRESH WORKER PENDING**
+- Status: **IMPLEMENTED / REVIEW 011 PENDING**
+
+- Implementation head: `ec75c4eb22333368cbe4847920dc4420fe8231cf`
 
 - Discovery head: `269d0bb962f85241633e1af8489b459357f2ff77`
 - Product changes: none
@@ -96,3 +98,12 @@ Steering comment `5370574104` accepts blocker002 and refreezes frame-carried rec
 in Interface1.2. Review031 returned REWORK trace-only; product remains stopped until fresh
 interface review032 PASS at `f79eb629…`; a fresh worker may restart. Product review
 identity 011 remains reserved.
+
+## Worker result
+
+Fresh worker committed `ec75c4eb22333368cbe4847920dc4420fe8231cf`, changing exactly
+`recipes.py`, additive package exports and the owned recipe test. It implements the closed DTO/
+parser/validator/evaluator surface, all opcodes/failure classes, selected-frame LocationEvaluator
+and current-profile recovered GPR rules with non-top PSW unavailable. Evidence: owned 34 passed;
+signed Slice002 47; broad debugger 218+1 classified WinError1314 skip; compile/import/export
+170 package/41 recipe exports; exact scope/diff/fsck/clean PASS. Fresh review011 is next.

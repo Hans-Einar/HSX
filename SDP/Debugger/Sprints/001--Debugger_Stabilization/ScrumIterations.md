@@ -474,7 +474,7 @@ traceability and no product drift after the combined signed head. Steering accep
 
 ## DBG-IT-001-005 — Typed Resolver and Inspection
 
-Status: ACTIVE — INTERFACE 1.2 PASS / SLICE 007 ACTIVE
+Status: ACTIVE — INTERFACE 1.2 PASS / SLICE 007 REVIEW 011 PENDING
 
 ### Authority and goal
 
@@ -1060,3 +1060,12 @@ with zero findings. The two-field UnwindFrame delta, recovered GPR/PSW rules, HS
 boundary, fixtures and review031 trace closures all passed. Master closes blocker002 and
 restarts only Slice007 with a fresh bounded worker. Review011 remains product-only;
 verification007/sign-off must pass before Slice003.
+
+### Slice007 worker result
+
+Fresh worker committed exact product head `ec75c4eb22333368cbe4847920dc4420fe8231cf`
+with the three owned files only. Closed recipes/rows/frames/parsers/validators, every bounded
+opcode and failure category, selected-frame LocationEvaluator and current-profile GPR recovery
+are implemented; current HSX has no PSW caller-rule seam, so non-top PSW is unavailable.
+Owned 34, signed Slice002 47 and broad debugger 218+1 pass; compile/import/export/scope/git pass.
+Fresh product review011 is the sole gate.

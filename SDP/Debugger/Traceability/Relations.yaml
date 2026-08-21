@@ -400,6 +400,7 @@ relations:
     type: reviewed_by
     to: [DBG-RVW-001-005-011]
     status: planned
+    candidate_head: ec75c4eb22333368cbe4847920dc4420fe8231cf
   - from: DBG-SL-001-005-007
     type: verified_by
     to: [DBG-VER-001-005-007]

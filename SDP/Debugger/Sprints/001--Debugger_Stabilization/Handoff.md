@@ -1,6 +1,6 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf004_interface_1_2_pass_slice007_worker_pending`
+Status: `rf004_interface_1_2_pass_slice007_review_011_pending`
 
 Steering escalation: issue #38 comment `5369244294`.
 Steering frame-evidence refreeze: issue #38 comment `5370574104`.
@@ -19,8 +19,8 @@ The accepted first-wave gate is closed. Execute only `DBG-RF-004` through the se
 `DBG-SL-001-005-001..007` contracts and refrozen `dbg.resolver-inspection/1.2` interface.
 Historical versions `1`/`1.1` passed reviews019/030; Slices001–002 are signed. Steering accepted
 `DBG-BLK-001-005-002` and selected frame-carried recovered evidence in comment `5370574104`.
-Review031 returned REWORK trace-only; review032 passed exact head `f79eb629…`. Only fresh
-Slice007 product work may start. RF-005..009 and
+Review031 returned REWORK trace-only; review032 passed exact head `f79eb629…`. Slice007 product
+head `ec75c4eb…` awaits fresh review011. RF-005..009 and
 Executive/VM/AVR/frontend migration remain blocked.
 
 ## Authority
@@ -195,8 +195,8 @@ Executive/VM/AVR/frontend migration remain blocked.
 
 ## Exact next step
 
-Dispatch a fresh bounded Slice007 worker under existing `recipes.py`/test ownership. Then run
-product review011, verification007 and Master sign-off before Slice003.
+Dispatch fresh product-only review011 against `ec75c4eb22333368cbe4847920dc4420fe8231cf`.
+Do not start verification007 or Slice003 before PASS.
 
 ## Traceability state
 
@@ -280,7 +280,7 @@ product review011, verification007 and Master sign-off before Slice003.
 - Verification `DBG-VER-001-004-006`: PASS at `1e47953…`
 - Dependent integration v2 sign-off: PASS at `1e47953…`
 - RF-002/RF-003 parent review, verification and exact-head sign-off: PASS
-- Active gate: fresh Slice007 worker
+- Active gate: `DBG-RVW-001-005-011` at product head `ec75c4eb…`
 - Blocker authority: issue #38 comment `5369244294`
 - Refreeze authority: issue #38 comment `5370574104`
 - Blocker authority: issue #38 comment `5365959417`
@@ -289,8 +289,8 @@ product review011, verification007 and Master sign-off before Slice003.
 ## Agents and worktree
 
 The prior design/portable-contract chain and RF-002/RF-003/integration wave are complete,
-Steering-accepted and remotely reconstructable. RF-004 `1.2` passed review032; only the bounded
-Slice007 worker is open. Later product/review/verification remains stopped. Controlled work is on
+Steering-accepted and remotely reconstructable. RF-004 `1.2` passed review032; Slice007
+review011 is open. Verification/later Slices remain stopped. Controlled work is on
 `codex/dbg-rf-004` from exact base `69a54aeb3394d3cd4792bce620748e15bab69f1f`;
 the user's original dirty
 `Implementation/vscode` worktree remains untouched.
