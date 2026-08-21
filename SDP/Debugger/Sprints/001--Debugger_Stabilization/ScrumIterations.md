@@ -832,3 +832,12 @@ and returned REWORK: High nested-result mutability/duck typing, High incomplete 
 coverage, High MemoryBlock/result status contradiction, plus Medium normalized trace summaries
 still worker-active. All existing tests/canonical/scope/import evidence passed. Fresh corrective
 worker owns Slice 002 files only; next review is `DBG-RVW-001-005-021`.
+
+### Slice 002 corrective result
+
+Fresh corrective worker committed `4280bc6008385042bdff923bd8e5392a1c290fdc`, changing only
+`results.py` and the owned metadata test. Nested evidence is deeply frozen and exact typed;
+ValuePiece coverage is gap-free; MemoryBlock/result status is bidirectionally consistent; all
+adversarial probes are covered. Evidence: focused 39 passed; debugger 176 passed/1 skip;
+mandated 39 passed/1 skip; canonical 2 passed; compile/import/export 129 PASS; stdlib trace
+84/85/84/86/86%; scope/diff/clean PASS. Fresh re-review is `DBG-RVW-001-005-021`.

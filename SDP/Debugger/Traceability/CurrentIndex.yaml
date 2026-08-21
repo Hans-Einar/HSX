@@ -467,11 +467,12 @@ active_rf004:
       verification: DBG-VER-001-005-001
     - id: DBG-SL-001-005-002
       path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/006--RF004_Identity_Address.md
-      status: rework_corrective_worker_pending
+      status: corrected_pending_rereview
       implementation_head: 4b5837644dc1196accfd8608bc3dbd20980476bb
       prior_review: DBG-RVW-001-005-002
       prior_review_status: rework
       corrective_review: DBG-RVW-001-005-021
+      corrected_head: 4280bc6008385042bdff923bd8e5392a1c290fdc
       review: DBG-RVW-001-005-002
       verification: DBG-VER-001-005-002
     - id: DBG-SL-001-005-003
@@ -503,7 +504,7 @@ active_rf004:
   parent_verification: DBG-VER-004-001-001
   product_base: 69a54aeb3394d3cd4792bce620748e15bab69f1f
   runtime_profile: hsx.python-debug-legacy/1
-  current_gate: DBG-SL-001-005-002_corrective_worker
+  current_gate: DBG-RVW-001-005-021
 structural_gate:
   rule: Only Steering-authorized Refactors with frozen Slice/interface contracts may execute.
   authorized_refactors:
