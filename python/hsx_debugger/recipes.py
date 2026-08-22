@@ -1656,7 +1656,7 @@ class RecipeComponentValidator:
         limits: RecipeLimits = RecipeLimits(),
     ) -> tuple[Diagnostic, ...]:
         if not isinstance(row, LocationRow):
-            raise TypeError("row must be UnwindRow")
+            raise TypeError("row must be LocationRow")
         if not isinstance(variable, SymbolRecord):
             raise TypeError("variable must be SymbolRecord")
         if not isinstance(architecture, ArchitectureDescriptor):

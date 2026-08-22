@@ -64,10 +64,6 @@ def test_checked_call_site_without_instruction_evidence_stops_before_caller_fram
     assert result.diagnostics[0].code in {"instruction_unavailable", "call_site_unavailable"}
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="P002 promotion cleanup: validator TypeError still names UnwindRow",
-)
 def test_location_validator_type_error_names_location_row() -> None:
     f = inspection_foundation()
     with pytest.raises(TypeError, match="row must be LocationRow"):
