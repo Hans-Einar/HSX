@@ -206,8 +206,8 @@ class InspectionService:
         architecture: ArchitectureDescriptor,
         abi: AbiDescriptorRef,
         profile_limits: RecipeLimits,
-        stack_service: type[StackService] = StackService,
-        location_evaluator: type[LocationEvaluator] = LocationEvaluator,
+        stack_service: type[StackService],
+        location_evaluator: type[LocationEvaluator],
     ) -> InspectionServiceCreateResult:
         if not isinstance(architecture, ArchitectureDescriptor):
             raise TypeError("architecture must be ArchitectureDescriptor")
