@@ -61,16 +61,14 @@ def test_malformed_optional_instruction_annotation_does_not_destroy_proven_frame
     )
 
 
-def test_malformed_call_site_metadata_is_diagnostic_and_resume_pc_remains_authoritative() -> None:
+def test_malformed_call_site_metadata_is_corrupt_and_never_fabricates_caller() -> None:
     f = foundation()
-    result = unwind(f, index=MalformedCallSiteInstructionIndex(f))
-    assert result.status is InspectionStatus.COMPLETE
-    assert len(result.frames) == 2
-    caller = result.frames[1]
-    assert caller.resume_pc == HsxAddress(f.code, 0x124)
-    assert caller.call_site_pc is None
-    assert caller.pc == HsxAddress(f.code, 0x124)
-    assert any(
-        diagnostic.code == "call_site_index_contract"
-        for diagnostic in caller.diagnostics
-    )
+    port = SnapshotPort(f)
+    result = unwind(f, index=MalformedCallSiteInstructionIndex(f), port=port)
+    assert result.status is InspectionStatus.CORRUPT
+    assert len(result.frames) == 1
+    assert result.frames[0].pc == HsxAddress(f.code, 0x100)
+    assert result.diagnostics[0].code == "call_site_index_contract"
+    assert [(address.unsigned_value, length) for address, length in port.memory_reads] == [
+        (0x204, 4)
+    ]
