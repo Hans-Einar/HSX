@@ -22,13 +22,6 @@ from .results import (
 from .stack import STACK_RESULT_STATUSES
 
 
-_SCOPE_ORDER = {
-    ScopeKind.REGISTERS: 0,
-    ScopeKind.LOCALS: 1,
-    ScopeKind.GLOBALS: 2,
-}
-
-
 def _diagnostics(value) -> tuple[Diagnostic, ...]:
     items = tuple(value)
     if not all(isinstance(item, Diagnostic) for item in items):
@@ -73,13 +66,14 @@ class FramePage:
         if len(frames) > self.total_frames:
             raise ValueError("paged frames cannot exceed total_frames")
         if frames:
-            indices = tuple(item.unwind.frame_index for item in frames)
-            if self.offset >= self.total_frames or indices[0] != self.offset:
-                raise ValueError("non-empty frame page must start at the requested offset")
-            if indices != tuple(range(self.offset, self.offset + len(frames))):
-                raise ValueError("paged frame indices must be contiguous")
-            if indices[-1] >= self.total_frames:
-                raise ValueError("paged frame index exceeds total_frames")
+            if self.offset >= self.total_frames or frames[0].unwind.frame_index != self.offset:
+                raise ValueError("first paged frame must match requested offset")
+            expected = tuple(range(self.offset, self.offset + len(frames)))
+            actual = tuple(item.unwind.frame_index for item in frames)
+            if actual != expected:
+                raise ValueError("paged frame indices must be contiguous from requested offset")
+            if self.offset + len(frames) > self.total_frames:
+                raise ValueError("paged frames exceed total_frames")
         object.__setattr__(self, "frames", frames)
 
 
@@ -157,11 +151,11 @@ class ScopeSet:
             raise ValueError("scope set must reference one frame handle")
         if any(item.context != self.frame_handle.context for item in scopes):
             raise ValueError("scope set must retain one exact context")
-        kinds = tuple(item.kind for item in scopes)
-        if len(set(kinds)) != len(kinds):
-            raise ValueError("scope kinds must be unique")
-        if kinds != tuple(sorted(kinds, key=_SCOPE_ORDER.__getitem__)):
-            raise ValueError("scope kinds must follow Registers/Locals/Globals order")
+        if len({item.kind for item in scopes}) != len(scopes) or len({item.handle for item in scopes}) != len(scopes):
+            raise ValueError("scope kinds and handles must be unique")
+        rank = {ScopeKind.REGISTERS: 0, ScopeKind.LOCALS: 1, ScopeKind.GLOBALS: 2}
+        if tuple(rank[item.kind] for item in scopes) != tuple(sorted(rank[item.kind] for item in scopes)):
+            raise ValueError("scopes must follow fixed Registers/Locals/Globals order")
         object.__setattr__(self, "scopes", scopes)
 
 
@@ -268,13 +262,26 @@ class VariablePage:
             raise TypeError("variables must contain ScopeValueRecord values")
         if len(variables) > self.total_variables:
             raise ValueError("paged variables cannot exceed total_variables")
+        if variables and self.offset >= self.total_variables:
+            raise ValueError("non-empty variable page cannot start at/beyond total_variables")
         if any(item.scope_handle != self.scope_handle for item in variables):
             raise ValueError("variable page must retain one exact scope handle")
         if any(item.context != self.scope_handle.context for item in variables):
             raise ValueError("variable page must retain one exact context")
-        handles = tuple(item.handle for item in variables)
-        if len(set(handles)) != len(handles):
-            raise ValueError("paged variable handles must be unique")
+        if len({item.handle for item in variables}) != len(variables):
+            raise ValueError("variable handles must be unique within one page")
+        if variables:
+            record_types = {type(item) for item in variables}
+            if len(record_types) != 1:
+                raise ValueError("one variable page must contain one record kind")
+            if isinstance(variables[0], RegisterVariableRecord):
+                keys = tuple(item.register_order for item in variables)
+                if keys != tuple(sorted(keys)):
+                    raise ValueError("register variables must follow register_order")
+            else:
+                keys = tuple((item.declaration_order, item.symbol_id) for item in variables)
+                if keys != tuple(sorted(keys)):
+                    raise ValueError("symbol variables must follow declaration_order/symbol_id")
         object.__setattr__(self, "variables", variables)
 
 
