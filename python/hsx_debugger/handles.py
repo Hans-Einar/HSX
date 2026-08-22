@@ -1,6 +1,6 @@
 """Epoch-bound domain handles for RF-004 inspection.
 
-The store owns only handle identity/lifetime.  Snapshot reads, artifact lookup, stack walking,
+The store owns only handle identity/lifetime. Snapshot reads, artifact lookup, stack walking,
 frontend IDs, and controller lifecycle remain outside this module.
 """
 
@@ -122,6 +122,8 @@ class HandleResolution:
         if self.status is InspectionStatus.COMPLETE:
             if not isinstance(self.object_key, tuple):
                 raise TypeError("COMPLETE handle resolution requires tuple object_key")
+            normalized = _normalized_object_key(self.kind, self.object_key)
+            object.__setattr__(self, "object_key", normalized)
             if diagnostics:
                 raise ValueError("COMPLETE handle resolution carries no diagnostics")
         else:
