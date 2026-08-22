@@ -114,15 +114,20 @@ def _runtime():
     return fixture, index, port, opened.session
 
 
-def test_real_index_stack_scope_variable_and_symbol_expression_chain() -> None:
+def test_real_index_bound_prefix_scope_variable_and_symbol_expression_chain() -> None:
     fixture, index, port, session = _runtime()
 
+    # The portable fixture has an ordinary (nonterminal) unwind row. max_frames=1 therefore
+    # proves one frame but must terminate UNSUPPORTED/limit_exceeded rather than fabricate
+    # completeness. Slice006 may still allocate/use the proven prefix frame in this epoch.
     stack = session.stack(PageRequest(0, 8))
-    assert stack.status is InspectionStatus.COMPLETE
+    assert stack.status is InspectionStatus.UNSUPPORTED
+    assert stack.diagnostics[0].code == "limit_exceeded"
     assert stack.page.total_frames == 1
     frame = stack.page.frames[0]
     assert frame.unwind.function.function_id == "fn"
     assert frame.unwind.pc == HsxAddress(fixture.architecture.pc_space, 0x20)
+    assert frame.unwind.terminal is False
 
     scopes = session.scopes(frame.handle)
     assert isinstance(scopes, ScopeQueryResult)
