@@ -18,6 +18,7 @@ from .addresses import (
 )
 from .artifacts import DebugArtifactIndex
 from .identity import AbiDescriptorRef, DebugBindingValidator, InspectionContext
+from .instruction_semantics import CallSemanticStatus, prove_call
 from .metadata import FunctionRecord, InstructionRecord, SourceLocation
 from .recipes import (
     RecipeAddress,
@@ -708,16 +709,23 @@ def _checked_call_site(
     index: DebugArtifactIndex,
     architecture: ArchitectureDescriptor,
     frame_index: int,
-) -> tuple[HsxAddress | None, tuple[Diagnostic, ...]]:
+) -> tuple[HsxAddress | None, InspectionStatus | None, tuple[Diagnostic, ...]]:
     adjustment = row.call_site_adjustment
     if adjustment is None:
-        return None, ()
+        return None, InspectionStatus.UNAVAILABLE, (
+            _diag(
+                "call_site_unavailable",
+                "unwind row supplies no checked call-site adjustment",
+                row_id=row.row_id,
+                frame_index=frame_index,
+            ),
+        )
     if adjustment == 0:
         candidate = resume_pc
     elif adjustment < 0:
         checked = architecture.subtract(resume_pc, -adjustment, AddressArithmeticMode.CHECKED)
         if checked.status is not AddressStatus.VALID:
-            return None, (
+            return None, InspectionStatus.UNAVAILABLE, (
                 _diag(
                     "call_site_unavailable",
                     checked.diagnostics[0].message if checked.diagnostics else "call-site subtraction failed",
@@ -729,7 +737,7 @@ def _checked_call_site(
     else:
         checked = architecture.add(resume_pc, adjustment, AddressArithmeticMode.CHECKED)
         if checked.status is not AddressStatus.VALID:
-            return None, (
+            return None, InspectionStatus.UNAVAILABLE, (
                 _diag(
                     "call_site_unavailable",
                     checked.diagnostics[0].message if checked.diagnostics else "call-site addition failed",
@@ -741,7 +749,7 @@ def _checked_call_site(
 
     executable = architecture.validate(candidate, Permission.EXECUTE)
     if executable.status is not AddressStatus.VALID:
-        return None, (
+        return None, InspectionStatus.UNAVAILABLE, (
             _diag(
                 "call_site_unavailable",
                 executable.diagnostics[0].message if executable.diagnostics else "call-site PC is not executable",
@@ -752,7 +760,7 @@ def _checked_call_site(
     try:
         instruction = index.instruction_at(candidate)
     except Exception as exc:
-        return None, (
+        return None, InspectionStatus.CORRUPT, (
             _diag(
                 "call_site_index_contract",
                 f"call-site instruction lookup failed with {type(exc).__name__}",
@@ -761,7 +769,7 @@ def _checked_call_site(
             ),
         )
     if not isinstance(instruction, ResolutionResult):
-        return None, (
+        return None, InspectionStatus.CORRUPT, (
             _diag(
                 "call_site_index_contract",
                 "call-site instruction lookup returned non-ResolutionResult",
@@ -778,9 +786,10 @@ def _checked_call_site(
                 frame_index=frame_index,
             ),
         )
-        return None, tuple(diagnostics)
-    if not isinstance(instruction.values[0], InstructionRecord):
-        return None, (
+        return None, _resolution_status(instruction.status), tuple(diagnostics)
+    record = instruction.values[0]
+    if type(record) is not InstructionRecord:
+        return None, InspectionStatus.CORRUPT, (
             _diag(
                 "call_site_index_contract",
                 "resolved call-site instruction is not InstructionRecord",
@@ -789,16 +798,45 @@ def _checked_call_site(
             ),
         )
 
-    # D-002 additionally requires proof that this exact instruction is a CALL. RF-004's
-    # frozen InstructionRecord currently exposes no portable semantic discriminator.
-    return None, (
+    try:
+        proof = prove_call(architecture, record)
+    except (TypeError, ValueError) as exc:
+        return None, InspectionStatus.CORRUPT, (
+            _diag(
+                "instruction_semantic_contract",
+                str(exc),
+                row_id=row.row_id,
+                frame_index=frame_index,
+            ),
+        )
+    if proof.status is CallSemanticStatus.CALL:
+        return candidate, None, ()
+
+    mapped = {
+        CallSemanticStatus.NOT_CALL: InspectionStatus.CORRUPT,
+        CallSemanticStatus.UNAVAILABLE: InspectionStatus.UNAVAILABLE,
+        CallSemanticStatus.UNSUPPORTED: InspectionStatus.UNSUPPORTED,
+        CallSemanticStatus.CORRUPT: InspectionStatus.CORRUPT,
+    }.get(proof.status, InspectionStatus.CORRUPT)
+    diagnostics = tuple(
         _diag(
-            "call_site_semantics_unavailable",
-            "exact instruction metadata does not provide frozen portable CALL semantic evidence",
+            diagnostic.code,
+            diagnostic.message,
             row_id=row.row_id,
             frame_index=frame_index,
-        ),
+        )
+        for diagnostic in proof.diagnostics
     )
+    if not diagnostics:
+        diagnostics = (
+            _diag(
+                "instruction_semantic_contract",
+                "instruction semantic proof returned no terminating diagnostic",
+                row_id=row.row_id,
+                frame_index=frame_index,
+            ),
+        )
+    return None, mapped, diagnostics
 
 
 class StackService:
@@ -1054,6 +1092,14 @@ class StackService:
                     context, _recipe_status(pc_status), frames, pc_diagnostics
                 )
 
+            call_site_pc, call_site_status, call_site_diagnostics = _checked_call_site(
+                caller_pc, row, index, architecture, frame_index
+            )
+            if call_site_status is not None:
+                return _terminated(
+                    context, call_site_status, frames, call_site_diagnostics
+                )
+
             caller_sp, sp_status, sp_diagnostics = _required_address_rule(
                 row.caller_sp_rule,
                 same_value=current.sp,
@@ -1100,12 +1146,8 @@ class StackService:
                     context, _recipe_status(gpr_status), frames, gpr_diagnostics
                 )
 
-            call_site_pc, call_site_diagnostics = _checked_call_site(
-                caller_pc, row, index, architecture, frame_index
-            )
-            next_pc = call_site_pc if call_site_pc is not None else caller_pc
             current = _FrameSeed(
-                pc=next_pc,
+                pc=call_site_pc,
                 sp=caller_sp,
                 recovered_registers=caller_gprs,
                 recovered_psw=RegisterValue(
@@ -1116,10 +1158,10 @@ class StackService:
                 call_site_pc=call_site_pc,
                 diagnostics=tuple(
                     pc_diagnostics
+                    + call_site_diagnostics
                     + sp_diagnostics
                     + base_diagnostics
                     + gpr_diagnostics
-                    + call_site_diagnostics
                 ),
             )
 
