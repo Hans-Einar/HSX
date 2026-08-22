@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from hsx_debugger import *
-from test_hsx_debugger_stack import IndexDouble, SnapshotPort, foundation, unwind
+from test_hsx_debugger_stack import IndexDouble, SnapshotPort, foundation
 
 
 def _instruction(f, *, encoded_word=(0x24 << 24), byte_size=4):
@@ -18,8 +18,12 @@ def _instruction(f, *, encoded_word=(0x24 << 24), byte_size=4):
     )
 
 
-def _run(f, instruction, *, architecture=None):
-    index = IndexDouble(f, instructions={} if instruction is None else {0x120: instruction})
+def _run(f, instruction, *, architecture=None, rows=None):
+    index = IndexDouble(
+        f,
+        rows=rows,
+        instructions={} if instruction is None else {0x120: instruction},
+    )
     port = SnapshotPort(f)
     result = StackService.unwind(
         f.context,
@@ -33,9 +37,15 @@ def _run(f, instruction, *, architecture=None):
     return result, port
 
 
-def test_proven_call_uses_checked_call_site_as_caller_frame_pc_and_keeps_resume_separate() -> None:
+def test_proven_call_uses_checked_call_site_for_caller_row_selection_and_keeps_resume_separate() -> None:
     f = foundation()
-    result, _ = _run(f, _instruction(f))
+    # Half-open [0x120,0x124) contains the CALL but explicitly excludes resume_pc 0x124.
+    # A regression to legacy resume-PC lookup therefore cannot select this terminal row.
+    terminal_at_call = replace(
+        f.terminal,
+        pc_range=HsxAddressRange(HsxAddress(f.code, 0x120), 4),
+    )
+    result, _ = _run(f, _instruction(f), rows=(f.body, terminal_at_call))
     assert result.status is InspectionStatus.COMPLETE
     assert len(result.frames) == 2
     top, caller = result.frames
@@ -43,6 +53,7 @@ def test_proven_call_uses_checked_call_site_as_caller_frame_pc_and_keeps_resume_
     assert caller.pc == HsxAddress(f.code, 0x120)
     assert caller.resume_pc == HsxAddress(f.code, 0x124)
     assert caller.call_site_pc == HsxAddress(f.code, 0x120)
+    assert caller.terminal is True
 
 
 def test_missing_encoded_semantics_stops_with_partial_prefix_and_never_uses_resume_as_pc() -> None:
