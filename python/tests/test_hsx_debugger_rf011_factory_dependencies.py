@@ -43,6 +43,12 @@ def test_omitting_location_evaluator_fails_at_python_call_boundary() -> None:
         InspectionService.create(*args, StaticStack)
 
 
+def test_omitting_stack_service_fails_at_python_call_boundary() -> None:
+    _, args = _args()
+    with pytest.raises(TypeError):
+        InspectionService.create(*args, location_evaluator=LocationEvaluator)
+
+
 def test_explicit_dependencies_are_retained_unchanged() -> None:
     _, args = _args()
     created = InspectionService.create(*args, StaticStack, LocationEvaluator)
