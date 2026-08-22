@@ -915,7 +915,17 @@ class StackService:
             if row.boundary is UnwindBoundary.TERMINAL:
                 return _result(context, InspectionStatus.COMPLETE, frames, ())
             if frame_index + 1 >= request_limits.max_frames:
-                return _result(context, InspectionStatus.COMPLETE, frames, ())
+                return _failure(
+                    context,
+                    InspectionStatus.UNSUPPORTED,
+                    _diag(
+                        "limit_exceeded",
+                        "stack walk reached request max_frames before a terminal row",
+                        row_id=row.row_id,
+                        frame_index=frame_index,
+                    ),
+                    frames,
+                )
 
             evaluation = _evaluation_context(
                 context,
