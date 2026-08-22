@@ -7,7 +7,7 @@ remain outside this boundary.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .addresses import (
     AddressArithmeticMode,
@@ -18,7 +18,7 @@ from .addresses import (
 )
 from .artifacts import DebugArtifactIndex
 from .identity import AbiDescriptorRef, DebugBindingValidator, InspectionContext
-from .metadata import FunctionRecord, SourceLocation
+from .metadata import FunctionRecord, InstructionRecord, SourceLocation
 from .recipes import (
     RecipeAddress,
     RecipeBudget,
@@ -44,6 +44,7 @@ from .results import (
     RegisterSelection,
     RegisterSet,
     RegisterValue,
+    ResolutionResult,
     ResolutionStatus,
 )
 from .snapshot import SnapshotReadPort, fence_snapshot_result, require_snapshot_read_set
@@ -315,7 +316,6 @@ def _read_top_seed(
     context: InspectionContext,
     read_port: SnapshotReadPort,
     architecture: ArchitectureDescriptor,
-    abi: AbiDescriptorRef,
 ) -> tuple[_FrameSeed | None, StackWalkResult | None]:
     coverage = require_snapshot_read_set(context, "registers")
     if coverage.status is not InspectionStatus.COMPLETE:
@@ -402,45 +402,91 @@ def _read_top_seed(
 
     gprs = RegisterSet(tuple(by_id[item] for item in architecture.register_order))
     psw = by_id["PSW"]
-    diagnostics = list(result.diagnostics)
-    frame_base = None
-    if abi.ref == _CURRENT_ABI and "R7" in by_id and by_id["R7"].available:
-        candidate = HsxAddress(architecture.sp_space, by_id["R7"].unsigned_value)
-        checked = architecture.validate(candidate)
-        if checked.status is AddressStatus.VALID:
-            frame_base = candidate
-        else:
-            diagnostics.append(
-                _diag(
-                    "top_frame_base_unavailable",
-                    checked.diagnostics[0].message if checked.diagnostics else "R7 is not a valid frame-base address",
-                    frame_index=0,
-                )
-            )
-
     return (
         _FrameSeed(
             pc=pc,
             sp=sp,
             recovered_registers=gprs,
             recovered_psw=psw,
-            frame_base=frame_base,
+            frame_base=None,
             resume_pc=None,
             call_site_pc=None,
-            diagnostics=tuple(diagnostics),
+            diagnostics=tuple(result.diagnostics),
         ),
         None,
     )
 
 
+def _row_aware_current_frame_base(
+    seed: _FrameSeed,
+    row: UnwindRow,
+    architecture: ArchitectureDescriptor,
+    abi: AbiDescriptorRef,
+    frame_index: int,
+) -> _FrameSeed:
+    if (
+        frame_index != 0
+        or abi.ref != _CURRENT_ABI
+        or row.boundary is not UnwindBoundary.ORDINARY
+    ):
+        return seed
+    r7 = next(
+        (item for item in seed.recovered_registers.registers if item.register_id == "R7"),
+        None,
+    )
+    if r7 is None or not r7.available:
+        return replace(
+            seed,
+            frame_base=None,
+            diagnostics=seed.diagnostics
+            + (
+                _diag(
+                    "top_frame_base_unavailable",
+                    "ordinary current-ABI row has no available snapshot R7 frame-base evidence",
+                    row_id=row.row_id,
+                    frame_index=frame_index,
+                ),
+            ),
+        )
+    candidate = HsxAddress(architecture.sp_space, r7.unsigned_value)
+    checked = architecture.validate(candidate)
+    if checked.status is not AddressStatus.VALID:
+        return replace(
+            seed,
+            frame_base=None,
+            diagnostics=seed.diagnostics
+            + (
+                _diag(
+                    "top_frame_base_unavailable",
+                    checked.diagnostics[0].message
+                    if checked.diagnostics
+                    else "snapshot R7 is not a valid current frame-base address",
+                    row_id=row.row_id,
+                    frame_index=frame_index,
+                ),
+            ),
+        )
+    return replace(seed, frame_base=candidate)
+
+
 def _annotations(
     index: DebugArtifactIndex, pc: HsxAddress
-) -> tuple[FunctionRecord | None, SourceLocation | None, tuple[Diagnostic, ...]]:
+) -> tuple[
+    FunctionRecord | None,
+    SourceLocation | None,
+    tuple[Diagnostic, ...],
+    bool,
+]:
     diagnostics: list[Diagnostic] = []
+    function_contract_failed = False
     try:
-        functions = tuple(item for item in index.functions() if item.range.contains(pc))
+        all_functions = tuple(index.functions())
+        if not all(isinstance(item, FunctionRecord) for item in all_functions):
+            raise TypeError("function enumeration returned a non-FunctionRecord")
+        functions = tuple(item for item in all_functions if item.range.contains(pc))
     except Exception as exc:
         functions = ()
+        function_contract_failed = True
         diagnostics.append(
             _diag("function_index_contract", f"function enumeration failed with {type(exc).__name__}")
         )
@@ -456,11 +502,21 @@ def _annotations(
             _diag("instruction_index_contract", f"instruction lookup failed with {type(exc).__name__}")
         )
     else:
-        if instruction.status is ResolutionStatus.RESOLVED and len(instruction.values) == 1:
-            source = instruction.values[0].source
+        if not isinstance(instruction, ResolutionResult):
+            diagnostics.append(
+                _diag("instruction_index_contract", "instruction lookup returned non-ResolutionResult")
+            )
+        elif instruction.status is ResolutionStatus.RESOLVED and len(instruction.values) == 1:
+            record = instruction.values[0]
+            if isinstance(record, InstructionRecord):
+                source = record.source
+            else:
+                diagnostics.append(
+                    _diag("instruction_index_contract", "resolved instruction is not InstructionRecord")
+                )
         elif instruction.status is not ResolutionStatus.UNAVAILABLE:
             diagnostics.extend(instruction.diagnostics)
-    return function, source, tuple(diagnostics)
+    return function, source, tuple(diagnostics), function_contract_failed
 
 
 def _evaluation_context(
@@ -698,8 +754,17 @@ def _checked_call_site(
     except Exception as exc:
         return None, (
             _diag(
-                "call_site_unavailable",
+                "call_site_index_contract",
                 f"call-site instruction lookup failed with {type(exc).__name__}",
+                row_id=row.row_id,
+                frame_index=frame_index,
+            ),
+        )
+    if not isinstance(instruction, ResolutionResult):
+        return None, (
+            _diag(
+                "call_site_index_contract",
+                "call-site instruction lookup returned non-ResolutionResult",
                 row_id=row.row_id,
                 frame_index=frame_index,
             ),
@@ -714,6 +779,15 @@ def _checked_call_site(
             ),
         )
         return None, tuple(diagnostics)
+    if not isinstance(instruction.values[0], InstructionRecord):
+        return None, (
+            _diag(
+                "call_site_index_contract",
+                "resolved call-site instruction is not InstructionRecord",
+                row_id=row.row_id,
+                frame_index=frame_index,
+            ),
+        )
 
     # D-002 additionally requires proof that this exact instruction is a CALL. RF-004's
     # frozen InstructionRecord currently exposes no portable semantic discriminator.
@@ -756,7 +830,7 @@ class StackService:
         if binding_failure is not None:
             return binding_failure
 
-        seed, seed_failure = _read_top_seed(context, read_port, architecture, abi)
+        seed, seed_failure = _read_top_seed(context, read_port, architecture)
         if seed_failure is not None:
             return seed_failure
 
@@ -786,7 +860,20 @@ class StackService:
                 )
             seen_frame_keys.add(key)
 
-            function, source, annotation_diagnostics = _annotations(index, current.pc)
+            function, source, annotation_diagnostics, function_contract_failed = _annotations(
+                index, current.pc
+            )
+            if function_contract_failed:
+                return _failure(
+                    context,
+                    InspectionStatus.CORRUPT,
+                    next(
+                        diagnostic
+                        for diagnostic in annotation_diagnostics
+                        if diagnostic.code == "function_index_contract"
+                    ),
+                    frames,
+                )
             function_id = function.function_id if function is not None else None
             try:
                 row_result = index.unwind_rows(current.pc, function_id)
@@ -797,6 +884,17 @@ class StackService:
                     _diag(
                         "unwind_index_contract",
                         f"unwind row lookup failed with {type(exc).__name__}",
+                        frame_index=frame_index,
+                    ),
+                    frames,
+                )
+            if not isinstance(row_result, ResolutionResult):
+                return _failure(
+                    context,
+                    InspectionStatus.CORRUPT,
+                    _diag(
+                        "unwind_index_contract",
+                        "unwind row lookup returned non-ResolutionResult",
                         frame_index=frame_index,
                     ),
                     frames,
@@ -838,6 +936,9 @@ class StackService:
                     frames,
                 )
 
+            current = _row_aware_current_frame_base(
+                current, row, architecture, abi, frame_index
+            )
             base_evaluation = _evaluation_context(
                 context,
                 binding,
