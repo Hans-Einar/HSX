@@ -797,6 +797,15 @@ def _checked_call_site(
                 frame_index=frame_index,
             ),
         )
+    if record.address != candidate:
+        return None, InspectionStatus.CORRUPT, (
+            _diag(
+                "call_site_index_contract",
+                "resolved call-site instruction address differs from the checked candidate",
+                row_id=row.row_id,
+                frame_index=frame_index,
+            ),
+        )
 
     try:
         proof = prove_call(architecture, record)
