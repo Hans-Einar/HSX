@@ -22,6 +22,13 @@ from .results import (
 from .stack import STACK_RESULT_STATUSES
 
 
+_SCOPE_ORDER = {
+    ScopeKind.REGISTERS: 0,
+    ScopeKind.LOCALS: 1,
+    ScopeKind.GLOBALS: 2,
+}
+
+
 def _diagnostics(value) -> tuple[Diagnostic, ...]:
     items = tuple(value)
     if not all(isinstance(item, Diagnostic) for item in items):
@@ -65,6 +72,14 @@ class FramePage:
             raise TypeError("frames must contain FrameRecord values")
         if len(frames) > self.total_frames:
             raise ValueError("paged frames cannot exceed total_frames")
+        if frames:
+            indices = tuple(item.unwind.frame_index for item in frames)
+            if self.offset >= self.total_frames or indices[0] != self.offset:
+                raise ValueError("non-empty frame page must start at the requested offset")
+            if indices != tuple(range(self.offset, self.offset + len(frames))):
+                raise ValueError("paged frame indices must be contiguous")
+            if indices[-1] >= self.total_frames:
+                raise ValueError("paged frame index exceeds total_frames")
         object.__setattr__(self, "frames", frames)
 
 
@@ -142,6 +157,11 @@ class ScopeSet:
             raise ValueError("scope set must reference one frame handle")
         if any(item.context != self.frame_handle.context for item in scopes):
             raise ValueError("scope set must retain one exact context")
+        kinds = tuple(item.kind for item in scopes)
+        if len(set(kinds)) != len(kinds):
+            raise ValueError("scope kinds must be unique")
+        if kinds != tuple(sorted(kinds, key=_SCOPE_ORDER.__getitem__)):
+            raise ValueError("scope kinds must follow Registers/Locals/Globals order")
         object.__setattr__(self, "scopes", scopes)
 
 
@@ -252,6 +272,9 @@ class VariablePage:
             raise ValueError("variable page must retain one exact scope handle")
         if any(item.context != self.scope_handle.context for item in variables):
             raise ValueError("variable page must retain one exact context")
+        handles = tuple(item.handle for item in variables)
+        if len(set(handles)) != len(handles):
+            raise ValueError("paged variable handles must be unique")
         object.__setattr__(self, "variables", variables)
 
 
