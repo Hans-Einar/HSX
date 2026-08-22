@@ -113,8 +113,22 @@ All 20 iterations must exit 0. Report aggregate pass count and any failure/skip/
 
 ## Phase D — signed RF-004 regression oracle
 
-Run the same signed RF-004 oracle used by Batch005. If the exact command is recorded in
-`SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/033--RF004_Batch005_Completion_Execution_Plan.md`, use it verbatim. Expected historical signal from Batch005 is `159 passed, 3 skipped`, with no failure/error.
+Use the exact signed set retained in
+`SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/033--RF004_Candidate_Batch_005_Test_Plan.md`:
+
+```text
+python -m pytest \
+  python/tests/test_hsx_debugger_addresses.py \
+  python/tests/test_hsx_debugger_identity.py \
+  python/tests/test_hsx_debugger_metadata.py \
+  python/tests/test_hsx_debugger_recipes.py \
+  python/tests/test_hsx_debugger_artifacts.py \
+  python/tests/test_hsx_debugger_sources.py \
+  python/tests/test_hsx_debugger_rf004_legacy_oracles.py \
+  -q --tb=short
+```
+
+Expected historical signal: `159 passed, 3 skipped`, with no failure/error.
 
 ## Phase E — signed RF-002/RF-003 first-wave signal
 
@@ -136,7 +150,7 @@ Expected signal: `81 passed`, no failure/error.
 In PowerShell enumerate the files rather than passing an unexpanded wildcard to pytest:
 
 ```powershell
-$files = Get-ChildItem python/tests/test_hsx_debugger_*.py | ForEach-Object { $_.FullName }
+$files = Get-ChildItem python/tests/test_hsx_debugger_*.py | Sort-Object FullName | ForEach-Object { $_.FullName }
 & $python -m pytest @files -q --tb=short
 ```
 
