@@ -903,25 +903,25 @@ relations:
     to:
       - DBG-F-027
     ownership: only
-    status: implemented_execution_pass_awaiting_independent_review_verification_signoff
+    status: technical_closure_confirmed_review038_awaiting_formal_reconstructed_review_verification_signoff
   - from: DBG-RF-011
     type: addresses
     to:
       - DBG-F-028
     ownership: only
-    status: implemented_execution_pass_awaiting_independent_review_verification_signoff
+    status: technical_closure_confirmed_review038_awaiting_formal_reconstructed_review_verification_signoff
   - from: DBG-RF-004
     type: addresses
     to:
       - DBG-F-029
     ownership: bounded_low_only
-    status: implemented_execution_pass_awaiting_independent_review
+    status: technical_closure_confirmed_review038_awaiting_parent_reconstruction_review_verification_signoff
   - from: DBG-RF-004
     type: requires_outputs_from
     to:
       - DBG-RF-010
       - DBG-RF-011
-    status: blocked_at_review_convergence_unsigned_corrective_children
+    status: technical_closure_confirmed_unsigned_children_awaiting_rereview039_and_reconstruction
   - from: DBG-RF-010
     type: prerequisite_for
     to:
@@ -939,7 +939,8 @@ relations:
     report_comment: 5381602329
     guards:
       - no_formal_review
-      - no_formal_verification_signoff
+      - no_formal_verification
+      - no_signoff
       - no_parent_completion
   - from: DBG-RF-004
     type: reviewed_by
@@ -949,6 +950,44 @@ relations:
     candidate_head: 514f7f1cdf8420ccaf6ae84d14b20e4d13931cdc
     coordination_issue: 38
     coordination_comment: 5381348250
+  - from: DBG-RF-004
+    type: reviewed_by
+    to:
+      - DBG-RVW-001-005-038
+    status: rework_return_to_steering
+    reviewed_head: 010ff7bea3c414d73f63c87580d0e91c76c8b965
+    coordination_issue: 54
+    coordination_comment: 5381873491
+    technical_closures:
+      - DBG-F-027
+      - DBG-F-028
+      - DBG-F-029
+    findings:
+      - DBG-F-030
+      - DBG-F-031
+  - from: DBG-RVW-001-005-038
+    type: routed_to_steering
+    to:
+      - issue-54
+    status: bounded_trace_only_correction_authorized_no_second_nesting
+    steering_disposition_comment: 5382237149
+    guards:
+      - no_product_or_test_change
+      - no_second_nested_remediation
+      - no_formal_verification_or_signoff
+  - from: DBG-RF-004
+    type: addresses
+    to:
+      - DBG-F-030
+      - DBG-F-031
+    ownership: suspended_parent_review_gate_trace_only
+    status: trace_only_correction_applied_awaiting_rereview
+    steering_disposition_comment: 5382237149
+    next_gate: awaiting_fresh_independent_rereview_DBG-RVW-001-005-039
+    guards:
+      - no_CR003_GAP003_RF012
+      - no_product_or_test_change
+      - no_review_verification_signoff_or_acceptance_claim
   - from: DBG-RF-004
     type: prerequisite_for
     to:

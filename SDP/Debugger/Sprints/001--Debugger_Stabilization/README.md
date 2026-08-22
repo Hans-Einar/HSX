@@ -1,6 +1,6 @@
 # DBG-SPR-001 — Debugger Stabilization
 
-- Status: ITERATION 005 ACTIVE — RF-004 SUSPENDED AT ROUTING-C REVIEW REMEDIATION
+- Status: ITERATION 005 ACTIVE — RF-004 SUSPENDED AT `awaiting_fresh_independent_rereview_DBG-RVW-001-005-039`
 - Owning track: Debugger
 - Root GapAnalysis: `DBG-GAP-001`
 - Active corrective GapAnalysis: `DBG-GAP-002`
@@ -63,6 +63,12 @@ Steering accepted `DBG-A-001..DBG-A-008` as target architecture direction in com
 - Batch005 completion execution: issue #38 comment `5381169826`
 - Fresh independent review `DBG-RVW-001-005-037`: **REWORK — Routing C**
 - Review comment: issue #38 `5381348250`
+- Bounded F-029 worker correction: complete at `1bc99e0f7b986de3878c88e75c1f1d927974679c`
+- Routing-C aggregate execution: PASS at exact product/test head
+  `045f1cf58beaf393680e1f4118cfa76de65220b2`, issue #54 comment `5381602329`
+- Remediation review `DBG-RVW-001-005-038`: **REWORK — RETURN_TO_STEERING** for trace/current-state only
+- Review038 head/comment: `010ff7bea3c414d73f63c87580d0e91c76c8b965` / issue #54 `5381873491`
+- Steering disposition: bounded trace-only correction, no second nesting, issue #54 `5382237149`
 
 ### Review-triggered remediation
 
@@ -86,6 +92,17 @@ Fan-out:
 - `DBG-RF-010` / issue #55 — corrective child of RF-004; owns F-027 / Slice005 evidence fence;
 - `DBG-RF-011` / issue #56 — corrective child of RF-004; owns F-028 / Slice006 factory seam;
 - F-029 remains bounded parent-RF004 Low rework and must not widen either child.
+
+Review038 technically closed F-027, F-028 and F-029. The only remaining findings are
+trace/current-state findings F-030 and F-031; RF-010/RF-011 remain formally unverified and
+unsigned pending their reconstructed formal gates.
+
+### Review038 bounded trace correction
+
+Steering assigned F-030 and F-031 directly to the suspended parent RF-004 review gate. No
+CR-003, GAP-003, RF-012 or second nested remediation exists. This correction changes only the
+six authorized SDP current-state/trace files. The F-029 worker must not be re-dispatched and
+aggregate product/test execution must not be repeated unless product/test code changes.
 
 Current remediation branch: `master/rf004-routing-c-remediation`, created from exact frozen
 candidate head. The frozen candidate ref itself remains unchanged.
@@ -114,10 +131,16 @@ After corrective review/verification, reconstruct the parent DAG:
 
 ## Next gate
 
-Complete Routing-C remediation for `DBG-F-027..029`, execute one aggregate regression gate,
-then obtain a **fresh independent exact-head review**. Any new Medium/High/Blocking structural or
-public-contract finding returns to Steering rather than creating a second nested remediation
-level.
+Obtain fresh independent rereview `DBG-RVW-001-005-039` of the corrected six-file trace head;
+the current gate is `awaiting_fresh_independent_rereview_DBG-RVW-001-005-039`. Reviewer039 must
+confirm F-030/F-031 closure, append-only Ledger semantics, zero product/test drift after
+`045f1cf...`, unsigned child state and the preserved reconstruction DAG. Do not re-dispatch the
+F-029 worker or repeat aggregate product/test execution unless product/test code changes.
+
+If review039 passes, return to the existing reconstruction sequence: RF-010/Slice005 fresh
+formal verification -> exact-head signoff; then RF-011/Slice006 on accepted Slice005 -> fresh
+review/formal verification/signoff; then parent RF-004 review -> verification -> signoff ->
+Steering disposition.
 
 `DBG-RF-005..DBG-RF-009` remain blocked until RF-004 receives parent completion and Steering
 acceptance.

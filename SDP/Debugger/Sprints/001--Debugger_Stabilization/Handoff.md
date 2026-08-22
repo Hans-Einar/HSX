@@ -1,10 +1,10 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf004_routing_c_remediation_active`
+Status: `rf004_trace_only_correction_applied_awaiting_rereview039`
 
 ## Current gate
 
-`DBG-RF-004` is **SUSPENDED AT FRESH INDEPENDENT REVIEW REWORK**.
+`DBG-RF-004` is **SUSPENDED AT `awaiting_fresh_independent_rereview_DBG-RVW-001-005-039`**.
 
 Frozen candidate authority remains:
 
@@ -14,6 +14,11 @@ Frozen candidate authority remains:
 - independent review: `DBG-RVW-001-005-037`
 - review result: **REWORK — Routing C**
 - review comment: issue #38 `5381348250`
+- remediation review: `DBG-RVW-001-005-038`
+- exact remediation-reviewed head: `010ff7bea3c414d73f63c87580d0e91c76c8b965`
+- remediation-review result: **REWORK — RETURN_TO_STEERING** for trace/current-state only
+- remediation-review comment: issue #54 `5381873491`
+- Steering disposition: bounded trace-only correction, no second nesting, issue #54 `5382237149`
 - PR #50 remains Draft on authoritative `codex/dbg-rf-004`; the candidate branch is not promoted wholesale.
 
 Current remediation work is isolated on:
@@ -26,15 +31,35 @@ Current remediation work is isolated on:
 
 `DBG-RF-005..DBG-RF-009` remain blocked. No Executive/VM/AVR/DAP/CLI/VS Code/frontend migration is authorized.
 
-## Why RF-004 is suspended
+## Why RF-004 is suspended now
 
-Fresh GPT-5.6 independent review found three stable findings:
+Origin review `DBG-RVW-001-005-037` found three product findings:
 
 1. `DBG-F-027` — **Medium** — CALL proof was not fenced to the exact checked call-site address.
 2. `DBG-F-028` — **Medium** — `InspectionService.create` supplied forbidden implicit composition defaults.
 3. `DBG-F-029` — **Low** — LocationRow validator TypeError names `UnwindRow`.
 
-The review reproduced 69 focused tests PASS read-only, so these are boundary gaps missed by the green Batch005 matrix rather than broad instability.
+The bounded F-029 worker correction completed at
+`1bc99e0f7b986de3878c88e75c1f1d927974679c`. Routing-C aggregate execution already completed
+with PASS classification at exact product/test head
+`045f1cf58beaf393680e1f4118cfa76de65220b2`; the execution report is issue #54 comment
+`5381602329`.
+
+Review038 technically closed all three origin findings:
+
+- `DBG-F-027` / RF-010 — technically closed;
+- `DBG-F-028` / RF-011 — technically closed;
+- `DBG-F-029` / bounded parent correction — technically closed.
+
+Review038 returned `REWORK — RETURN_TO_STEERING` solely for two trace/current-state findings:
+
+- `DBG-F-030` — aggregate execution was incorrectly represented as formal verification under
+  invalid identity `DBG-VER-ROUTING-C-AGGREGATE`;
+- `DBG-F-031` — this Handoff and the Sprint README still routed the already-completed F-029
+  worker and aggregate tester work.
+
+Steering comment `5382237149` authorized only the bounded six-file trace correction. No
+product, interface, state, concurrency, ownership, runtime or architecture defect was found.
 
 ## Nested remediation model
 
@@ -52,11 +77,14 @@ Medium findings fan out by ownership:
 
 `DBG-F-029` remains a bounded parent-RF004 Low correction and must not widen either corrective child.
 
-This is one nested remediation level only. Any new structural/public-contract problem found inside RF-010/RF-011 returns to Steering instead of recursively nesting another corrective tree.
+This is one nested remediation level only. `DBG-F-030` and `DBG-F-031` are owned directly by
+the suspended parent RF-004 review gate. They do not create CR-003, GAP-003, RF-012 or any
+second corrective tree.
 
 ## Corrective implementation state
 
-Master corrective implementation is permitted by the Routing-C handoff while fresh independent review and verification remain mandatory.
+The product corrections are technically closed by review038. Formal reconstructed Slice
+review, verification and exact-head signoff remain mandatory.
 
 ### DBG-RF-010
 
@@ -68,6 +96,9 @@ Implemented on `master/rf004-routing-c-remediation`:
 - dedicated adversarial test `test_hsx_debugger_rf010_call_site_fence.py` is present;
 - no interface/HSX/runtime/frontend change.
 
+Review038 confirmed technical closure. RF-010 remains formally unverified and unsigned; this
+review is not the reconstructed formal Slice005 gate.
+
 ### DBG-RF-011
 
 Implemented on the same remediation branch:
@@ -77,22 +108,30 @@ Implemented on the same remediation branch:
 - dedicated signature/omission test `test_hsx_debugger_rf011_factory_dependencies.py` is present;
 - lifecycle/state/concurrency and binding -> profile -> limits validation are unchanged.
 
+Review038 confirmed technical closure. RF-011 remains formally unverified and unsigned; this
+review is not the reconstructed formal Slice006 gate.
+
 ### DBG-F-029
 
-Not yet closed in this handoff revision. It is intentionally reserved as the tiny Low worker exercise allowed by the nested-remediation policy. Any worker may change only the incorrect LocationRow TypeError wording and its strict-XFAIL guard. A changed head must receive fresh independent review; the original reviewer cannot self-approve its own patch.
+Technically closed by review038. The bounded worker correction is commit
+`1bc99e0f7b986de3878c88e75c1f1d927974679c`; the LocationRow assertion is an ordinary PASS
+and the former P002 strict XFAIL is gone. The F-029 worker must **not** be re-dispatched.
 
 ## Required next sequence
 
-1. Synchronize current traceability for `DBG-CR-002`, `DBG-GAP-002`, `DBG-RF-010`, `DBG-RF-011`, `DBG-F-027..029` and the suspended RF-004 gate.
-2. Dispatch one bounded Low WORKER for `DBG-F-029` only, or have Master perform it if usage conservation is preferred; do not combine it with Medium code ownership.
-3. Run one aggregate read-only TESTER batch over RF-010/RF-011/F-029 plus the complete Batch005 regression matrix.
-4. If execution is clean, obtain fresh independent exact-head review. The reviewer must check the two adversarial Medium boundaries, Low closure, child ownership and no contract drift.
-5. Reconstruct/promote in the original parent DAG rather than promoting the remediation branch wholesale:
-   - corrected Slice005/RF-010 -> independent review -> verification -> sign-off;
-   - corrected Slice006/RF-011 on accepted Slice005 -> independent review -> verification -> sign-off;
-   - bounded Low correction included in the appropriate RF-004 reviewed head;
-   - fresh RF-004 parent/interface/product review -> verification -> exact-head sign-off.
-6. Return to Steering. Only after RF-004 acceptance may RF-005 become eligible.
+1. Obtain fresh independent rereview `DBG-RVW-001-005-039` of this six-file trace-only head,
+   with current gate `awaiting_fresh_independent_rereview_DBG-RVW-001-005-039`.
+2. Do **not** re-dispatch the F-029 worker.
+3. Do **not** repeat aggregate product/test execution unless product or test code changes;
+   exact aggregate-tested authority remains `045f1cf58beaf393680e1f4118cfa76de65220b2`.
+4. If review039 passes, reconstruct/promote in the original parent DAG rather than promoting
+   the remediation branch wholesale:
+   - corrected Slice005/RF-010 -> formal verification -> exact-head signoff;
+   - corrected Slice006/RF-011 on accepted Slice005 -> fresh review -> formal verification ->
+     exact-head signoff;
+   - bounded F-029 correction included in the appropriate RF-004 reviewed head;
+   - fresh RF-004 parent review -> verification -> exact-head signoff -> Steering disposition.
+5. Only after RF-004 acceptance may RF-005 become eligible.
 
 ## Frozen contracts that remain authoritative
 
@@ -113,7 +152,9 @@ The broad Python suite may still contain only these accepted unrelated baseline 
 - `python/tests/test_hsx_dbg_commands.py::test_break_add_symbol_line` — ignored/generated demo `.sym` absent;
 - `python/tests/test_shell_client.py::test_pretty_dmesg_assigns_session_numbers` — optional-tabulate formatting baseline.
 
-The candidate P002 strict XFAIL corresponds to `DBG-F-029` and must disappear when that Low finding is closed. No other candidate XFAIL/skip is authorized except previously classified platform-specific skips.
+The former candidate P002 strict XFAIL is removed and its assertion passed in aggregate
+execution. No other candidate XFAIL/skip is authorized except previously classified
+platform-specific skips.
 
 ## Durable coordination
 
@@ -121,6 +162,9 @@ The candidate P002 strict XFAIL corresponds to `DBG-F-029` and must disappear wh
 - `DBG-CR-002` / `DBG-GAP-002`: #54
 - `DBG-RF-010`: #55
 - `DBG-RF-011`: #56
+- review038: issue #54 comment `5381873491`
+- Steering trace-only disposition: issue #54 comment `5382237149`
+- next gate: `awaiting_fresh_independent_rereview_DBG-RVW-001-005-039`
 - PR #50: Draft, intentionally not candidate/remediation authority
 
 A fresh agent should read this Handoff, `SDP/Shared/Process.md`, CurrentIndex/Issues/Relations, issues #38/#54/#55/#56, then the CR/GAP/child-Refactor documents before acting.
