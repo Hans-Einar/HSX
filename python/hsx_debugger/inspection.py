@@ -36,7 +36,7 @@ from .inspection_records import (
     VariableQueryResult,
 )
 from .metadata import SymbolKind, SymbolRecord
-from .recipes import LocationEvaluator, RecipeLimits, RecipeRequestLimits, UnwindFrame
+from .recipes import LocationEvaluator, LocationRow, RecipeLimits, RecipeRequestLimits, UnwindFrame
 from .results import (
     ConstantExpression,
     Diagnostic,
@@ -96,8 +96,12 @@ class InspectionServiceCreateResult:
             raise TypeError("status must be ResolutionStatus")
         diagnostics = _diagnostics(self.diagnostics)
         object.__setattr__(self, "diagnostics", diagnostics)
+        if self.status is ResolutionStatus.AMBIGUOUS:
+            raise ValueError("AMBIGUOUS is not valid for InspectionServiceCreateResult")
         if self.status is ResolutionStatus.RESOLVED:
-            if self.service is None or diagnostics:
+            if not isinstance(self.service, InspectionService):
+                raise TypeError("RESOLVED service must be InspectionService")
+            if diagnostics:
                 raise ValueError("RESOLVED requires one service and no diagnostics")
         elif self.service is not None or not diagnostics:
             raise ValueError("failed creation requires no service and diagnostics")
@@ -117,7 +121,9 @@ class InspectionOpenResult:
         diagnostics = _diagnostics(self.diagnostics)
         object.__setattr__(self, "diagnostics", diagnostics)
         if self.status is InspectionOpenStatus.OPENED:
-            if self.session is None or diagnostics:
+            if not isinstance(self.session, EpochInspectionSession):
+                raise TypeError("OPENED session must be EpochInspectionSession")
+            if diagnostics:
                 raise ValueError("OPENED requires one session and no diagnostics")
         elif self.session is not None or not diagnostics:
             raise ValueError("failed open requires no session and diagnostics")
@@ -134,7 +140,19 @@ class ServiceCloseResult:
             raise TypeError("status must be ServiceCloseStatus")
         if self.invalidation is not None and not isinstance(self.invalidation, InvalidationResult):
             raise TypeError("invalidation must be InvalidationResult or None")
-        object.__setattr__(self, "diagnostics", _diagnostics(self.diagnostics))
+        diagnostics = _diagnostics(self.diagnostics)
+        object.__setattr__(self, "diagnostics", diagnostics)
+        if self.status is ServiceCloseStatus.CLOSED:
+            if diagnostics:
+                raise ValueError("CLOSED carries no diagnostics")
+            if (
+                self.invalidation is not None
+                and self.invalidation.status is not InvalidationStatus.INVALIDATED
+            ):
+                raise ValueError("CLOSED invalidation must be INVALIDATED when present")
+        else:
+            if self.invalidation is not None or not diagnostics:
+                raise ValueError("ALREADY_CLOSED requires no invalidation and diagnostics")
 
 
 def _failed_create(status: ResolutionStatus, code: str, message: str) -> InspectionServiceCreateResult:
@@ -781,18 +799,51 @@ class EpochInspectionSession:
                 _diag("location_row_unavailable", "variable has no exact applicable LocationRow"),
             )
             return InspectionResult(status, self._context, None, diagnostics)
-        return self._service._location_evaluator.evaluate(
-            self._context,
-            frame,
-            self._service._index,
-            symbol,
-            rows.values[0],
-            self._service._read_port,
-            self._service._architecture,
-            self._service._abi,
-            self._service._profile_limits,
-            self._request_limits,
-        )
+        row = rows.values[0]
+        if type(row) is not LocationRow:
+            return _failure(
+                self._context,
+                InspectionStatus.CORRUPT,
+                "artifact_index_contract",
+                "resolved location row is not LocationRow",
+            )
+        try:
+            evaluated = self._service._location_evaluator.evaluate(
+                self._context,
+                frame,
+                self._service._index,
+                symbol,
+                row,
+                self._service._read_port,
+                self._service._architecture,
+                self._service._abi,
+                self._service._profile_limits,
+                self._request_limits,
+            )
+        except Exception as exc:
+            return _failure(
+                self._context,
+                InspectionStatus.CORRUPT,
+                "location_evaluator_contract",
+                f"LocationEvaluator raised {type(exc).__name__}",
+            )
+        if not isinstance(evaluated, InspectionResult):
+            return _failure(
+                self._context,
+                InspectionStatus.CORRUPT,
+                "location_evaluator_contract",
+                "LocationEvaluator returned non-InspectionResult",
+            )
+        if evaluated.status in {InspectionStatus.COMPLETE, InspectionStatus.PARTIAL} and not isinstance(
+            evaluated.value, EvaluatedValue
+        ):
+            return _failure(
+                self._context,
+                InspectionStatus.CORRUPT,
+                "location_evaluator_contract",
+                "successful LocationEvaluator result is not EvaluatedValue",
+            )
+        return evaluated
 
     def variables(self, scope_handle: DomainHandle, page: PageRequest) -> VariableQueryResult:
         if not isinstance(page, PageRequest):
@@ -811,47 +862,60 @@ class EpochInspectionSession:
         if failed is not None:
             return _variable_failure(self._context, failed.status, failed.diagnostics)
 
+        try:
+            if scope_kind is ScopeKind.REGISTERS:
+                candidates = tuple(
+                    ("register", order, register_id, None)
+                    for order, register_id in enumerate(
+                        self._service._architecture.declared_register_order
+                    )
+                )
+            else:
+                symbols = self._symbols_for_scope(frame, scope_kind)
+                candidates = tuple(
+                    ("symbol", symbol.declaration_order, symbol.symbol_id, symbol)
+                    for symbol in symbols
+                )
+        except Exception as exc:
+            return _variable_failure(
+                self._context,
+                InspectionStatus.CORRUPT,
+                (_diag("artifact_index_contract", f"scope lookup raised {type(exc).__name__}"),),
+            )
+
+        total = len(candidates)
+        start, end = _page_bounds(total, page)
+        selected = candidates[start:end]
         pending: list[tuple[str, int, str, object]] = []
-        if scope_kind is ScopeKind.REGISTERS:
-            for order, register_id in enumerate(
-                self._service._architecture.declared_register_order
-            ):
+        diagnostics: list[Diagnostic] = []
+        for discriminator, order, identity, payload in selected:
+            if discriminator == "register":
                 pending.append(
                     (
-                        "register",
+                        discriminator,
                         order,
-                        register_id,
-                        self._register_expression_value(frame, register_id),
+                        identity,
+                        self._register_expression_value(frame, identity),
                     )
                 )
-        else:
-            try:
-                symbols = self._symbols_for_scope(frame, scope_kind)
-            except Exception as exc:
+                continue
+            symbol = payload
+            evaluated = self._evaluate_symbol(frame, symbol)
+            if evaluated.status not in {InspectionStatus.COMPLETE, InspectionStatus.PARTIAL}:
                 return _variable_failure(
-                    self._context,
-                    InspectionStatus.CORRUPT,
-                    (_diag("artifact_index_contract", f"scope lookup raised {type(exc).__name__}"),),
+                    self._context, evaluated.status, evaluated.diagnostics
                 )
-            for symbol in symbols:
-                evaluated = self._evaluate_symbol(frame, symbol)
-                if evaluated.status not in {InspectionStatus.COMPLETE, InspectionStatus.PARTIAL}:
-                    return _variable_failure(
-                        self._context, evaluated.status, evaluated.diagnostics
-                    )
-                pending.append(
-                    ("symbol", symbol.declaration_order, symbol.symbol_id, (symbol, evaluated))
-                )
+            diagnostics.extend(evaluated.diagnostics)
+            pending.append((discriminator, order, identity, (symbol, evaluated)))
+
         if not self._finish(revision):
             return self._stale_variable("variable_evaluation_invalidated")
 
-        start, end = _page_bounds(len(pending), page)
         records: list[ScopeValueRecord] = []
-        diagnostics: list[Diagnostic] = []
         with self._lock:
             if not self._active or self._revision != revision:
                 return self._stale_variable("variable_handle_publication_invalidated")
-            for discriminator, order, identity, payload in pending[start:end]:
+            for discriminator, order, identity, payload in pending:
                 interned = self._store.intern(
                     HandleKind.VARIABLE,
                     (scope_handle.serial, discriminator, order, identity),
@@ -873,7 +937,6 @@ class EpochInspectionSession:
                     )
                 else:
                     symbol, evaluated = payload
-                    diagnostics.extend(evaluated.diagnostics)
                     records.append(
                         SymbolVariableRecord(
                             self._context,
@@ -889,7 +952,7 @@ class EpochInspectionSession:
         return VariableQueryResult(
             status,
             self._context,
-            VariablePage(scope_handle, len(pending), page.offset, tuple(records)),
+            VariablePage(scope_handle, total, page.offset, tuple(records)),
             tuple(diagnostics),
         )
 
@@ -928,7 +991,15 @@ class EpochInspectionSession:
                 _diag("symbol_id_unavailable", "symbol_id did not resolve exactly once"),
             )
             return None, InspectionResult(status, self._context, None, diagnostics)
-        return result.values[0], None
+        symbol = result.values[0]
+        if type(symbol) is not SymbolRecord:
+            return None, _failure(
+                self._context,
+                InspectionStatus.CORRUPT,
+                "artifact_index_contract",
+                "resolved symbol is not SymbolRecord",
+            )
+        return symbol, None
 
     def evaluate_snapshot(
         self, frame_handle: DomainHandle, expression: SnapshotExpression
@@ -1187,7 +1258,7 @@ class EpochInspectionSession:
         result = fence_snapshot_result(self._context, result)
         if not self._finish(revision):
             return self._stale()
-        if result.status is not InspectionStatus.COMPLETE:
+        if result.status not in {InspectionStatus.COMPLETE, InspectionStatus.PARTIAL}:
             return InspectionResult(result.status, self._context, None, result.diagnostics)
         if not isinstance(result.value, tuple) or not all(
             isinstance(item, InstructionBytes) for item in result.value
@@ -1227,7 +1298,15 @@ class EpochInspectionSession:
                     metadata = metadata_result.values[0]
                 elif metadata_result.status is not ResolutionStatus.UNAVAILABLE:
                     diagnostics.extend(metadata_result.diagnostics)
-            mapped.append(DisassembledInstruction(item.address, item.encoded, metadata, None))
+            try:
+                mapped.append(DisassembledInstruction(item.address, item.encoded, metadata, None))
+            except (TypeError, ValueError) as exc:
+                return _failure(
+                    self._context,
+                    InspectionStatus.CORRUPT,
+                    "disassembly_metadata_mismatch",
+                    str(exc),
+                )
         try:
             block = DisassemblyBlock(address, instruction_count, tuple(mapped))
         except (TypeError, ValueError) as exc:
@@ -1240,7 +1319,7 @@ class EpochInspectionSession:
         if not self._finish(revision):
             return self._stale()
         return InspectionResult(
-            InspectionStatus.COMPLETE, self._context, block, tuple(diagnostics)
+            result.status, self._context, block, tuple(diagnostics)
         )
 
 
