@@ -487,3 +487,91 @@ issues:
   DBG-RF-009:
     issue: 46
     status: blocked_pending_later_steering_authorization_and_dependencies
+  DBG-CR-002:
+    issue: 54
+    role: frozen_candidate_independent_review_snapshot
+    status: complete_rework_routed
+    review: DBG-RVW-001-005-037
+    review_issue: 38
+    review_comment: 5381348250
+    reviewed_head: 514f7f1cdf8420ccaf6ae84d14b20e4d13931cdc
+    verdict: rework_routing_c
+    record: SDP/Debugger/CodeReview/002--RF004_Frozen_Candidate/01--CodeReview.md
+    findings:
+      - DBG-F-027
+      - DBG-F-028
+      - DBG-F-029
+    next_gate: fresh_independent_exact_head_review
+  DBG-GAP-002:
+    issue: 54
+    role: active_corrective_gap
+    status: active_fan_out_frozen
+    parent_refactor: DBG-RF-004
+    origin_code_review: DBG-CR-002
+    origin_review: DBG-RVW-001-005-037
+    origin_reviewed_head: 514f7f1cdf8420ccaf6ae84d14b20e4d13931cdc
+    record: SDP/Debugger/GapAnalysis/002--RF004_Review_Remediation/01--GapAnalysis.md
+    corrective_children:
+      - DBG-RF-010
+      - DBG-RF-011
+    bounded_parent_rework:
+      - DBG-F-029
+    ordering: DBG-RF-010_before_DBG-RF-011_before_fresh_DBG-RF-004_review
+    current_gate: awaiting_fresh_independent_remediation_review
+  DBG-F-027:
+    severity: medium
+    status: implemented_execution_pass_awaiting_independent_review_verification_signoff
+    origin_code_review: DBG-CR-002
+    corrective_gap: DBG-GAP-002
+    remediation: DBG-RF-010
+    ownership: DBG-RF-010_only
+    execution_evidence: 2_pass
+    product_test_head: 045f1cf58beaf393680e1f4118cfa76de65220b2
+  DBG-F-028:
+    severity: medium
+    status: implemented_execution_pass_awaiting_independent_review_verification_signoff
+    origin_code_review: DBG-CR-002
+    corrective_gap: DBG-GAP-002
+    remediation: DBG-RF-011
+    ownership: DBG-RF-011_only
+    execution_evidence: 5_pass
+    product_test_head: 045f1cf58beaf393680e1f4118cfa76de65220b2
+  DBG-F-029:
+    severity: low
+    status: bounded_parent_rf004_rework_execution_pass_awaiting_independent_review
+    origin_code_review: DBG-CR-002
+    corrective_gap: DBG-GAP-002
+    remediation: DBG-RF-004_bounded_low_only
+    ownership: DBG-RF-004_only
+    worker_commit: 1bc99e0f7b986de3878c88e75c1f1d927974679c
+    execution_evidence: 5_pass_zero_xfail
+    product_test_head: 045f1cf58beaf393680e1f4118cfa76de65220b2
+    review_guard: worker_not_independent_for_resulting_head
+  DBG-RF-010:
+    issue: 55
+    status: implemented_execution_pass_awaiting_independent_review_verification_signoff
+    corrective_child_of: DBG-RF-004
+    origin_code_review: DBG-CR-002
+    corrective_gap: DBG-GAP-002
+    finding: DBG-F-027
+    execution_order: before_DBG-RF-011
+    product_test_head: 045f1cf58beaf393680e1f4118cfa76de65220b2
+    execution_report: SDP/Debugger/Verification/RoutingC_Aggregate_Execution_Result.md
+    execution_comment: 5381602329
+    review_status: awaiting_fresh_independent_review
+    verification_status: awaiting_formal_verification
+    signoff_status: not_signed
+  DBG-RF-011:
+    issue: 56
+    status: implemented_execution_pass_awaiting_independent_review_verification_signoff
+    corrective_child_of: DBG-RF-004
+    origin_code_review: DBG-CR-002
+    corrective_gap: DBG-GAP-002
+    finding: DBG-F-028
+    execution_order: after_DBG-RF-010
+    product_test_head: 045f1cf58beaf393680e1f4118cfa76de65220b2
+    execution_report: SDP/Debugger/Verification/RoutingC_Aggregate_Execution_Result.md
+    execution_comment: 5381602329
+    review_status: awaiting_fresh_independent_review
+    verification_status: awaiting_formal_verification
+    signoff_status: not_signed

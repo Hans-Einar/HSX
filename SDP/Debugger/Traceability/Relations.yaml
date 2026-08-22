@@ -880,6 +880,81 @@ relations:
     type: verification_input_for
     to:
       - DBG-RF-009
+  - from: DBG-CR-002
+    type: evidence_for
+    to:
+      - DBG-GAP-002
+    status: complete_rework_routed
+    reviewed_head: 514f7f1cdf8420ccaf6ae84d14b20e4d13931cdc
+    review: DBG-RVW-001-005-037
+    review_comment: 5381348250
+    record: SDP/Debugger/CodeReview/002--RF004_Frozen_Candidate/01--CodeReview.md
+  - from: DBG-GAP-002
+    type: spawns
+    to:
+      - DBG-RF-010
+      - DBG-RF-011
+    status: active_fan_out_frozen
+    parent: DBG-RF-004
+    bounded_parent_rework:
+      - DBG-F-029
+  - from: DBG-RF-010
+    type: addresses
+    to:
+      - DBG-F-027
+    ownership: only
+    status: implemented_execution_pass_awaiting_independent_review_verification_signoff
+  - from: DBG-RF-011
+    type: addresses
+    to:
+      - DBG-F-028
+    ownership: only
+    status: implemented_execution_pass_awaiting_independent_review_verification_signoff
+  - from: DBG-RF-004
+    type: addresses
+    to:
+      - DBG-F-029
+    ownership: bounded_low_only
+    status: implemented_execution_pass_awaiting_independent_review
+  - from: DBG-RF-004
+    type: requires_outputs_from
+    to:
+      - DBG-RF-010
+      - DBG-RF-011
+    status: blocked_at_review_convergence_unsigned_corrective_children
+  - from: DBG-RF-010
+    type: prerequisite_for
+    to:
+      - DBG-RF-011
+    status: reconstruction_order_slice005_before_slice006
+  - from: SDP/Debugger/Verification/RoutingC_Aggregate_Execution_Result.md
+    type: evidence_for
+    to:
+      - DBG-RF-004
+      - DBG-RF-010
+      - DBG-RF-011
+      - DBG-F-029
+    status: ROUTING_C_EXECUTION_PASS_WITH_KNOWN_BASELINES
+    product_test_head: 045f1cf58beaf393680e1f4118cfa76de65220b2
+    report_comment: 5381602329
+    guards:
+      - no_formal_review
+      - no_formal_verification_signoff
+      - no_parent_completion
+  - from: DBG-RF-004
+    type: reviewed_by
+    to:
+      - DBG-RVW-001-005-037
+    status: rework_routing_c
+    candidate_head: 514f7f1cdf8420ccaf6ae84d14b20e4d13931cdc
+    coordination_issue: 38
+    coordination_comment: 5381348250
+  - from: DBG-RF-004
+    type: prerequisite_for
+    to:
+      - DBG-RF-008
+      - DBG-RF-009
+    status: blocked_until_rf004_fresh_review_and_signoff
 legacy_provenance:
   - from: DR-8.1
     type: migrated_into
