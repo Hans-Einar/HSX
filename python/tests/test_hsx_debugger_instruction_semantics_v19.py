@@ -9,6 +9,7 @@ from hsx_debugger.instruction_semantics import (
     CallSemanticStatus,
     FIXED32_CALL_OPCODE,
     FIXED32_ENCODING,
+    FIXED32_KNOWN_OPCODES,
     prove_call,
 )
 from test_hsx_debugger_stack import foundation
@@ -26,9 +27,12 @@ def _instruction(f, *, encoded_word=(0x24 << 24), byte_size=4, address=None):
     )
 
 
-def test_fixed32_call_constant_and_decode_rule_match_canonical_toolchain() -> None:
+def test_fixed32_constants_and_decode_rule_match_canonical_toolchain() -> None:
     assert FIXED32_ENCODING == "hsx.fixed32/1"
     assert FIXED32_CALL_OPCODE == opcodes.OPCODES["CALL"] == 0x24
+    assert FIXED32_KNOWN_OPCODES == frozenset(
+        opcode for _, opcode in opcodes.OPCODE_LIST
+    )
     word = (opcodes.OPCODES["CALL"] << 24) | 0x00ABCDEF
     assert ((word >> 24) & 0xFF) == FIXED32_CALL_OPCODE
 
@@ -46,7 +50,16 @@ def test_prove_call_accepts_only_exact_fixed32_call_opcode() -> None:
     assert non_call.diagnostics[0].code == "call_site_not_call"
 
 
-def test_prove_call_requires_encoded_word_and_exact_fixed32_width() -> None:
+def test_unknown_fixed32_primary_opcode_is_corrupt_not_legitimate_non_call() -> None:
+    f = foundation()
+    assert 0x05 not in FIXED32_KNOWN_OPCODES
+    result = prove_call(f.architecture, _instruction(f, encoded_word=(0x05 << 24)))
+    assert result.status is CallSemanticStatus.CORRUPT
+    assert result.opcode is None
+    assert result.diagnostics[0].code == "instruction_encoding_contract"
+
+
+def test_prove_call_requires_encoded_word_and_exact_fixed32_call_width() -> None:
     f = foundation()
     unavailable = prove_call(f.architecture, _instruction(f, encoded_word=None))
     assert unavailable.status is CallSemanticStatus.UNAVAILABLE
