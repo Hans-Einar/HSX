@@ -56,6 +56,7 @@ from .results import (
     RegisterExpression,
     RegisterSelection,
     RegisterSet,
+    ResolutionResult,
     ResolutionStatus,
     ScalarBytes,
     ServiceCloseStatus,
@@ -194,12 +195,6 @@ class InspectionService:
             raise TypeError("architecture must be ArchitectureDescriptor")
         if not isinstance(abi, AbiDescriptorRef):
             raise TypeError("abi must be AbiDescriptorRef")
-        if not isinstance(profile_limits, RecipeLimits):
-            return _failed_create(
-                ResolutionStatus.SCHEMA_UNSUPPORTED,
-                "recipe_profile_limits_mismatch",
-                "profile_limits differ from the accepted recipe profile",
-            )
         try:
             binding = index.binding()
             bundle = index.bundle_identity()
@@ -217,6 +212,12 @@ class InspectionService:
                 ResolutionStatus.SCHEMA_UNSUPPORTED,
                 "inspection_profile_unsupported",
                 "binding capability profile is unsupported",
+            )
+        if not isinstance(profile_limits, RecipeLimits):
+            return _failed_create(
+                ResolutionStatus.SCHEMA_UNSUPPORTED,
+                "recipe_profile_limits_mismatch",
+                "profile_limits differ from the accepted recipe profile",
             )
         return InspectionServiceCreateResult(
             ResolutionStatus.RESOLVED,
@@ -752,9 +753,24 @@ class EpochInspectionSession:
     def _evaluate_symbol(
         self, frame: UnwindFrame, symbol: SymbolRecord
     ) -> InspectionResult[EvaluatedValue]:
-        rows = self._service._index.location_rows(
-            symbol.symbol_id, symbol.function_id, symbol.lexical_scope_id, frame.pc
-        )
+        try:
+            rows = self._service._index.location_rows(
+                symbol.symbol_id, symbol.function_id, symbol.lexical_scope_id, frame.pc
+            )
+        except Exception as exc:
+            return _failure(
+                self._context,
+                InspectionStatus.CORRUPT,
+                "artifact_index_contract",
+                f"location row lookup raised {type(exc).__name__}",
+            )
+        if not isinstance(rows, ResolutionResult):
+            return _failure(
+                self._context,
+                InspectionStatus.CORRUPT,
+                "artifact_index_contract",
+                "location row lookup returned non-ResolutionResult",
+            )
         if rows.status is not ResolutionStatus.RESOLVED or len(rows.values) != 1:
             status = (
                 InspectionStatus.UNAVAILABLE
@@ -886,7 +902,22 @@ class EpochInspectionSession:
                 "artifact_index_contract",
                 "DebugArtifactIndex lacks frozen symbol_by_id query",
             )
-        result = query(symbol_id)
+        try:
+            result = query(symbol_id)
+        except Exception as exc:
+            return None, _failure(
+                self._context,
+                InspectionStatus.CORRUPT,
+                "artifact_index_contract",
+                f"symbol lookup raised {type(exc).__name__}",
+            )
+        if not isinstance(result, ResolutionResult):
+            return None, _failure(
+                self._context,
+                InspectionStatus.CORRUPT,
+                "artifact_index_contract",
+                "symbol lookup returned non-ResolutionResult",
+            )
         if result.status is not ResolutionStatus.RESOLVED or len(result.values) != 1:
             status = (
                 InspectionStatus.UNAVAILABLE
@@ -1167,15 +1198,35 @@ class EpochInspectionSession:
                 "snapshot_read_contract",
                 "disassembly result must contain InstructionBytes",
             )
+
         mapped: list[DisassembledInstruction] = []
+        diagnostics = list(result.diagnostics)
         for item in result.value:
-            metadata_result = self._service._index.instruction_at(item.address)
-            metadata = (
-                metadata_result.values[0]
-                if metadata_result.status is ResolutionStatus.RESOLVED
-                and len(metadata_result.values) == 1
-                else None
-            )
+            metadata = None
+            try:
+                metadata_result = self._service._index.instruction_at(item.address)
+            except Exception as exc:
+                diagnostics.append(
+                    _diag(
+                        "instruction_index_contract",
+                        f"instruction metadata lookup raised {type(exc).__name__}",
+                    )
+                )
+            else:
+                if not isinstance(metadata_result, ResolutionResult):
+                    diagnostics.append(
+                        _diag(
+                            "instruction_index_contract",
+                            "instruction metadata lookup returned non-ResolutionResult",
+                        )
+                    )
+                elif (
+                    metadata_result.status is ResolutionStatus.RESOLVED
+                    and len(metadata_result.values) == 1
+                ):
+                    metadata = metadata_result.values[0]
+                elif metadata_result.status is not ResolutionStatus.UNAVAILABLE:
+                    diagnostics.extend(metadata_result.diagnostics)
             mapped.append(DisassembledInstruction(item.address, item.encoded, metadata, None))
         try:
             block = DisassemblyBlock(address, instruction_count, tuple(mapped))
@@ -1189,7 +1240,7 @@ class EpochInspectionSession:
         if not self._finish(revision):
             return self._stale()
         return InspectionResult(
-            InspectionStatus.COMPLETE, self._context, block, result.diagnostics
+            InspectionStatus.COMPLETE, self._context, block, tuple(diagnostics)
         )
 
 
