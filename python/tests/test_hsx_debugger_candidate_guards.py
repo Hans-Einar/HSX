@@ -47,7 +47,7 @@ def test_inspection_rejects_unknown_register_selection_before_port_io() -> None:
     assert port.register_reads == 0
 
 
-def test_checked_call_site_is_not_fabricated_without_instruction_evidence() -> None:
+def test_checked_call_site_without_instruction_evidence_stops_before_caller_frame() -> None:
     f = stack_foundation()
     result = StackService.unwind(
         f.context,
@@ -58,16 +58,10 @@ def test_checked_call_site_is_not_fabricated_without_instruction_evidence() -> N
         RecipeLimits(),
         RecipeRequestLimits(64, 16),
     )
-    assert result.status is InspectionStatus.COMPLETE
-    assert len(result.frames) == 2
-    caller = result.frames[1]
-    assert caller.resume_pc == HsxAddress(f.code, 0x124)
-    assert caller.call_site_pc is None
-    assert caller.pc == HsxAddress(f.code, 0x124)
-    assert any(
-        diagnostic.code in {"instruction_unavailable", "call_site_unavailable"}
-        for diagnostic in caller.diagnostics
-    )
+    assert result.status is InspectionStatus.PARTIAL
+    assert len(result.frames) == 1
+    assert result.frames[0].pc == HsxAddress(f.code, 0x100)
+    assert result.diagnostics[0].code in {"instruction_unavailable", "call_site_unavailable"}
 
 
 @pytest.mark.xfail(
