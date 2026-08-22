@@ -54,7 +54,7 @@ def foundation() -> SimpleNamespace:
     ))
     function0 = FunctionRecord("callee", "callee", None, HsxAddressRange(HsxAddress(code, 0x100), 4), None)
     function1 = FunctionRecord("caller", "caller", None, HsxAddressRange(HsxAddress(code, 0x120), 8), None)
-    instruction = InstructionRecord("candidate-before-resume", HsxAddress(code, 0x120), 4, 0, "caller", None, InstructionClassification.USER)
+    instruction = InstructionRecord("candidate-before-resume", HsxAddress(code, 0x120), 4, 0x24 << 24, "caller", None, InstructionClassification.USER)
 
     def expr(role, operations, result, width):
         return RecipeExpression(role, tuple(operations), result, width)
@@ -156,10 +156,9 @@ def test_current_body_unwinds_scalar_bound_r7_into_terminal_caller() -> None:
     top, caller = result.frames
     assert (top.pc.unsigned_value, top.sp.unsigned_value, top.cfa.unsigned_value) == (0x100, 0x1E0, 0x208)
     assert top.frame_base == HsxAddress(f.data, 0x200) and not top.terminal
-    assert (caller.pc.unsigned_value, caller.sp.unsigned_value, caller.cfa.unsigned_value) == (0x124, 0x208, 0x20C)
+    assert (caller.pc.unsigned_value, caller.sp.unsigned_value, caller.cfa.unsigned_value) == (0x120, 0x208, 0x20C)
     assert caller.resume_pc == HsxAddress(f.code, 0x124)
-    assert caller.call_site_pc is None
-    assert any(diagnostic.code == "call_site_semantics_unavailable" for diagnostic in caller.diagnostics)
+    assert caller.call_site_pc == HsxAddress(f.code, 0x120)
     assert caller.terminal and rvalue(caller, "R7") == RegisterValue("R7", 32, 0x180, True)
     assert not caller.recovered_psw.available and port.register_reads == 1
     assert [(address.unsigned_value, length) for address, length in port.memory_reads] == [(0x204, 4), (0x200, 4)]
@@ -208,19 +207,44 @@ def test_requesting_one_frame_reports_bound_exhaustion_without_caller_reads() ->
     assert result.diagnostics[0].code == "limit_exceeded"
 
 
-def test_call_site_is_optional_when_row_has_no_adjustment() -> None:
+def test_missing_call_site_adjustment_stops_partial_without_fabricated_caller() -> None:
     f = foundation(); body = replace(f.body, call_site_adjustment=None)
-    terminal_at_resume = replace(f.terminal, pc_range=HsxAddressRange(HsxAddress(f.code, 0x124), 4))
-    result = unwind(f, index=IndexDouble(f, rows=(body, terminal_at_resume), instructions={}))
-    assert result.status is InspectionStatus.COMPLETE
-    caller = result.frames[1]
-    assert caller.pc == caller.resume_pc == HsxAddress(f.code, 0x124)
-    assert caller.call_site_pc is None
+    result = unwind(f, index=IndexDouble(f, rows=(body, f.terminal), instructions={}))
+    assert result.status is InspectionStatus.PARTIAL
+    assert len(result.frames) == 1
+    assert result.frames[0].pc == HsxAddress(f.code, 0x100)
+    assert result.diagnostics[0].code == "call_site_unavailable"
 
 
 def test_repeated_pc_sp_is_corrupt_and_keeps_prior_prefix() -> None:
-    f = foundation(); cyclic = replace(f.body, caller_pc_rule=RecipeRule(RecipeRuleKind.SAME, None, None), caller_sp_rule=RecipeRule(RecipeRuleKind.SAME, None, None), register_rules=(), call_site_adjustment=None)
-    result = unwind(f, index=IndexDouble(f, rows=(cyclic,)))
+    f = foundation()
+    caller_pc = RecipeRule(
+        RecipeRuleKind.EXPRESSION,
+        f.expr(
+            RecipeRole.CALLER_PC,
+            (StaticAddressOp("static_address", HsxAddress(f.code, 0x104)),),
+            RecipeResultKind.ADDRESS,
+            None,
+        ),
+        None,
+    )
+    cyclic = replace(
+        f.body,
+        caller_pc_rule=caller_pc,
+        caller_sp_rule=RecipeRule(RecipeRuleKind.SAME, None, None),
+        register_rules=(),
+        call_site_adjustment=-4,
+    )
+    call = InstructionRecord(
+        "cycle-call",
+        HsxAddress(f.code, 0x100),
+        4,
+        0x24 << 24,
+        "callee",
+        None,
+        InstructionClassification.USER,
+    )
+    result = unwind(f, index=IndexDouble(f, rows=(cyclic,), instructions={0x100: call}))
     assert (result.status, result.diagnostics[0].code) == (InspectionStatus.CORRUPT, "unwind_cycle")
     assert len(result.frames) == 1
 
