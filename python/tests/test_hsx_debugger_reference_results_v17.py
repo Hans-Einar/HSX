@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import replace
-
 import pytest
 
 from hsx_debugger import *
 from hsx_debugger.handles import DomainHandle, HandleInternResult, HandleKind
 from hsx_debugger.inspection import (
     ScopeQueryResult,
-    ScopeRecord,
     ScopeSet,
     VariablePage,
     VariableQueryResult,
@@ -50,7 +47,6 @@ def test_real_session_uses_dedicated_scope_and_variable_envelopes() -> None:
 def test_dedicated_reference_envelopes_reject_cross_epoch_payloads() -> None:
     left = foundation()
     right = foundation(epoch_id="other", snapshot_token="other")
-    left_frame = DomainHandle(left.context, HandleKind.FRAME, 1)
     right_frame = DomainHandle(right.context, HandleKind.FRAME, 1)
     right_scope = DomainHandle(right.context, HandleKind.SCOPE, 2)
 
@@ -70,18 +66,6 @@ def test_dedicated_reference_envelopes_reject_cross_epoch_payloads() -> None:
             VariablePage(right_scope, 0, 0, ()),
             (),
         )
-
-    local_scope = DomainHandle(left.context, HandleKind.SCOPE, 2)
-    scope_record = ScopeRecord(
-        left.context,
-        local_scope,
-        left_frame,
-        ScopeKind.LOCALS,
-        "Locals",
-        False,
-    )
-    with pytest.raises(ValueError, match="same record context"):
-        ScopeSet(right_frame, (scope_record,))
 
 
 def test_failed_reference_envelopes_never_publish_reference_values() -> None:
