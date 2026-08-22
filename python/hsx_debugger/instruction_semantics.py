@@ -18,6 +18,20 @@ from .results import Diagnostic
 
 FIXED32_ENCODING = "hsx.fixed32/1"
 FIXED32_CALL_OPCODE = 0x24
+# Frozen self-contained projection of the canonical stable opcode table.  This avoids making
+# the debugger package depend on the build/toolchain module at runtime; conformance tests assert
+# exact set equality against python/opcodes.py.
+FIXED32_KNOWN_OPCODES = frozenset(
+    {
+        0x01, 0x02, 0x03, 0x04, 0x06, 0x07, 0x08, 0x09,
+        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+        0x20, 0x21, 0x22, 0x23, 0x24, 0x25,
+        0x30, 0x31, 0x32, 0x33, 0x34, 0x35,
+        0x40, 0x41,
+        0x50, 0x51, 0x52, 0x53, 0x54, 0x55,
+        0x60, 0x7F,
+    }
+)
 
 
 class CallSemanticStatus(str, Enum):
@@ -48,8 +62,13 @@ class CallSemanticEvidence:
             if self.opcode != FIXED32_CALL_OPCODE or diagnostics:
                 raise ValueError("CALL requires the exact fixed32 CALL opcode and no diagnostics")
         elif self.status is CallSemanticStatus.NOT_CALL:
-            if self.opcode is None or self.opcode == FIXED32_CALL_OPCODE or not diagnostics:
-                raise ValueError("NOT_CALL requires a non-CALL opcode and diagnostic")
+            if (
+                self.opcode is None
+                or self.opcode == FIXED32_CALL_OPCODE
+                or self.opcode not in FIXED32_KNOWN_OPCODES
+                or not diagnostics
+            ):
+                raise ValueError("NOT_CALL requires a canonical non-CALL fixed32 opcode and diagnostic")
         elif self.opcode is not None or not diagnostics:
             raise ValueError("unavailable/unsupported/corrupt semantic evidence has no opcode and diagnostics")
         object.__setattr__(self, "diagnostics", diagnostics)
@@ -85,7 +104,7 @@ def prove_call(
             None,
             _diagnostic(
                 "instruction_encoding_contract",
-                "hsx.fixed32/1 InstructionRecord must have byte_size=4",
+                "hsx.fixed32/1 CALL-site InstructionRecord must have byte_size=4",
             ),
         )
     checked = architecture.validate(instruction.address, Permission.EXECUTE)
@@ -112,6 +131,15 @@ def prove_call(
         )
 
     opcode = (instruction.encoded_word >> 24) & 0xFF
+    if opcode not in FIXED32_KNOWN_OPCODES:
+        return CallSemanticEvidence(
+            CallSemanticStatus.CORRUPT,
+            None,
+            _diagnostic(
+                "instruction_encoding_contract",
+                f"primary opcode 0x{opcode:02x} is outside the canonical hsx.fixed32/1 table",
+            ),
+        )
     if opcode == FIXED32_CALL_OPCODE:
         return CallSemanticEvidence(CallSemanticStatus.CALL, opcode, ())
     return CallSemanticEvidence(
@@ -129,5 +157,6 @@ __all__ = [
     "CallSemanticStatus",
     "FIXED32_CALL_OPCODE",
     "FIXED32_ENCODING",
+    "FIXED32_KNOWN_OPCODES",
     "prove_call",
 ]
