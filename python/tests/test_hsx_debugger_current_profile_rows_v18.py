@@ -221,13 +221,36 @@ def test_terminal_top_level_never_fabricates_frame_base_or_caller() -> None:
     assert port.memory_reads == []
 
 
-def test_ordinary_row_with_unavailable_r7_never_publishes_a_guessed_frame_base() -> None:
+def test_ordinary_row_with_unavailable_r7_keeps_frame_but_no_guessed_frame_base() -> None:
     f = foundation()
+    ordinary_sp_cfa = replace(
+        f.body,
+        row_id="ordinary-no-r7-cfa",
+        cfa_expression=RecipeExpression(
+            RecipeRole.CFA,
+            (
+                SpecialValueOp("special_value", RecipeSpecial.SP),
+                AddSConstCheckedOp("add_sconst_checked", 4),
+            ),
+            RecipeResultKind.ADDRESS,
+            None,
+        ),
+    )
     port = SnapshotPort(f, registers=_registers(f, sp=0x1C0, r7=None), memory={})
-    result = unwind(f, index=IndexDouble(f, rows=(f.body,)), port=port)
-    assert result.status is InspectionStatus.UNAVAILABLE
-    assert result.frames == ()
-    assert result.diagnostics
-    assert all(frame.frame_base is None for frame in result.frames)
+    result = unwind(
+        f,
+        index=IndexDouble(f, rows=(ordinary_sp_cfa,)),
+        port=port,
+        request=RecipeRequestLimits(1, 16),
+    )
+    assert result.status is InspectionStatus.UNSUPPORTED
+    assert len(result.frames) == 1
+    frame = result.frames[0]
+    assert frame.cfa == HsxAddress(f.data, 0x1C4)
+    assert frame.frame_base is None
+    assert any(
+        diagnostic.code == "top_frame_base_unavailable"
+        for diagnostic in frame.diagnostics
+    )
     assert port.register_reads == 1
     assert port.memory_reads == []
