@@ -198,10 +198,14 @@ def test_explicit_same_is_the_only_younger_register_propagation() -> None:
     assert rvalue(result.frames[1], "R7") == RegisterValue("R7", 32, 0x200, True)
 
 
-def test_requesting_one_frame_does_not_recover_or_read_the_caller() -> None:
+def test_requesting_one_frame_reports_bound_exhaustion_without_caller_reads() -> None:
     f = foundation(); port = SnapshotPort(f)
     result = unwind(f, port=port, request=RecipeRequestLimits(1, 16))
-    assert (result.status, len(result.frames), port.register_reads, port.memory_reads) == (InspectionStatus.COMPLETE, 1, 1, [])
+    assert (result.status, len(result.frames), port.register_reads, port.memory_reads) == (
+        InspectionStatus.UNSUPPORTED, 1, 1, []
+    )
+    assert result.frames[0].terminal is False
+    assert result.diagnostics[0].code == "limit_exceeded"
 
 
 def test_call_site_is_optional_when_row_has_no_adjustment() -> None:
