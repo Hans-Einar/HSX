@@ -13,7 +13,6 @@ from threading import Lock
 from .identity import InspectionContext, StopEpochId
 from .results import (
     Diagnostic,
-    InspectionResult,
     InspectionStatus,
     InvalidationStatus,
     _register_contract_enums,
@@ -28,6 +27,13 @@ def _require_int(value: int, field_name: str, *, minimum: int = 0) -> None:
 def _require_nonempty(value: str, field_name: str) -> None:
     if not isinstance(value, str) or not value:
         raise ValueError(f"{field_name} must be a non-empty string")
+
+
+def _diagnostics(value) -> tuple[Diagnostic, ...]:
+    diagnostics = tuple(value)
+    if not all(isinstance(item, Diagnostic) for item in diagnostics):
+        raise TypeError("diagnostics must contain Diagnostic values")
+    return diagnostics
 
 
 class HandleKind(str, Enum):
@@ -60,6 +66,40 @@ class DomainHandle:
 
 
 @dataclass(frozen=True, slots=True)
+class HandleInternResult:
+    """Dedicated 1.7 envelope for an epoch-bound handle reference."""
+
+    status: InspectionStatus
+    context: InspectionContext
+    handle: DomainHandle | None
+    diagnostics: tuple[Diagnostic, ...] = ()
+
+    def __post_init__(self) -> None:
+        if type(self.status) is not InspectionStatus or self.status not in {
+            InspectionStatus.COMPLETE,
+            InspectionStatus.CORRUPT,
+            InspectionStatus.STALE,
+        }:
+            raise ValueError("HandleInternResult status must be COMPLETE/CORRUPT/STALE")
+        if not isinstance(self.context, InspectionContext):
+            raise TypeError("context must be InspectionContext")
+        diagnostics = _diagnostics(self.diagnostics)
+        object.__setattr__(self, "diagnostics", diagnostics)
+        if self.status is InspectionStatus.COMPLETE:
+            if not isinstance(self.handle, DomainHandle):
+                raise TypeError("COMPLETE handle interning requires DomainHandle")
+            if self.handle.context != self.context:
+                raise ValueError("interned handle must retain exact result context")
+            if diagnostics:
+                raise ValueError("COMPLETE handle interning carries no diagnostics")
+        else:
+            if self.handle is not None:
+                raise ValueError("failed handle interning publishes no handle")
+            if not diagnostics:
+                raise ValueError("failed handle interning requires diagnostics")
+
+
+@dataclass(frozen=True, slots=True)
 class HandleResolution:
     status: InspectionStatus
     context: InspectionContext
@@ -78,9 +118,7 @@ class HandleResolution:
             raise TypeError("context must be InspectionContext")
         if type(self.kind) is not HandleKind:
             raise TypeError("kind must be HandleKind")
-        diagnostics = tuple(self.diagnostics)
-        if not all(isinstance(item, Diagnostic) for item in diagnostics):
-            raise TypeError("diagnostics must contain Diagnostic values")
+        diagnostics = _diagnostics(self.diagnostics)
         if self.status is InspectionStatus.COMPLETE:
             if not isinstance(self.object_key, tuple):
                 raise TypeError("COMPLETE handle resolution requires tuple object_key")
@@ -105,10 +143,7 @@ class InvalidationResult:
             raise TypeError("status must be InvalidationStatus")
         if not isinstance(self.stop_epoch_id, StopEpochId):
             raise TypeError("stop_epoch_id must be StopEpochId")
-        diagnostics = tuple(self.diagnostics)
-        if not all(isinstance(item, Diagnostic) for item in diagnostics):
-            raise TypeError("diagnostics must contain Diagnostic values")
-        object.__setattr__(self, "diagnostics", diagnostics)
+        object.__setattr__(self, "diagnostics", _diagnostics(self.diagnostics))
 
 
 def _diagnostic(code: str, message: str) -> Diagnostic:
@@ -171,15 +206,13 @@ class EpochHandleStore:
         with self._lock:
             return self._active
 
-    def intern(
-        self, kind: HandleKind, object_key: tuple
-    ) -> InspectionResult[DomainHandle]:
+    def intern(self, kind: HandleKind, object_key: tuple) -> HandleInternResult:
         if type(kind) is not HandleKind:
             raise TypeError("kind must be HandleKind")
         try:
             key = _normalized_object_key(kind, object_key)
         except (TypeError, ValueError) as exc:
-            return InspectionResult(
+            return HandleInternResult(
                 InspectionStatus.CORRUPT,
                 self._context,
                 None,
@@ -187,7 +220,7 @@ class EpochHandleStore:
             )
         with self._lock:
             if not self._active:
-                return InspectionResult(
+                return HandleInternResult(
                     InspectionStatus.STALE,
                     self._context,
                     None,
@@ -196,13 +229,13 @@ class EpochHandleStore:
             composite = (kind, key)
             existing = self._by_key.get(composite)
             if existing is not None:
-                return InspectionResult(InspectionStatus.COMPLETE, self._context, existing, ())
+                return HandleInternResult(InspectionStatus.COMPLETE, self._context, existing, ())
             serial = self._next_serial
             self._next_serial += 1
             handle = DomainHandle(self._context, kind, serial)
             self._by_key[composite] = handle
             self._by_serial[serial] = composite
-            return InspectionResult(InspectionStatus.COMPLETE, self._context, handle, ())
+            return HandleInternResult(InspectionStatus.COMPLETE, self._context, handle, ())
 
     def resolve(self, handle: DomainHandle, expected_kind: HandleKind) -> HandleResolution:
         if not isinstance(handle, DomainHandle):
@@ -272,6 +305,7 @@ class EpochHandleStore:
 __all__ = [
     "DomainHandle",
     "EpochHandleStore",
+    "HandleInternResult",
     "HandleKind",
     "HandleResolution",
     "InvalidationResult",
