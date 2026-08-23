@@ -921,7 +921,7 @@ relations:
     to:
       - DBG-RF-010
       - DBG-RF-011
-    status: technical_closure_confirmed_unsigned_children_awaiting_rereview039_and_reconstruction
+    status: technical_closure_confirmed_unsigned_children_awaiting_rereview040_and_reconstruction
   - from: DBG-RF-010
     type: prerequisite_for
     to:
@@ -976,16 +976,56 @@ relations:
       - no_second_nested_remediation
       - no_formal_verification_or_signoff
   - from: DBG-RF-004
+    type: reviewed_by
+    to:
+      - DBG-RVW-001-005-039
+    status: rework_return_to_steering
+    reviewed_head: cfc4c451a396776c2a878bef2fbfd636a6083dad
+    coordination_issue: 54
+    coordination_comment: 5382639606
+    technical_closures:
+      - DBG-F-030
+    findings:
+      - DBG-F-031
+  - from: DBG-RVW-001-005-039
+    type: routed_to_steering
+    to:
+      - issue-54
+    status: close_F030_correct_residual_F031_no_new_nesting
+    steering_disposition_comment: 5385170864
+    next_review: DBG-RVW-001-005-040
+    guards:
+      - no_CR003_GAP003_RF012_F032
+      - no_product_or_test_change
+      - no_formal_verification_signoff_or_acceptance
+  - from: DBG-RF-004
     type: addresses
     to:
       - DBG-F-030
+    ownership: suspended_parent_review_gate_trace_only
+    status: closed_by_DBG-RVW-001-005-039
+    steering_disposition_comment: 5385170864
+    next_gate: closed
+    guards:
+      - no_CR003_GAP003_RF012_F032
+      - no_product_or_test_change
+      - no_review_verification_signoff_or_acceptance_claim
+  - from: DBG-RF-004
+    type: addresses
+    to:
       - DBG-F-031
     ownership: suspended_parent_review_gate_trace_only
-    status: trace_only_correction_applied_awaiting_rereview
-    steering_disposition_comment: 5382237149
-    next_gate: awaiting_fresh_independent_rereview_DBG-RVW-001-005-039
+    status: residual_routing_omission_corrected_awaiting_rereview040
+    steering_disposition_comment: 5385170864
+    next_gate: awaiting_fresh_independent_rereview_DBG-RVW-001-005-040
+    required_reconstruction_route:
+      - RF010_fresh_independent_review_then_formal_verification_then_exact_head_signoff
+      - RF011_on_signed_RF010_fresh_independent_review_then_formal_verification_then_exact_head_signoff
+      - bounded_F029_integrated_into_appropriate_RF004_reconstruction
+      - parent_RF004_fresh_independent_review_then_formal_verification_then_exact_head_signoff_then_Steering
+      - RF005_through_RF009_blocked_until_parent_Steering_acceptance
     guards:
-      - no_CR003_GAP003_RF012
+      - no_CR003_GAP003_RF012_F032
       - no_product_or_test_change
       - no_review_verification_signoff_or_acceptance_claim
   - from: DBG-RF-004
@@ -993,7 +1033,7 @@ relations:
     to:
       - DBG-RF-008
       - DBG-RF-009
-    status: blocked_until_rf004_fresh_review_and_signoff
+    status: blocked_until_rf004_fresh_review_formal_verification_exact_head_signoff_and_steering_acceptance
 legacy_provenance:
   - from: DR-8.1
     type: migrated_into

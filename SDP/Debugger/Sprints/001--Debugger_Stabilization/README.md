@@ -1,6 +1,6 @@
 # DBG-SPR-001 — Debugger Stabilization
 
-- Status: ITERATION 005 ACTIVE — RF-004 SUSPENDED AT `awaiting_fresh_independent_rereview_DBG-RVW-001-005-039`
+- Status: ITERATION 005 ACTIVE — RF-004 SUSPENDED AT `awaiting_fresh_independent_rereview_DBG-RVW-001-005-040`
 - Owning track: Debugger
 - Root GapAnalysis: `DBG-GAP-001`
 - Active corrective GapAnalysis: `DBG-GAP-002`
@@ -93,16 +93,19 @@ Fan-out:
 - `DBG-RF-011` / issue #56 — corrective child of RF-004; owns F-028 / Slice006 factory seam;
 - F-029 remains bounded parent-RF004 Low rework and must not widen either child.
 
-Review038 technically closed F-027, F-028 and F-029. The only remaining findings are
-trace/current-state findings F-030 and F-031; RF-010/RF-011 remain formally unverified and
-unsigned pending their reconstructed formal gates.
+Review038 technically closed F-027, F-028 and F-029. Review039 closed trace finding F-030 and
+returned one residual routing omission under the existing F-031 identity. That omission is now
+corrected and awaits review040. RF-010/RF-011 remain formally unverified and unsigned pending
+their reconstructed formal gates.
 
 ### Review038 bounded trace correction
 
-Steering assigned F-030 and F-031 directly to the suspended parent RF-004 review gate. No
-CR-003, GAP-003, RF-012 or second nested remediation exists. This correction changes only the
-six authorized SDP current-state/trace files. The F-029 worker must not be re-dispatched and
-aggregate product/test execution must not be repeated unless product/test code changes.
+Steering assigned F-030 and F-031 directly to the suspended parent RF-004 review gate. Review039
+closed F-030. Steering comment `5385170864` retained F-031 for its residual post-review route
+omission and authorized one consolidated six-file correction followed by review040. No CR-003,
+GAP-003, RF-012, F-032 or second nested remediation exists. The F-029 worker must not be
+re-dispatched and aggregate product/test execution must not be repeated unless product/test
+code changes.
 
 Current remediation branch: `master/rf004-routing-c-remediation`, created from exact frozen
 candidate head. The frozen candidate ref itself remains unchanged.
@@ -112,11 +115,13 @@ candidate head. The frozen candidate ref itself remains unchanged.
 The remediation branch is a staging/work branch only and must **not** be promoted wholesale.
 After corrective review/verification, reconstruct the parent DAG:
 
-1. corrected Slice005 / RF-010 -> fresh independent review -> verification -> exact-head signoff;
-2. corrected Slice006 / RF-011 on accepted Slice005 -> fresh review -> verification -> signoff;
+1. corrected Slice005 / RF-010 -> fresh independent review -> formal verification -> exact-head signoff;
+2. corrected Slice006 / RF-011 on signed Slice005 -> fresh independent review -> formal
+   verification -> exact-head signoff;
 3. include the bounded Low correction on the appropriate RF-004 reviewed head;
-4. fresh RF-004 interface/product/parent integration review and verification;
-5. Steering disposition.
+4. fresh independent RF-004 interface/product/parent integration review -> formal verification
+   -> exact-head signoff;
+5. Steering disposition; RF-005..009 remain blocked until that parent acceptance.
 
 ## Iteration 005 non-goals
 
@@ -131,16 +136,19 @@ After corrective review/verification, reconstruct the parent DAG:
 
 ## Next gate
 
-Obtain fresh independent rereview `DBG-RVW-001-005-039` of the corrected six-file trace head;
-the current gate is `awaiting_fresh_independent_rereview_DBG-RVW-001-005-039`. Reviewer039 must
-confirm F-030/F-031 closure, append-only Ledger semantics, zero product/test drift after
-`045f1cf...`, unsigned child state and the preserved reconstruction DAG. Do not re-dispatch the
-F-029 worker or repeat aggregate product/test execution unless product/test code changes.
+Obtain fresh independent trace-only rereview `DBG-RVW-001-005-040` of the consolidated six-file
+correction; the current gate is
+`awaiting_fresh_independent_rereview_DBG-RVW-001-005-040`. Reviewer040 must confirm review039
+closure of F-030, correction of the sole actionable F-031 routing omission, append-only Ledger
+semantics, zero product/test drift after `045f1cf...`, unsigned child state and the preserved
+reconstruction DAG. Do not re-dispatch the F-029 worker or repeat aggregate product/test
+execution unless product/test code changes.
 
-If review039 passes, return to the existing reconstruction sequence: RF-010/Slice005 fresh
-formal verification -> exact-head signoff; then RF-011/Slice006 on accepted Slice005 -> fresh
-review/formal verification/signoff; then parent RF-004 review -> verification -> signoff ->
-Steering disposition.
+If review040 passes, return to the existing reconstruction sequence: RF-010/Slice005 -> fresh
+independent review -> formal verification -> exact-head signoff; then RF-011/Slice006 on signed
+Slice005 -> fresh independent review -> formal verification -> exact-head signoff; integrate the
+bounded F-029 correction into the appropriate RF-004 reconstruction; then parent RF-004 -> fresh
+independent review -> formal verification -> exact-head signoff -> Steering disposition.
 
 `DBG-RF-005..DBG-RF-009` remain blocked until RF-004 receives parent completion and Steering
 acceptance.

@@ -273,11 +273,13 @@ issues:
     steering_completion_comment: 5362514094
   DBG-RF-004:
     issue: 41
-    status: active_suspended_awaiting_fresh_independent_rereview_DBG-RVW-001-005-039
+    status: active_suspended_awaiting_fresh_independent_rereview_DBG-RVW-001-005-040
     draft_pull_request: 50
     draft_pull_request_url: https://github.com/Hans-Einar/HSX/pull/50
     draft_pull_request_base: codex/dbg-rf-002-003
-    draft_pull_request_head: 31322e3a722fd575a02be2a65419f2e20882172a
+    draft_pull_request_head_ref: codex/dbg-rf-004
+    draft_pull_request_head: 46169516058aadf0e691a5981e29da4954b7444f
+    draft_pull_request_status: open_draft
     steering_progress_issue: 38
     steering_progress_summary_comment: 5372569290
     iteration: DBG-IT-001-005
@@ -300,7 +302,7 @@ issues:
     slice001_signoff_status: pass
     slice001_signed_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
     active_slice: none_parent_review_gate
-    active_slice_status: trace_only_correction_applied_awaiting_rereview
+    active_slice_status: review039_F031_correction_applied_awaiting_rereview040
     active_slice_discovery_head: 943b8d4d111304638989e429863bece8323b4b08
     active_slice_blocker: DBG-BLK-001-005-003
     active_slice_blocker_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/009--RF004_Stack_Register_Result_Steering_Blocker.md
@@ -480,30 +482,39 @@ issues:
     remediation_review_findings:
       - DBG-F-030
       - DBG-F-031
-    steering_trace_disposition_comment: 5382237149
-    steering_trace_disposition: bounded_trace_only_correction_no_second_nesting
+    trace_rereview: DBG-RVW-001-005-039
+    trace_rereviewed_head: cfc4c451a396776c2a878bef2fbfd636a6083dad
+    trace_rereview_status: rework_return_to_steering
+    trace_rereview_comment: 5382639606
+    trace_rereview_technical_closures:
+      - DBG-F-030
+    trace_rereview_findings:
+      - DBG-F-031
+    initial_steering_trace_disposition_comment: 5382237149
+    steering_trace_disposition_comment: 5385170864
+    steering_trace_disposition: close_F030_correct_residual_F031_no_new_nesting
     exact_aggregate_tested_product_head: 045f1cf58beaf393680e1f4118cfa76de65220b2
     aggregate_evidence_kind: read_only_execution_only
     formal_aggregate_verification: none
-    next_gate: awaiting_fresh_independent_rereview_DBG-RVW-001-005-039
+    next_gate: awaiting_fresh_independent_rereview_DBG-RVW-001-005-040
   DBG-RF-005:
     issue: 42
-    status: blocked_pending_rf004_accepted_interface_and_later_steering_authorization
+    status: blocked_until_rf004_parent_steering_acceptance_and_later_steering_authorization
     depends_on_refactor: DBG-RF-004
     depends_on_interface: dbg.resolver-inspection/1.2
     dependency_clarification_comment: 5362515750
   DBG-RF-006:
     issue: 43
-    status: blocked_pending_later_steering_authorization_and_dependencies
+    status: blocked_until_rf004_parent_steering_acceptance_and_later_steering_authorization_and_dependencies
   DBG-RF-007:
     issue: 44
-    status: blocked_pending_later_steering_authorization_and_dependencies
+    status: blocked_until_rf004_parent_steering_acceptance_and_later_steering_authorization_and_dependencies
   DBG-RF-008:
     issue: 45
-    status: blocked_pending_later_steering_authorization_and_dependencies
+    status: blocked_until_rf004_parent_steering_acceptance_and_later_steering_authorization_and_dependencies
   DBG-RF-009:
     issue: 46
-    status: blocked_pending_later_steering_authorization_and_dependencies
+    status: blocked_until_rf004_parent_steering_acceptance_and_later_steering_authorization_and_dependencies
   DBG-CR-002:
     issue: 54
     role: frozen_candidate_independent_review_snapshot
@@ -518,7 +529,7 @@ issues:
       - DBG-F-027
       - DBG-F-028
       - DBG-F-029
-    next_gate: awaiting_fresh_independent_rereview_DBG-RVW-001-005-039
+    next_gate: awaiting_fresh_independent_rereview_DBG-RVW-001-005-040
   DBG-GAP-002:
     issue: 54
     role: active_corrective_gap
@@ -534,7 +545,7 @@ issues:
     bounded_parent_rework:
       - DBG-F-029
     ordering: DBG-RF-010_before_DBG-RF-011_before_fresh_DBG-RF-004_review
-    current_gate: awaiting_fresh_independent_rereview_DBG-RVW-001-005-039
+    current_gate: awaiting_fresh_independent_rereview_DBG-RVW-001-005-040
   DBG-F-027:
     severity: medium
     status: technical_closure_confirmed_review038_awaiting_formal_reconstructed_review_verification_signoff
@@ -575,26 +586,35 @@ issues:
     closure_review_comment: 5381873491
   DBG-F-030:
     severity: medium
-    status: trace_only_correction_applied_awaiting_rereview
+    status: closed_by_DBG-RVW-001-005-039
     origin_review: DBG-RVW-001-005-038
     origin_reviewed_head: 010ff7bea3c414d73f63c87580d0e91c76c8b965
     origin_review_comment: 5381873491
     ownership: DBG-RF-004_suspended_parent_review_gate_only
     correction: append_only_ledger_semantic_correction
-    steering_disposition_comment: 5382237149
+    closure_review: DBG-RVW-001-005-039
+    closure_reviewed_head: cfc4c451a396776c2a878bef2fbfd636a6083dad
+    closure_review_comment: 5382639606
+    initial_steering_disposition_comment: 5382237149
+    steering_disposition_comment: 5385170864
     nesting: no_second_nesting
-    next_gate: awaiting_fresh_independent_rereview_DBG-RVW-001-005-039
+    next_gate: closed
   DBG-F-031:
     severity: medium
-    status: trace_only_correction_applied_awaiting_rereview
+    status: residual_routing_omission_corrected_awaiting_DBG-RVW-001-005-040
     origin_review: DBG-RVW-001-005-038
     origin_reviewed_head: 010ff7bea3c414d73f63c87580d0e91c76c8b965
     origin_review_comment: 5381873491
     ownership: DBG-RF-004_suspended_parent_review_gate_only
     correction: handoff_and_sprint_current_routing
-    steering_disposition_comment: 5382237149
+    residual_review: DBG-RVW-001-005-039
+    residual_reviewed_head: cfc4c451a396776c2a878bef2fbfd636a6083dad
+    residual_review_comment: 5382639606
+    residual: mandatory_fresh_independent_RF010_Slice005_review_before_formal_verification
+    initial_steering_disposition_comment: 5382237149
+    steering_disposition_comment: 5385170864
     nesting: no_second_nesting
-    next_gate: awaiting_fresh_independent_rereview_DBG-RVW-001-005-039
+    next_gate: awaiting_fresh_independent_rereview_DBG-RVW-001-005-040
   DBG-RF-010:
     issue: 55
     status: technical_closure_confirmed_review038_awaiting_formal_reconstructed_review_verification_signoff
@@ -610,6 +630,7 @@ issues:
     formal_slice_review_status: awaiting_reconstructed_head
     verification_status: awaiting_formal_verification
     signoff_status: not_signed
+    required_gate_order: fresh_independent_review_then_formal_verification_then_exact_head_signoff
   DBG-RF-011:
     issue: 56
     status: technical_closure_confirmed_review038_awaiting_formal_reconstructed_review_verification_signoff
@@ -625,3 +646,4 @@ issues:
     formal_slice_review_status: awaiting_reconstructed_head
     verification_status: awaiting_formal_verification
     signoff_status: not_signed
+    required_gate_order: on_signed_RF010_fresh_independent_review_then_formal_verification_then_exact_head_signoff

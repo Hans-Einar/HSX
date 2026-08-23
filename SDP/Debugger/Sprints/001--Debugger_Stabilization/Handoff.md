@@ -1,10 +1,10 @@
 # DBG-SPR-001 Handoff
 
-Status: `rf004_trace_only_correction_applied_awaiting_rereview039`
+Status: `rf004_review039_f031_correction_applied_awaiting_rereview040`
 
 ## Current gate
 
-`DBG-RF-004` is **SUSPENDED AT `awaiting_fresh_independent_rereview_DBG-RVW-001-005-039`**.
+`DBG-RF-004` is **SUSPENDED AT `awaiting_fresh_independent_rereview_DBG-RVW-001-005-040`**.
 
 Frozen candidate authority remains:
 
@@ -19,7 +19,14 @@ Frozen candidate authority remains:
 - remediation-review result: **REWORK — RETURN_TO_STEERING** for trace/current-state only
 - remediation-review comment: issue #54 `5381873491`
 - Steering disposition: bounded trace-only correction, no second nesting, issue #54 `5382237149`
-- PR #50 remains Draft on authoritative `codex/dbg-rf-004`; the candidate branch is not promoted wholesale.
+- trace-only rereview: `DBG-RVW-001-005-039`
+- exact trace-only rereviewed head: `cfc4c451a396776c2a878bef2fbfd636a6083dad`
+- trace-only rereview result: **REWORK — RETURN_TO_STEERING** for one residual routing omission
+- trace-only rereview comment: issue #54 `5382639606`
+- review039 Steering disposition: close F-030 and correct residual F-031 directly, issue #54 `5385170864`
+- PR #50 remains Draft on authoritative
+  `codex/dbg-rf-004@46169516058aadf0e691a5981e29da4954b7444f`; the candidate branch is not
+  promoted wholesale.
 
 Current remediation work is isolated on:
 
@@ -58,8 +65,12 @@ Review038 returned `REWORK — RETURN_TO_STEERING` solely for two trace/current-
 - `DBG-F-031` — this Handoff and the Sprint README still routed the already-completed F-029
   worker and aggregate tester work.
 
-Steering comment `5382237149` authorized only the bounded six-file trace correction. No
-product, interface, state, concurrency, ownership, runtime or architecture defect was found.
+Review039 closed `DBG-F-030` and found one residual use of `DBG-F-031`: the operative
+post-review039 route omitted the mandatory fresh independent RF-010/Slice005 review before
+formal verification. Steering comment `5385170864` accepted F-030 closed and ordered this
+residual corrected directly under the parent review gate without a new finding or second
+nesting. No product, interface, state, concurrency, ownership, runtime or architecture defect
+was found.
 
 ## Nested remediation model
 
@@ -77,9 +88,10 @@ Medium findings fan out by ownership:
 
 `DBG-F-029` remains a bounded parent-RF004 Low correction and must not widen either corrective child.
 
-This is one nested remediation level only. `DBG-F-030` and `DBG-F-031` are owned directly by
-the suspended parent RF-004 review gate. They do not create CR-003, GAP-003, RF-012 or any
-second corrective tree.
+This is one nested remediation level only. `DBG-F-030` is closed by review039. The corrected
+residual `DBG-F-031` remains owned directly by the suspended parent RF-004 review gate while
+awaiting review040. They do not create CR-003, GAP-003, RF-012, F-032 or any second corrective
+tree.
 
 ## Corrective implementation state
 
@@ -119,19 +131,22 @@ and the former P002 strict XFAIL is gone. The F-029 worker must **not** be re-di
 
 ## Required next sequence
 
-1. Obtain fresh independent rereview `DBG-RVW-001-005-039` of this six-file trace-only head,
-   with current gate `awaiting_fresh_independent_rereview_DBG-RVW-001-005-039`.
+1. Obtain fresh independent trace-only rereview `DBG-RVW-001-005-040` of this consolidated
+   six-file correction, with current gate
+   `awaiting_fresh_independent_rereview_DBG-RVW-001-005-040`.
 2. Do **not** re-dispatch the F-029 worker.
 3. Do **not** repeat aggregate product/test execution unless product or test code changes;
    exact aggregate-tested authority remains `045f1cf58beaf393680e1f4118cfa76de65220b2`.
-4. If review039 passes, reconstruct/promote in the original parent DAG rather than promoting
+4. If review040 passes, reconstruct/promote in the original parent DAG rather than promoting
    the remediation branch wholesale:
-   - corrected Slice005/RF-010 -> formal verification -> exact-head signoff;
-   - corrected Slice006/RF-011 on accepted Slice005 -> fresh review -> formal verification ->
-     exact-head signoff;
+   - corrected Slice005/RF-010 -> fresh independent review -> formal verification -> exact-head
+     signoff;
+   - corrected Slice006/RF-011 on signed Slice005 -> fresh independent review -> formal
+     verification -> exact-head signoff;
    - bounded F-029 correction included in the appropriate RF-004 reviewed head;
-   - fresh RF-004 parent review -> verification -> exact-head signoff -> Steering disposition.
-5. Only after RF-004 acceptance may RF-005 become eligible.
+   - fresh independent RF-004 parent review -> formal verification -> exact-head signoff ->
+     Steering disposition.
+5. `DBG-RF-005..DBG-RF-009` remain blocked until parent RF-004 Steering acceptance.
 
 ## Frozen contracts that remain authoritative
 
@@ -164,7 +179,10 @@ platform-specific skips.
 - `DBG-RF-011`: #56
 - review038: issue #54 comment `5381873491`
 - Steering trace-only disposition: issue #54 comment `5382237149`
-- next gate: `awaiting_fresh_independent_rereview_DBG-RVW-001-005-039`
-- PR #50: Draft, intentionally not candidate/remediation authority
+- review039: issue #54 comment `5382639606`
+- review039 Steering disposition: issue #54 comment `5385170864`
+- next gate: `awaiting_fresh_independent_rereview_DBG-RVW-001-005-040`
+- PR #50: Draft on `codex/dbg-rf-004@46169516058aadf0e691a5981e29da4954b7444f`,
+  intentionally not candidate/remediation authority
 
 A fresh agent should read this Handoff, `SDP/Shared/Process.md`, CurrentIndex/Issues/Relations, issues #38/#54/#55/#56, then the CR/GAP/child-Refactor documents before acting.

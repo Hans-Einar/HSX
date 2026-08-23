@@ -1,7 +1,7 @@
 schema_version: 1
 track: Debugger
 namespace: DBG
-status: debugger_rf004_active_suspended_awaiting_fresh_independent_rereview_DBG-RVW-001-005-039
+status: debugger_rf004_active_suspended_awaiting_fresh_independent_rereview_DBG-RVW-001-005-040
 baseline:
   repository: Hans-Einar/HSX
   implementation_branch: Implementation/vscode
@@ -53,7 +53,18 @@ active:
         - DBG-F-031
       steering_disposition_comment: 5382237149
       steering_disposition: bounded_trace_only_correction_no_second_nesting
-      next_gate: awaiting_fresh_independent_rereview_DBG-RVW-001-005-039
+      trace_rereview:
+        id: DBG-RVW-001-005-039
+        reviewed_head: cfc4c451a396776c2a878bef2fbfd636a6083dad
+        status: rework_return_to_steering
+        comment: 5382639606
+        technical_closures:
+          - DBG-F-030
+        findings:
+          - DBG-F-031
+        steering_disposition_comment: 5385170864
+        steering_disposition: close_F030_correct_residual_F031_no_new_nesting
+      next_gate: awaiting_fresh_independent_rereview_DBG-RVW-001-005-040
   design_analysis:
     id: DBG-DA-001
     path: SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md
@@ -123,7 +134,7 @@ active_gate:
   iteration:
     id: DBG-IT-001-005
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/ScrumIterations.md
-    status: active_suspended_awaiting_fresh_independent_rereview_DBG-RVW-001-005-039
+    status: active_suspended_awaiting_fresh_independent_rereview_DBG-RVW-001-005-040
   architecture_review:
     id: DBG-RVW-001-002-001
     status: rework
@@ -153,7 +164,7 @@ active_gate:
     first_wave_status: complete_steering_accepted
     first_wave_acceptance_comment: 5362514094
     next_authorized_refactor: DBG-RF-004
-    next_wave_status: rf004_active_suspended_awaiting_fresh_independent_rereview_DBG-RVW-001-005-039
+    next_wave_status: rf004_active_suspended_awaiting_fresh_independent_rereview_DBG-RVW-001-005-040
     rf004_authorization_comment: 5362514094
     rf005_dependency_clarification_comment: 5362515750
   portable_contract_study:
@@ -402,10 +413,13 @@ active_rf004:
   refactor:
     id: DBG-RF-004
     path: SDP/Debugger/Refactor/004--Typed_Resolver_Inspection/README.md
-    status: active_suspended_awaiting_fresh_independent_rereview_DBG-RVW-001-005-039
+    status: active_suspended_awaiting_fresh_independent_rereview_DBG-RVW-001-005-040
     draft_pull_request: 50
     draft_pull_request_url: https://github.com/Hans-Einar/HSX/pull/50
     draft_pull_request_base: codex/dbg-rf-002-003
+    draft_pull_request_head_ref: codex/dbg-rf-004
+    draft_pull_request_head: 46169516058aadf0e691a5981e29da4954b7444f
+    draft_pull_request_status: open_draft
     published_coordination_head: 31322e3a722fd575a02be2a65419f2e20882172a
     steering_progress_summary_comment: 5372569290
     steering_authority_comment: 5362514094
@@ -435,14 +449,22 @@ active_rf004:
     convergence_review_findings:
       - DBG-F-030
       - DBG-F-031
-    steering_disposition_comment: 5382237149
-    steering_disposition: bounded_trace_only_correction_no_second_nesting
-    current_gate: awaiting_fresh_independent_rereview_DBG-RVW-001-005-039
-    next_gate: DBG-RVW-001-005-039
+    trace_rereview: DBG-RVW-001-005-039
+    trace_rereviewed_head: cfc4c451a396776c2a878bef2fbfd636a6083dad
+    trace_rereview_status: rework_return_to_steering
+    trace_rereview_comment: 5382639606
+    trace_rereview_technical_closures:
+      - DBG-F-030
+    trace_rereview_findings:
+      - DBG-F-031
+    steering_disposition_comment: 5385170864
+    steering_disposition: close_F030_correct_residual_F031_no_new_nesting
+    current_gate: awaiting_fresh_independent_rereview_DBG-RVW-001-005-040
+    next_gate: DBG-RVW-001-005-040
   iteration:
     id: DBG-IT-001-005
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/ScrumIterations.md
-    status: active_suspended_awaiting_fresh_independent_rereview_DBG-RVW-001-005-039
+    status: active_suspended_awaiting_fresh_independent_rereview_DBG-RVW-001-005-040
   interface:
     id: dbg.resolver-inspection/1.2
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/004--Typed_Resolver_Inspection_Interface_v1.md
@@ -717,7 +739,7 @@ active_rf004:
   parent_verification: DBG-VER-004-001-001
   product_base: 69a54aeb3394d3cd4792bce620748e15bab69f1f
   runtime_profile: hsx.python-debug-legacy/1
-  current_gate: awaiting_fresh_independent_rereview_DBG-RVW-001-005-039
+  current_gate: awaiting_fresh_independent_rereview_DBG-RVW-001-005-040
   aggregate_execution_classification: ROUTING_C_EXECUTION_PASS_WITH_KNOWN_BASELINES
   aggregate_execution_report: SDP/Debugger/Verification/RoutingC_Aggregate_Execution_Result.md
   aggregate_execution_comment: 5381602329
@@ -725,13 +747,19 @@ active_rf004:
   aggregate_evidence_kind: read_only_execution_only
   formal_aggregate_verification: none
   origin_findings_status: technical_closure_confirmed_review038
-  trace_findings:
+  trace_findings_closed:
     - DBG-F-030
+  trace_findings_awaiting_rereview:
     - DBG-F-031
   trace_correction_scope: six_sdp_files_no_second_nesting
-  steering_disposition_comment: 5382237149
+  review039: DBG-RVW-001-005-039
+  review039_reviewed_head: cfc4c451a396776c2a878bef2fbfd636a6083dad
+  review039_status: rework_return_to_steering
+  review039_comment: 5382639606
+  steering_disposition_comment: 5385170864
   corrective_children_status: technical_closure_confirmed_review038_awaiting_formal_reconstructed_review_verification_signoff
-  next_gate: DBG-RVW-001-005-039
+  reconstruction_route: RF010_fresh_independent_review_then_formal_verification_then_exact_head_signoff_before_RF011_equivalent_gates_then_parent_RF004_equivalent_gates_and_Steering
+  next_gate: DBG-RVW-001-005-040
 structural_gate:
   rule: Only Steering-authorized Refactors with frozen Slice/interface contracts may execute.
   authorized_refactors:
