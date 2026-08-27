@@ -185,7 +185,17 @@ def _page_bounds(total: int, page: PageRequest) -> tuple[int, int]:
 
 
 class InspectionService:
-    def __init__(self, index, read_port, architecture, abi, profile_limits, stack_service, location_evaluator) -> None:
+    def __init__(
+        self,
+        index,
+        read_port,
+        architecture,
+        abi,
+        profile_limits,
+        stack_service,
+        location_evaluator,
+        validated_binding,
+    ) -> None:
         self._index = index
         self._read_port = read_port
         self._architecture = architecture
@@ -193,6 +203,7 @@ class InspectionService:
         self._profile_limits = profile_limits
         self._stack_service = stack_service
         self._location_evaluator = location_evaluator
+        self._validated_binding = validated_binding
         self._lock = Lock()
         self._closed = False
         self._active: EpochInspectionSession | None = None
@@ -239,7 +250,16 @@ class InspectionService:
             )
         return InspectionServiceCreateResult(
             ResolutionStatus.RESOLVED,
-            cls(index, read_port, architecture, abi, profile_limits, stack_service, location_evaluator),
+            cls(
+                index,
+                read_port,
+                architecture,
+                abi,
+                profile_limits,
+                stack_service,
+                location_evaluator,
+                binding,
+            ),
             (),
         )
 
@@ -491,15 +511,48 @@ class EpochInspectionSession:
         return self._store.resolve(handle, expected_kind)
 
     def _stack_frames(self) -> StackWalkResult:
-        return self._service._stack_service.unwind(
-            self._context,
-            self._service._index,
-            self._service._read_port,
-            self._service._architecture,
-            self._service._abi,
-            self._service._profile_limits,
-            self._request_limits,
-        )
+        try:
+            walk = self._service._stack_service.unwind(
+                self._context,
+                self._service._index,
+                self._service._read_port,
+                self._service._architecture,
+                self._service._abi,
+                self._service._profile_limits,
+                self._request_limits,
+            )
+        except Exception as exc:
+            return StackWalkResult(
+                InspectionStatus.CORRUPT,
+                self._context,
+                (),
+                (
+                    _diag(
+                        "stack_service_contract",
+                        f"StackService raised {type(exc).__name__}",
+                    ),
+                ),
+            )
+        if not isinstance(walk, StackWalkResult):
+            return StackWalkResult(
+                InspectionStatus.CORRUPT,
+                self._context,
+                (),
+                (_diag("stack_service_contract", "StackService returned a non-StackWalkResult"),),
+            )
+        if walk.context != self._context:
+            return StackWalkResult(
+                InspectionStatus.STALE,
+                self._context,
+                (),
+                (
+                    _diag(
+                        "stack_service_context_stale",
+                        "StackService result does not match the active inspection context",
+                    ),
+                ),
+            )
+        return walk
 
     def _frame_from_handle(self, handle: DomainHandle):
         resolution = self._resolve_handle(handle, HandleKind.FRAME)
@@ -509,13 +562,6 @@ class EpochInspectionSession:
             )
         frame_index = resolution.object_key[0]
         walk = self._stack_frames()
-        if not isinstance(walk, StackWalkResult):
-            return None, _failure(
-                self._context,
-                InspectionStatus.CORRUPT,
-                "stack_service_contract",
-                "StackService returned a non-StackWalkResult",
-            )
         if frame_index < len(walk.frames):
             return walk.frames[frame_index], None
         if walk.status in {InspectionStatus.PARTIAL, InspectionStatus.UNAVAILABLE}:
@@ -598,13 +644,6 @@ class EpochInspectionSession:
         if revision is None:
             return self._stale_stack_page(page)
         walk = self._stack_frames()
-        if not isinstance(walk, StackWalkResult):
-            return StackPageResult(
-                InspectionStatus.CORRUPT,
-                self._context,
-                FramePage(0, page.offset, ()),
-                (_diag("stack_service_contract", "StackService returned a non-StackWalkResult"),),
-            )
         if not self._finish(revision):
             return self._stale_stack_page(page, "stack_walk_invalidated")
 
@@ -834,6 +873,7 @@ class EpochInspectionSession:
                 "location_evaluator_contract",
                 "LocationEvaluator returned non-InspectionResult",
             )
+        evaluated = fence_snapshot_result(self._context, evaluated)
         if evaluated.status in {InspectionStatus.COMPLETE, InspectionStatus.PARTIAL} and not isinstance(
             evaluated.value, EvaluatedValue
         ):
@@ -980,6 +1020,13 @@ class EpochInspectionSession:
                 InspectionStatus.CORRUPT,
                 "artifact_index_contract",
                 "symbol lookup returned non-ResolutionResult",
+            )
+        if result.binding != self._service._validated_binding:
+            return None, _failure(
+                self._context,
+                InspectionStatus.ARTIFACT_MISMATCH,
+                "artifact_binding_mismatch",
+                "symbol lookup binding differs from the validated service binding",
             )
         if result.status is not ResolutionStatus.RESOLVED or len(result.values) != 1:
             status = (

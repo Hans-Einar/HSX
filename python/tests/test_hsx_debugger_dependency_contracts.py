@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from hsx_debugger import *
 from hsx_debugger.inspection import InspectionService
 from test_hsx_debugger_inspection import (
@@ -44,6 +46,82 @@ class MalformedLocationEvaluator:
         return object()
 
 
+class RaisingStackService:
+    @staticmethod
+    def unwind(*args, **kwargs):
+        raise RuntimeError("injected stack failure")
+
+
+class MalformedStackService:
+    @staticmethod
+    def unwind(*args, **kwargs):
+        return object()
+
+
+class ForeignBindingSymbolIndex(IndexDouble):
+    def __init__(self, f):
+        super().__init__(f)
+        self.foreign_binding = replace(f.binding, binding_digest="f" * 64)
+
+    def symbol_by_id(self, symbol_id):
+        value = self.symbols[symbol_id]
+        return ResolutionResult(
+            ResolutionStatus.RESOLVED,
+            self.foreign_binding,
+            (value,),
+            (),
+        )
+
+
+def _foreign_context_stack(foreign_context):
+    class ForeignContextStack:
+        @staticmethod
+        def unwind(context, index, *args, **kwargs):
+            frame = replace(index.f.frame, context=foreign_context)
+            return StackWalkResult(
+                InspectionStatus.COMPLETE,
+                foreign_context,
+                (frame,),
+                (),
+            )
+
+    return ForeignContextStack
+
+
+def _local_then_foreign_stack(foreign_context):
+    class LocalThenForeignStack:
+        calls = 0
+
+        @classmethod
+        def unwind(cls, context, index, *args, **kwargs):
+            cls.calls += 1
+            result_context = context if cls.calls == 1 else foreign_context
+            frame = replace(index.f.frame, context=result_context)
+            return StackWalkResult(
+                InspectionStatus.COMPLETE,
+                result_context,
+                (frame,),
+                (),
+            )
+
+    return LocalThenForeignStack
+
+
+def _foreign_context_evaluator(foreign_context):
+    class ForeignContextEvaluator:
+        @staticmethod
+        def evaluate(*args, **kwargs):
+            evaluated = LocationEvaluator.evaluate(*args, **kwargs)
+            return InspectionResult(
+                evaluated.status,
+                foreign_context,
+                evaluated.value,
+                evaluated.diagnostics,
+            )
+
+    return ForeignContextEvaluator
+
+
 def _open_with_location_evaluator(f, index, evaluator):
     port = SnapshotPort(f)
     created = InspectionService.create(
@@ -59,6 +137,133 @@ def _open_with_location_evaluator(f, index, evaluator):
     opened = created.service.open_epoch(f.context, RecipeRequestLimits(64, 16))
     assert opened.status is InspectionOpenStatus.OPENED
     return opened.session
+
+
+def test_stack_query_classifies_stack_service_exception() -> None:
+    f = foundation()
+    _, _, _, _, session = open_session(f, stack_service=RaisingStackService)
+
+    result = session.stack(PageRequest(0, 16))
+    assert result.status is InspectionStatus.CORRUPT
+    assert result.context == f.context
+    assert result.page.frames == ()
+    assert result.diagnostics[0].code == "stack_service_contract"
+
+
+def test_stack_query_rejects_non_stack_walk_result() -> None:
+    f = foundation()
+    _, _, _, _, session = open_session(f, stack_service=MalformedStackService)
+
+    result = session.stack(PageRequest(0, 16))
+    assert result.status is InspectionStatus.CORRUPT
+    assert result.context == f.context
+    assert result.page.frames == ()
+    assert result.diagnostics[0].code == "stack_service_contract"
+
+
+def test_stack_query_rejects_foreign_context_before_frame_publication() -> None:
+    f = foundation()
+    foreign = foundation(epoch_id="foreign", snapshot_token="foreign")
+    stack_service = _foreign_context_stack(foreign.context)
+    _, _, _, _, session = open_session(f, stack_service=stack_service)
+
+    result = session.stack(PageRequest(0, 16))
+    assert result.status is InspectionStatus.STALE
+    assert result.context == f.context
+    assert result.page.frames == ()
+    assert result.diagnostics[0].code == "stack_service_context_stale"
+
+
+def test_foreign_repeated_walk_cannot_reuse_interned_frame() -> None:
+    f = foundation()
+    foreign = foundation(epoch_id="foreign", snapshot_token="foreign")
+    stack_service = _local_then_foreign_stack(foreign.context)
+    _, _, _, _, session = open_session(f, stack_service=stack_service)
+    frame = first_frame(session)
+
+    scopes = session.scopes(frame.handle)
+    selected = session.evaluate_snapshot(frame.handle, RegisterExpression("R0"))
+
+    assert scopes.status is InspectionStatus.STALE
+    assert scopes.value is None
+    assert scopes.diagnostics[0].code == "stack_service_context_stale"
+    assert selected.status is InspectionStatus.STALE
+    assert selected.value is None
+    assert selected.diagnostics[0].code == "stack_service_context_stale"
+
+
+def test_variable_query_rejects_foreign_location_evaluator_context() -> None:
+    f = foundation()
+    foreign = foundation(epoch_id="foreign", snapshot_token="foreign")
+    session = _open_with_location_evaluator(
+        f,
+        IndexDouble(f),
+        _foreign_context_evaluator(foreign.context),
+    )
+    frame = first_frame(session)
+    scope = scope_by_kind(session, frame.handle, ScopeKind.LOCALS)
+
+    result = session.variables(scope.handle, PageRequest(0, 16))
+    assert result.status is InspectionStatus.STALE
+    assert result.context == f.context
+    assert result.value is None
+    assert result.diagnostics[0].code == "snapshot_context_stale"
+
+
+def test_variable_expression_rejects_foreign_location_evaluator_context() -> None:
+    f = foundation()
+    foreign = foundation(epoch_id="foreign", snapshot_token="foreign")
+    session = _open_with_location_evaluator(
+        f,
+        IndexDouble(f),
+        _foreign_context_evaluator(foreign.context),
+    )
+    frame = first_frame(session)
+
+    result = session.evaluate_snapshot(
+        frame.handle,
+        VariableExpression("local", "fn", "scope"),
+    )
+    assert result.status is InspectionStatus.STALE
+    assert result.context == f.context
+    assert result.value is None
+    assert result.diagnostics[0].code == "snapshot_context_stale"
+
+
+def test_symbol_queries_reject_foreign_result_binding() -> None:
+    f = foundation()
+    index = ForeignBindingSymbolIndex(f)
+    _, _, _, _, session = open_session(f, index=index)
+    frame = first_frame(session)
+
+    symbol = session.evaluate_snapshot(frame.handle, SymbolExpression("label"))
+    variable = session.evaluate_snapshot(
+        frame.handle,
+        VariableExpression("local", "fn", "scope"),
+    )
+
+    for result in (symbol, variable):
+        assert result.status is InspectionStatus.ARTIFACT_MISMATCH
+        assert result.context == f.context
+        assert result.value is None
+        assert result.diagnostics[0].code == "artifact_binding_mismatch"
+
+
+def test_symbol_queries_accept_exact_service_validated_binding() -> None:
+    f = foundation()
+    _, _, _, _, session = open_session(f, index=IndexDouble(f))
+    frame = first_frame(session)
+
+    symbol = session.evaluate_snapshot(frame.handle, SymbolExpression("label"))
+    variable = session.evaluate_snapshot(
+        frame.handle,
+        VariableExpression("local", "fn", "scope"),
+    )
+
+    assert symbol.status is InspectionStatus.COMPLETE
+    assert symbol.value.display_value == "288"
+    assert variable.status is InspectionStatus.COMPLETE
+    assert variable.value.display_value == "4660"
 
 
 def test_variable_query_classifies_location_index_exception() -> None:
