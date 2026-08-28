@@ -36,7 +36,14 @@ from .inspection_records import (
     VariableQueryResult,
 )
 from .metadata import SymbolKind, SymbolRecord
-from .recipes import LocationEvaluator, LocationRow, RecipeLimits, RecipeRequestLimits, UnwindFrame
+from .recipes import (
+    LocationEvaluator,
+    LocationRow,
+    RecipeComponentValidator,
+    RecipeLimits,
+    RecipeRequestLimits,
+    UnwindFrame,
+)
 from .results import (
     ConstantExpression,
     Diagnostic,
@@ -552,6 +559,30 @@ class EpochInspectionSession:
                     ),
                 ),
             )
+        for frame in walk.frames:
+            try:
+                diagnostics = RecipeComponentValidator.validate_unwind_frame(
+                    frame, self._service._architecture
+                )
+            except Exception as exc:
+                return StackWalkResult(
+                    InspectionStatus.CORRUPT,
+                    self._context,
+                    (),
+                    (
+                        _diag(
+                            "stack_frame_validation_contract",
+                            f"unwind-frame validation raised {type(exc).__name__}",
+                        ),
+                    ),
+                )
+            if diagnostics:
+                return StackWalkResult(
+                    InspectionStatus.CORRUPT,
+                    self._context,
+                    (),
+                    tuple(diagnostics),
+                )
         return walk
 
     def _frame_from_handle(self, handle: DomainHandle):
@@ -874,15 +905,27 @@ class EpochInspectionSession:
                 "LocationEvaluator returned non-InspectionResult",
             )
         evaluated = fence_snapshot_result(self._context, evaluated)
-        if evaluated.status in {InspectionStatus.COMPLETE, InspectionStatus.PARTIAL} and not isinstance(
-            evaluated.value, EvaluatedValue
-        ):
-            return _failure(
-                self._context,
-                InspectionStatus.CORRUPT,
-                "location_evaluator_contract",
-                "successful LocationEvaluator result is not EvaluatedValue",
-            )
+        if evaluated.status in {InspectionStatus.COMPLETE, InspectionStatus.PARTIAL}:
+            if not isinstance(evaluated.value, EvaluatedValue):
+                return _failure(
+                    self._context,
+                    InspectionStatus.CORRUPT,
+                    "location_evaluator_contract",
+                    "successful LocationEvaluator result is not EvaluatedValue",
+                )
+            value = evaluated.value
+            if (
+                value.symbol_id != symbol.symbol_id
+                or value.name != symbol.name
+                or value.declared_type_id != row.declared_type_id
+                or (value.bit_size is not None and value.bit_size != row.declared_bit_size)
+            ):
+                return _failure(
+                    self._context,
+                    InspectionStatus.CORRUPT,
+                    "location_evaluator_identity_mismatch",
+                    "LocationEvaluator value differs from the requested symbol/location row",
+                )
         return evaluated
 
     def variables(self, scope_handle: DomainHandle, page: PageRequest) -> VariableQueryResult:
@@ -1316,6 +1359,16 @@ class EpochInspectionSession:
                 "snapshot_read_contract",
                 "disassembly result must contain InstructionBytes",
             )
+        if (
+            result.status is InspectionStatus.COMPLETE
+            and len(result.value) != instruction_count
+        ):
+            return _failure(
+                self._context,
+                InspectionStatus.CORRUPT,
+                "snapshot_disassembly_count_mismatch",
+                "COMPLETE disassembly result count differs from the exact request",
+            )
 
         mapped: list[DisassembledInstruction] = []
         diagnostics = list(result.diagnostics)
@@ -1336,6 +1389,13 @@ class EpochInspectionSession:
                         _diag(
                             "instruction_index_contract",
                             "instruction metadata lookup returned non-ResolutionResult",
+                        )
+                    )
+                elif metadata_result.binding != self._service._validated_binding:
+                    diagnostics.append(
+                        _diag(
+                            "instruction_artifact_binding_mismatch",
+                            "instruction metadata binding differs from the validated service binding",
                         )
                     )
                 elif (

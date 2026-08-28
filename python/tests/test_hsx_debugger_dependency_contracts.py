@@ -58,6 +58,38 @@ class MalformedStackService:
         return object()
 
 
+class SwitchableMalformedFrameStack:
+    malformed = False
+
+    @classmethod
+    def unwind(cls, context, index, *args, **kwargs):
+        frame = index.f.frame
+        if frame.context != context:
+            frame = replace(frame, context=context)
+        if cls.malformed:
+            frame = replace(
+                frame,
+                recovered_registers=RegisterSet(frame.recovered_registers.registers[1:]),
+            )
+        return StackWalkResult(InspectionStatus.COMPLETE, context, (frame,), ())
+
+
+class ForeignSymbolLocationEvaluator:
+    @staticmethod
+    def evaluate(context, frame, index, symbol, row, *args, **kwargs):
+        value = EvaluatedValue(
+            "global",
+            "foreign-name",
+            row.declared_type_id,
+            "57005",
+            b"\xad\xde",
+            row.declared_bit_size,
+            ValueAvailability.AVAILABLE,
+            (),
+        )
+        return InspectionResult(InspectionStatus.COMPLETE, context, value, ())
+
+
 class ForeignBindingSymbolIndex(IndexDouble):
     def __init__(self, f):
         super().__init__(f)
@@ -161,6 +193,48 @@ def test_stack_query_rejects_non_stack_walk_result() -> None:
     assert result.diagnostics[0].code == "stack_service_contract"
 
 
+def test_stack_query_rejects_architecture_incomplete_frame_without_handle_publication() -> None:
+    f = foundation()
+    SwitchableMalformedFrameStack.malformed = True
+    _, _, _, _, session = open_session(f, stack_service=SwitchableMalformedFrameStack)
+    before_serial = session._store._next_serial
+    before_handles = dict(session._store._by_serial)
+
+    result = session.stack(PageRequest(0, 16))
+
+    assert result.status is InspectionStatus.CORRUPT
+    assert result.context == f.context
+    assert result.page.frames == ()
+    assert result.diagnostics[0].code == "invalid_recovered_register_order"
+    assert session._store._next_serial == before_serial
+    assert session._store._by_serial == before_handles
+
+
+def test_repeated_selected_frame_consumers_reject_malformed_walk_without_new_handles() -> None:
+    f = foundation()
+    SwitchableMalformedFrameStack.malformed = False
+    _, _, _, _, session = open_session(f, stack_service=SwitchableMalformedFrameStack)
+    frame = first_frame(session)
+    scope = scope_by_kind(session, frame.handle, ScopeKind.LOCALS)
+    before_serial = session._store._next_serial
+    before_handles = dict(session._store._by_serial)
+    SwitchableMalformedFrameStack.malformed = True
+
+    stack = session.stack(PageRequest(0, 16))
+    scopes = session.scopes(frame.handle)
+    variables = session.variables(scope.handle, PageRequest(0, 16))
+    selected = session.evaluate_snapshot(frame.handle, RegisterExpression("R0"))
+
+    assert stack.status is InspectionStatus.CORRUPT
+    assert stack.page.frames == ()
+    for result in (scopes, variables, selected):
+        assert result.status is InspectionStatus.CORRUPT
+        assert result.value is None
+        assert result.diagnostics[0].code == "invalid_recovered_register_order"
+    assert session._store._next_serial == before_serial
+    assert session._store._by_serial == before_handles
+
+
 def test_stack_query_rejects_foreign_context_before_frame_publication() -> None:
     f = foundation()
     foreign = foundation(epoch_id="foreign", snapshot_token="foreign")
@@ -228,6 +302,33 @@ def test_variable_expression_rejects_foreign_location_evaluator_context() -> Non
     assert result.context == f.context
     assert result.value is None
     assert result.diagnostics[0].code == "snapshot_context_stale"
+
+
+def test_same_context_foreign_symbol_value_is_corrupt_before_variable_publication() -> None:
+    f = foundation()
+    session = _open_with_location_evaluator(
+        f,
+        IndexDouble(f),
+        ForeignSymbolLocationEvaluator,
+    )
+    frame = first_frame(session)
+    scope = scope_by_kind(session, frame.handle, ScopeKind.LOCALS)
+    before_serial = session._store._next_serial
+    before_handles = dict(session._store._by_serial)
+
+    variables = session.variables(scope.handle, PageRequest(0, 16))
+    selected = session.evaluate_snapshot(
+        frame.handle,
+        VariableExpression("local", "fn", "scope"),
+    )
+
+    for result in (variables, selected):
+        assert result.status is InspectionStatus.CORRUPT
+        assert result.context == f.context
+        assert result.value is None
+        assert result.diagnostics[0].code == "location_evaluator_identity_mismatch"
+    assert session._store._next_serial == before_serial
+    assert session._store._by_serial == before_handles
 
 
 def test_symbol_queries_reject_foreign_result_binding() -> None:

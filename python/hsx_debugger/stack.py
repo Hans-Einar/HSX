@@ -471,7 +471,7 @@ def _row_aware_current_frame_base(
 
 
 def _annotations(
-    index: DebugArtifactIndex, pc: HsxAddress
+    index: DebugArtifactIndex, pc: HsxAddress, validated_binding
 ) -> tuple[
     FunctionRecord | None,
     SourceLocation | None,
@@ -506,6 +506,13 @@ def _annotations(
         if not isinstance(instruction, ResolutionResult):
             diagnostics.append(
                 _diag("instruction_index_contract", "instruction lookup returned non-ResolutionResult")
+            )
+        elif instruction.binding != validated_binding:
+            diagnostics.append(
+                _diag(
+                    "instruction_artifact_binding_mismatch",
+                    "instruction annotation binding differs from the validated stack binding",
+                )
             )
         elif instruction.status is ResolutionStatus.RESOLVED and len(instruction.values) == 1:
             record = instruction.values[0]
@@ -708,6 +715,7 @@ def _checked_call_site(
     row: UnwindRow,
     index: DebugArtifactIndex,
     architecture: ArchitectureDescriptor,
+    validated_binding,
     frame_index: int,
 ) -> tuple[HsxAddress | None, InspectionStatus | None, tuple[Diagnostic, ...]]:
     adjustment = row.call_site_adjustment
@@ -773,6 +781,15 @@ def _checked_call_site(
             _diag(
                 "call_site_index_contract",
                 "call-site instruction lookup returned non-ResolutionResult",
+                row_id=row.row_id,
+                frame_index=frame_index,
+            ),
+        )
+    if instruction.binding != validated_binding:
+        return None, InspectionStatus.ARTIFACT_MISMATCH, (
+            _diag(
+                "call_site_artifact_binding_mismatch",
+                "call-site instruction binding differs from the validated stack binding",
                 row_id=row.row_id,
                 frame_index=frame_index,
             ),
@@ -908,7 +925,7 @@ class StackService:
             seen_frame_keys.add(key)
 
             function, source, annotation_diagnostics, function_contract_failed = _annotations(
-                index, current.pc
+                index, current.pc, binding
             )
             if function_contract_failed:
                 return _failure(
@@ -1102,7 +1119,7 @@ class StackService:
                 )
 
             call_site_pc, call_site_status, call_site_diagnostics = _checked_call_site(
-                caller_pc, row, index, architecture, frame_index
+                caller_pc, row, index, architecture, binding, frame_index
             )
             if call_site_status is not None:
                 return _terminated(
