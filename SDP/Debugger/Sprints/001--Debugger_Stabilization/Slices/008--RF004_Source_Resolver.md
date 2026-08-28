@@ -1,0 +1,101 @@
+# DBG-SL-001-005-004 — RF-004 Exact Source Resolver
+
+- Status: **COMPLETE / EXACT-HEAD SIGNED**
+- Product head: `c0f975c4a278cecd89e19d332ca5601b074a115e`
+- Parent: `DBG-RF-004`
+- Iteration: `DBG-IT-001-005`
+- Depends on signed: `DBG-SL-001-005-001..003`, `DBG-SL-001-005-007`
+- Review: `DBG-RVW-001-005-004`
+- Verification: `DBG-VER-001-005-004`
+
+## Goal and why now
+
+Implement exact case-preserving, content-verified SourceRef-to-local-locator resolution,
+separate from the artifact index and any frontend navigation policy.
+
+## Owned files
+
+- `python/hsx_debugger/sources.py`
+- relevant additive exports in `python/hsx_debugger/__init__.py`
+- `python/tests/test_hsx_debugger_sources.py`
+
+`python/source_map.py`, artifact modules and all runtime/frontend files are read-only.
+
+## Required behavior
+
+- validate frozen logical-ID NFC/separator/control/dot/absolute/drive/UNC rules;
+- accept only explicit exact overrides, prefix mappings and ordered search roots as locator
+  policy;
+- preserve original SourceRef identity through relocation and symlink resolution;
+- verify exact candidate byte length and SHA-256 before `RESOLVED`;
+- return missing, ambiguous, content-mismatch and case-collision outcomes with all candidates;
+- enforce exact override/no-fallthrough then case-collision/ambiguity/single-candidate content
+  precedence; one content match among multiple locators remains ambiguous;
+- adapt classified SourceMap prefix/relocation/symlink behavior without using its first-match
+  fallback as target semantics;
+- never globally lowercase/casefold identity or perform basename guessing.
+
+## Invariants and non-goals
+
+- local locators are excluded from SourceRef/bundle identity and canonical digests;
+- filesystem case behavior may discover candidates but never changes logical identity;
+- no symbol parsing, target reads, UI navigation, workspace heuristics or current-directory
+  fallback unless the directory is an explicit search root;
+- no DAP/CLI/VS Code, Executive/VM/AVR or RF-005..009 work.
+
+## Traceability
+
+`DBG-R-024..DBG-R-025`, `DBG-R-028`, `DBG-R-034..DBG-R-036`;
+`DBG-F-020`; `DBG-D-004`, `DBG-D-009`; `HSX-D-002`;
+interface `dbg.resolver-inspection/1.2`.
+
+## Verification and completion signal
+
+Test exact current root, explicit relocation/prefix, explicit override, symlink, missing,
+digest/length mismatch, duplicate basename, case-collision and case-distinct files. Include
+portable invalid logical IDs and ensure no CWD/basename/lowercase guess. Run legacy SourceMap
+tests unchanged. Close only after exact-head review, formal verification and Master sign-off.
+
+## Worker evidence
+
+- Focused SourceResolver + unchanged SourceMap: `29 passed, 3 skipped`.
+- Skips: case-distinct host behavior inapplicable on case-insensitive Windows; new and unchanged
+  legacy symlink cases both exact WinError1314 privilege degradation.
+- Compile/import/exports/exact resolve signature/Black: PASS.
+- Exact three-file scope, diff check and clean Git state: PASS.
+- Broad regression intentionally deferred to review/verification.
+
+## Review004 decision
+
+Review004 returned one Medium finding: Windows host join semantics can collapse an inner
+drive-looking segment in a valid artifact-relative logical ID. Correct only the private literal
+join and add the regression. All other SourceResolver behavior passed. Review036 is reserved.
+
+## Corrective worker evidence
+
+- Corrected product head: `3d1f2e8a98308835162702c579dda1dc3ef40900`.
+- Exact scope: `sources.py` and owned source test.
+- Focused SourceResolver/SourceMap: `30 passed, 3` classified platform skips.
+- Compile/Black/import/signature/scope/diff/connectivity: PASS.
+- No frozen-contract or filesystem-semantic blocker.
+
+## Review036 decision
+
+Fresh review036 passed exact corrected head `3d1f2e8a…` with zero findings. Focused30/3,
+oracle16/1, broad280/3, compile/exports/signatures, strict trace, exact scope and Git integrity
+pass. Skips remain classified Windows host/symlink degradation.
+
+## Verification004 decision
+
+Product evidence passed; verification004 failed stale Handoff prose only. Master normalized
+the exact Slice002/open-loop/review036 sentences. Fresh verification011 is required; product
+head remains unchanged.
+
+Verification011 passed the requested correction and full product matrix but found one later
+stale Handoff summary. Master corrected only that sentence. Fresh verification012 is required.
+
+## Final verification and sign-off
+
+Verification012 passed unchanged product `3d1f2e8a…`, full current Handoff, focused30/3,
+oracle16/1, broad280/3, M1 tiers7, compile/exports/signatures, exact scope and remote integrity.
+Master signed the exact product head and authorized only Slice005.

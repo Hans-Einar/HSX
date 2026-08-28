@@ -19,7 +19,7 @@ issues:
     master_signoff: pass
   DBG-DA-001:
     issue: 38
-    status: debugger_v1_design_frozen_first_wave_complete_awaiting_steering
+    status: debugger_v1_design_frozen_rf004_authorized_active
     decision_package_comment: 5346421143
     architecture_acceptance_comment: 5348190806
     steering_start_comment: 5345600066
@@ -167,13 +167,85 @@ issues:
     first_wave_remote_branch: codex/dbg-rf-002-003
     first_wave_published_head: b0a9e8161bebac6b9eb1a0bba9003c82fd21fa8c
     first_wave_publication_verification_status: pass
-    first_wave_current_gate: final_publication_closeout_then_await_steering
+    first_wave_final_remote_head: 69a54aeb3394d3cd4792bce620748e15bab69f1f
+    first_wave_acceptance_comment: 5362514094
+    first_wave_current_gate: closed_steering_accepted
+    next_authorized_refactor: DBG-RF-004
+    rf004_iteration: DBG-IT-001-005
+    rf004_slices: DBG-SL-001-005-001..DBG-SL-001-005-007
+    rf004_interface: dbg.resolver-inspection/1.2
+    rf004_prior_interface: dbg.resolver-inspection/1.1
+    rf004_historical_interface: dbg.resolver-inspection/1
+    rf004_refreeze_comment: 5368017338
+    rf004_frame_refreeze_comment: 5370574104
+    rf004_interface_review: DBG-RVW-001-005-007
+    rf004_interface_review_status: rework
+    rf004_interface_reviewed_head: 82154c614a31284723bf3e6a337c5bedfb8aba5d
+    rf004_interface_rereview: DBG-RVW-001-005-008
+    rf004_interface_rereview_status: rework
+    rf004_interface_rereviewed_head: 8d6c0f571f46a10ce6db7331618ef7600d6a8203
+    rf004_interface_review_attempt_3: DBG-RVW-001-005-009
+    rf004_interface_review_attempt_3_status: rework
+    rf004_interface_review_attempt_3_head: 07f7e16040bec1c225d263c682066f65b173e6aa
+    rf004_interface_review_attempt_4: DBG-RVW-001-005-010
+    rf004_interface_review_attempt_4_status: rework
+    rf004_interface_review_attempt_4_head: 72b06ad0bae53b70bc3d64edad91591998d2408d
+    rf004_interface_review_attempt_5: DBG-RVW-001-005-012
+    rf004_interface_review_attempt_5_status: rework
+    rf004_interface_review_attempt_5_head: 573f396e29de728f69abb0961e9b79a2fdb3c29d
+    rf004_interface_review_attempt_6: DBG-RVW-001-005-013
+    rf004_interface_review_attempt_6_status: rework
+    rf004_interface_review_attempt_6_head: 1e8fb7e74c92a69711bd48809696552cf2f982db
+    rf004_interface_review_attempt_7: DBG-RVW-001-005-014
+    rf004_interface_review_attempt_7_status: rework
+    rf004_interface_review_attempt_7_head: 96daa3a5dffa6b80b2b5687b9cd0429ffaa402c8
+    rf004_interface_review_attempt_8: DBG-RVW-001-005-015
+    rf004_interface_review_attempt_8_status: rework
+    rf004_interface_review_attempt_8_head: 18c0a26cad4c2d82e4a23ef0ec3e6409b022cb95
+    rf004_interface_review_attempt_9: DBG-RVW-001-005-016
+    rf004_interface_review_attempt_9_status: rework
+    rf004_interface_review_attempt_9_head: e330a7b344715dfdbae0de46e44f4720b4387d4e
+    rf004_interface_review_attempt_10: DBG-RVW-001-005-017
+    rf004_interface_review_attempt_10_status: rework
+    rf004_interface_review_attempt_10_head: cb88b62b7c45ea6ebfe31c40e522daa3adcf8896
+    rf004_interface_review_attempt_11: DBG-RVW-001-005-018
+    rf004_interface_review_attempt_11_status: rework
+    rf004_interface_review_attempt_11_head: 08719457a341b01ca8f64ea568e1ab04678dd10d
+    rf004_interface_review_attempt_12: DBG-RVW-001-005-019
+    rf004_interface_review_attempt_12_status: pass
+    rf004_interface_review_attempt_12_head: 058c3383593553aa1497d024d41285d44d9c67a8
+    rf004_prior_interface_frozen_head: 058c3383593553aa1497d024d41285d44d9c67a8
+    rf004_refreeze_candidate_head: 94a59f3738fadc0b6230fc3dc69cf36ca8b9202e
+    rf004_refreeze_review: DBG-RVW-001-005-028
+    rf004_refreeze_review_status: rework
+    rf004_corrected_refreeze_candidate_head: 4c581a740ee95c3362aa77de85630ba001013e1c
+    rf004_refreeze_rereview: DBG-RVW-001-005-029
+    rf004_refreeze_rereview_status: rework_trace_only
+    rf004_refreeze_rereviewed_coordination_head: ed23423814d58fe3c03b252084d43d2464a46118
+    rf004_trace_corrected_refreeze_candidate_head: ae49435ebb24198ad1fb2017e5998bbad305792f
+    rf004_refreeze_review_3: DBG-RVW-001-005-030
+    rf004_refreeze_review_3_status: pass
+    rf004_refreeze_review_3_coordination_head: 39f6a2efca83a584b554ecd818c9d31319304143
+    rf004_interface_frozen_head_1_1: ae49435ebb24198ad1fb2017e5998bbad305792f
+    rf004_refreeze_conformance: DBG-CF-001-005-001
+    rf004_frame_refreeze_candidate_head: cb575ac0920bec8cc7ddd5565df9544b746f069b
+    rf004_frame_refreeze_review: DBG-RVW-001-005-031
+    rf004_frame_refreeze_review_status: rework_trace_only
+    rf004_frame_refreeze_reviewed_coordination_head: b4f95e4f3b4094f3bdfbc912207772f85c6c9a92
+    rf004_frame_trace_corrected_candidate_head: f79eb6298798250e7aca7e0266b1948af7903138
+    rf004_frame_refreeze_rereview: DBG-RVW-001-005-032
+    rf004_frame_refreeze_rereview_status: pass
+    rf004_frame_refreeze_rereview_coordination_head: 0ebd8ef8b4a3d70543e7ee8ac445b107d6589da9
+    rf004_interface_frozen_head_1_2: f79eb6298798250e7aca7e0266b1948af7903138
+    rf004_frame_refreeze_conformance: DBG-CF-001-005-002
+    rf005_dependency_clarification_issue: 42
+    rf005_dependency_clarification_comment: 5362515750
     portable_contract_gate: complete_accepted_frozen
     rf002_parent_review_attempt_6: DBG-RVW-002-001-006
     rf002_parent_review_attempt_6_status: rework_trace_only
   DBG-RF-002:
     issue: 39
-    status: complete_parent_signed
+    status: complete_steering_accepted
     final_review: DBG-RVW-002-001-007
     final_review_status: pass
     final_verification: DBG-VER-002-001-001
@@ -183,9 +255,10 @@ issues:
     shared_interface: dbg.controller-gateway/1.1
     resume_base: 0cf52fcf69d11f254b957cfc52605a8be3114955
     steering_comment: 5356484309
+    steering_completion_comment: 5362514094
   DBG-RF-003:
     issue: 40
-    status: complete_parent_signed
+    status: complete_steering_accepted
     final_review: DBG-RVW-003-001-006
     final_review_status: pass
     parent_verification_attempt_1: DBG-VER-003-001-001
@@ -197,12 +270,211 @@ issues:
     shared_interface: dbg.controller-gateway/1.1
     resume_base: 0cf52fcf69d11f254b957cfc52605a8be3114955
     steering_comment: 5356484309
+    steering_completion_comment: 5362514094
   DBG-RF-004:
     issue: 41
-    status: blocked_pending_later_steering_authorization_and_dependencies
+    status: slice005_blocked_awaiting_steering_recipe_result_decision
+    draft_pull_request: 50
+    draft_pull_request_url: https://github.com/Hans-Einar/HSX/pull/50
+    draft_pull_request_base: codex/dbg-rf-002-003
+    draft_pull_request_head: 31322e3a722fd575a02be2a65419f2e20882172a
+    steering_progress_issue: 38
+    steering_progress_summary_comment: 5372569290
+    iteration: DBG-IT-001-005
+    slices: DBG-SL-001-005-001..DBG-SL-001-005-007
+    execution_order: DBG-SL-001-005-001,DBG-SL-001-005-002,DBG-SL-001-005-007,DBG-SL-001-005-003,DBG-SL-001-005-004,DBG-SL-001-005-005,DBG-SL-001-005-006
+    public_interface: dbg.resolver-inspection/1.2
+    prior_public_interface: dbg.resolver-inspection/1.1
+    slice001_implementation_head: a9a22fc4750f22d774eade43810a499dd1992859
+    slice001_initial_review: DBG-RVW-001-005-001
+    slice001_initial_review_status: rework
+    slice001_corrective_review: DBG-RVW-001-005-020
+    slice001_corrected_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
+    slice001_corrective_review_status: pass
+    slice001_verification_attempt_1: DBG-VER-001-005-001
+    slice001_verification_attempt_1_status: fail_trace_only
+    slice001_verification_attempt_2: DBG-VER-001-005-008
+    slice001_verification_attempt_2_status: fail_trace_only
+    slice001_final_verification: DBG-VER-001-005-009
+    slice001_final_verification_status: pass
+    slice001_signoff_status: pass
+    slice001_signed_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
+    active_slice: DBG-SL-001-005-005
+    active_slice_status: blocked_frozen_hsx_recipe_result_conflict
+    active_slice_discovery_head: 943b8d4d111304638989e429863bece8323b4b08
+    active_slice_blocker: DBG-BLK-001-005-003
+    active_slice_blocker_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/009--RF004_Stack_Register_Result_Steering_Blocker.md
+    active_slice_blocker_published_head: 43c9cfaa8bd75a3bd098c3be5df8647612b3f51a
+    active_slice_blocker_comment: 5373731599
+    active_slice_blocker_status: published_awaiting_steering
+    active_slice_product_changes: none
+    slice004_implementation_head: c0f975c4a278cecd89e19d332ca5601b074a115e
+    slice004_implementation_parent: d575299e81b1d1d29f75c9f0a5d2d43005fa8d11
+    slice004_focused_evidence: 29_passed_3_classified_skips
+    slice003_implementation_head: 196111030e0f25e861d03f5dffd159f52c10622a
+    slice003_implementation_parent: fdd6e4635615b2fc203a4de312b8ef4edc4fba45
+    slice003_focused_evidence: 29_passed
+    slice003_initial_review: DBG-RVW-001-005-003
+    slice003_initial_review_status: rework
+    slice003_initial_review_coordination_head: 4af2250436687ea62f783989d8f486504ad1adf8
+    slice003_corrected_head: a335789759a68dfd8bef01dbdf59591b096307d3
+    slice003_corrective_focused_evidence: 31_passed
+    slice003_corrective_review: DBG-RVW-001-005-035
+    slice003_corrective_review_status: pass
+    slice003_corrective_review_coordination_head: 0ceb250ca87d7df11d2fa2d9714b0af59a2eef3a
+    slice003_verification_attempt_1: DBG-VER-001-005-003
+    slice003_verification_attempt_1_status: fail_trace_only
+    slice003_verification_attempt_1_coordination_head: f7a772b580ba0dfa99d3c12693119242ccbe2792
+    slice003_final_verification: DBG-VER-001-005-010
+    slice003_final_verification_status: pass
+    slice003_final_verification_coordination_head: fffe766b8d4257bef4375973e16ff01364befca5
+    slice003_signoff_status: pass
+    slice003_signed_head: a335789759a68dfd8bef01dbdf59591b096307d3
+    slice004_initial_review: DBG-RVW-001-005-004
+    slice004_initial_review_status: rework
+    slice004_initial_review_coordination_head: 54196e271dbc83b99bbf9f02286f45e8491a1fb5
+    slice004_corrected_head: 3d1f2e8a98308835162702c579dda1dc3ef40900
+    slice004_corrective_focused_evidence: 30_passed_3_classified_skips
+    slice004_corrective_review: DBG-RVW-001-005-036
+    slice004_corrective_review_status: pass
+    slice004_corrective_review_coordination_head: c0a880b0b88fb86b8cfe45262dacf2d208ac11e1
+    slice004_verification_attempt_1: DBG-VER-001-005-004
+    slice004_verification_attempt_1_status: fail_trace_only
+    slice004_verification_attempt_1_coordination_head: c848bfc3bd82f0953fc00c0b5df6c0eb7036bd16
+    slice004_verification_attempt_2: DBG-VER-001-005-011
+    slice004_verification_attempt_2_status: fail_trace_only
+    slice004_verification_attempt_2_coordination_head: c0a024b598a3f9b7b3f355b2e4c1dea919c27d98
+    slice004_final_verification: DBG-VER-001-005-012
+    slice004_final_verification_status: pass
+    slice004_final_verification_coordination_head: 346a5612bf9e0ceb2743a2590d8a72e546bb5a4f
+    slice004_signoff_status: pass
+    slice004_signed_head: 3d1f2e8a98308835162702c579dda1dc3ef40900
+    active_slice_review: DBG-RVW-001-005-005
+    active_slice_review_status: planned
+    active_slice_verification: DBG-VER-001-005-005
+    slice007_verification_status: pass
+    slice007_verification_coordination_head: 86f43d8241f8ff504c7fd25afceed43d2f9c0b77
+    slice007_signoff_status: pass
+    slice007_signed_head: 3228c9b23dcd8fa08a81499181e2ea9b55a0f5f0
+    slice007_implementation_head: ec75c4eb22333368cbe4847920dc4420fe8231cf
+    slice007_initial_review: DBG-RVW-001-005-011
+    slice007_initial_review_status: rework
+    slice007_corrective_review: DBG-RVW-001-005-033
+    slice007_corrective_review_status: rework_trace_only
+    slice007_corrected_head: 3228c9b23dcd8fa08a81499181e2ea9b55a0f5f0
+    slice007_blocker: DBG-BLK-001-005-002
+    slice007_blocker_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/007--RF004_Location_Frame_Evidence_Steering_Blocker.md
+    slice007_blocker_comment: 5369244294
+    slice007_refreeze_comment: 5370574104
+    slice007_blocker_status: closed_refreeze_review_pass
+    frame_refreeze_candidate_head: cb575ac0920bec8cc7ddd5565df9544b746f069b
+    frame_refreeze_interface_review: DBG-RVW-001-005-031
+    frame_refreeze_interface_review_status: rework_trace_only
+    frame_refreeze_reviewed_content_head: cb575ac0920bec8cc7ddd5565df9544b746f069b
+    frame_refreeze_reviewed_coordination_head: b4f95e4f3b4094f3bdfbc912207772f85c6c9a92
+    frame_trace_corrected_candidate_head: f79eb6298798250e7aca7e0266b1948af7903138
+    frame_refreeze_interface_rereview: DBG-RVW-001-005-032
+    frame_refreeze_interface_rereview_status: pass
+    frame_refreeze_rereview_content_head: f79eb6298798250e7aca7e0266b1948af7903138
+    frame_refreeze_rereview_coordination_head: 0ebd8ef8b4a3d70543e7ee8ac445b107d6589da9
+    interface_frozen_head_1_2: f79eb6298798250e7aca7e0266b1948af7903138
+    frame_refreeze_conformance: DBG-CF-001-005-002
+    slice002_initial_implementation_head: 4b5837644dc1196accfd8608bc3dbd20980476bb
+    slice002_initial_review: DBG-RVW-001-005-002
+    slice002_initial_review_status: rework
+    slice002_corrective_review: DBG-RVW-001-005-021
+    slice002_corrected_head: 4280bc6008385042bdff923bd8e5392a1c290fdc
+    slice002_corrective_review_status: rework
+    slice002_corrective_review_2: DBG-RVW-001-005-022
+    slice002_corrected_head_2: 6c933ea6b11e42d58da52faf0997f8c978dad54b
+    slice002_corrective_review_2_status: rework_trace_only
+    slice002_corrective_review_3: DBG-RVW-001-005-023
+    slice002_corrective_review_3_status: rework
+    slice002_corrected_head_3: 373d786a983252d5b1735b599596293557adba5a
+    slice002_corrective_review_4: DBG-RVW-001-005-024
+    slice002_corrective_review_4_status: rework
+    slice002_corrective_reviewed_head_4: 373d786a983252d5b1735b599596293557adba5a
+    slice002_corrected_head_4: bbc5c8ba3be960bcb7d522edbf3d5ae12dbe8c2a
+    slice002_corrective_review_5: DBG-RVW-001-005-025
+    slice002_corrective_review_5_status: rework
+    slice002_corrective_reviewed_head_5: bbc5c8ba3be960bcb7d522edbf3d5ae12dbe8c2a
+    slice002_corrected_head_5: 0bedb2d110147f3f34c5846d14ee9b9581926f2d
+    slice002_corrective_review_6: DBG-RVW-001-005-026
+    slice002_corrective_review_6_status: rework
+    slice002_corrective_reviewed_head_6: 0bedb2d110147f3f34c5846d14ee9b9581926f2d
+    slice002_corrective_review_7: DBG-RVW-001-005-027
+    slice002_corrective_review_7_status: pass
+    slice002_corrective_review_7_coordination_head: 6779e241d9223c949ffe1addc70e86d4328b8f07
+    slice002_post_refreeze_corrected_head: c7bc39057469f1aa62a78f409753ec0213631214
+    slice002_verification_status: pass
+    slice002_verification_coordination_head: db01d0a247f1ac04fbfb2b80e5f95bdc55080450
+    slice002_signoff_status: pass
+    slice002_signed_head: c7bc39057469f1aa62a78f409753ec0213631214
+    steering_blocker: DBG-BLK-001-005-001
+    steering_blocker_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/005--RF004_Enum_Immutability_Steering_Blocker.md
+    steering_blocker_comment: 5365959417
+    steering_refreeze_comment: 5368017338
+    steering_blocker_status: closed_refreeze_review_pass
+    refreeze_interface_review: DBG-RVW-001-005-028
+    refreeze_interface_review_status: rework
+    refreeze_reviewed_content_head: 94a59f3738fadc0b6230fc3dc69cf36ca8b9202e
+    refreeze_reviewed_coordination_head: 7998e0a55c2a1bd648e43ca667a9678dc8af0642
+    corrected_refreeze_candidate_head: 4c581a740ee95c3362aa77de85630ba001013e1c
+    refreeze_interface_rereview: DBG-RVW-001-005-029
+    refreeze_interface_rereview_status: rework_trace_only
+    refreeze_rereviewed_coordination_head: ed23423814d58fe3c03b252084d43d2464a46118
+    trace_corrected_refreeze_candidate_head: ae49435ebb24198ad1fb2017e5998bbad305792f
+    refreeze_interface_review_3: DBG-RVW-001-005-030
+    refreeze_interface_review_3_status: pass
+    refreeze_review_3_content_head: ae49435ebb24198ad1fb2017e5998bbad305792f
+    refreeze_review_3_coordination_head: 39f6a2efca83a584b554ecd818c9d31319304143
+    interface_frozen_head_1_1: ae49435ebb24198ad1fb2017e5998bbad305792f
+    refreeze_conformance: DBG-CF-001-005-001
+    interface_review: DBG-RVW-001-005-007
+    interface_review_status: rework
+    interface_reviewed_head: 82154c614a31284723bf3e6a337c5bedfb8aba5d
+    interface_rereview: DBG-RVW-001-005-008
+    interface_rereview_status: rework
+    interface_rereviewed_head: 8d6c0f571f46a10ce6db7331618ef7600d6a8203
+    interface_review_attempt_3: DBG-RVW-001-005-009
+    interface_review_attempt_3_status: rework
+    interface_review_attempt_3_head: 07f7e16040bec1c225d263c682066f65b173e6aa
+    interface_review_attempt_4: DBG-RVW-001-005-010
+    interface_review_attempt_4_status: rework
+    interface_review_attempt_4_head: 72b06ad0bae53b70bc3d64edad91591998d2408d
+    interface_review_attempt_5: DBG-RVW-001-005-012
+    interface_review_attempt_5_status: rework
+    interface_review_attempt_5_head: 573f396e29de728f69abb0961e9b79a2fdb3c29d
+    interface_review_attempt_6: DBG-RVW-001-005-013
+    interface_review_attempt_6_status: rework
+    interface_review_attempt_6_head: 1e8fb7e74c92a69711bd48809696552cf2f982db
+    interface_review_attempt_7: DBG-RVW-001-005-014
+    interface_review_attempt_7_status: rework
+    interface_review_attempt_7_head: 96daa3a5dffa6b80b2b5687b9cd0429ffaa402c8
+    interface_review_attempt_8: DBG-RVW-001-005-015
+    interface_review_attempt_8_status: rework
+    interface_review_attempt_8_head: 18c0a26cad4c2d82e4a23ef0ec3e6409b022cb95
+    interface_review_attempt_9: DBG-RVW-001-005-016
+    interface_review_attempt_9_status: rework
+    interface_review_attempt_9_head: e330a7b344715dfdbae0de46e44f4720b4387d4e
+    interface_review_attempt_10: DBG-RVW-001-005-017
+    interface_review_attempt_10_status: rework
+    interface_review_attempt_10_head: cb88b62b7c45ea6ebfe31c40e522daa3adcf8896
+    interface_review_attempt_11: DBG-RVW-001-005-018
+    interface_review_attempt_11_status: rework
+    interface_review_attempt_11_head: 08719457a341b01ca8f64ea568e1ab04678dd10d
+    interface_review_attempt_12: DBG-RVW-001-005-019
+    interface_review_attempt_12_status: pass
+    interface_review_attempt_12_head: 058c3383593553aa1497d024d41285d44d9c67a8
+    prior_interface_frozen_head: 058c3383593553aa1497d024d41285d44d9c67a8
+    refreeze_candidate_head: 94a59f3738fadc0b6230fc3dc69cf36ca8b9202e
+    steering_authority_comment: 5362514094
   DBG-RF-005:
     issue: 42
-    status: blocked_pending_later_steering_authorization_and_dependencies
+    status: blocked_pending_rf004_accepted_interface_and_later_steering_authorization
+    depends_on_refactor: DBG-RF-004
+    depends_on_interface: dbg.resolver-inspection/1.2
+    dependency_clarification_comment: 5362515750
   DBG-RF-006:
     issue: 43
     status: blocked_pending_later_steering_authorization_and_dependencies

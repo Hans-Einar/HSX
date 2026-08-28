@@ -328,5 +328,7 @@ The current ordering remains structurally sound with these proposed refinements:
 - RF-009 consumes RF-002..RF-008 and owns final immutable-artifact/platform convergence, while
   every earlier Refactor still owns fast portable tests.
 
-These dependency refinements are part of the accepted baseline. RF-004..RF-009 remain blocked
-until later Steering decisions.
+These dependency refinements are part of the accepted baseline. Steering later authorized
+RF-004 only in issue #38 comment `5362514094`; RF-005..RF-009 remain blocked. RF-005's
+accepted-interface dependency on RF-004 is clarified durably in issue #42 comment
+`5362515750`.

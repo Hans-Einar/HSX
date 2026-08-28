@@ -76,6 +76,7 @@ relations:
       - DBG-IT-001-002
       - DBG-IT-001-003
       - DBG-IT-001-004
+      - DBG-IT-001-005
   - from: DBG-IT-001-002
     type: analyzes
     to:
@@ -144,18 +145,471 @@ relations:
     type: implemented_by_authorized_refactor
     to:
       - DBG-RF-002
+      - DBG-RF-004
+  - from: DBG-D-004
+    type: implemented_by_authorized_refactor
+    to:
+      - DBG-RF-004
   - from: DBG-D-009
     type: constrains
     to:
       - DBG-RF-002
       - DBG-RF-003
       - DBG-SL-001-004-003
+      - DBG-RF-004
   - from: DBG-IT-001-004
     type: executes
     to:
       - DBG-SL-001-004-001
       - DBG-SL-001-004-002
       - DBG-SL-001-004-003
+  - from: DBG-IT-001-005
+    type: executes
+    to:
+      - DBG-SL-001-005-001
+      - DBG-SL-001-005-002
+      - DBG-SL-001-005-007
+      - DBG-SL-001-005-003
+      - DBG-SL-001-005-004
+      - DBG-SL-001-005-005
+      - DBG-SL-001-005-006
+  - from: DBG-RF-004
+    type: implemented_by
+    to:
+      - DBG-SL-001-005-001
+      - DBG-SL-001-005-002
+      - DBG-SL-001-005-007
+      - DBG-SL-001-005-003
+      - DBG-SL-001-005-004
+      - DBG-SL-001-005-005
+      - DBG-SL-001-005-006
+  - from: DBG-RF-004
+    type: produces_interface
+    to:
+      - dbg.resolver-inspection/1.2
+    status: frozen_review032_pass_slice007_resumed
+  - from: DBG-SL-001-005-001
+    type: reviewed_by
+    to: [DBG-RVW-001-005-001]
+    status: rework
+    reviewed_head: a9a22fc4750f22d774eade43810a499dd1992859
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/041--RF004_Legacy_Oracle_Review.md
+  - from: DBG-SL-001-005-001
+    type: reviewed_by
+    to: [DBG-RVW-001-005-020]
+    status: pass
+    reviewed_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/042--RF004_Legacy_Oracle_Final_Review.md
+  - from: DBG-SL-001-005-001
+    type: verified_by
+    to: [DBG-VER-001-005-001]
+    status: fail_trace_only
+    implementation_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
+    coordination_head: 705545b38853185cba5904ea7d362683c3835fe6
+    record: SDP/Debugger/Verification/DBG-VER-001-005-001.md
+  - from: DBG-SL-001-005-001
+    type: verified_by
+    to: [DBG-VER-001-005-008]
+    status: fail_trace_only
+    implementation_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
+    coordination_head: 8085f6d977be1ca4b96c0857bae8fe49a862dbc5
+    record: SDP/Debugger/Verification/DBG-VER-001-005-008.md
+  - from: DBG-SL-001-005-001
+    type: verified_by
+    to: [DBG-VER-001-005-009]
+    status: pass
+    implementation_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
+    coordination_head: 4e33f768ddfd8fcf2c0cb61a0c0b5ad2c6ab1f98
+    record: SDP/Debugger/Verification/DBG-VER-001-005-009.md
+  - from: DBG-SL-001-005-001
+    type: signed_at
+    to: [8e5669940dd5c23df532577c39dc10bd84692ad2]
+    status: pass
+    record: SDP/Debugger/Verification/DBG-SL-001-005-001--Master_Signoff.md
+  - from: DBG-SL-001-005-002
+    type: reviewed_by
+    to: [DBG-RVW-001-005-002]
+    status: rework
+    reviewed_head: 4b5837644dc1196accfd8608bc3dbd20980476bb
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/043--RF004_Identity_Address_Review.md
+  - from: DBG-SL-001-005-002
+    type: reviewed_by
+    to: [DBG-RVW-001-005-021]
+    status: rework
+    reviewed_head: 4280bc6008385042bdff923bd8e5392a1c290fdc
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/044--RF004_Identity_Address_Rereview.md
+  - from: DBG-SL-001-005-002
+    type: reviewed_by
+    to: [DBG-RVW-001-005-022]
+    status: rework_trace_only
+    reviewed_head: 6c933ea6b11e42d58da52faf0997f8c978dad54b
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/045--RF004_Identity_Address_Review_Trace.md
+  - from: DBG-SL-001-005-002
+    type: reviewed_by
+    to: [DBG-RVW-001-005-023]
+    status: rework
+    reviewed_head: 6c933ea6b11e42d58da52faf0997f8c978dad54b
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/046--RF004_Identity_Address_Review_Attempt4.md
+  - from: DBG-SL-001-005-002
+    type: reviewed_by
+    to: [DBG-RVW-001-005-024]
+    status: rework
+    reviewed_head: 373d786a983252d5b1735b599596293557adba5a
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/047--RF004_Identity_Address_Review_Attempt5.md
+  - from: DBG-SL-001-005-002
+    type: reviewed_by
+    to: [DBG-RVW-001-005-025]
+    status: rework
+    reviewed_head: bbc5c8ba3be960bcb7d522edbf3d5ae12dbe8c2a
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/048--RF004_Identity_Address_Review_Attempt6.md
+  - from: DBG-SL-001-005-002
+    type: reviewed_by
+    to: [DBG-RVW-001-005-026]
+    status: rework
+    reviewed_head: 0bedb2d110147f3f34c5846d14ee9b9581926f2d
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/049--RF004_Identity_Address_Review_Attempt7.md
+  - from: DBG-SL-001-005-002
+    type: reviewed_by
+    to: [DBG-RVW-001-005-027]
+    status: pass
+    candidate_head: c7bc39057469f1aa62a78f409753ec0213631214
+    coordination_head: 6779e241d9223c949ffe1addc70e86d4328b8f07
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/053--RF004_Identity_Address_Post_Refreeze_Review.md
+  - from: DBG-SL-001-005-002
+    type: blocked_by
+    to: [DBG-BLK-001-005-001]
+    status: resolved_refreeze_review_030_pass
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/005--RF004_Enum_Immutability_Steering_Blocker.md
+  - from: DBG-BLK-001-005-001
+    type: requires_steering_decision_on
+    to: [dbg.resolver-inspection/1.1]
+    status: resolved_by_steering_refreeze_and_review_030_pass
+    issue: 38
+    escalation_comment: 5365959417
+    resolution_comment: 5368017338
+  - from: dbg.resolver-inspection/1.1
+    type: conforms_via
+    to: [DBG-CF-001-005-001]
+    status: refrozen_candidate
+  - from: dbg.resolver-inspection/1.1
+    type: reviewed_by
+    to: [DBG-RVW-001-005-028]
+    status: rework
+    candidate_head: 94a59f3738fadc0b6230fc3dc69cf36ca8b9202e
+    coordination_head: 7998e0a55c2a1bd648e43ca667a9678dc8af0642
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/050--RF004_Interface_1_1_Review.md
+  - from: dbg.resolver-inspection/1.1
+    type: reviewed_by
+    to: [DBG-RVW-001-005-029]
+    status: rework_trace_only
+    candidate_head: 4c581a740ee95c3362aa77de85630ba001013e1c
+    coordination_head: ed23423814d58fe3c03b252084d43d2464a46118
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/051--RF004_Interface_1_1_Rereview.md
+  - from: dbg.resolver-inspection/1.1
+    type: reviewed_by
+    to: [DBG-RVW-001-005-030]
+    status: pass
+    candidate_head: ae49435ebb24198ad1fb2017e5998bbad305792f
+    coordination_head: 39f6a2efca83a584b554ecd818c9d31319304143
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/052--RF004_Interface_1_1_Final_Review.md
+  - from: DBG-SL-001-005-002
+    type: resumes_after
+    to: [DBG-RVW-001-005-030]
+    status: satisfied
+  - from: DBG-SL-001-005-002
+    type: verified_by
+    to: [DBG-VER-001-005-002]
+    status: pass
+    implementation_head: c7bc39057469f1aa62a78f409753ec0213631214
+    coordination_head: db01d0a247f1ac04fbfb2b80e5f95bdc55080450
+    record: SDP/Debugger/Verification/DBG-VER-001-005-002.md
+  - from: DBG-SL-001-005-002
+    type: signed_at
+    to: [c7bc39057469f1aa62a78f409753ec0213631214]
+    status: pass
+    record: SDP/Debugger/Verification/DBG-SL-001-005-002--Master_Signoff.md
+  - from: DBG-SL-001-005-007
+    type: blocked_by
+    to: [DBG-BLK-001-005-002]
+    status: resolved_refreeze_review032_pass
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/007--RF004_Location_Frame_Evidence_Steering_Blocker.md
+  - from: DBG-BLK-001-005-002
+    type: requires_steering_decision_on
+    to: [dbg.resolver-inspection/1.2]
+    status: resolved_by_steering_refreeze_and_review032_pass
+    issue: 38
+    escalation_comment: 5369244294
+    resolution_comment: 5370574104
+  - from: dbg.resolver-inspection/1.2
+    type: conforms_via
+    to: [DBG-CF-001-005-002]
+    status: refrozen_candidate
+  - from: dbg.resolver-inspection/1.2
+    type: reviewed_by
+    to: [DBG-RVW-001-005-031]
+    status: rework_trace_only
+    candidate_head: cb575ac0920bec8cc7ddd5565df9544b746f069b
+    coordination_head: b4f95e4f3b4094f3bdfbc912207772f85c6c9a92
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/054--RF004_Interface_1_2_Review.md
+  - from: dbg.resolver-inspection/1.2
+    type: reviewed_by
+    to: [DBG-RVW-001-005-032]
+    status: pass
+    candidate_head: f79eb6298798250e7aca7e0266b1948af7903138
+    coordination_head: 0ebd8ef8b4a3d70543e7ee8ac445b107d6589da9
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/055--RF004_Interface_1_2_Final_Review.md
+  - from: DBG-SL-001-005-007
+    type: resumes_after
+    to: [DBG-RVW-001-005-032]
+    status: satisfied
+    issue: 38
+    comment: 5370574104
+  - from: DBG-SL-001-005-003
+    type: reviewed_by
+    to: [DBG-RVW-001-005-003]
+    status: rework
+    product_head: 196111030e0f25e861d03f5dffd159f52c10622a
+    coordination_head: 4af2250436687ea62f783989d8f486504ad1adf8
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/059--RF004_Artifact_Index_Review.md
+  - from: DBG-SL-001-005-003
+    type: corrective_reviewed_by
+    to: [DBG-RVW-001-005-035]
+    status: pass
+    product_head: a335789759a68dfd8bef01dbdf59591b096307d3
+    coordination_head: 0ceb250ca87d7df11d2fa2d9714b0af59a2eef3a
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/060--RF004_Artifact_Index_Final_Review.md
+  - from: DBG-SL-001-005-003
+    type: verified_by
+    to: [DBG-VER-001-005-003]
+    status: fail_trace_only
+    coordination_head: f7a772b580ba0dfa99d3c12693119242ccbe2792
+    record: SDP/Debugger/Verification/DBG-VER-001-005-003.md
+  - from: DBG-SL-001-005-003
+    type: final_verified_by
+    to: [DBG-VER-001-005-010]
+    status: pass
+    product_head: a335789759a68dfd8bef01dbdf59591b096307d3
+    coordination_head: fffe766b8d4257bef4375973e16ff01364befca5
+    record: SDP/Debugger/Verification/DBG-VER-001-005-010.md
+  - from: DBG-SL-001-005-004
+    type: resumes_after
+    to: [DBG-SL-001-005-003]
+    status: satisfied_exact_head_signed
+    signed_dependency_head: a335789759a68dfd8bef01dbdf59591b096307d3
+  - from: DBG-SL-001-005-004
+    type: reviewed_by
+    to: [DBG-RVW-001-005-004]
+    status: rework
+    product_head: c0f975c4a278cecd89e19d332ca5601b074a115e
+    coordination_head: 54196e271dbc83b99bbf9f02286f45e8491a1fb5
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/061--RF004_Source_Resolver_Review.md
+  - from: DBG-SL-001-005-004
+    type: corrective_reviewed_by
+    to: [DBG-RVW-001-005-036]
+    status: pass
+    product_head: 3d1f2e8a98308835162702c579dda1dc3ef40900
+    coordination_head: c0a880b0b88fb86b8cfe45262dacf2d208ac11e1
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/062--RF004_Source_Resolver_Final_Review.md
+  - from: DBG-SL-001-005-004
+    type: verified_by
+    to: [DBG-VER-001-005-004]
+    status: fail_trace_only
+    coordination_head: c848bfc3bd82f0953fc00c0b5df6c0eb7036bd16
+    record: SDP/Debugger/Verification/DBG-VER-001-005-004.md
+  - from: DBG-SL-001-005-004
+    type: final_verified_by
+    to: [DBG-VER-001-005-011]
+    status: fail_trace_only
+    coordination_head: c0a024b598a3f9b7b3f355b2e4c1dea919c27d98
+    record: SDP/Debugger/Verification/DBG-VER-001-005-011.md
+  - from: DBG-SL-001-005-004
+    type: final_verified_by
+    to: [DBG-VER-001-005-012]
+    status: pass
+    product_head: 3d1f2e8a98308835162702c579dda1dc3ef40900
+    coordination_head: 346a5612bf9e0ceb2743a2590d8a72e546bb5a4f
+    record: SDP/Debugger/Verification/DBG-VER-001-005-012.md
+  - from: DBG-SL-001-005-005
+    type: resumes_after
+    to: [DBG-SL-001-005-004]
+    status: satisfied_exact_head_signed
+    signed_dependency_head: 3d1f2e8a98308835162702c579dda1dc3ef40900
+  - from: DBG-SL-001-005-005
+    type: requires_steering_decision_on
+    to: [DBG-BLK-001-005-003]
+    status: published_awaiting_steering
+    issue: 38
+    comment: 5373731599
+    published_head: 43c9cfaa8bd75a3bd098c3be5df8647612b3f51a
+  - from: DBG-BLK-001-005-003
+    type: conflicts_between
+    to:
+      - HSX-D-002
+      - dbg.resolver-inspection/1.2
+    topic: caller_register_memory_recipe_result_type
+  - from: DBG-SL-001-005-005
+    type: reviewed_by
+    to: [DBG-RVW-001-005-005]
+    status: planned
+  - from: DBG-SL-001-005-005
+    type: verified_by
+    to: [DBG-VER-001-005-005]
+    status: planned
+  - from: DBG-SL-001-005-006
+    type: reviewed_by
+    to: [DBG-RVW-001-005-006]
+    status: planned
+  - from: DBG-SL-001-005-006
+    type: verified_by
+    to: [DBG-VER-001-005-006]
+    status: planned
+  - from: DBG-SL-001-005-007
+    type: reviewed_by
+    to: [DBG-RVW-001-005-011]
+    status: rework
+    candidate_head: ec75c4eb22333368cbe4847920dc4420fe8231cf
+    coordination_head: 76d44110156b68e63fac448e38847e6cce28a716
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/056--RF004_Recipe_Foundation_Review.md
+  - from: DBG-SL-001-005-007
+    type: reviewed_by
+    to: [DBG-RVW-001-005-033]
+    status: rework_trace_only
+    candidate_head: 3228c9b23dcd8fa08a81499181e2ea9b55a0f5f0
+    coordination_head: d517a5be51eed7a3293f26e7cf8dae511dd907c3
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/057--RF004_Recipe_Foundation_Rereview.md
+  - from: DBG-SL-001-005-007
+    type: reviewed_by
+    to: [DBG-RVW-001-005-034]
+    status: pass
+    candidate_head: 3228c9b23dcd8fa08a81499181e2ea9b55a0f5f0
+    coordination_head: d045fb29dd7c94535d99134779cef07943b5196f
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/058--RF004_Recipe_Foundation_Final_Review.md
+  - from: DBG-SL-001-005-007
+    type: verified_by
+    to: [DBG-VER-001-005-007]
+    status: pass
+    implementation_head: 3228c9b23dcd8fa08a81499181e2ea9b55a0f5f0
+    coordination_head: 86f43d8241f8ff504c7fd25afceed43d2f9c0b77
+    record: SDP/Debugger/Verification/DBG-VER-001-005-007.md
+  - from: DBG-SL-001-005-007
+    type: signed_at
+    to: [3228c9b23dcd8fa08a81499181e2ea9b55a0f5f0]
+    status: pass
+    record: SDP/Debugger/Verification/DBG-SL-001-005-007--Master_Signoff.md
+  - from: DBG-SL-001-005-001
+    type: prerequisite_for
+    to: [DBG-SL-001-005-002]
+  - from: DBG-SL-001-005-002
+    type: prerequisite_for
+    to: [DBG-SL-001-005-007]
+  - from: DBG-SL-001-005-007
+    type: prerequisite_for
+    to: [DBG-SL-001-005-003]
+  - from: DBG-SL-001-005-003
+    type: prerequisite_for
+    to: [DBG-SL-001-005-004]
+  - from: DBG-SL-001-005-004
+    type: prerequisite_for
+    to: [DBG-SL-001-005-005]
+  - from: DBG-SL-001-005-005
+    type: prerequisite_for
+    to: [DBG-SL-001-005-006]
+  - from: dbg.resolver-inspection/1
+    type: reviewed_by
+    to:
+      - DBG-RVW-001-005-007
+    status: rework
+    reviewed_head: 82154c614a31284723bf3e6a337c5bedfb8aba5d
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/029--RF004_Interface_Review.md
+  - from: dbg.resolver-inspection/1
+    type: reviewed_by
+    to:
+      - DBG-RVW-001-005-008
+    status: rework
+    reviewed_head: 8d6c0f571f46a10ce6db7331618ef7600d6a8203
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/030--RF004_Interface_Rereview.md
+  - from: dbg.resolver-inspection/1
+    type: reviewed_by
+    to:
+      - DBG-RVW-001-005-009
+    status: rework
+    reviewed_head: 07f7e16040bec1c225d263c682066f65b173e6aa
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/031--RF004_Interface_Review_Attempt3.md
+  - from: dbg.resolver-inspection/1
+    type: reviewed_by
+    to:
+      - DBG-RVW-001-005-010
+    status: rework
+    reviewed_head: 72b06ad0bae53b70bc3d64edad91591998d2408d
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/032--RF004_Interface_Review_Attempt4.md
+  - from: dbg.resolver-inspection/1
+    type: reviewed_by
+    to:
+      - DBG-RVW-001-005-012
+    status: rework
+    reviewed_head: 573f396e29de728f69abb0961e9b79a2fdb3c29d
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/033--RF004_Interface_Review_Attempt5.md
+  - from: dbg.resolver-inspection/1
+    type: reviewed_by
+    to:
+      - DBG-RVW-001-005-013
+    status: rework
+    reviewed_head: 1e8fb7e74c92a69711bd48809696552cf2f982db
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/034--RF004_Interface_Review_Attempt6.md
+  - from: dbg.resolver-inspection/1
+    type: reviewed_by
+    to:
+      - DBG-RVW-001-005-014
+    status: rework
+    reviewed_head: 96daa3a5dffa6b80b2b5687b9cd0429ffaa402c8
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/035--RF004_Interface_Review_Attempt7.md
+  - from: dbg.resolver-inspection/1
+    type: reviewed_by
+    to:
+      - DBG-RVW-001-005-015
+    status: rework
+    reviewed_head: 18c0a26cad4c2d82e4a23ef0ec3e6409b022cb95
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/036--RF004_Interface_Review_Attempt8.md
+  - from: dbg.resolver-inspection/1
+    type: reviewed_by
+    to:
+      - DBG-RVW-001-005-016
+    status: rework
+    reviewed_head: e330a7b344715dfdbae0de46e44f4720b4387d4e
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/037--RF004_Interface_Review_Attempt9.md
+  - from: dbg.resolver-inspection/1
+    type: reviewed_by
+    to:
+      - DBG-RVW-001-005-017
+    status: rework
+    reviewed_head: cb88b62b7c45ea6ebfe31c40e522daa3adcf8896
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/038--RF004_Interface_Review_Attempt10.md
+  - from: dbg.resolver-inspection/1
+    type: reviewed_by
+    to:
+      - DBG-RVW-001-005-018
+    status: rework
+    reviewed_head: 08719457a341b01ca8f64ea568e1ab04678dd10d
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/039--RF004_Interface_Review_Attempt11.md
+  - from: dbg.resolver-inspection/1
+    type: reviewed_by
+    to:
+      - DBG-RVW-001-005-019
+    status: pass
+    reviewed_head: 058c3383593553aa1497d024d41285d44d9c67a8
+    record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/040--RF004_Interface_Final_Review.md
+  - from: dbg.resolver-inspection/1
+    type: frozen_at
+    to:
+      - 058c3383593553aa1497d024d41285d44d9c67a8
+    status: pass
+  - from: DBG-RF-005
+    type: depends_on_accepted_interface
+    to:
+      - dbg.resolver-inspection/1.2
+    status: blocked_pending_rf004_parent_signoff_and_steering
+    authority_issue: 42
+    authority_comment: 5362515750
   - from: DBG-RF-002
     type: implemented_by
     to:
@@ -182,6 +636,10 @@ relations:
       - f52447ab7dcf6b1ddcca5934be0c8516d5255a14
     product_head: a0640203a1a87c7acb080c75286ef09808e5195c
     status: pass
+  - from: DBG-RF-002
+    type: steering_accepted_complete
+    to: [issue-38-comment-5362514094]
+    status: complete
   - from: DBG-SL-001-004-001
     type: reviewed_by
     to:
@@ -226,6 +684,10 @@ relations:
       - f52447ab7dcf6b1ddcca5934be0c8516d5255a14
     product_head: 1e479536ce5e746e1b06a53b1039b1af84adaed6
     status: pass
+  - from: DBG-RF-003
+    type: steering_accepted_complete
+    to: [issue-38-comment-5362514094]
+    status: complete
   - from: DBG-SL-001-004-002
     type: reviewed_by
     to:
@@ -278,6 +740,10 @@ relations:
       - 860a98a68440b8e22b67f03fbdbb93d2dd33ab7a
       - 1e479536ce5e746e1b06a53b1039b1af84adaed6
     status: dependency_revalidated_pass
+  - from: DBG-SL-001-004-003
+    type: steering_accepted_complete
+    to: [issue-38-comment-5362514094]
+    status: complete
   - from: dbg.controller-gateway/1
     type: blocked_by
     to:
@@ -319,17 +785,22 @@ relations:
       - DBG-SL-001-004-001
       - DBG-SL-001-004-002
       - DBG-SL-001-004-003
-    status: first_wave_complete_awaiting_steering
+    status: first_wave_complete_steering_accepted
   - from: DBG-IT-001-004
     type: published_on_remote_branch
     to:
-      - origin/codex/dbg-rf-002-003@b0a9e8161bebac6b9eb1a0bba9003c82fd21fa8c
+      - origin/codex/dbg-rf-002-003@69a54aeb3394d3cd4792bce620748e15bab69f1f
     status: pass
   - from: DBG-IT-001-004
     type: fresh_remote_checkout_verified_at
     to:
-      - origin/codex/dbg-rf-002-003@b0a9e8161bebac6b9eb1a0bba9003c82fd21fa8c
+      - origin/codex/dbg-rf-002-003@69a54aeb3394d3cd4792bce620748e15bab69f1f
     status: pass
+  - from: DBG-IT-001-004
+    type: steering_accepted_complete
+    to:
+      - issue-38-comment-5362514094
+    status: complete
   - from: DBG-RF-001
     type: implemented_by
     to:
@@ -386,6 +857,7 @@ relations:
   - from: DBG-RF-004
     type: prerequisite_for
     to:
+      - DBG-RF-005
       - DBG-RF-006
       - DBG-RF-007
   - from: DBG-RF-005
@@ -436,8 +908,11 @@ cross_track_dependencies:
     to:
       - HSX-ST-001
     required_contract: portable_address_model
-    blocks:
+    historical_blocked_before_hsx_acceptance:
       - DBG-RF-004
+    status: satisfied_by_issue_47_comment_5356480919
+    later_authorized_refactor: DBG-RF-004
+    authorization_comment: 5362514094
   - from: DBG-R-016..DBG-R-020
     type: requires_stable_contract_from
     to:
@@ -458,9 +933,10 @@ cross_track_dependencies:
       - HSX-ST-008
     required_contract: portable_debug_runtime_semantics
     status: satisfied_by_issue_47_comment_5356480919
-    unblocks_authorized_wave:
+    unblocks_authorized_refactors:
       - DBG-RF-002
       - DBG-RF-003
+      - DBG-RF-004
     implementation_guard: current_executive_legacy_degraded_only
 proposed_dependency_changes:
   status: accepted_frozen_debugger_v1
@@ -469,6 +945,8 @@ proposed_dependency_changes:
       type: prerequisite_for
       to:
         - DBG-RF-005
+      required_interface: dbg.resolver-inspection/1.2
+      acceptance_gate: rf004_parent_signoff_remote_publication_and_later_steering_authorization
     - from: DBG-RF-005
       type: prerequisite_for
       to:

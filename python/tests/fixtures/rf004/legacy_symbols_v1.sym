@@ -1,0 +1,172 @@
+{
+  "version": 1,
+  "hxe_path": "artifacts/oracle.hxe",
+  "hxe_crc": 305419896,
+  "symbols": {
+    "functions": [
+      {
+        "name": "main",
+        "linkage_name": "_main",
+        "address": 256,
+        "size": 32,
+        "file": "src/main.c",
+        "line": 10
+      },
+      {
+        "name": "shared",
+        "address": 288,
+        "size": 8,
+        "file": "src/shared.c",
+        "line": 3
+      },
+      {
+        "name": "wide_address",
+        "address": 65568,
+        "size": 4,
+        "file": "src/wide.c",
+        "line": 30
+      }
+    ],
+    "variables": [
+      {
+        "name": "global_counter",
+        "address": 8192,
+        "size": 4,
+        "type": "i32"
+      },
+      {
+        "name": "shared",
+        "address": 296,
+        "size": 4,
+        "type": "i32"
+      }
+    ],
+    "locals": [
+      {
+        "name": "counter",
+        "function": "main",
+        "file": "src/main.c",
+        "directory": "build/project",
+        "line": 11,
+        "scope": "main:block0",
+        "locations": [
+          {
+            "start": 256,
+            "end": 272,
+            "location": {
+              "kind": "stack",
+              "offset": -4,
+              "size": 4
+            }
+          },
+          {
+            "start": 272,
+            "end": 288,
+            "location": {
+              "kind": "register",
+              "name": "R5",
+              "index": 5,
+              "size": 4
+            }
+          }
+        ]
+      }
+    ],
+    "labels": {
+      "0x124": [
+        "shared",
+        "loop"
+      ]
+    }
+  },
+  "instructions": [
+    {
+      "pc": 256,
+      "word": 16909060,
+      "mvasm_line": 7,
+      "ordinal": 0,
+      "function": "main",
+      "file": "src/main.c",
+      "directory": "build/project",
+      "file_id": 1,
+      "line": 10,
+      "column": 3,
+      "source_kind": "source"
+    },
+    {
+      "pc": 260,
+      "word": 286331153,
+      "mvasm_line": 8,
+      "ordinal": 1,
+      "function": "main",
+      "file": "src/main.c",
+      "directory": "build/project",
+      "file_id": 1,
+      "line": 12,
+      "column": 5,
+      "source_kind": "source"
+    },
+    {
+      "pc": 264,
+      "word": 572662306,
+      "mvasm_line": 9,
+      "ordinal": 2,
+      "function": "main",
+      "file": "src/main.c",
+      "directory": "build/project",
+      "file_id": 1,
+      "line": 12,
+      "column": 9,
+      "source_kind": "source"
+    },
+    {
+      "pc": 272,
+      "file": "src/Case.c",
+      "directory": "build/project",
+      "line": 50,
+      "function": "case_upper"
+    },
+    {
+      "pc": 276,
+      "file": "src/case.c",
+      "directory": "build/project",
+      "line": 50,
+      "function": "case_lower"
+    },
+    {
+      "pc": 280,
+      "file": "src/alpha/unit.c",
+      "directory": "build/project",
+      "line": 40,
+      "function": "alpha"
+    },
+    {
+      "pc": 284,
+      "file": "lib/beta/unit.c",
+      "directory": "build/project",
+      "line": 40,
+      "function": "beta"
+    },
+    {
+      "pc": 65540,
+      "file": "src/wide.c",
+      "directory": "build/project",
+      "line": 30,
+      "function": "wide_address"
+    }
+  ],
+  "memory_regions": [
+    {
+      "name": "code",
+      "type": "text",
+      "start": 0,
+      "end": 511
+    },
+    {
+      "name": "rodata",
+      "type": "data",
+      "start": 16384,
+      "end": 16415
+    }
+  ]
+}

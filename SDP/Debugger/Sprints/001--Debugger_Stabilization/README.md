@@ -1,6 +1,6 @@
 # DBG-SPR-001 — Debugger Stabilization
 
-- Status: ITERATION 004 FIRST WAVE COMPLETE / AWAITING STEERING
+- Status: ITERATION 005 ACTIVE — SLICES 001,002,007 SIGNED / SLICE 003 ACTIVE
 - Owning track: Debugger
 - Owning GapAnalysis: `DBG-GAP-001`
 
@@ -48,7 +48,7 @@ Steering accepted `DBG-A-001..DBG-A-008` as target architecture direction in com
 - Steering froze the portable HSX target baseline in #47 comment `5356480919` and accepted
   `DBG-ST-006` complete in #38 comment `5356484309`.
 
-## Active structural iteration
+## Completed structural iteration
 
 - `DBG-IT-001-004` — controller/gateway first structural wave
 - Authorized Refactors: `DBG-RF-002`, `DBG-RF-003`
@@ -56,7 +56,7 @@ Steering accepted `DBG-A-001..DBG-A-008` as target architecture direction in com
   `DBG-SL-001-004-003`
 - Frozen shared interface: `dbg.controller-gateway/1.1`
 - Existing Executive profile: `hsx.python-debug-legacy/1`
-- Still blocked: `DBG-RF-004..DBG-RF-009`
+- Steering accepted the remotely published wave complete in issue #38 comment `5362514094`.
 
 ## Non-goals for iteration 004
 
@@ -64,6 +64,30 @@ Steering accepted `DBG-A-001..DBG-A-008` as target architecture direction in com
 - no production DAP/CLI/VS Code migration;
 - no artifact/inspection/resource/lifecycle/source-step work;
 - no work on `DBG-RF-004..DBG-RF-009`.
+
+## Active RF-004 iteration
+
+- `DBG-IT-001-005` — typed artifact/source/address/stack/inspection
+- Authorized Refactor: `DBG-RF-004` only
+- Refrozen interface: `dbg.resolver-inspection/1.2`
+- Immutability conformance: `DBG-CF-001-005-001`
+- Recovered-frame conformance: `DBG-CF-001-005-002`
+- Frozen Slices: `DBG-SL-001-005-001..DBG-SL-001-005-007`
+- Frozen execution order: `001 -> 002 -> 007 -> 003 -> 004 -> 005 -> 006`
+- Interface reviews 007..010/012..018: REWORK; `DBG-RVW-001-005-019`: PASS at
+  `058c3383593553aa1497d024d41285d44d9c67a8`
+- Exact product base: `69a54aeb3394d3cd4792bce620748e15bab69f1f`
+- Active gate: fresh artifact Slice003 worker
+- Authority: issue #38 comment `5362514094`
+- Refreeze authority: issue #38 comment `5368017338`
+- Frame-evidence refreeze authority: issue #38 comment `5370574104`
+- Dependency clarification: issue #42 comment `5362515750`
+- Still blocked: `DBG-RF-005..DBG-RF-009`
+
+Iteration 005 is side-by-side and frontend-neutral. It may add typed identity/address/result,
+artifact/index, source resolver, recipe/stack and epoch-inspection modules plus isolated tests.
+It may not edit Executive/VM/AVR, migrate DAP/CLI/VS Code, implement resource ownership or
+lifecycle/stepping, or change a frozen design/interface.
 
 ## Completed iteration 001 exit
 

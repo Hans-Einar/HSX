@@ -399,7 +399,7 @@ publication passed. Steering froze the HSX portable target contracts in #47 comm
 
 ## DBG-IT-001-004 — Controller/Gateway First Structural Wave
 
-Status: FIRST STRUCTURAL WAVE COMPLETE / AWAITING STEERING
+Status: CLOSED — STEERING ACCEPTED / REMOTE PUBLICATION PASS
 
 ### Authority and scope
 
@@ -462,3 +462,738 @@ promote semantics in issue #38 comment `5357146230`. The frozen successor is
 implementation, all nine specified fixtures and fresh `DBG-RVW-001-004-004` are required
 before RF-002/RF-003 resume. Partial stash `efc91f2640647402bc92c69bde1c57685cfaa1f1`
 remains candidate-only and integration/RF-004..009 remain blocked.
+
+### Final closeout
+
+RF-002, RF-003 and dependent integration passed their complete worker/review/verification/
+sign-off chains. The signed ancestry through final publication head
+`69a54aeb3394d3cd4792bce620748e15bab69f1f` is remote-resolvable on
+`origin/codex/dbg-rf-002-003`; fresh-checkout contracted evidence reported `121 passed`, clean
+traceability and no product drift after the combined signed head. Steering accepted iteration
+004 and the three first-wave units complete in issue #38 comment `5362514094`.
+
+## DBG-IT-001-005 — Typed Resolver and Inspection
+
+Status: ACTIVE — SLICES 001,002,007 SIGNED / SLICE 003 ACTIVE
+
+### Authority and goal
+
+- Steering authority: issue #38 comment `5362514094`.
+- Dependency clarification: issue #42 comment `5362515750`.
+- Immutability refreeze: issue #38 comment `5368017338`.
+- Frame-evidence refreeze: issue #38 comment `5370574104`.
+- Authorized product domain: `DBG-RF-004` only.
+- Goal: frontend-neutral artifact/source/address/stack/variables/memory/disassembly services
+  under `DBG-D-003`, `DBG-D-004`, `DBG-D-009` and frozen portable HSX contracts.
+- Branch/base: `codex/dbg-rf-004` from
+  `69a54aeb3394d3cd4792bce620748e15bab69f1f`.
+- Still blocked: `DBG-RF-005..DBG-RF-009`, Executive/VM/AVR, DAP/CLI/VS Code migration.
+
+### Frozen public interface
+
+`Interfaces/004--Typed_Resolver_Inspection_Interface_v1.md` now refreezes
+`dbg.resolver-inspection/1.2`; the stable path preserves prior review history. Every
+successful/partial inspection result carries the exact
+TargetRef, LoadedImageRef, StopEpochId, StopToken and InspectionSnapshotRef. Typed HSX
+addresses use descriptor-checked spaces/ranges; best-effort live reads are explicitly degraded
+and cannot be coherent. Artifact index, source resolver, recipes/stack, epoch inspection and
+frontend mapping remain separate responsibilities.
+
+Interface review `DBG-RVW-001-005-007` returned REWORK at exact remote-published head
+`82154c614a31284723bf3e6a337c5bedfb8aba5d`. Master corrected only the candidate interface,
+Slice ownership and live traceability. Reviews 007..010 and 012..018 returned REWORK;
+`DBG-RVW-001-005-019` passed exact contract head `058c338…`. Slice 001 is the only authorized
+signed product Slice. Steering comment `5368017338` changes only the immutability definition:
+supported debugger/caller-input mutation and recursively contract-safe values, with exact
+typed Enum members retained. `DBG-CF-001-005-001` freezes the conformance matrix. Review 028
+returned REWORK; review 029 returned REWORK trace-only; review030 passed version1.1.
+Steering comment `5370574104` now adds only exact recovered GPR/PSW evidence to UnwindFrame as
+version1.2; `DBG-CF-001-005-002` freezes the evidence rules. Fresh interface review031 must
+pass before Slice007 restarts.
+
+### Frozen execution units
+
+1. `DBG-SL-001-005-001` — classified legacy oracle/golden evidence; tests/fixtures only.
+2. `DBG-SL-001-005-002` — immutable identities, binding, typed addresses and result algebra.
+3. `DBG-SL-001-005-007` — recipe DTO/validator/evaluator foundation.
+4. `DBG-SL-001-005-003` — verified immutable artifact index and explicit legacy `.sym` adapter.
+5. `DBG-SL-001-005-004` — exact content-verified SourceResolver.
+6. `DBG-SL-001-005-005` — snapshot-bound StackService.
+7. `DBG-SL-001-005-006` — domain handles and integrated epoch-bound InspectionService.
+
+Slices are sequential because each later worker consumes prior signed interfaces. Each uses a
+fresh worker, fresh exact-head reviewer, formal `DBG-VER-001-005-00N` evidence and Master
+exact-head sign-off before the next Slice starts.
+
+### Invariants
+
+- no hidden `0xFFFF`/`0xFFFFFFFF`, modulo/truncation or implicit wrap;
+- no unconditional lowercase/casefold identity, basename guessing or first-candidate choice;
+- no unknown-frame fallback, fixed-R7 guess or invented/padded partial values;
+- no independent live reads represented as one coherent stop snapshot;
+- legacy algorithms are adapted only after Slice 001 classifies executable evidence;
+- no module owns artifact parsing, source resolution, unwind/stack, epoch inspection and
+  frontend policy together;
+- prior signed controller/gateway modules and `dbg.controller-gateway/1.1` remain unchanged.
+
+### Traceability and dependency graph
+
+- Parent: `DBG-RF-004`; iteration `DBG-IT-001-005`; Slices
+  `DBG-SL-001-005-001..007`.
+- Requirements: `DBG-R-004`, `DBG-R-021..DBG-R-028`, `DBG-R-034..DBG-R-036`.
+- Design: `DBG-D-003`, `DBG-D-004`, `DBG-D-009`; portable `HSX-D-001..003`.
+- Slice reviews: `DBG-RVW-001-005-001..006` and `DBG-RVW-001-005-011`; interface
+  reviews: `DBG-RVW-001-005-007..010`, then `...012..019`, plus refreeze reviews
+  `DBG-RVW-001-005-028..031`; conformance `DBG-CF-001-005-001..002`; verifications
+  `DBG-VER-001-005-001..007`.
+- Parent final: `DBG-RVW-004-001-001`, `DBG-VER-004-001-001`.
+- RF-005 explicitly depends on RF-004's accepted `dbg.resolver-inspection/1.2`; partial/frozen
+  implementation does not satisfy the dependency and no RF-005 worker is authorized.
+
+### Verification and exit signal
+
+Each Slice runs its frozen focused matrix, prior signed RF-004 tests and applicable
+RF-002/RF-003 regressions, plus YAML/NDJSON/diff/protected-path checks. Iteration 005 closes
+only after all seven exact-head Slice sign-offs, fresh combined parent review/verification,
+parent Master sign-off, remote publication/fresh reconstruction and issue #38 decision
+package. The package must cover interfaces, address/source/stack/variables/memory/disassembly,
+legacy status, degraded behavior, exact heads and RF-005 recommendation. Master then stops for
+Steering.
+
+### Interface review attempt 1
+
+Fresh read-only `DBG-RVW-001-005-007` confirmed exact remote head/ancestry, SDP-only scope,
+clean worktree, YAML/114-row NDJSON, IDs/paths/fences and one active iteration, but returned
+REWORK:
+
+- High: incomplete record/query/pagination/expression schemas plus contradictory wrap API;
+- High: Slice 005 required handles owned only by Slice 006;
+- Medium: RF-002 StopEpoch consumption seam was unspecified;
+- Medium: two live Relations gates remained stale.
+
+Master refroze a complete public schema/result surface, explicit checked/wrap mode,
+handle-free Slice 005 output with Slice 006 wrapping, a read-only `ControllerEpochAdapter`, and
+corrected live dependency statuses. No product file changed. Fresh exact-head review is
+`DBG-RVW-001-005-008`; Slice 001 remained unstarted.
+
+### Interface review attempt 2
+
+Fresh read-only `DBG-RVW-001-005-008` reviewed exact remote head `8d6c0f571…`. It confirmed
+the prior stack-handle and live-Relations closures, exact remote/ancestry/clean scope,
+YAML/116-row append-only Ledger, paths/fences and RF-004-only authority, then returned REWORK:
+
+- High: convenience bundle/ref/binding schemas contradicted the canonical HSX payloads;
+- High: recipe/evaluator/result/order/page semantics remained incomplete;
+- High: returned variables could not carry VARIABLE handles or structural partial pieces;
+- High: legacy index could advertise an exact binding without canonical evidence;
+- Medium: StopEpoch evidence grade and mismatch status/code matrix remained incomplete.
+
+Master replaced the identity types with exact normative payload/ref/binding projections,
+froze recipe/op/rule/evaluator/budget and deterministic ordering/page rules, added variable
+records/handles/pieces, separated LegacyDebugArtifactIndex with mandatory
+LEGACY_UNVERIFIED provenance and no binding/SourceRef, and froze the StopEpoch matrix. No
+product file changed. Fresh exact-head review is `DBG-RVW-001-005-009`.
+
+### Interface review attempt 3
+
+Fresh read-only `DBG-RVW-001-005-009` reviewed exact remote head `07f7e1604…`. It confirmed
+the earlier handle/Relations/StopEpoch/variable-piece/legacy-type closures and all scope/
+trace validations, then returned REWORK:
+
+- High: composite TargetRef lacked exact scalar mapping for canonical LoadedImageRef;
+- High: recipe bound exhaustion used a forbidden separate LIMIT_EXCEEDED status;
+- High: artifact queries could not enumerate sources/types/scopes/variables, and generic
+  expressions incorrectly required variable identity;
+- High: artifact Slice 003 preceded the Slice 005-owned recipe validator it required;
+- Medium: legacy functions could transitively return portable SourceRef.
+
+Master added the exact opaque TargetRef canonical scalar/emission mapping, restored
+`unsupported(limit_exceeded)`, froze source/type/scope/variable queries and separate
+ExpressionValue plus scope composition, introduced early recipe foundation Slice 007 before
+artifact Slice 003, and added LegacyFunctionRecord. No product file changed. Fresh exact-head
+review is `DBG-RVW-001-005-010`.
+
+### Interface review attempt 4
+
+Fresh read-only `DBG-RVW-001-005-010` reviewed exact remote head `72b06ad0…`. It confirmed
+all review 007..009 closures plus seven-Slice ownership/order, SDP-only scope and 120-row
+append-only trace, then returned REWORK:
+
+- High: InspectionService dependency construction, epoch/session activation/invalidation and
+  persistent handle-store lifetime were not public/frozen;
+- High: SymbolRecord used symbol_id while LocationRow/results/handles used an undefined second
+  variable_id namespace;
+- Medium: index order referenced absent address `.value` and no SymbolKind rank.
+
+Master froze explicit service/session/store factory and lifecycle/concurrency semantics,
+standardized variables end-to-end on SymbolRecord.symbol_id with referential validation, and
+corrected `.unsigned_value` ordering plus SymbolKind rank. Review 011 remains reserved for
+Recipe Slice 007; fresh interface review is `DBG-RVW-001-005-012`.
+
+### Interface review attempt 5
+
+Fresh read-only `DBG-RVW-001-005-012` reviewed exact remote head `573f396e2…`. It confirmed
+all earlier interface/sequence/identity/query closures and trace/scope checks, then returned
+REWORK:
+
+- High: service stale history did not forbid reopening an invalidated epoch and close/store
+  invalidation terminal/idempotent behavior remained incomplete;
+- High: DomainHandle lacked full context and could alias equal epoch strings/serials across
+  independent services;
+- High: service factory omitted exact architecture digest, ABI ref/digest and accepted
+  capability-profile checks/status mapping.
+
+Master made close terminal, retained/rejected stale epoch IDs for service lifetime, froze
+first/repeated store invalidation, embedded full InspectionContext in DomainHandle with exact
+foreign/stale behavior, and added first-match architecture/ABI ref+digest/full-profile/limit
+factory validation. No product file changed. Fresh exact-head review is
+`DBG-RVW-001-005-013`.
+
+### Interface review attempt 6
+
+Fresh read-only `DBG-RVW-001-005-013` reviewed exact remote head `1e8fb7e74…`. It confirmed
+all review 007..012 closures and full mechanical/authority gates, then returned REWORK:
+
+- High: ArchitectureDescriptor omitted accepted version, encoding/serialization and register
+  width/count fields;
+- High: REGISTERS scope could not return symbol-only VariableRecord without inventing symbols;
+- Medium: child_scope_handle had no allocation/traversal contract;
+- Medium: recipe DTOs lacked exact per-op pop/push/width/signedness/final-stack semantics.
+
+Master completed the descriptor, split RegisterVariableRecord from SymbolVariableRecord,
+removed child-scope handles, and froze every opcode transition/failure/final-result rule. No
+product file changed. Fresh exact-head review is `DBG-RVW-001-005-014`.
+
+### Interface review attempt 7
+
+Fresh read-only `DBG-RVW-001-005-014` reviewed exact remote head `96daa3a5d…`. It confirmed
+all prior descriptor/register/child-scope/recipe and mechanical/authority closures, then
+returned REWORK:
+
+- High: a LOCALS/REGISTERS composition typo contradicted the new DTOs;
+- High: ArchitectureDescriptor was not explicit in artifact/recipe/stack/location signatures;
+- Medium: blanket different-epoch STALE contradicted foreign-context UNKNOWN_HANDLE;
+- Medium: CFA expression role/cyclic/use-before-computed classification remained implicit;
+- Medium: non-byte address units had no range/arithmetic/byte-conversion semantics.
+
+Master corrected scope composition, threaded the exact descriptor through every required
+signature, unified handle status rules, added recipe roles/CFA corruption rules, and made
+addresses/ranges/arithmetic unit-based with checked byte conversion. No product file changed.
+Fresh exact-head review is `DBG-RVW-001-005-015`.
+
+### Interface review attempt 8
+
+Fresh read-only `DBG-RVW-001-005-015` reviewed exact remote head `18c0a26ca…`. It confirmed
+the scope/descriptor/CFA/unit and all earlier closures, then returned REWORK:
+
+- High: direct recipe/stack/location entrypoints accepted ArchitectureDescriptor without
+  independently matching exact binding/bundle ref+digest;
+- Medium: stale handle classification still matched stale history by opaque epoch string,
+  conflicting with foreign-context UNKNOWN_HANDLE.
+
+Master introduced one shared DebugBindingValidator used before artifact/recipe/stack/
+location/inspection work, added binding+bundle to recipe context and index to location
+evaluation, and made STALE require exact retained InspectionContext equality. No product file
+changed. Fresh exact-head review is `DBG-RVW-001-005-016`.
+
+### Interface review attempt 9
+
+Fresh read-only `DBG-RVW-001-005-016` reviewed exact remote head `e330a7b34…`. It confirmed
+shared binding validation, exact-context handle classification and every earlier closure,
+then returned REWORK for one High: LocationRow required `row.abi == ABI` but lacked an ABI
+field. Master added exact AbiDescriptorRef to LocationRow and row-construction/evaluator
+verification. No product file changed. Fresh exact-head review is
+`DBG-RVW-001-005-017`.
+
+### Interface review attempt 10
+
+Fresh read-only `DBG-RVW-001-005-017` reviewed exact remote head `cb88b62b7…`. It confirmed
+LocationRow ABI and all prior closures, then returned REWORK:
+
+- High: the binding validator omitted exact ArtifactRef agreement and recomputed binding_digest;
+- High: variable SymbolRecord/LocationRow nullability/address rules could not represent normal
+  global or stack/register/constant local locations without sentinels;
+- Medium: RF-004 dependency diagram and inspection row retained the old pre-Slice-007 order.
+
+Master completed the validator matrix, made variable symbols addressless and location-row-
+owned with exact nullable kind rules/query joins, and synchronized the diagram/inspection
+dependency to `001→002→007→003→004→005→006`. No product file changed. Fresh exact-head review
+is `DBG-RVW-001-005-018`.
+
+### Interface review attempt 11
+
+Fresh read-only `DBG-RVW-001-005-018` reviewed exact remote head `08719457a…`. It confirmed
+complete artifact/binding validation, addressless variable/LocationRow joins and the corrected
+seven-Slice diagram, then returned REWORK:
+
+- High: VariableExpression could not represent global None/None function/scope;
+- High: AVAILABLE scalar raw_bytes lacked exact byte order/fixed-width/padding rules;
+- Medium: SourceResolver winning-tier outcome precedence remained incomplete;
+- Medium: IdScheme retained old Slice-005 recipe/location ownership wording.
+
+Master froze nullable expression joins, ScalarBytes encoding and per-source byte-order rules,
+exact override/case-collision/ambiguity/content precedence, and corrected IdScheme ownership.
+No product file changed. Fresh exact-head review is `DBG-RVW-001-005-019`.
+
+### Interface review attempt 12
+
+Fresh read-only `DBG-RVW-001-005-019` reviewed exact remote head
+`058c3383593553aa1497d024d41285d44d9c67a8` and returned PASS with no
+Blocking/High/Medium findings. It confirmed nullable global/local/constant expression joins,
+canonical scalar bytes, resolver precedence, IdScheme ownership, all prior contract closures,
+36 SDP-only paths, YAML/136-row append-only Ledger, seven Slice paths/order/review/verification
+mappings, Markdown and RF-004-only authority. This is interface review only, not product
+verification or parent sign-off. Master freezes the reviewed content and may dispatch Slice 001.
+
+### Slice 001 activation
+
+Master marked `DBG-SL-001-005-001` active after interface review 019 PASS. A fresh worker owns
+only `python/tests/fixtures/rf004/` and
+`python/tests/test_hsx_debugger_rf004_legacy_oracles.py`; all product modules, existing tests
+and shared SDP/traceability are read-only. Next gate is fresh exact-head
+`DBG-RVW-001-005-001`, then formal `DBG-VER-001-005-001` and Master sign-off.
+
+### Slice 001 worker result
+
+Fresh worker committed exact head `a9a22fc4750f22d774eade43810a499dd1992859` with seven
+owned test/fixture files only. The deterministic manifest contains 25 cases (13 preserve,
+5 change intentionally, 7 retire), with known-bad legacy outputs explicitly excluded from
+target conformance. Worker evidence: new oracle 14 passed/1 WinError 1314 symlink skip;
+SymbolIndex 2 passed; SourceMap 4 passed/1 same skip; focused stack/backend/location 11 passed;
+hash-seed 0/1 repeats each 14 passed/1 skip; diff/scope/clean PASS. Fresh exact-head review is
+`DBG-RVW-001-005-001`; no later Slice is active.
+
+### Slice 001 review attempt 1
+
+Fresh independent `DBG-RVW-001-005-001` reviewed `a9a22fc4750f22d774eade43810a499dd1992859`
+and returned REWORK: one High descriptor-independent wide-address target, plus Medium source
+identity/locator conflation, wrong BEST_EFFORT diagnostic, overly broad symlink skip and an
+unasserted function-qualified local golden. Product/scope/mechanical tests passed. Fresh
+corrective worker owns the same seven files; next review is `DBG-RVW-001-005-020`.
+
+### Slice 001 corrective result
+
+Fresh corrective worker committed `8e5669940dd5c23df532577c39dc10bd84692ad2`, changing only
+the manifest and oracle test. Descriptor-conditioned wide-address cases, separated source
+identity/locator outcomes, correct BEST_EFFORT diagnostic, exact WinError 1314/unsupported/
+other-OSError handling and exact local/global assertions are covered. The manifest now has
+29 cases (13 preserve, 8 intentional-change, 8 retire), all legacy outputs marked non-target-
+conformant. Evidence: new oracle 16 passed/1 skip; SymbolIndex 2 passed; SourceMap 4 passed/
+1 same skip; focused 14 passed; hashseed 0/1 repeat; scope/diff/clean PASS. Fresh re-review is
+`DBG-RVW-001-005-020`.
+
+### Slice 001 review attempt 2
+
+Fresh independent `DBG-RVW-001-005-020` reviewed corrected head
+`8e5669940dd5c23df532577c39dc10bd84692ad2` and returned PASS with no
+Blocking/High/Medium findings. All five prior findings are closed. Independent evidence:
+oracle 16 passed/1 WinError 1314 skip; SymbolIndex 2 passed; SourceMap 4 passed/1 same skip;
+focused 14 passed; hashseed 0/1 repeats; 29 unique classified/provenanced/non-target-
+conformant legacy outputs; exact correction/combined scope and trace PASS. No symlink PASS is
+claimed. Formal next gate is `DBG-VER-001-005-001`.
+
+### Slice 001 verification attempt 1
+
+Fresh `DBG-VER-001-005-001` returned FAIL trace-only at coordination head `705545b…`.
+All product/test/manifest/scope/head/connectivity evidence passed, with only the explicit
+WinError 1314 symlink skip and no symlink PASS. CurrentIndex active iteration/next-wave and
+this iteration header still said product-not-started despite interface/review/verification
+state. Master corrected only current-state trace and reserved fresh
+`DBG-VER-001-005-008`; implementation head `8e566994…` remains unchanged.
+
+### Slice 001 verification attempt 2
+
+Fresh `DBG-VER-001-005-008` again passed every implementation, manifest, scope, head,
+connectivity and trace parse check, with only the explicit WinError 1314 symlink skip. It
+returned FAIL trace-only because `Issues.yaml` RF-004 normalized status alone retained the
+pre-worker value. Master corrected that field, recorded attempts 001/008 as trace-only FAIL,
+and reserved fresh `DBG-VER-001-005-009`. Implementation remains `8e566994…`; no sign-off or
+later Slice start.
+
+### Slice 001 verification attempt 3 and sign-off
+
+Fresh `DBG-VER-001-005-009` passed against unchanged reviewed head `8e566994…` and remote
+coordination `4e33f76…`: six YAML, Debugger 148/HSX 24 Ledger rows, all contracted tests,
+manifest, scope, python hash, ancestry/objects/connectivity and clean remote state passed. The
+only residual is explicit WinError 1314 symlink-degraded evidence; no symlink PASS is claimed.
+Master exact-head sign-off passed. Slice 001 is complete; Slice 002 is next.
+
+### Slice 002 activation
+
+Master activated `DBG-SL-001-005-002` after Slice 001 sign-off. Fresh worker owns only
+`identity.py`, `addresses.py`, `results.py`, `snapshot.py`, `metadata.py`, additive exports and
+the three new identity/address/metadata tests. Existing controller/contracts/gateway/runtime,
+later modules, frontends, runtime and shared SDP/trace are read-only. Next gate is fresh
+`DBG-RVW-001-005-002`, then `DBG-VER-001-005-002` and Master sign-off.
+
+### Slice 002 worker result
+
+Fresh worker committed exact head `4b5837644dc1196accfd8608bc3dbd20980476bb` with the nine
+owned files only and append-only prior exports. Evidence: focused 35 passed; all
+`test_hsx_debugger*.py` 172 passed/1 classified WinError 1314 skip; mandated contracts/epochs/
+Slice001 39 passed/1 same skip; import/export 129 unique PASS; stdlib trace aggregate 84.2%;
+diff/scope/clean PASS. `pytest-cov` was unavailable, so coverage used stdlib trace. Fresh
+exact-head review is `DBG-RVW-001-005-002`; no later Slice is active.
+
+### Slice 002 review attempt 1
+
+Fresh independent `DBG-RVW-001-005-002` reviewed `4b5837644dc1196accfd8608bc3dbd20980476bb`
+and returned REWORK: High nested-result mutability/duck typing, High incomplete ValuePiece bit
+coverage, High MemoryBlock/result status contradiction, plus Medium normalized trace summaries
+still worker-active. All existing tests/canonical/scope/import evidence passed. Fresh corrective
+worker owns Slice 002 files only; next review is `DBG-RVW-001-005-021`.
+
+### Slice 002 corrective result
+
+Fresh corrective worker committed `4280bc6008385042bdff923bd8e5392a1c290fdc`, changing only
+`results.py` and the owned metadata test. Nested evidence is deeply frozen and exact typed;
+ValuePiece coverage is gap-free; MemoryBlock/result status is bidirectionally consistent; all
+adversarial probes are covered. Evidence: focused 39 passed; debugger 176 passed/1 skip;
+mandated 39 passed/1 skip; canonical 2 passed; compile/import/export 129 PASS; stdlib trace
+84/85/84/86/86%; scope/diff/clean PASS. Fresh re-review is `DBG-RVW-001-005-021`.
+
+### Slice 002 review attempt 2
+
+Fresh `DBG-RVW-001-005-021` reviewed `4280bc6008385042bdff923bd8e5392a1c290fdc`
+and returned REWORK: High scalar/frozen-dataclass subclasses could carry extra mutable state
+through generic result freeze; Medium normalized CurrentIndex/Issues summaries still said
+Slice-002-rework rather than corrected re-review. Exact DTO, piece, memory, tests, canonical,
+scope and trace mechanics otherwise passed. Fresh corrective worker fixes deep subtype rejection;
+next review is `DBG-RVW-001-005-022`.
+
+### Slice 002 corrective result 2
+
+Fresh worker committed `6c933ea6b11e42d58da52faf0997f8c978dad54b`, changing only
+`results.py` and the owned metadata test. Exact scalar atom types, directly declared frozen
+dataclasses, full field traversal and rejection of undeclared dict/slot state are enforced.
+Evidence: focused 43; debugger 180+1 skip; mandated 39+1; canonical 2; compile/import/export
+129; diff/fsck/scope/clean PASS. Fresh review is `DBG-RVW-001-005-022`.
+
+### Slice 002 review attempt 3
+
+Fresh `DBG-RVW-001-005-022` confirmed all code findings closed at `6c933ea6…`: 25 adversarial
+subclass/deep-freeze probes plus every prior test/scope/canonical/export gate passed. It returned
+REWORK trace-only because normalized CurrentIndex/Issues summaries remained `slice002_rework_2`
+while nested state/gate were corrected review 022. Master corrected summaries only and reserved
+fresh `DBG-RVW-001-005-023`; code remains unchanged.
+
+### Slice 002 review attempt 4
+
+Fresh `DBG-RVW-001-005-023` found one High remaining bypass: a directly frozen dataclass could
+override `__getattribute__` to hide extra/mutable raw state from validation. Normalized trace
+and every other code/test/scope gate passed. Fresh corrective worker must use non-overridable
+raw-state inspection/reject custom attribute access; next review is `DBG-RVW-001-005-024`.
+
+### Slice 002 corrective result 3
+
+Fresh worker committed `373d786a983252d5b1735b599596293557adba5a`, changing only
+`results.py` and the owned metadata test. Validation now reads raw dataclass/enum state through
+non-overridable access and rejects custom `__getattribute__`/`__getattr__` across the relevant
+MRO. Regressions cover hidden extra state, hidden mutable fields, direct frozen inheritance,
+enum concealment and legitimate frozen DTOs. Evidence: focused 45 passed; debugger 182 passed/
+1 classified WinError 1314 skip; mandated 39 passed/1 same skip; canonical 2 passed; compile/
+import/export 129 unique PASS; diff/fsck/exact scope/clean PASS. Fresh review is
+`DBG-RVW-001-005-024`; no later Slice is active.
+
+### Slice 002 review attempt 5
+
+Fresh `DBG-RVW-001-005-024` returned REWORK at exact code head `373d786a…`. A directly frozen
+dataclass can shadow `__dict__` with a filtering descriptor, and mutable `__slots__` metadata
+can hide live member descriptors for frozen dataclass and Enum instances. A 42-case independent
+matrix found these three unexpected acceptances while every prior code closure and full test/
+scope/trace/git gate passed. Master also corrected two stale narratives in this Iteration header
+and the Debugger README. Fresh corrective worker 4 must inspect actual raw storage descriptors;
+next review is `DBG-RVW-001-005-025`.
+
+### Slice 002 corrective result 4
+
+Fresh worker committed `bbc5c8ba3be960bcb7d522edbf3d5ae12dbe8c2a`, changing only
+`results.py` and the owned metadata test. Raw class mappings and exact built-in getset/member
+descriptors now drive dict/slot inventory and direct storage reads; layout cross-checks reject
+descriptor deletion/replacement and mutable metadata concealment. The six pre-fix bypass
+regressions now pass while legitimate frozen DTO/Enum cases remain accepted. Evidence: focused
+51 passed; debugger 188 passed/1 classified WinError 1314 skip; mandated 39 passed/1 same skip;
+canonical 2; targeted adversarial 7; compile/import/export 129 unique; exact scope/diff/fsck/
+ancestry/clean PASS. Fresh review is `DBG-RVW-001-005-025`; no later Slice is active.
+
+### Slice 002 review attempt 6
+
+Fresh `DBG-RVW-001-005-025` confirmed every review 024 dict/slot/member-descriptor finding
+closed at `bbc5c8ba…`, but returned REWORK because Enum validation traversed only `_value_`
+while retaining other possible mutable instance storage. Focused 51, debugger 188+1, mandated
+39+1, oracle 16+1, canonical 2, exports 129 and all scope/YAML/Ledger/git gates passed. Master
+also reconciled three stale Handoff narratives. Fresh corrective worker 5 must deep-validate
+every actual Enum storage cell; next review is `DBG-RVW-001-005-026`.
+
+### Slice 002 corrective result 5
+
+Fresh worker committed `0bedb2d110147f3f34c5846d14ee9b9581926f2d`, changing only
+`results.py` and the owned metadata test. Every actual Enum storage cell and status Enum now
+passes canonical member-name/class/order/map validation before retention; mutable/inconsistent
+metadata and extra dict/slot state are rejected while standard HSX/status Enums and public DTOs
+remain accepted. Evidence: focused 60; debugger 197+1 classified WinError 1314 skip; mandated
+39+1 same skip; oracle 16+1; canonical 2; compile/import/export 129; exact scope/diff/fsck/
+ancestry/clean PASS. Fresh review is `DBG-RVW-001-005-026`; no later Slice is active.
+
+### Slice 002 review attempt 7
+
+Fresh `DBG-RVW-001-005-026` confirmed all pre-construction Enum and prior result findings
+closed at `0bedb2d1…`, but returned REWORK because `results.py` retains the original Enum
+singleton and an already accepted result can observe later member/property changes. All tests,
+scope, API, YAML/Ledger and git gates passed; the sprint top status was the sole trace defect and
+is corrected. A fresh feasibility worker must either implement a private type-preserving
+immutable snapshot or stop for Steering because scalar/proxy snapshotting changes the frozen
+generic typed envelope. Review 027 is conditional; no later Slice is active.
+
+### Slice 002 feasibility result / Steering stop
+
+Fresh feasibility worker returned NEGATIVE at clean remote-exact head `71b471a…` and made no
+edits. Exact Python Enum values are class-owned canonical singletons: copy/deepcopy retain the
+same member, while a detached object/proxy/scalar changes canonical identity or the frozen type.
+Global sealing is not a private portable guarantee, and revalidation cannot revoke a returned
+reference. This conflicts with Interface 004's simultaneous exact typed Enum-bearing schemas
+and absolute post-construction immutable result requirement. Master opened
+`DBG-BLK-001-005-001`, stopped review 027/verification/later Slices, and returns to Steering.
+
+### Steering refreeze / interface 1.1 candidate
+
+Steering comment `5368017338` accepted the blocker and refroze the interface as
+`dbg.resolver-inspection/1.1`. Every public DTO/result schema and exact typed Enum member is
+unchanged. Only immutability semantics change: no supported debugger API or ordinary mutation
+of caller-owned construction inputs may change accepted declared value-state; generic/nested
+payloads are recursively contract-safe; approved closed contract Enums are exact canonical
+immutable atoms. Enum cloning and isolation from reflection/monkey-patching of Python types are
+explicit non-conformance cases. Master published Interface 004 plus
+`DBG-CF-001-005-001`; fresh exact-head interface review 028 is the sole active gate. Historical
+review 026 remains REWORK, product review 027 remains unstarted, and no later Slice is active.
+The exact remote-published refreeze content head is `94a59f3738fadc0b6230fc3dc69cf36ca8b9202e`.
+
+### Interface 1.1 review 028 / corrected candidate
+
+Fresh `DBG-RVW-001-005-028` returned REWORK with two Medium findings and no schema/Enum/member/
+method drift: Interface 006 published an unnamed read-only mapping outside the closed payload
+domain, and IdScheme still described review 027 using the rejected private-snapshot premise.
+Master corrected dict normalization to an insertion-ordered tuple of recursively frozen pairs,
+removed mapping output, and reserved review 027 solely for a new post-refreeze product head.
+Fresh exact-head interface review 029 is the only active gate; product remains stopped.
+The corrected remote-published content head is `4c581a740ee95c3362aa77de85630ba001013e1c`.
+
+### Interface 1.1 review 029 / trace correction
+
+Fresh `DBG-RVW-001-005-029` confirmed every Steering/schema/Enum/fixture requirement and both
+review028 technical closures, but returned REWORK trace-only because two Relations entries
+still named review028 as the current gate. Master corrected the RF-004 interface production
+status and product-review-027 restart dependency to fresh review030. Contract semantics and
+product files are unchanged; review030 is the only active gate.
+The trace-corrected remote candidate is `ae49435ebb24198ad1fb2017e5998bbad305792f`.
+
+### Interface 1.1 review 030 PASS / Slice 002 restart
+
+Fresh `DBG-RVW-001-005-030` passed exact content head `ae49435…` at coordination `39f6a2e…`
+with zero findings. All public schemas/methods/Enum members remain byte-identical to v1;
+Steering semantics, fixtures, review028/029 closures and full trace mechanics passed. Master
+closes `DBG-BLK-001-005-001` and resumes only Slice 002 with a fresh corrective worker under
+existing ownership. Review 026 remains historical REWORK; review 027 is product-only and must
+review the new post-refreeze head before formal verification or any later Slice.
+
+### Slice 002 post-refreeze corrective result
+
+Fresh worker committed `c7bc39057469f1aa62a78f409753ec0213631214` under the existing
+Slice ownership, changing five owned files. The exact 19-type private Enum registry preserves
+canonical members; list/dict/set normalize to tuple/ordered tuple-pairs/frozenset; recursively
+contract-safe frozen DTOs pass; arbitrary Enums, mutable/duck records, unsafe leaves and cycles
+reject. Reflection/type-system isolation tests are retired exactly as Steering required. Public
+surface and 129 exports match `0bedb2d…`. Focused 47, debugger 184+1, mandated 39+1, oracle
+16+1, canonical 2, hashseed 0/1 and full scope/git gates pass. Fresh product-only review 027 is
+the sole active gate.
+
+### Slice 002 post-refreeze review 027 PASS
+
+Fresh `DBG-RVW-001-005-027` passed exact product head `c7bc390…` at coordination `6779e24…`
+with zero findings. Public AST/129 exports, both import paths, exact 19-type catalog, CS-IMM,
+all prior supported closures, focused/debugger/mandated/oracle/golden/hashseed tests, exact
+scope and full trace/git mechanics passed. Formal `DBG-VER-001-005-002` is now the sole active
+gate; no sign-off or later Slice is active.
+
+### Slice 002 verification/sign-off / Slice 007 activation
+
+Fresh `DBG-VER-001-005-002` formally passed product head `c7bc390…` at coordination `db01d0a…`.
+Master exact-head sign-off completed with review027/interface030 PASS. The only degraded evidence
+is WinError 1314 symlink privilege; no symlink PASS is claimed. Slice 002 is complete. Master
+activates only `DBG-SL-001-005-007` recipe foundation under its frozen ownership; review011,
+verification007 and sign-off must pass before artifact Slice003.
+
+### Slice 007 frozen frame-evidence contradiction / Steering stop
+
+The fresh Slice 007 worker independently found that frozen LocationEvaluator cannot evaluate
+non-top-frame `reg_value`: UnwindFrame exposes no recovered registers/PSW, the evaluator
+signature accepts no frame-evidence context, and SnapshotReadPort has no frame-aware recovered
+read. Using current registers, hidden state or inferred ABI values violates frozen no-fallback
+semantics. Worker made zero edits at clean remote head `269d0bb…`. Master opened
+`DBG-BLK-001-005-002`; review011, verification007, Slice003 and later work remain unstarted.
+
+### Steering frame-evidence refreeze / interface 1.2 candidate
+
+Steering comment `5370574104` accepts blocker002 and selects frame-carried evidence. Interface
+1.2 adds only `UnwindFrame.recovered_registers: RegisterSet` and
+`recovered_psw: RegisterValue`; existing frame fields and LocationEvaluator/SnapshotReadPort
+signatures remain unchanged. GPR evidence is architecture-complete and ordered, unavailable is
+explicit, top evidence comes only from the exact snapshot, and caller evidence only from
+accepted EXPRESSION/SAME rules. Missing/clobbered/unsupported state never falls back. Master
+published `DBG-CF-001-005-002`; interface review031 is the sole gate. Product review011 remains
+reserved and Slice007 has no product changes.
+The exact remote-published refreeze content head is `cb575ac0920bec8cc7ddd5565df9544b746f069b`.
+
+### Interface 1.2 review031 / trace correction
+
+Fresh `DBG-RVW-001-005-031` passed every public schema/signature/recovery/fixture rule but
+returned REWORK trace-only: Handoff had one stale present-tense `1.1` candidate sentence,
+Slice007 resume cited blocker escalation instead of refreeze authority, and Issues did not name
+1.1 as the immediate prior interface. Master corrected only those current trace fields. Fresh
+interface review032 is the sole gate; Slice007 product remains untouched.
+The trace-corrected remote candidate is `f79eb6298798250e7aca7e0266b1948af7903138`.
+
+### Interface 1.2 review032 PASS / Slice007 restart
+
+Fresh `DBG-RVW-001-005-032` passed exact content head `f79eb629…` at coordination `0ebd8ef…`
+with zero findings. The two-field UnwindFrame delta, recovered GPR/PSW rules, HSX authority
+boundary, fixtures and review031 trace closures all passed. Master closes blocker002 and
+restarts only Slice007 with a fresh bounded worker. Review011 remains product-only;
+verification007/sign-off must pass before Slice003.
+
+### Slice007 worker result
+
+Fresh worker committed exact product head `ec75c4eb22333368cbe4847920dc4420fe8231cf`
+with the three owned files only. Closed recipes/rows/frames/parsers/validators, every bounded
+opcode and failure category, selected-frame LocationEvaluator and current-profile GPR recovery
+are implemented; current HSX has no PSW caller-rule seam, so non-top PSW is unavailable.
+Owned 34, signed Slice002 47 and broad debugger 218+1 pass; compile/import/export/scope/git pass.
+Fresh product review011 is the sole gate.
+
+### Slice007 review011 REWORK
+
+Fresh `DBG-RVW-001-005-011` returned REWORK at `ec75c4eb…`: the pure artifact-facing validator
+omitted normative postfix/finality/limit checks; valid unavailable GPR terminals rejected;
+bool/float and unknown-schema parsing were misclassified; and LocationEvaluator exposed
+`index: object`. Binding/no-fallback/ownership and all existing suites otherwise passed. Fresh
+corrective worker is bounded to the same three files; review033 is next.
+
+### Slice007 corrective result
+
+Fresh worker committed `3228c9b2…`, changing only recipe implementation/test. The shared
+abstract validator now rejects malformed postfix/finality/limits before artifact acceptance;
+explicit unavailable GPR terminals pass; integer/schema classification and public annotation
+are exact. Owned39, Slice00247, broad223+1 and all mechanical gates pass. Review033 is next.
+
+### Slice007 review033 trace-only REWORK
+
+Fresh review033 confirmed zero product findings and all review011 closures, but strict YAML
+rejected a duplicated `active_slice_review_status` key in Issues. Master normalized the current
+review fields only; product head `3228c9b2…` is unchanged. Fresh review034 is next.
+
+### Slice007 review034 PASS
+
+Fresh review034 passed unchanged product head `3228c9b2…` with zero findings and reproduced
+owned39/Slice00247/broad223+1 plus strict trace/scope/git. Formal verification007 is next.
+
+Formal verification007 passed `3228c9b2…`; Master sign-off completed and activates only Slice003.
+
+### Slice003 implementation candidate
+
+Fresh bounded worker completed the artifact/index Slice at exact product head
+`196111030e0f25e861d03f5dffd159f52c10622a` over publication head `fdd6e463…`. The commit is
+limited to `artifacts.py`, the separate `legacy_symbols.py` adapter, additive package exports
+and the owned artifact tests. Focused evidence is 29 passed; compile/import/export/signature,
+scope, diff and Git connectivity pass. No broad regression was run during iteration. Fresh
+independent `DBG-RVW-001-005-003` is the only next gate.
+
+### Slice003 review003 REWORK
+
+Fresh review003 returned 0 Blocking / 0 High / 3 Medium at `196111030…`. Product rework is
+limited to recursively contract-safe legacy result payloads and preserving unsupported recipe
+limit classification at the artifact result boundary. The third finding is stale Handoff
+state, corrected by Master while recording the review. Fresh corrective review035 follows the
+bounded worker; verification003 and Slice004 remain stopped.
+
+### Slice003 bounded correction
+
+Fresh corrective worker closed only review003 M1/M2 at exact product head `a335789759…`.
+Recursive legacy generic payload normalization/rejection now uses the accepted contract-safe
+boundary; recipe `limit_exceeded` maps to artifact `SCHEMA_UNSUPPORTED`, while other malformed
+validator diagnostics remain `CORRUPT`. Focused artifact evidence is 31 passed and exact scope
+is three owned files. Fresh review035 is the only next gate.
+
+### Slice003 review035 PASS
+
+Fresh independent review035 passed corrected product head `a335789759…` with zero findings.
+All review003 closures, original artifact/index responsibilities, degraded legacy boundary,
+focused31, broad254+1, legacy22+2, strict trace and exact Git scope pass. Formal verification003
+is next; Slice004 remains stopped.
+
+### Slice003 verification003 FAIL trace-only
+
+Formal verification003 passed product head `a335789759…`, focused31, broad254+1, legacy22+2,
+M1/M2 closure, compile/exports/signatures, scope and Git integrity. It failed current trace:
+two Handoff sentences stopped at review003 and Issues exposed Slice007 history as generic active
+Slice fields. Master normalized exactly those fields. Fresh verification010 is required;
+product is unchanged and Slice004 remains stopped.
+
+### Slice003 verification010 PASS and sign-off
+
+Fresh verification010 passed unchanged product `a335789759…`, review035, corrected current
+trace, artifact31, broad254+1, legacy22+2, adversarial2, compile/exports/signatures, scope and
+remote integrity. Master accepts and signs exact product head. Only frozen SourceResolver
+Slice004 is activated next.
+
+### Slice004 implementation candidate
+
+Fresh bounded SourceResolver worker completed exact product head `c0f975c4…` over signed
+coordination base `d575299e…`. Scope is only `sources.py`, additive exports and owned source
+tests. Focused SourceResolver/legacy SourceMap evidence is 29 passed/3 classified platform
+skips; compile/import/signature/Black/scope/Git pass. Fresh review004 is the only next gate.
+
+### Slice004 review004 REWORK
+
+Fresh review004 returned 0 Blocking / 0 High / 1 Medium. On Windows, `os.path.join` can treat
+an inner `C:` segment in valid logical ID `src/C:/unit.c` as host drive syntax and collapse the
+explicit-root/full-ID locator. Correct only literal joining and add the regression; review036
+then verification004 remain the next gates. Slice005 is stopped.
+
+### Slice004 bounded correction
+
+Fresh worker reproduced and closed only review004 M1 at `3d1f2e8a…`: validated logical-ID
+segments are joined as literal locator text and an inner Windows `C:` segment cannot reset the
+explicit root. Focused SourceResolver/SourceMap is 30 passed/3 classified skips; exact two-file
+scope and compile/Black/signature/Git pass. Fresh review036 is next.
+
+### Slice004 review036 PASS
+
+Fresh review036 passed corrected product `3d1f2e8a…` with zero findings. M1 and all frozen
+SourceResolver tiers/content/case/symlink boundaries pass with focused30/3, oracle16/1,
+broad280/3 and exact trace/scope/Git evidence. Formal verification004 is next; Slice005 stops.
+
+### Slice004 verification004 FAIL trace-only
+
+Verification004 passed all SourceResolver product evidence but failed three stale Handoff
+sentences describing Slice002/six loops/review036 as open. Master normalized only those
+sentences. Fresh verification011 is required; product is unchanged and Slice005 remains stopped.
+
+### Slice004 verification011 FAIL trace-only
+
+Verification011 passed the complete unchanged product matrix and verification004 corrections,
+but one later Handoff summary still stopped at Slice003 verification003. Master corrected only
+that sentence. Fresh verification012 is required; Slice005 remains stopped.
+
+### Slice004 verification012 PASS and sign-off
+
+Fresh verification012 passed unchanged product `3d1f2e8a…`, review036, all Handoff corrections,
+focused30/3, oracle16/1, broad280/3, M1 tiers7, static public surface, exact scopes and remote
+integrity. Master signs exact head and activates only snapshot-bound StackService Slice005.
+
+### Slice005 STOP — frozen recipe result conflict
+
+Fresh worker proved `DBG-BLK-001-005-003` before product commit. HSX-D-002/ST007 requires body
+caller R7 from `deref_u(CFA-8,4,little)`; the value is RecipeScalar, while Interface1.2 requires
+a matching RecipeRegister and the closed schema has no conversion. SAME is false and unavailable
+would violate current-profile coverage. All drafts were removed. Steering options A/B/C are in
+Interface blocker009; review005, verification005, Slice006 and parent work are stopped.

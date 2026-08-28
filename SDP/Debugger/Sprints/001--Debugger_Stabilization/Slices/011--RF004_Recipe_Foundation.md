@@ -1,0 +1,136 @@
+# DBG-SL-001-005-007 — RF-004 Recipe Schema and Evaluator Foundation
+
+- Status: **COMPLETE / MASTER EXACT-HEAD SIGN-OFF**
+
+- Implementation head: `ec75c4eb22333368cbe4847920dc4420fe8231cf`
+
+- Discovery head: `269d0bb962f85241633e1af8489b459357f2ff77`
+- Product changes: none
+- Parent: `DBG-RF-004`
+- Iteration: `DBG-IT-001-005`
+- Depends on signed: `DBG-SL-001-005-001..002`
+- Review: `DBG-RVW-001-005-011`
+- Verification: `DBG-VER-001-005-007`
+
+## Goal and why now
+
+Implement the closed `hsx.unwind-recipe/1` / `hsx.location-recipe/1` Python DTO,
+parse/validation, bounded RecipeEvaluator and handle-free LocationEvaluator foundation before
+the artifact Slice parses recipe-bearing rows. This resolves schema ownership without merging
+artifact parsing, stack traversal or inspection composition into the recipe module.
+
+## Owned files
+
+- `python/hsx_debugger/recipes.py`
+- relevant additive exports in `python/hsx_debugger/__init__.py`
+- `python/tests/test_hsx_debugger_recipes.py`
+
+Identity/address/result modules from Slice 002 are read-only. Artifact, source, stack,
+inspection, legacy product/runtime and frontend files are read-only.
+
+## Required behavior
+
+- implement the exact frozen opcode/rule/location-piece/evaluation-context/budget/result DTOs
+  and RecipeEvaluator/LocationEvaluator signatures from `dbg.resolver-inspection/1.2`;
+- implement every frozen postfix pop/push, signedness/width propagation, final-stack/result
+  rule and exact corrupt/unavailable/unsupported classification;
+- enforce expression roles: CFA forbids recursive `cfa`; dependent roles require computed CFA;
+  row/form role mismatch and cyclic/non-progressing CFA are corrupt;
+- own UnwindRow/LocationRow DTOs and consume Slice 002 metadata SymbolRecord read-only, so no
+  future artifact-module import cycle exists;
+- require exact AbiDescriptorRef on both row types and reject evaluator row/ABI mismatch before
+  any opcode/read;
+- validate nullable LocationRow function/scope exactly against LOCAL, GLOBAL or CONSTANT
+  SymbolRecord kind invariants; no address sentinel is permitted;
+- preserve LocationRow.value_byte_order and exact ScalarBytes encoding for value/register/
+  constant forms; address forms preserve exact read bytes;
+- reject unknown mandatory schema/field/opcode as unsupported and malformed
+  arity/type/width/stack/address/piece coverage as corrupt;
+- enforce exact profile limits; every exhaustion is `UNSUPPORTED` with diagnostic
+  `limit_exceeded` and never a separate status or truncation;
+- keep scalar absence unavailable and allow partial only for structural pieces with exact
+  available/missing ranges;
+- use SnapshotReadPort only through exact InspectionContext and checked typed addresses;
+- define UnwindFrame with architecture-complete recovered_registers plus explicit recovered_psw
+  exactly as `DBG-CF-001-005-002`, preserving unavailable entries and deterministic order;
+- seed top-frame recovered evidence only from its exact context snapshot; propagate caller GPR/
+  PSW evidence only through accepted unwind EXPRESSION/SAME rules, never implicit ABI/clobber
+  copying or current-frame substitution;
+- construct LocationEvaluator RecipeEvaluationContext solely from the selected UnwindFrame and
+  existing explicit binding/index/architecture/ABI inputs;
+- carry exact ArchitectureDescriptor in RecipeEvaluationContext for all register/special/
+  address/alignment/serialization behavior;
+- carry exact binding+bundle identity/architecture/ABI in RecipeEvaluationContext and call
+  the shared DebugBindingValidator before any opcode/read;
+- expose a pure row/component validator consumed read-only by the artifact Slice.
+
+## Invariants and non-goals
+
+- no artifact/component digest parsing, index/query ownership or local source resolution;
+- no stack walk/frame handles, scope/variable enumeration or InspectionService;
+- no fixed-R7 fallback, live reads, implicit masks/wrap/endian or frontend expression parsing;
+- no Executive/VM/AVR/DAP/CLI/VS Code or RF-005..009 work.
+
+## Traceability
+
+`DBG-R-021..DBG-R-025`, `DBG-R-028`, `DBG-R-035..DBG-R-036`;
+`DBG-F-007`, `DBG-F-015`; `DBG-D-003`, `DBG-D-004`; `HSX-D-002..HSX-D-003`;
+interface `dbg.resolver-inspection/1.2`; recovered-frame conformance `DBG-CF-001-005-002`.
+
+## Verification and completion signal
+
+Test every opcode/rule/location form, `DBG-CF-001-005-002` recovered-frame matrix, exact result
+type, unknown/malformed input, evaluator
+stack/deref/byte/total/piece bounds, `unsupported(limit_exceeded)`, endian/width/address
+failure, stale context and structural partial pieces. Run signed identity/address regressions.
+Close only after exact-head review, formal verification and Master sign-off.
+
+## Frozen contradiction discovered before implementation
+
+The public LocationEvaluator inputs cannot construct the mandatory RecipeEvaluationContext for
+non-top-frame `reg_value`: UnwindFrame has no recovered registers/PSW, the method accepts no
+frame evidence, and SnapshotReadPort has no frame-aware recovered-state read. Current snapshot
+registers are a forbidden fallback. See
+`Interfaces/007--RF004_Location_Frame_Evidence_Steering_Blocker.md`. Worker stopped with zero
+edits; review011/verification007 did not start.
+
+Steering comment `5370574104` accepts blocker002 and refreezes frame-carried recovered evidence
+in Interface1.2. Review031 returned REWORK trace-only; product remains stopped until fresh
+interface review032 PASS at `f79eb629…`; a fresh worker may restart. Product review
+identity 011 remains reserved.
+
+## Worker result
+
+Fresh worker committed `ec75c4eb22333368cbe4847920dc4420fe8231cf`, changing exactly
+`recipes.py`, additive package exports and the owned recipe test. It implements the closed DTO/
+parser/validator/evaluator surface, all opcodes/failure classes, selected-frame LocationEvaluator
+and current-profile recovered GPR rules with non-top PSW unavailable. Evidence: owned 34 passed;
+signed Slice002 47; broad debugger 218+1 classified WinError1314 skip; compile/import/export
+170 package/41 recipe exports; exact scope/diff/fsck/clean PASS. Fresh review011 is next.
+
+## Review011 result
+
+`DBG-RVW-001-005-011` returned REWORK: High incomplete pure postfix/limit validation; Medium
+unavailable register terminals rejected, exact bool/float/schema parsing gaps, and widened
+LocationEvaluator index annotation. Fresh corrective worker owns the same three files; next
+review is `DBG-RVW-001-005-033`.
+
+## Corrective result
+
+Fresh worker committed `3228c9b23dcd8fa08a81499181e2ea9b55a0f5f0`, changing only
+`recipes.py` and the owned recipe test. Shared pure/runtime postfix validation, aggregate limits,
+unavailable GPR terminals, exact integer/schema parsing and DebugArtifactIndex annotation close
+review011. Owned39, Slice00247, broad223+1, compile/import/export/signature/scope/git PASS.
+Fresh review033 is next.
+
+## Review033 result
+
+Review033 found no product issue and confirmed all review011 closures, but returned REWORK
+trace-only for a duplicate `active_slice_review_status` YAML key. Product remains unchanged;
+fresh review034 is next.
+
+Review034 passed exact product head `3228c9b2…` with zero findings. Formal verification007 is
+the only active gate.
+
+Formal verification007 passed and Master signed exact head `3228c9b2…`. Slice007 is complete;
+only artifact Slice003 is authorized next.

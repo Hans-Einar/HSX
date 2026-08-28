@@ -1,7 +1,7 @@
 schema_version: 1
 track: Debugger
 namespace: DBG
-status: debugger_first_structural_wave_complete_awaiting_steering
+status: debugger_rf004_slice005_blocked_awaiting_steering_recipe_result_decision
 baseline:
   repository: Hans-Einar/HSX
   implementation_branch: Implementation/vscode
@@ -92,9 +92,9 @@ active_gate:
     path: SDP/Debugger/05--DesignAnalysis/001--Optimal_Debugger_Architecture/README.md
     status: debugger_v1_architecture_and_design_baseline_frozen
   iteration:
-    id: DBG-IT-001-004
+    id: DBG-IT-001-005
     path: SDP/Debugger/Sprints/001--Debugger_Stabilization/ScrumIterations.md
-    status: first_structural_wave_complete_awaiting_steering
+    status: slice005_blocked_awaiting_steering_recipe_result_decision
   architecture_review:
     id: DBG-RVW-001-002-001
     status: rework
@@ -121,7 +121,12 @@ active_gate:
     portable_contract_acceptance_comment: 5356480919
     debugger_design_status: accepted_frozen_v1_baseline
     debugger_design_freeze_comment: 5356484309
-    first_wave_status: authorized
+    first_wave_status: complete_steering_accepted
+    first_wave_acceptance_comment: 5362514094
+    next_authorized_refactor: DBG-RF-004
+    next_wave_status: rf004_slice005_blocked_awaiting_steering
+    rf004_authorization_comment: 5362514094
+    rf005_dependency_clarification_comment: 5362515750
   portable_contract_study:
     debugger_study: DBG-ST-006
     hsx_coordinator: HSX-ST-001
@@ -189,29 +194,31 @@ proposed:
       - range: DBG-D-001..DBG-D-010
         status: frozen_debugger_v1_baseline
       - ids: DBG-D-001,DBG-D-002,DBG-D-003,DBG-D-009
-        status: first_wave_implementation_authority_through_frozen_slices_only
-      - ids: DBG-D-004..DBG-D-008,DBG-D-010
-        status: frozen_but_not_implementation_authorized_in_this_wave
+        status: first_wave_complete_steering_accepted
+      - ids: DBG-D-003,DBG-D-004,DBG-D-009
+        status: rf004_implementation_authority_through_frozen_slices_only
+      - ids: DBG-D-005..DBG-D-008,DBG-D-010
+        status: frozen_but_not_implementation_authorized
   study:
     id: DBG-ST-006
     path: SDP/Debugger/02--Study/006--Portable_Debug_Runtime_Contracts.md
     status: complete_accepted_dependency
 first_structural_wave:
-  status: publication_pass_awaiting_steering
+  status: complete_steering_accepted
   steering_comment: 5356484309
   decision_package_comment: 5361796061
   activation_comment: 5356712010
   activation_correction_comment: 5356745504
   branch: codex/dbg-rf-002-003
   remote_branch: origin/codex/dbg-rf-002-003
-  published_signed_history_head: b0a9e8161bebac6b9eb1a0bba9003c82fd21fa8c
+  published_signed_history_head: 69a54aeb3394d3cd4792bce620748e15bab69f1f
   publication_steering_comment: 5361993826
   publication_verification:
     status: pass
-    fresh_checkout_head: b0a9e8161bebac6b9eb1a0bba9003c82fd21fa8c
+    fresh_checkout_head: 69a54aeb3394d3cd4792bce620748e15bab69f1f
     contracted_debugger: 121_passed
     unchanged_regressions: 121_passed
-    traceability: CurrentIndex_Issues_Relations_YAML_and_110_Ledger_records_PASS
+    traceability: CurrentIndex_Issues_Relations_YAML_and_112_Ledger_records_PASS
     scope: no_non_SDP_diff_after_1e479536_and_no_Executive_VM_frontend_AVR_change
   contract_head: 97d8c5b8d62d56dcfcab59c97c516d83f68c7075
   shared_interface:
@@ -234,7 +241,7 @@ first_structural_wave:
   refactors:
     - id: DBG-RF-002
       path: SDP/Debugger/Refactor/002--Debugger_Controller_State_Epoch/README.md
-      status: complete_parent_signed
+      status: complete_steering_accepted
       slice: DBG-SL-001-004-001
       prior_parent_review: DBG-RVW-002-001-001
       prior_parent_review_status: rework
@@ -252,7 +259,7 @@ first_structural_wave:
       final_verification: DBG-VER-002-001-001
     - id: DBG-RF-003
       path: SDP/Debugger/Refactor/003--Executive_Gateway_Health_Recovery/README.md
-      status: complete_parent_signed
+      status: complete_steering_accepted
       slice: DBG-SL-001-004-002
       prior_parent_review: DBG-RVW-003-001-001
       prior_parent_review_status: rework_gate_order_only
@@ -336,7 +343,7 @@ first_structural_wave:
       corrected_signoff_record: SDP/Debugger/Verification/DBG-SL-001-004-002--Master_Signoff_v2.md
     - id: DBG-SL-001-004-003
       path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/004--Controller_Gateway_Integration.md
-      status: complete_dependency_revalidated_signed
+      status: complete_steering_accepted
       contract_base: 97d8c5b8d62d56dcfcab59c97c516d83f68c7075
       review: DBG-RVW-001-004-003
       verification: DBG-VER-001-004-003
@@ -358,16 +365,307 @@ first_structural_wave:
       dependent_signed_product_head: 1e479536ce5e746e1b06a53b1039b1af84adaed6
       dependent_signoff_record: SDP/Debugger/Verification/DBG-SL-001-004-003--Master_Signoff_v2.md
   runtime_profile: hsx.python-debug-legacy/1
-  still_blocked: DBG-RF-004..DBG-RF-009
+  steering_acceptance_comment: 5362514094
+  still_blocked: none_in_first_wave_closed_scope
   partial_product_wip_stash: efc91f2640647402bc92c69bde1c57685cfaa1f1
-  current_gate: final_issue_38_publication_closeout_then_await_steering
+  current_gate: closed
+active_rf004:
+  refactor:
+    id: DBG-RF-004
+    path: SDP/Debugger/Refactor/004--Typed_Resolver_Inspection/README.md
+    status: slice005_blocked_awaiting_steering_recipe_result_decision
+    draft_pull_request: 50
+    draft_pull_request_url: https://github.com/Hans-Einar/HSX/pull/50
+    draft_pull_request_base: codex/dbg-rf-002-003
+    published_coordination_head: 31322e3a722fd575a02be2a65419f2e20882172a
+    steering_progress_summary_comment: 5372569290
+    steering_authority_comment: 5362514094
+    steering_refreeze_comment: 5368017338
+    steering_frame_refreeze_comment: 5370574104
+  iteration:
+    id: DBG-IT-001-005
+    path: SDP/Debugger/Sprints/001--Debugger_Stabilization/ScrumIterations.md
+    status: slice005_blocked_awaiting_steering_recipe_result_decision
+  interface:
+    id: dbg.resolver-inspection/1.2
+    path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/004--Typed_Resolver_Inspection_Interface_v1.md
+    status: frozen_review_pass
+    prior_interface_id_1_1: dbg.resolver-inspection/1.1
+    prior_interface_review_1_1: DBG-RVW-001-005-030
+    prior_interface_review_1_1_status: pass
+    steering_frame_refreeze_comment: 5370574104
+    steering_refreeze_comment: 5368017338
+    prior_interface_id: dbg.resolver-inspection/1
+    prior_interface_review: DBG-RVW-001-005-019
+    prior_interface_review_status: pass
+    prior_review: DBG-RVW-001-005-007
+    prior_review_status: rework
+    prior_reviewed_head: 82154c614a31284723bf3e6a337c5bedfb8aba5d
+    review_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/029--RF004_Interface_Review.md
+    rereview: DBG-RVW-001-005-008
+    rereview_status: rework
+    rereviewed_head: 8d6c0f571f46a10ce6db7331618ef7600d6a8203
+    rereview_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/030--RF004_Interface_Rereview.md
+    review_attempt_3: DBG-RVW-001-005-009
+    review_attempt_3_status: rework
+    review_attempt_3_head: 07f7e16040bec1c225d263c682066f65b173e6aa
+    review_attempt_3_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/031--RF004_Interface_Review_Attempt3.md
+    review_attempt_4: DBG-RVW-001-005-010
+    review_attempt_4_status: rework
+    review_attempt_4_head: 72b06ad0bae53b70bc3d64edad91591998d2408d
+    review_attempt_4_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/032--RF004_Interface_Review_Attempt4.md
+    review_attempt_5: DBG-RVW-001-005-012
+    review_attempt_5_status: rework
+    review_attempt_5_head: 573f396e29de728f69abb0961e9b79a2fdb3c29d
+    review_attempt_5_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/033--RF004_Interface_Review_Attempt5.md
+    review_attempt_6: DBG-RVW-001-005-013
+    review_attempt_6_status: rework
+    review_attempt_6_head: 1e8fb7e74c92a69711bd48809696552cf2f982db
+    review_attempt_6_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/034--RF004_Interface_Review_Attempt6.md
+    review_attempt_7: DBG-RVW-001-005-014
+    review_attempt_7_status: rework
+    review_attempt_7_head: 96daa3a5dffa6b80b2b5687b9cd0429ffaa402c8
+    review_attempt_7_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/035--RF004_Interface_Review_Attempt7.md
+    review_attempt_8: DBG-RVW-001-005-015
+    review_attempt_8_status: rework
+    review_attempt_8_head: 18c0a26cad4c2d82e4a23ef0ec3e6409b022cb95
+    review_attempt_8_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/036--RF004_Interface_Review_Attempt8.md
+    review_attempt_9: DBG-RVW-001-005-016
+    review_attempt_9_status: rework
+    review_attempt_9_head: e330a7b344715dfdbae0de46e44f4720b4387d4e
+    review_attempt_9_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/037--RF004_Interface_Review_Attempt9.md
+    review_attempt_10: DBG-RVW-001-005-017
+    review_attempt_10_status: rework
+    review_attempt_10_head: cb88b62b7c45ea6ebfe31c40e522daa3adcf8896
+    review_attempt_10_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/038--RF004_Interface_Review_Attempt10.md
+    review_attempt_11: DBG-RVW-001-005-018
+    review_attempt_11_status: rework
+    review_attempt_11_head: 08719457a341b01ca8f64ea568e1ab04678dd10d
+    review_attempt_11_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/039--RF004_Interface_Review_Attempt11.md
+    review_attempt_12: DBG-RVW-001-005-019
+    review_attempt_12_status: pass
+    review_attempt_12_head: 058c3383593553aa1497d024d41285d44d9c67a8
+    review_attempt_12_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/040--RF004_Interface_Final_Review.md
+    prior_master_freeze_status: pass
+    prior_frozen_contract_head: 058c3383593553aa1497d024d41285d44d9c67a8
+    refreeze_candidate_head: 94a59f3738fadc0b6230fc3dc69cf36ca8b9202e
+    refreeze_review: DBG-RVW-001-005-028
+    refreeze_review_status: rework
+    refreeze_reviewed_content_head: 94a59f3738fadc0b6230fc3dc69cf36ca8b9202e
+    refreeze_reviewed_coordination_head: 7998e0a55c2a1bd648e43ca667a9678dc8af0642
+    corrected_refreeze_candidate_head: 4c581a740ee95c3362aa77de85630ba001013e1c
+    refreeze_rereview: DBG-RVW-001-005-029
+    refreeze_rereview_status: rework_trace_only
+    refreeze_rereviewed_content_head: 4c581a740ee95c3362aa77de85630ba001013e1c
+    refreeze_rereviewed_coordination_head: ed23423814d58fe3c03b252084d43d2464a46118
+    trace_corrected_refreeze_candidate_head: ae49435ebb24198ad1fb2017e5998bbad305792f
+    refreeze_review_3: DBG-RVW-001-005-030
+    refreeze_review_3_status: pass
+    refreeze_review_3_content_head: ae49435ebb24198ad1fb2017e5998bbad305792f
+    refreeze_review_3_coordination_head: 39f6a2efca83a584b554ecd818c9d31319304143
+    conformance_id: DBG-CF-001-005-001
+    conformance_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/006--Typed_Resolver_Inspection_Immutability_Conformance_v1_1.md
+    prior_master_refreeze_status_1_1: pass_slice002_resume_authorized
+    prior_frozen_contract_head_1_1: ae49435ebb24198ad1fb2017e5998bbad305792f
+    frame_refreeze_candidate_head: cb575ac0920bec8cc7ddd5565df9544b746f069b
+    frame_refreeze_review: DBG-RVW-001-005-031
+    frame_refreeze_review_status: rework_trace_only
+    frame_refreeze_reviewed_content_head: cb575ac0920bec8cc7ddd5565df9544b746f069b
+    frame_refreeze_reviewed_coordination_head: b4f95e4f3b4094f3bdfbc912207772f85c6c9a92
+    frame_trace_corrected_candidate_head: f79eb6298798250e7aca7e0266b1948af7903138
+    frame_refreeze_rereview: DBG-RVW-001-005-032
+    frame_refreeze_rereview_status: pass
+    frame_refreeze_rereview_content_head: f79eb6298798250e7aca7e0266b1948af7903138
+    frame_refreeze_rereview_coordination_head: 0ebd8ef8b4a3d70543e7ee8ac445b107d6589da9
+    recovered_frame_conformance_id: DBG-CF-001-005-002
+    recovered_frame_conformance_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/008--RF004_Recovered_Frame_Evidence_Conformance_v1_2.md
+    master_frame_refreeze_status: pass_slice007_resume_authorized
+    frame_frozen_contract_head: f79eb6298798250e7aca7e0266b1948af7903138
+    implementation_owner: DBG-RF-004
+    blocked_consumer: DBG-RF-005
+    blocked_consumer_requires: accepted_dbg.resolver-inspection/1.2
+  execution_order:
+    - DBG-SL-001-005-001
+    - DBG-SL-001-005-002
+    - DBG-SL-001-005-007
+    - DBG-SL-001-005-003
+    - DBG-SL-001-005-004
+    - DBG-SL-001-005-005
+    - DBG-SL-001-005-006
+  slices:
+    - id: DBG-SL-001-005-001
+      path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/005--RF004_Legacy_Oracle.md
+      status: complete_exact_head_signed
+      implementation_head: a9a22fc4750f22d774eade43810a499dd1992859
+      prior_review: DBG-RVW-001-005-001
+      prior_review_status: rework
+      corrective_review: DBG-RVW-001-005-020
+      corrected_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
+      corrective_review_status: pass
+      corrective_reviewed_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
+      prior_verification: DBG-VER-001-005-001
+      prior_verification_status: fail_trace_only
+      reverification: DBG-VER-001-005-008
+      reverification_status: fail_trace_only
+      reverification_2: DBG-VER-001-005-009
+      reverification_2_status: pass
+      signoff_status: pass
+      signed_head: 8e5669940dd5c23df532577c39dc10bd84692ad2
+      signoff_record: SDP/Debugger/Verification/DBG-SL-001-005-001--Master_Signoff.md
+      review: DBG-RVW-001-005-001
+      verification: DBG-VER-001-005-001
+    - id: DBG-SL-001-005-002
+      path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/006--RF004_Identity_Address.md
+      status: complete_exact_head_signed
+      implementation_head: 4b5837644dc1196accfd8608bc3dbd20980476bb
+      prior_review: DBG-RVW-001-005-002
+      prior_review_status: rework
+      corrective_review: DBG-RVW-001-005-021
+      corrected_head: 4280bc6008385042bdff923bd8e5392a1c290fdc
+      corrective_review_status: rework
+      corrective_reviewed_head: 4280bc6008385042bdff923bd8e5392a1c290fdc
+      corrective_review_2: DBG-RVW-001-005-022
+      corrected_head_2: 6c933ea6b11e42d58da52faf0997f8c978dad54b
+      corrective_review_2_status: rework_trace_only
+      corrective_review_3: DBG-RVW-001-005-023
+      corrective_review_3_status: rework
+      corrected_head_3: 373d786a983252d5b1735b599596293557adba5a
+      corrective_review_4: DBG-RVW-001-005-024
+      corrective_review_4_status: rework
+      corrective_reviewed_head_4: 373d786a983252d5b1735b599596293557adba5a
+      corrected_head_4: bbc5c8ba3be960bcb7d522edbf3d5ae12dbe8c2a
+      corrective_review_5: DBG-RVW-001-005-025
+      corrective_review_5_status: rework
+      corrective_reviewed_head_5: bbc5c8ba3be960bcb7d522edbf3d5ae12dbe8c2a
+      corrected_head_5: 0bedb2d110147f3f34c5846d14ee9b9581926f2d
+      corrective_review_6: DBG-RVW-001-005-026
+      corrective_review_6_status: rework
+      corrective_reviewed_head_6: 0bedb2d110147f3f34c5846d14ee9b9581926f2d
+      corrective_review_7: DBG-RVW-001-005-027
+      corrective_review_7_status: pass
+      corrective_review_7_coordination_head: 6779e241d9223c949ffe1addc70e86d4328b8f07
+      post_refreeze_corrected_head: c7bc39057469f1aa62a78f409753ec0213631214
+      verification_status: pass
+      verification_coordination_head: db01d0a247f1ac04fbfb2b80e5f95bdc55080450
+      signoff_status: pass
+      signed_head: c7bc39057469f1aa62a78f409753ec0213631214
+      signoff_record: SDP/Debugger/Verification/DBG-SL-001-005-002--Master_Signoff.md
+      blocker: DBG-BLK-001-005-001
+      blocker_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/005--RF004_Enum_Immutability_Steering_Blocker.md
+      steering_blocker_comment: 5365959417
+      steering_refreeze_comment: 5368017338
+      blocker_status: closed_refreeze_review_pass
+      review: DBG-RVW-001-005-002
+      verification: DBG-VER-001-005-002
+    - id: DBG-SL-001-005-003
+      path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/007--RF004_Artifact_Index.md
+      status: complete_exact_head_signed
+      implementation_head: 196111030e0f25e861d03f5dffd159f52c10622a
+      implementation_parent: fdd6e4635615b2fc203a4de312b8ef4edc4fba45
+      corrected_head: a335789759a68dfd8bef01dbdf59591b096307d3
+      corrective_scope: artifacts.py,legacy_symbols.py,test_hsx_debugger_artifacts.py
+      corrective_focused_evidence: 31_passed
+      focused_evidence: 29_passed
+      review: DBG-RVW-001-005-003
+      review_status: rework
+      review_coordination_head: 4af2250436687ea62f783989d8f486504ad1adf8
+      review_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/059--RF004_Artifact_Index_Review.md
+      corrective_review: DBG-RVW-001-005-035
+      corrective_review_status: pass
+      corrective_review_coordination_head: 0ceb250ca87d7df11d2fa2d9714b0af59a2eef3a
+      corrective_review_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/060--RF004_Artifact_Index_Final_Review.md
+      verification_attempt_1: DBG-VER-001-005-003
+      verification_attempt_1_status: fail_trace_only
+      verification_attempt_1_coordination_head: f7a772b580ba0dfa99d3c12693119242ccbe2792
+      verification_attempt_1_record: SDP/Debugger/Verification/DBG-VER-001-005-003.md
+      final_verification: DBG-VER-001-005-010
+      final_verification_status: pass
+      final_verification_coordination_head: fffe766b8d4257bef4375973e16ff01364befca5
+      final_verification_record: SDP/Debugger/Verification/DBG-VER-001-005-010.md
+      signoff_status: pass
+      signed_head: a335789759a68dfd8bef01dbdf59591b096307d3
+      signoff_record: SDP/Debugger/Verification/DBG-SL-001-005-003--Master_Signoff.md
+    - id: DBG-SL-001-005-004
+      path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/008--RF004_Source_Resolver.md
+      status: complete_exact_head_signed
+      implementation_head: c0f975c4a278cecd89e19d332ca5601b074a115e
+      implementation_parent: d575299e81b1d1d29f75c9f0a5d2d43005fa8d11
+      corrected_head: 3d1f2e8a98308835162702c579dda1dc3ef40900
+      corrective_scope: sources.py,test_hsx_debugger_sources.py
+      corrective_focused_evidence: 30_passed_3_classified_skips
+      focused_evidence: 29_passed_3_classified_skips
+      review: DBG-RVW-001-005-004
+      review_status: rework
+      review_coordination_head: 54196e271dbc83b99bbf9f02286f45e8491a1fb5
+      review_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/061--RF004_Source_Resolver_Review.md
+      corrective_review: DBG-RVW-001-005-036
+      corrective_review_status: pass
+      corrective_review_coordination_head: c0a880b0b88fb86b8cfe45262dacf2d208ac11e1
+      corrective_review_record: SDP/Debugger/Sprints/001--Debugger_Stabilization/Reviews/062--RF004_Source_Resolver_Final_Review.md
+      verification_attempt_1: DBG-VER-001-005-004
+      verification_attempt_1_status: fail_trace_only
+      verification_attempt_1_coordination_head: c848bfc3bd82f0953fc00c0b5df6c0eb7036bd16
+      verification_attempt_1_record: SDP/Debugger/Verification/DBG-VER-001-005-004.md
+      verification_attempt_2: DBG-VER-001-005-011
+      verification_attempt_2_status: fail_trace_only
+      verification_attempt_2_coordination_head: c0a024b598a3f9b7b3f355b2e4c1dea919c27d98
+      verification_attempt_2_record: SDP/Debugger/Verification/DBG-VER-001-005-011.md
+      final_verification: DBG-VER-001-005-012
+      final_verification_status: pass
+      final_verification_coordination_head: 346a5612bf9e0ceb2743a2590d8a72e546bb5a4f
+      final_verification_record: SDP/Debugger/Verification/DBG-VER-001-005-012.md
+      signoff_status: pass
+      signed_head: 3d1f2e8a98308835162702c579dda1dc3ef40900
+      signoff_record: SDP/Debugger/Verification/DBG-SL-001-005-004--Master_Signoff.md
+    - id: DBG-SL-001-005-005
+      path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/009--RF004_Recipes_Stack.md
+      status: blocked_frozen_hsx_recipe_result_conflict
+      discovery_head: 943b8d4d111304638989e429863bece8323b4b08
+      blocker: DBG-BLK-001-005-003
+      blocker_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/009--RF004_Stack_Register_Result_Steering_Blocker.md
+      blocker_published_head: 43c9cfaa8bd75a3bd098c3be5df8647612b3f51a
+      steering_blocker_comment: 5373731599
+      product_changes: none
+      review: DBG-RVW-001-005-005
+      verification: DBG-VER-001-005-005
+    - id: DBG-SL-001-005-006
+      path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/010--RF004_Epoch_Inspection.md
+      status: planned
+      review: DBG-RVW-001-005-006
+      verification: DBG-VER-001-005-006
+    - id: DBG-SL-001-005-007
+      path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Slices/011--RF004_Recipe_Foundation.md
+      status: complete_exact_head_signed
+      corrected_head: 3228c9b23dcd8fa08a81499181e2ea9b55a0f5f0
+      implementation_head: ec75c4eb22333368cbe4847920dc4420fe8231cf
+      review: DBG-RVW-001-005-011
+      review_status: rework
+      corrective_review: DBG-RVW-001-005-033
+      corrective_review_status: rework_trace_only
+      final_review: DBG-RVW-001-005-034
+      final_review_status: pass
+      final_review_coordination_head: d045fb29dd7c94535d99134779cef07943b5196f
+      verification_status: pass
+      verification_coordination_head: 86f43d8241f8ff504c7fd25afceed43d2f9c0b77
+      signoff_status: pass
+      signed_head: 3228c9b23dcd8fa08a81499181e2ea9b55a0f5f0
+      signoff_record: SDP/Debugger/Verification/DBG-SL-001-005-007--Master_Signoff.md
+      verification: DBG-VER-001-005-007
+      blocker: DBG-BLK-001-005-002
+      blocker_path: SDP/Debugger/Sprints/001--Debugger_Stabilization/Interfaces/007--RF004_Location_Frame_Evidence_Steering_Blocker.md
+      steering_blocker_comment: 5369244294
+      steering_refreeze_comment: 5370574104
+      blocker_status: closed_refreeze_review_pass
+  parent_review: DBG-RVW-004-001-001
+  parent_verification: DBG-VER-004-001-001
+  product_base: 69a54aeb3394d3cd4792bce620748e15bab69f1f
+  runtime_profile: hsx.python-debug-legacy/1
+  current_gate: DBG-BLK-001-005-003_awaiting_steering
 structural_gate:
   rule: Only Steering-authorized Refactors with frozen Slice/interface contracts may execute.
   authorized_refactors:
-    - DBG-RF-002
-    - DBG-RF-003
-  blocked_refactors:
     - DBG-RF-004
+  blocked_refactors:
     - DBG-RF-005
     - DBG-RF-006
     - DBG-RF-007

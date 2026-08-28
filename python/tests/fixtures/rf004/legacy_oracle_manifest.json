@@ -1,0 +1,930 @@
+{
+  "schema": "hsx.debug.rf004-legacy-oracle/1",
+  "slice": "DBG-SL-001-005-001",
+  "frozen_interface": "dbg.resolver-inspection/1",
+  "scope": "legacy_oracle_only",
+  "target_conformance": false,
+  "classifications": [
+    "preserve",
+    "change_intentionally",
+    "retire"
+  ],
+  "cases": [
+    {
+      "id": "address_hidden_16bit_mask",
+      "classification": "retire",
+      "legacy_surface": "SymbolIndex",
+      "provenance": {
+        "kind": "legacy_fixture_and_product",
+        "path": "python/tests/fixtures/rf004/legacy_symbols_v1.sym",
+        "product_path": "python/hsx_dbg/symbols.py",
+        "symbols": [
+          "SymbolIndex._load_functions",
+          "SymbolIndex.lookup_pc"
+        ]
+      },
+      "current_behavior": {
+        "observation": "The legacy index aliases 0x00010020 to 0x0020 and 0x00010004 to 0x0004.",
+        "value": {
+          "wide_address_lookup": [
+            32
+          ],
+          "wide_instruction_alias": 4
+        }
+      },
+      "frozen_target": {
+        "interface": "HsxAddress and LegacySymbolAdapter",
+        "category": "ResolutionStatus.CORRUPT",
+        "expectation": "Retire the hidden mask itself: never publish a masked alias, and let the explicit descriptor determine whether the original address overflows or resolves."
+      },
+      "known_bad_legacy_output": true,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "address_narrow_descriptor_overflow",
+      "classification": "change_intentionally",
+      "legacy_surface": "SymbolIndex",
+      "provenance": {
+        "kind": "legacy_fixture_and_product",
+        "path": "python/tests/fixtures/rf004/legacy_symbols_v1.sym",
+        "product_path": "python/hsx_dbg/symbols.py",
+        "symbols": [
+          "SymbolIndex._load_functions"
+        ]
+      },
+      "inputs": {
+        "address": 65568,
+        "descriptor": {
+          "space": "code",
+          "width_bits": 16,
+          "legal_range_start": 0,
+          "legal_range_length_units": 65536,
+          "wrap_policy": "FORBIDDEN"
+        }
+      },
+      "current_behavior": {
+        "observation": "The legacy index has no descriptor input and masks the fixture address 0x10020 to 0x0020.",
+        "value": [
+          32
+        ]
+      },
+      "frozen_target": {
+        "interface": "HsxAddress and LegacySymbolAdapter",
+        "category": "ResolutionStatus.CORRUPT",
+        "address_category": "AddressStatus.OVERFLOW",
+        "expectation": "Under this explicit 16-bit non-wrapping descriptor, reject 0x10020 as OVERFLOW and publish no accepted legacy index."
+      },
+      "known_bad_legacy_output": true,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "address_wide_descriptor_resolved_unmasked",
+      "classification": "change_intentionally",
+      "legacy_surface": ".sym v1 fixture and SymbolIndex",
+      "provenance": {
+        "kind": "legacy_fixture_and_product",
+        "path": "python/tests/fixtures/rf004/legacy_symbols_v1.sym",
+        "product_path": "python/hsx_dbg/symbols.py",
+        "symbols": [
+          "SymbolIndex._load_functions"
+        ]
+      },
+      "inputs": {
+        "address": 65568,
+        "descriptor": {
+          "space": "code",
+          "width_bits": 24,
+          "legal_range_start": 0,
+          "legal_range_length_units": 131072,
+          "wrap_policy": "FORBIDDEN"
+        }
+      },
+      "current_behavior": {
+        "observation": "The fixture retains 0x10020, but the descriptor-free legacy index exposes only the masked value 0x0020.",
+        "value": {
+          "fixture_address": 65568,
+          "legacy_lookup": [
+            32
+          ]
+        }
+      },
+      "frozen_target": {
+        "interface": "HsxAddress and LegacySymbolAdapter",
+        "category": "ResolutionStatus.RESOLVED",
+        "address_category": "AddressStatus.VALID",
+        "value": {
+          "space": "code",
+          "unsigned_value": 65568
+        },
+        "expectation": "Under this explicit sufficiently wide legal descriptor, resolve the original address as unmasked code:0x10020."
+      },
+      "known_bad_legacy_output": true,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "artifact_hxe_crc_mismatch",
+      "classification": "change_intentionally",
+      "legacy_surface": "SymbolIndex",
+      "provenance": {
+        "kind": "legacy_fixture_and_product",
+        "path": "python/tests/fixtures/rf004/legacy_symbols_image_mismatch.sym",
+        "product_path": "python/hsx_dbg/symbols.py",
+        "symbols": [
+          "SymbolIndex._load"
+        ]
+      },
+      "inputs": {
+        "fixture_hxe_crc32": 286331153,
+        "expected_hxe_crc32": 572662306
+      },
+      "current_behavior": {
+        "observation": "The legacy constructor has no expected-image argument and accepts the mismatched file.",
+        "value": [
+          32
+        ]
+      },
+      "frozen_target": {
+        "interface": "LegacySymbolAdapter.build",
+        "category": "ResolutionStatus.ARTIFACT_MISMATCH",
+        "expectation": "Reject a version-1 file whose hxe_crc does not exactly equal expected_hxe_crc32."
+      },
+      "known_bad_legacy_output": true,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "artifact_malformed_json",
+      "classification": "change_intentionally",
+      "legacy_surface": "SymbolIndex",
+      "provenance": {
+        "kind": "legacy_fixture_and_product",
+        "path": "python/tests/fixtures/rf004/legacy_symbols_malformed.sym",
+        "product_path": "python/hsx_dbg/symbols.py",
+        "symbols": [
+          "SymbolIndex._load"
+        ]
+      },
+      "current_behavior": {
+        "observation": "Construction raises JSONDecodeError and returns no typed result.",
+        "value": "JSONDecodeError"
+      },
+      "frozen_target": {
+        "interface": "LegacySymbolAdapter.build",
+        "category": "ResolutionStatus.CORRUPT",
+        "expectation": "Return a structured corrupt diagnostic and publish no index."
+      },
+      "known_bad_legacy_output": false,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "artifact_schema_version",
+      "classification": "change_intentionally",
+      "legacy_surface": "SymbolIndex",
+      "provenance": {
+        "kind": "legacy_fixture_and_product",
+        "path": "python/tests/fixtures/rf004/legacy_symbols_version2.sym",
+        "product_path": "python/hsx_dbg/symbols.py",
+        "symbols": [
+          "SymbolIndex._load"
+        ]
+      },
+      "current_behavior": {
+        "observation": "The legacy constructor ignores version and accepts version 2.",
+        "value": [
+          16
+        ]
+      },
+      "frozen_target": {
+        "interface": "LegacySymbolAdapter.build",
+        "category": "ResolutionStatus.SCHEMA_UNSUPPORTED",
+        "expectation": "Accept only .sym version 1 and publish no index for another version."
+      },
+      "known_bad_legacy_output": true,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "line_duplicate_candidate_order",
+      "classification": "preserve",
+      "legacy_surface": "SymbolIndex",
+      "provenance": {
+        "kind": "legacy_fixture_and_product",
+        "path": "python/tests/fixtures/rf004/legacy_symbols_v1.sym",
+        "product_path": "python/hsx_dbg/symbols.py",
+        "symbols": [
+          "SymbolIndex.lookup_line"
+        ]
+      },
+      "current_behavior": {
+        "observation": "Distinct instruction candidates for one exact file and line remain ordered.",
+        "value": [
+          260,
+          264
+        ]
+      },
+      "frozen_target": {
+        "interface": "LegacyDebugArtifactIndex.source_spelling_locations",
+        "category": "ResolutionStatus.RESOLVED",
+        "expectation": "Return the ordered one-or-more exact instruction set without deduplicating distinct addresses."
+      },
+      "known_bad_legacy_output": false,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "location_register_evidence",
+      "classification": "preserve",
+      "legacy_surface": "Executive local-location diagnostics",
+      "provenance": {
+        "kind": "existing_test_evidence",
+        "path": "python/tests/test_executive_sessions.py",
+        "symbols": [
+          "test_watch_local_register_emits_updates"
+        ]
+      },
+      "current_behavior": {
+        "observation": "An existing regression asserts a register-backed local and its location label.",
+        "value": "R5"
+      },
+      "frozen_target": {
+        "interface": "LocationEvaluator.evaluate",
+        "category": "InspectionStatus.COMPLETE",
+        "expectation": "Treat this only as location-list concept evidence; evaluate the exact selected-frame LocationRow and snapshot rather than copying the legacy live-read algorithm."
+      },
+      "known_bad_legacy_output": false,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "location_stack_evidence",
+      "classification": "preserve",
+      "legacy_surface": "Executive local-location diagnostics",
+      "provenance": {
+        "kind": "existing_test_evidence",
+        "path": "python/tests/test_executive_sessions.py",
+        "symbols": [
+          "test_watch_add_local_stack_tracks_frame_pointer"
+        ]
+      },
+      "current_behavior": {
+        "observation": "An existing regression asserts a stack-backed local and its fp-relative location label.",
+        "value": "fp-0x4"
+      },
+      "frozen_target": {
+        "interface": "LocationEvaluator.evaluate",
+        "category": "InspectionStatus.COMPLETE",
+        "expectation": "Treat this only as location-list concept evidence; require a matching selected-frame LocationRow, ABI, context, and snapshot."
+      },
+      "known_bad_legacy_output": false,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "source_case_colliding_logical_paths",
+      "classification": "change_intentionally",
+      "legacy_surface": "SymbolIndex",
+      "provenance": {
+        "kind": "legacy_fixture_and_product",
+        "path": "python/tests/fixtures/rf004/legacy_symbols_v1.sym",
+        "product_path": "python/hsx_dbg/symbols.py",
+        "symbols": [
+          "_canonical_path",
+          "SymbolIndex.lookup_line"
+        ]
+      },
+      "current_behavior": {
+        "observation": "Unconditional lowercase identity merges src/Case.c and src/case.c.",
+        "value": {
+          "src/Case.c": [
+            272,
+            276
+          ],
+          "src/case.c": [
+            272,
+            276
+          ]
+        }
+      },
+      "frozen_target": {
+        "interface": "SourceRef",
+        "category": "SourceRef",
+        "logical_ids": [
+          "src/Case.c",
+          "src/case.c"
+        ],
+        "expectation": "Keep the two logical IDs exact, case-sensitive, and distinct independently of host locator behavior."
+      },
+      "known_bad_legacy_output": true,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "source_host_locator_case_collision",
+      "classification": "change_intentionally",
+      "legacy_surface": "SymbolIndex source spelling lookup",
+      "provenance": {
+        "kind": "legacy_fixture_and_product",
+        "path": "python/tests/fixtures/rf004/legacy_symbols_v1.sym",
+        "product_path": "python/hsx_dbg/symbols.py",
+        "symbols": [
+          "_canonical_path",
+          "SymbolIndex.lookup_line"
+        ]
+      },
+      "inputs": {
+        "source_logical_ids": [
+          "src/Case.c",
+          "src/case.c"
+        ],
+        "host_locator_capability": "cannot_address_both_exact_spellings"
+      },
+      "current_behavior": {
+        "observation": "The legacy lookup case-folds before any host-locator capability can be classified.",
+        "value": {
+          "src/Case.c": [
+            272,
+            276
+          ],
+          "src/case.c": [
+            272,
+            276
+          ]
+        }
+      },
+      "frozen_target": {
+        "interface": "SourceResolver.resolve",
+        "category": "ResolutionStatus.CASE_COLLISION",
+        "resolved_locator": null,
+        "expectation": "Return CASE_COLLISION only for this explicit host-locator condition, after retaining the two SourceRefs as distinct identities, and select no locator."
+      },
+      "known_bad_legacy_output": true,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "source_duplicate_basename_alias",
+      "classification": "retire",
+      "legacy_surface": "SymbolIndex",
+      "provenance": {
+        "kind": "legacy_fixture_and_product",
+        "path": "python/tests/fixtures/rf004/legacy_symbols_v1.sym",
+        "product_path": "python/hsx_dbg/symbols.py",
+        "symbols": [
+          "SymbolIndex.lookup_line"
+        ]
+      },
+      "current_behavior": {
+        "observation": "A basename query and either full spelling merge two unrelated unit.c files; full-path ordering is unstable because lookup keys are a set.",
+        "value": {
+          "basename_query": [
+            280,
+            284
+          ],
+          "full_path_unordered_candidates": [
+            280,
+            284
+          ]
+        }
+      },
+      "frozen_target": {
+        "interface": "SourceRef and DebugArtifactIndex",
+        "category": "SourceRef",
+        "logical_ids": [
+          "src/alpha/unit.c",
+          "lib/beta/unit.c"
+        ],
+        "expectation": "Keep the two exact full logical IDs as distinct SourceRefs; neither acquires a basename alias."
+      },
+      "known_bad_legacy_output": true,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "source_basename_without_locator",
+      "classification": "retire",
+      "legacy_surface": "SymbolIndex",
+      "provenance": {
+        "kind": "legacy_fixture_and_product",
+        "path": "python/tests/fixtures/rf004/legacy_symbols_v1.sym",
+        "product_path": "python/hsx_dbg/symbols.py",
+        "symbols": [
+          "SymbolIndex.lookup_line"
+        ]
+      },
+      "inputs": {
+        "source_logical_id": "unit.c",
+        "existing_winning_tier_locators": []
+      },
+      "current_behavior": {
+        "observation": "The legacy basename query guesses both unrelated full-path records even though no locator exists for the exact logical ID unit.c.",
+        "value": [
+          280,
+          284
+        ]
+      },
+      "frozen_target": {
+        "interface": "SourceResolver.resolve",
+        "category": "ResolutionStatus.UNAVAILABLE",
+        "resolved_locator": null,
+        "expectation": "With no existing locator for this exact SourceRef, return UNAVAILABLE; never substitute basename matches."
+      },
+      "known_bad_legacy_output": true,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "source_exact_requested_path",
+      "classification": "preserve",
+      "legacy_surface": "SourceMap",
+      "provenance": {
+        "kind": "legacy_fixture_and_product",
+        "path": "python/tests/fixtures/rf004/source_map_v1.template.json",
+        "product_path": "python/source_map.py",
+        "symbols": [
+          "SourceMap.resolve"
+        ]
+      },
+      "current_behavior": {
+        "observation": "An exact indexed path resolves to the same present locator.",
+        "value": "project_root/src/exact.c"
+      },
+      "frozen_target": {
+        "interface": "SourceResolver.resolve",
+        "category": "ResolutionStatus.RESOLVED",
+        "expectation": "Resolve an explicit exact locator only after exact SourceRef byte length and SHA-256 verification."
+      },
+      "known_bad_legacy_output": false,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "source_first_candidate",
+      "classification": "retire",
+      "legacy_surface": "SourceMap",
+      "provenance": {
+        "kind": "legacy_fixture_and_product",
+        "path": "python/tests/fixtures/rf004/source_map_v1.template.json",
+        "product_path": "python/source_map.py",
+        "symbols": [
+          "SourceMap.resolve"
+        ]
+      },
+      "current_behavior": {
+        "observation": "When two indexed direct paths exist, SourceMap returns the first source entry.",
+        "value": "candidate_a/src/ambiguous.c"
+      },
+      "frozen_target": {
+        "interface": "SourceResolver.resolve",
+        "category": "ResolutionStatus.AMBIGUOUS",
+        "source_logical_id": "src/ambiguous.c",
+        "winning_tier": "PREFIX",
+        "candidate_locators": [
+          "candidate_a/src/ambiguous.c",
+          "candidate_b/src/ambiguous.c"
+        ],
+        "resolved_locator": null,
+        "expectation": "For one exact SourceRef with multiple distinct existing winning-tier locators, return every candidate, no resolved_locator, and no preferred candidate."
+      },
+      "known_bad_legacy_output": true,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "source_multiple_line_candidates",
+      "classification": "change_intentionally",
+      "legacy_surface": "HSXDebugAdapter",
+      "provenance": {
+        "kind": "legacy_fixture_and_product",
+        "path": "python/tests/fixtures/rf004/legacy_symbols_v1.sym",
+        "product_path": "python/hsx_dap/__init__.py",
+        "symbols": [
+          "HSXDebugAdapter._resolve_breakpoint_addresses"
+        ]
+      },
+      "current_behavior": {
+        "observation": "The legacy frontend discards all but the first of two line candidates.",
+        "value": [
+          260
+        ]
+      },
+      "frozen_target": {
+        "interface": "DebugArtifactIndex.source_locations",
+        "category": "ResolutionStatus.RESOLVED",
+        "expectation": "Return the ordered complete executable instruction set [260, 264]; source_locations never chooses one address."
+      },
+      "known_bad_legacy_output": true,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "source_prefix_map",
+      "classification": "preserve",
+      "legacy_surface": "SourceMap",
+      "provenance": {
+        "kind": "legacy_fixture_and_product",
+        "path": "python/tests/fixtures/rf004/source_map_v1.template.json",
+        "product_path": "python/source_map.py",
+        "symbols": [
+          "_parse_prefix_map",
+          "SourceMap.resolve"
+        ]
+      },
+      "current_behavior": {
+        "observation": "An explicit prefix mapping discovers the remapped locator.",
+        "value": "build_root/src/prefix.c"
+      },
+      "frozen_target": {
+        "interface": "SourceResolver.resolve",
+        "category": "ResolutionStatus.RESOLVED",
+        "expectation": "Use every longest explicit prefix mapping as one candidate tier and content-verify before resolution."
+      },
+      "known_bad_legacy_output": false,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "source_relocated_root",
+      "classification": "preserve",
+      "legacy_surface": "SourceMap",
+      "provenance": {
+        "kind": "legacy_fixture_and_product",
+        "path": "python/tests/fixtures/rf004/source_map_v1.template.json",
+        "product_path": "python/source_map.py",
+        "symbols": [
+          "SourceMap.resolve"
+        ]
+      },
+      "current_behavior": {
+        "observation": "A missing build locator is found under an explicit relocated search root.",
+        "value": "new_root/src/relocated.c"
+      },
+      "frozen_target": {
+        "interface": "SourceResolver.resolve",
+        "category": "ResolutionStatus.RESOLVED",
+        "expectation": "Discover the full logical ID under explicit search roots and verify exact content."
+      },
+      "known_bad_legacy_output": false,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "source_symlink",
+      "classification": "preserve",
+      "legacy_surface": "SourceMap",
+      "provenance": {
+        "kind": "legacy_fixture_and_product",
+        "path": "python/tests/fixtures/rf004/source_map_v1.template.json",
+        "product_path": "python/source_map.py",
+        "symbols": [
+          "SourceMap.resolve"
+        ]
+      },
+      "platform_evidence": {
+        "allowed_outcomes": [
+          "SUPPORTED",
+          "SKIP_SYMLINK_PRIVILEGE",
+          "SKIP_SYMLINK_UNSUPPORTED"
+        ]
+      },
+      "current_behavior": {
+        "observation": "A present symlink under an explicit relocated root is returned as that locator.",
+        "value": "new_root/src/symlink.c"
+      },
+      "frozen_target": {
+        "interface": "SourceResolver.resolve",
+        "category": "ResolutionStatus.RESOLVED",
+        "expectation": "Treat symlinks as locator behavior while retaining the original SourceRef and verifying target bytes."
+      },
+      "known_bad_legacy_output": false,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "stack_fixed_r7_unwinding",
+      "classification": "retire",
+      "legacy_surface": "ExecutiveState.stack_info",
+      "provenance": {
+        "kind": "existing_test_evidence",
+        "path": "python/tests/test_executive_sessions.py",
+        "product_path": "python/execd.py",
+        "symbols": [
+          "test_stack_info_two_frames_with_symbols"
+        ]
+      },
+      "current_behavior": {
+        "observation": "The existing two-frame oracle walks the frame chain from R7/fp with fixed two-word records.",
+        "value": {
+          "frames": 2,
+          "errors": []
+        }
+      },
+      "frozen_target": {
+        "interface": "StackService.unwind",
+        "category": "InspectionStatus.UNAVAILABLE",
+        "expectation": "Never retry with a fixed R7 chain; require the selected ABI and one exact recipe row."
+      },
+      "known_bad_legacy_output": true,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "stack_mixed_live_read_coherence",
+      "classification": "retire",
+      "legacy_surface": "ExecutiveState.stack_info",
+      "provenance": {
+        "kind": "legacy_product",
+        "path": "python/execd.py",
+        "symbols": [
+          "ExecutiveState.stack_info",
+          "ExecutiveState.request_dump_regs",
+          "ExecutiveState._read_stack_words"
+        ]
+      },
+      "current_behavior": {
+        "observation": "Registers from live revision 1 and stack memory from live revision 2 are merged into an unqualified successful frame list.",
+        "value": {
+          "read_revisions": [
+            1,
+            2
+          ],
+          "errors": []
+        }
+      },
+      "frozen_target": {
+        "interface": "ControllerEpochAdapter and SnapshotReadPort",
+        "category": "ContextBindingStatus.UNAVAILABLE",
+        "diagnostic": "portable_snapshot_evidence_unavailable",
+        "coherent_snapshot_unavailable_reserved_for": [
+          "stop_token_absent_or_untyped",
+          "snapshot_absent_or_untyped"
+        ],
+        "expectation": "BEST_EFFORT_LIVE or mixed-read evidence is never coherent and cannot allocate epoch handles."
+      },
+      "known_bad_legacy_output": true,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "stack_partial_fp_cycle",
+      "classification": "preserve",
+      "legacy_surface": "Executive stack diagnostics",
+      "provenance": {
+        "kind": "existing_test_evidence",
+        "path": "python/tests/test_executive_sessions.py",
+        "symbols": [
+          "test_stack_info_detects_fp_cycle"
+        ]
+      },
+      "current_behavior": {
+        "observation": "The existing oracle retains the top frame and an fp_cycle diagnostic.",
+        "value": {
+          "truncated": true,
+          "diagnostic_prefix": "fp_cycle"
+        }
+      },
+      "frozen_target": {
+        "interface": "StackService.unwind",
+        "category": "InspectionStatus.CORRUPT",
+        "expectation": "Retain explicit offending row/frame diagnostics and never invent a caller or fallback."
+      },
+      "known_bad_legacy_output": false,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "stack_partial_read_failure",
+      "classification": "preserve",
+      "legacy_surface": "Executive stack diagnostics",
+      "provenance": {
+        "kind": "existing_test_evidence",
+        "path": "python/tests/test_executive_sessions.py",
+        "symbols": [
+          "test_stack_info_reports_read_error"
+        ]
+      },
+      "current_behavior": {
+        "observation": "The existing oracle retains two recovered frames and a stack_read_failed diagnostic.",
+        "value": {
+          "frames": 2,
+          "truncated": true,
+          "diagnostic_prefix": "stack_read_failed"
+        }
+      },
+      "frozen_target": {
+        "interface": "StackService.unwind",
+        "category": "InspectionStatus.PARTIAL",
+        "expectation": "Return only recovered immutable frames with an explicit missing-data diagnostic and no fabricated value."
+      },
+      "known_bad_legacy_output": false,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "symbol_duplicate_candidate_order",
+      "classification": "preserve",
+      "legacy_surface": "SymbolIndex",
+      "provenance": {
+        "kind": "legacy_fixture_and_product",
+        "path": "python/tests/fixtures/rf004/legacy_symbols_v1.sym",
+        "product_path": "python/hsx_dbg/symbols.py",
+        "symbols": [
+          "SymbolIndex.lookup_symbol"
+        ]
+      },
+      "current_behavior": {
+        "observation": "The same name remains associated with distinct function, label, and variable addresses in insertion order.",
+        "value": [
+          288,
+          292,
+          296
+        ]
+      },
+      "frozen_target": {
+        "interface": "LegacyDebugArtifactIndex.symbols_named",
+        "category": "ResolutionStatus.AMBIGUOUS",
+        "expectation": "Return every distinct same-name candidate in frozen kind/id order with no preferred value."
+      },
+      "known_bad_legacy_output": false,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "symbol_first_candidate",
+      "classification": "retire",
+      "legacy_surface": "HSXDebugAdapter",
+      "provenance": {
+        "kind": "legacy_fixture_and_product",
+        "path": "python/tests/fixtures/rf004/legacy_symbols_v1.sym",
+        "product_path": "python/hsx_dap/__init__.py",
+        "symbols": [
+          "HSXDebugAdapter._lookup_symbol_metadata"
+        ]
+      },
+      "current_behavior": {
+        "observation": "The frontend silently selects the first address for the duplicate symbol name shared.",
+        "value": {
+          "name": "shared",
+          "address": 288
+        }
+      },
+      "frozen_target": {
+        "interface": "DebugArtifactIndex.symbols_named",
+        "category": "ResolutionStatus.AMBIGUOUS",
+        "expectation": "Return all distinct candidates and no preferred or first value."
+      },
+      "known_bad_legacy_output": true,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "sym_v1_functions_labels_locals_globals",
+      "classification": "preserve",
+      "legacy_surface": "SymbolIndex",
+      "provenance": {
+        "kind": "legacy_fixture_and_product",
+        "path": "python/tests/fixtures/rf004/legacy_symbols_v1.sym",
+        "product_path": "python/hsx_dbg/symbols.py",
+        "symbols": [
+          "SymbolIndex.lookup_symbol",
+          "SymbolIndex.locals_for_function",
+          "SymbolIndex.globals_list"
+        ]
+      },
+      "current_behavior": {
+        "observation": "Version-1 function, label, local, and global concepts remain queryable.",
+        "value": {
+          "function_main": [
+            256
+          ],
+          "label_loop": [
+            292
+          ],
+          "locals_for_function": {
+            "main": [
+              {
+                "name": "counter",
+                "function": "main",
+                "file": "src/main.c",
+                "directory": "build/project",
+                "line": 11,
+                "scope": "main:block0",
+                "locations": [
+                  {
+                    "start": 256,
+                    "end": 272,
+                    "location": {
+                      "kind": "stack",
+                      "offset": -4,
+                      "size": 4
+                    }
+                  },
+                  {
+                    "start": 272,
+                    "end": 288,
+                    "location": {
+                      "kind": "register",
+                      "name": "R5",
+                      "index": 5,
+                      "size": 4
+                    }
+                  }
+                ]
+              }
+            ],
+            "shared": []
+          },
+          "globals_list": [
+            {
+              "name": "global_counter",
+              "address": 8192,
+              "size": 4,
+              "type": "i32"
+            },
+            {
+              "name": "shared",
+              "address": 296,
+              "size": 4,
+              "type": "i32"
+            }
+          ]
+        }
+      },
+      "frozen_target": {
+        "interface": "LegacyDebugArtifactIndex",
+        "category": "ResolutionStatus.RESOLVED",
+        "expectation": "Preserve the concepts and exact spellings without claiming portable bundle, SourceRef, unwind, or location conformance."
+      },
+      "known_bad_legacy_output": false,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "sym_v1_instruction_source_metadata",
+      "classification": "preserve",
+      "legacy_surface": "SymbolIndex",
+      "provenance": {
+        "kind": "legacy_fixture_and_product",
+        "path": "python/tests/fixtures/rf004/legacy_symbols_v1.sym",
+        "product_path": "python/hsx_dbg/symbols.py",
+        "symbols": [
+          "SymbolIndex.lookup_pc"
+        ]
+      },
+      "current_behavior": {
+        "observation": "Instruction-to-source spelling, directory, line, column, and function metadata are retained.",
+        "value": {
+          "file": "src/main.c",
+          "directory": "build/project",
+          "line": 10,
+          "column": 3,
+          "function": "main"
+        }
+      },
+      "frozen_target": {
+        "interface": "LegacyDebugArtifactIndex.instruction_at",
+        "category": "ResolutionStatus.RESOLVED",
+        "expectation": "Return LegacyInstructionRecord with exact LegacySourceSpelling and source coordinates."
+      },
+      "known_bad_legacy_output": false,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "sym_v1_memory_regions",
+      "classification": "preserve",
+      "legacy_surface": ".sym v1 fixture",
+      "provenance": {
+        "kind": "legacy_fixture",
+        "path": "python/tests/fixtures/rf004/legacy_symbols_v1.sym",
+        "product_path": "python/hld.py",
+        "symbols": [
+          "memory_regions"
+        ]
+      },
+      "current_behavior": {
+        "observation": "The emitted version-1 document contains ordered code and rodata region concepts even though SymbolIndex does not expose them.",
+        "value": [
+          {
+            "name": "code",
+            "type": "text",
+            "start": 0,
+            "end": 511
+          },
+          {
+            "name": "rodata",
+            "type": "data",
+            "start": 16384,
+            "end": 16415
+          }
+        ]
+      },
+      "frozen_target": {
+        "interface": "LegacyDebugArtifactIndex.memory_regions",
+        "category": "MemoryRegion",
+        "expectation": "Convert each present region through the explicit descriptor and retain deterministic ordering."
+      },
+      "known_bad_legacy_output": false,
+      "legacy_output_is_target_conformance": false
+    },
+    {
+      "id": "unknown_frame_fallback",
+      "classification": "retire",
+      "legacy_surface": "HSXDebugAdapter",
+      "provenance": {
+        "kind": "legacy_product",
+        "path": "python/hsx_dap/__init__.py",
+        "symbols": [
+          "HSXDebugAdapter._resolve_frame"
+        ]
+      },
+      "current_behavior": {
+        "observation": "An unknown frame ID returns the first currently stored frame.",
+        "value": "first_frame"
+      },
+      "frozen_target": {
+        "interface": "EpochHandleStore.resolve",
+        "category": "InspectionStatus.UNKNOWN_HANDLE",
+        "expectation": "Never fall back to current, top, first, or a foreign frame."
+      },
+      "known_bad_legacy_output": true,
+      "legacy_output_is_target_conformance": false
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "hxe_path": "artifacts/wrong-image.hxe",
+  "hxe_crc": 286331153,
+  "symbols": {
+    "functions": [
+      {
+        "name": "wrong_image",
+        "address": 32
+      }
+    ]
+  },
+  "instructions": [],
+  "memory_regions": []
+}

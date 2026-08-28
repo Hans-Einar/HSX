@@ -64,3 +64,60 @@ track IDs rather than silently renamed in historical documents.
 - `DBG-RVW-003-001-006` / `DBG-VER-003-001-001` — RF-003 final parent review/verification
 - `DBG-VER-003-001-001` — RF-003 parent verification attempt, FAIL trace-only
 - `DBG-VER-003-001-002` — RF-003 fresh parent verification after current-state correction
+
+## Allocated RF-004 wave IDs
+
+- `DBG-IT-001-005` — typed artifact/source/address/stack/inspection iteration
+- `DBG-SL-001-005-001` — classified legacy symbol/source/stack oracle
+- `DBG-SL-001-005-002` — immutable identity/binding/address/result foundation
+- `DBG-SL-001-005-003` — verified artifact index and legacy `.sym` adapter
+- `DBG-SL-001-005-004` — exact content-verified source resolver
+- `DBG-SL-001-005-005` — snapshot-bound stack service over signed recipe foundation
+- `DBG-SL-001-005-006` — epoch-bound inspection integration
+- `DBG-SL-001-005-007` — early recipe schema/validator/evaluator foundation
+- `DBG-RVW-001-005-001..DBG-RVW-001-005-006` — exact-head Slice reviews
+- `DBG-RVW-001-005-001` — Slice 001 initial review, REWORK
+- `DBG-RVW-001-005-002` — Slice 002 initial review, REWORK
+- `DBG-RVW-001-005-007` — first `dbg.resolver-inspection/1` review, REWORK
+- `DBG-RVW-001-005-008` — corrected interface re-review, REWORK
+- `DBG-RVW-001-005-009` — interface review attempt 3, REWORK
+- `DBG-RVW-001-005-010` — interface review attempt 4, REWORK
+- `DBG-RVW-001-005-011` — exact-head Slice review for `DBG-SL-001-005-007`
+- `DBG-RVW-001-005-012` — interface review attempt 5, REWORK
+- `DBG-RVW-001-005-013` — interface review attempt 6, REWORK
+- `DBG-RVW-001-005-014` — interface review attempt 7, REWORK
+- `DBG-RVW-001-005-015` — interface review attempt 8, REWORK
+- `DBG-RVW-001-005-016` — interface review attempt 9, REWORK
+- `DBG-RVW-001-005-017` — interface review attempt 10, REWORK
+- `DBG-RVW-001-005-018` — interface review attempt 11, REWORK
+- `DBG-RVW-001-005-019` — final interface review, PASS
+- `DBG-RVW-001-005-020` — Slice 001 fresh corrective re-review, PASS
+- `DBG-RVW-001-005-021` — Slice 002 corrective re-review, REWORK
+- `DBG-RVW-001-005-022` — Slice 002 second corrective review, REWORK trace-only
+- `DBG-RVW-001-005-023` — Slice 002 review attempt 4, REWORK
+- `DBG-RVW-001-005-024` — Slice 002 review attempt 5, REWORK
+- `DBG-RVW-001-005-025` — Slice 002 review attempt 6, REWORK
+- `DBG-RVW-001-005-026` — Slice 002 review attempt 7, REWORK
+- `DBG-RVW-001-005-027` — Slice 002 review of the new post-refreeze corrected product head
+- `DBG-RVW-001-005-028` — fresh exact-head `dbg.resolver-inspection/1.1` refreeze review
+- `DBG-RVW-001-005-029` — fresh exact-head corrected `dbg.resolver-inspection/1.1` refreeze review
+- `DBG-RVW-001-005-030` — final exact-head `dbg.resolver-inspection/1.1` review, PASS
+- `DBG-RVW-001-005-031` — fresh exact-head `dbg.resolver-inspection/1.2` interface review
+- `DBG-RVW-001-005-032` — final exact-head `dbg.resolver-inspection/1.2` review, PASS
+- `DBG-RVW-001-005-033` — Slice007 fresh corrective product rereview
+- `DBG-RVW-001-005-034` — Slice007 fresh trace-corrected product review
+- `DBG-BLK-001-005-001` — RF-004 frozen Enum immutability/interface Steering blocker
+- `DBG-BLK-001-005-002` — RF-004 LocationEvaluator selected-frame evidence Steering blocker
+- `DBG-CF-001-005-001` — `dbg.resolver-inspection/1.1` contract-safe immutability fixtures
+- `DBG-CF-001-005-002` — `dbg.resolver-inspection/1.2` recovered-frame evidence fixtures
+- `DBG-VER-001-005-001..DBG-VER-001-005-007` — formal Slice verifications
+- `DBG-VER-001-005-001` — Slice 001 verification attempt, FAIL trace-only
+- `DBG-VER-001-005-008` — Slice 001 reverification attempt 2, FAIL trace-only
+- `DBG-VER-001-005-009` — Slice 001 final reverification, PASS
+- `DBG-VER-001-005-002` — Slice 002 post-refreeze formal verification, PASS
+- `DBG-RVW-004-001-001` / `DBG-VER-004-001-001` — RF-004 parent review/verification
+
+Public interface string `dbg.resolver-inspection/1.2` is the current versioned contract identifier
+rather than a numeric execution ID; versions `1`/`1.1` remain historical under reviews 019/030.
+Version `1.2` is produced by `DBG-RF-004` and becomes a satisfied dependency
+for RF-005 only after RF-004 parent sign-off and remote publication.
